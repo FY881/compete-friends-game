@@ -206,4 +206,142 @@ export const QUESTION_BANK: Question[] = [
   { id: "q130", category: "منوعات", difficulty: "easy", question: "ما هو الشهر الذي يأتي بعد يناير؟", options: ["فبراير", "مارس", "ديسمبر", "نوفمبر"], correctIndex: 0 },
   { id: "q131", category: "منوعات", difficulty: "easy", question: "ما هي العملة الرسمية للمملكة العربية السعودية؟", options: ["الريال", "الدينار", "الدرهم", "الجنيه"], correctIndex: 0 },
   { id: "q133", category: "منوعات", difficulty: "easy", question: "كم عدد أيام شهر فبراير في السنة الكبيسة؟", options: ["28", "29", "30", "31"], correctIndex: 1 },
+
+  // ── النسخة النهائية: 100 سؤال جديد (q134 – q233) ──────────────────────
+
+  // ── عام ───────────────────────────────────────────────────────────────
+  { id: "q134", category: "عام", difficulty: "easy", question: "ما هو أطول نهر في العالم؟", options: ["الميسيسيبي", "النيل", "اليانغتسي", "الأمازون"], correctIndex: 1 },
+  { id: "q135", category: "عام", difficulty: "easy", question: "ما هي عاصمة فرنسا؟", options: ["روما", "مدريد", "لندن", "باريس"], correctIndex: 3 },
+  { id: "q136", category: "عام", difficulty: "easy", question: "ما هي عاصمة مصر؟", options: ["القاهرة", "الجيزة", "الأقصر", "الإسكندرية"], correctIndex: 0 },
+  { id: "q137", category: "عام", difficulty: "easy", question: "كم عدد أضلاع المثلث؟", options: ["5", "6", "3", "4"], correctIndex: 2 },
+  { id: "q138", category: "عام", difficulty: "medium", question: "ما هو المعدن السائل في درجة حرارة الغرفة؟", options: ["الذهب", "الألمنيوم", "الزئبق", "الحديد"], correctIndex: 2 },
+  { id: "q139", category: "عام", difficulty: "medium", question: "ما هو أكبر حيوان بري على وجه الأرض؟", options: ["وحيد القرن", "فرس النهر", "الدب البني", "الفيل الأفريقي"], correctIndex: 3 },
+
+  // ── علوم ──────────────────────────────────────────────────────────────
+  { id: "q140", category: "علوم", difficulty: "easy", question: "ما هو العنصر الكيميائي الذي رمزه H؟", options: ["الهيدروجين", "الأكسجين", "الكربون", "الهيليوم"], correctIndex: 0 },
+  { id: "q141", category: "علوم", difficulty: "easy", question: "كم عدد حواس الإنسان الأساسية؟", options: ["7", "5", "4", "6"], correctIndex: 1 },
+  { id: "q142", category: "علوم", difficulty: "medium", question: "ما هي أصغر وحدة بنائية في الكائن الحي؟", options: ["الخلية", "الذرة", "النسيج", "العضو"], correctIndex: 0 },
+  { id: "q143", category: "علوم", difficulty: "medium", question: "ما هي سرعة الضوء تقريباً؟", options: ["300 ألف كيلومتر في الثانية", "150 ألف كيلومتر في الثانية", "3 ملايين كيلومتر في الثانية", "30 ألف كيلومتر في الثانية"], correctIndex: 0 },
+  { id: "q144", category: "علوم", difficulty: "hard", question: "ما هو العنصر الأكثر وفرة في الكون؟", options: ["الكربون", "الهيدروجين", "الأكسجين", "النيتروجين"], correctIndex: 1 },
+  { id: "q145", category: "علوم", difficulty: "hard", question: "ما اسم العملية التي تحوّل الغذاء إلى طاقة داخل الخلايا؟", options: ["النتح", "التنفس الخلوي", "التخمر", "التمثيل الضوئي"], correctIndex: 1 },
+
+  // ── جغرافيا ───────────────────────────────────────────────────────────
+  { id: "q146", category: "جغرافيا", difficulty: "easy", question: "ما هي عاصمة إيطاليا؟", options: ["روما", "ميلانو", "نابولي", "فلورنسا"], correctIndex: 0 },
+  { id: "q147", category: "جغرافيا", difficulty: "easy", question: "في أي قارة تقع مصر؟", options: ["أوروبا", "آسيا", "أمريكا الجنوبية", "أفريقيا"], correctIndex: 3 },
+  { id: "q148", category: "جغرافيا", difficulty: "easy", question: "ما هي عاصمة أستراليا؟", options: ["سيدني", "ملبورن", "بريزبن", "كانبرا"], correctIndex: 3 },
+  { id: "q149", category: "جغرافيا", difficulty: "medium", question: "ما هي أكبر بحيرة في العالم من حيث المساحة؟", options: ["بحيرة فيكتوريا", "بحر قزوين", "بحيرة بايكال", "بحيرة تنجانيقا"], correctIndex: 1 },
+  { id: "q150", category: "جغرافيا", difficulty: "medium", question: "ما هي الدولة التي يشبه شكلها الحذاء؟", options: ["اليونان", "البرتغال", "إيطاليا", "إسبانيا"], correctIndex: 2 },
+  { id: "q151", category: "جغرافيا", difficulty: "hard", question: "ما هي أطول سلسلة جبال في العالم؟", options: ["جبال الألب", "جبال روكي", "جبال الهيمالايا", "جبال الأنديز"], correctIndex: 3 },
+
+  // ── رياضيات ───────────────────────────────────────────────────────────
+  { id: "q152", category: "رياضيات", difficulty: "easy", question: "كم يساوي 12 × 3؟", options: ["32", "36", "34", "38"], correctIndex: 1 },
+  { id: "q153", category: "رياضيات", difficulty: "easy", question: "ما هو العدد الزوجي من بين الأعداد التالية؟", options: ["31", "7", "24", "13"], correctIndex: 2 },
+  { id: "q154", category: "رياضيات", difficulty: "medium", question: "كم يساوي 25% من 200؟", options: ["75", "25", "50", "40"], correctIndex: 2 },
+  { id: "q155", category: "رياضيات", difficulty: "medium", question: "ما هو الجذر التربيعي للعدد 81؟", options: ["11", "7", "8", "9"], correctIndex: 3 },
+  { id: "q156", category: "رياضيات", difficulty: "medium", question: "كم عدد الدقائق في اليوم الواحد؟", options: ["1200", "1680", "1440", "1500"], correctIndex: 2 },
+  { id: "q157", category: "رياضيات", difficulty: "hard", question: "كم يساوي (4 + 6) × 3؟", options: ["24", "36", "22", "30"], correctIndex: 3 },
+
+  // ── لغة ───────────────────────────────────────────────────────────────
+  { id: "q158", category: "لغة", difficulty: "easy", question: "ما هو مفرد كلمة «معلمون»؟", options: ["معلمة", "معلم", "معلمات", "تعليم"], correctIndex: 1 },
+  { id: "q159", category: "لغة", difficulty: "easy", question: "ما هو جمع كلمة «بنت»؟", options: ["أبناء", "بنتات", "بنيات", "بنات"], correctIndex: 3 },
+  { id: "q160", category: "لغة", difficulty: "easy", question: "ما هو حرف الجر في جملة «ذهبتُ إلى المدرسة»؟", options: ["ذهبت", "المدرسة", "إلى", "تُ"], correctIndex: 2 },
+  { id: "q161", category: "لغة", difficulty: "medium", question: "كم عدد حروف المد في اللغة العربية؟", options: ["أربعة", "حرفان", "خمسة", "ثلاثة"], correctIndex: 3 },
+  { id: "q162", category: "لغة", difficulty: "medium", question: "ما هي الكلمة الصحيحة إملائياً؟", options: ["إنشاء الله", "ان شاء الله", "إن شاء الله", "إنشاءُ الله"], correctIndex: 2 },
+  { id: "q163", category: "لغة", difficulty: "hard", question: "ما هو المصدر من الفعل «علّم»؟", options: ["معلم", "تعلّم", "معلومة", "تعليم"], correctIndex: 3 },
+
+  // ── منطق ──────────────────────────────────────────────────────────────
+  { id: "q164", category: "منطق", difficulty: "easy", question: "أكمل المتتالية: 2، 4، 6، 8، …؟", options: ["10", "9", "12", "14"], correctIndex: 0 },
+  { id: "q165", category: "منطق", difficulty: "easy", question: "ما هو الشيء الذي له أسنان ولا يعضّ؟", options: ["السكين", "المشط", "المنشار", "القفل"], correctIndex: 1 },
+  { id: "q166", category: "منطق", difficulty: "medium", question: "في سباق، تجاوزتَ صاحبَ المركز الثاني، فما مركزك الآن؟", options: ["الثالث", "الأول", "الأخير", "الثاني"], correctIndex: 3 },
+  { id: "q167", category: "منطق", difficulty: "medium", question: "قطار كهربائي يسير من الشرق إلى الغرب، أين يتجه دخانه؟", options: ["الشرق", "لا يصدر دخاناً", "الغرب", "الشمال"], correctIndex: 1 },
+  { id: "q168", category: "منطق", difficulty: "medium", question: "أكمل المتتالية: 1، 1، 2، 3، 5، 8، …؟", options: ["12", "11", "13", "14"], correctIndex: 2 },
+  { id: "q169", category: "منطق", difficulty: "hard", question: "لديك 8 عملات متطابقة وإحداها أخف وزناً، كم وزنًا تحتاج بميزان كفتين لتجدها؟", options: ["أربع وزنات", "ثلاث وزنات", "وزنة واحدة", "وزنتان"], correctIndex: 3 },
+
+  // ── تاريخ ─────────────────────────────────────────────────────────────
+  { id: "q170", category: "تاريخ", difficulty: "easy", question: "من هو مؤسس الدولة السعودية الحديثة؟", options: ["الملك عبد العزيز آل سعود", "الملك فيصل", "الملك سعود", "الملك خالد"], correctIndex: 0 },
+  { id: "q171", category: "تاريخ", difficulty: "easy", question: "من هو القائد المسلم الذي فتح الأندلس؟", options: ["طارق بن زياد", "خالد بن الوليد", "صلاح الدين الأيوبي", "محمد الفاتح"], correctIndex: 0 },
+  { id: "q172", category: "تاريخ", difficulty: "easy", question: "على أي دولة أُلقيت أول قنبلة ذرية في التاريخ؟", options: ["اليابان", "ألمانيا", "إيطاليا", "روسيا"], correctIndex: 0 },
+  { id: "q173", category: "تاريخ", difficulty: "medium", question: "من هو مؤلف كتاب «المقدمة» الشهير؟", options: ["ابن رشد", "ابن خلدون", "الجاحظ", "الفارابي"], correctIndex: 1 },
+  { id: "q174", category: "تاريخ", difficulty: "medium", question: "ما هي أول عاصمة للدولة الإسلامية بعد الهجرة؟", options: ["القدس", "مكة المكرمة", "دمشق", "المدينة المنورة"], correctIndex: 3 },
+  { id: "q175", category: "تاريخ", difficulty: "medium", question: "ما هي الحضارة التي اخترعت الكتابة المسمارية؟", options: ["الإغريقية", "الرومانية", "الفرعونية", "السومرية"], correctIndex: 3 },
+
+  // ── رياضة ─────────────────────────────────────────────────────────────
+  { id: "q176", category: "رياضة", difficulty: "easy", question: "كم عدد لاعبي فريق الكرة الطائرة داخل الملعب؟", options: ["6", "5", "7", "8"], correctIndex: 0 },
+  { id: "q177", category: "رياضة", difficulty: "easy", question: "كم عدد الحكام الأساسيين داخل ملعب كرة القدم؟", options: ["أربعة", "حكم واحد", "حكمان", "ثلاثة"], correctIndex: 1 },
+  { id: "q178", category: "رياضة", difficulty: "easy", question: "ما هي الرياضة الوطنية في اليابان؟", options: ["السومو", "الجودو", "الكاراتيه", "الكيندو"], correctIndex: 0 },
+  { id: "q179", category: "رياضة", difficulty: "medium", question: "ما هي الدولة الفائزة بكأس العالم 2018؟", options: ["فرنسا", "ألمانيا", "البرازيل", "إسبانيا"], correctIndex: 0 },
+  { id: "q180", category: "رياضة", difficulty: "medium", question: "في أي مدينة أقيمت أولمبياد 2020؟", options: ["لندن", "طوكيو", "باريس", "ريو دي جانيرو"], correctIndex: 1 },
+  { id: "q181", category: "رياضة", difficulty: "hard", question: "من هو الهداف التاريخي لكأس العالم؟", options: ["رونالدو البرازيلي", "ليونيل ميسي", "ميروسلاف كلوزه", "بيليه"], correctIndex: 2 },
+
+  // ── فنون ──────────────────────────────────────────────────────────────
+  { id: "q182", category: "فنون", difficulty: "easy", question: "من هو الرسام الذي قطع جزءاً من أذنه؟", options: ["بيكاسو", "فان جوخ", "مونيه", "سلفادور دالي"], correctIndex: 1 },
+  { id: "q183", category: "فنون", difficulty: "easy", question: "ما هو المتحف الباريسي الذي يضم لوحة «الموناليزا»؟", options: ["أورسيه", "بومبيدو", "اللوفر", "متروبوليتان"], correctIndex: 2 },
+  { id: "q184", category: "فنون", difficulty: "medium", question: "من هو الفنان الذي رسم لوحة «الصرخة»؟", options: ["فان جوخ", "بيكاسو", "سلفادور دالي", "إدوارد مونك"], correctIndex: 3 },
+  { id: "q185", category: "فنون", difficulty: "medium", question: "من أي مادة نُحت تمثال «ديفيد» لمايكل أنجلو؟", options: ["البرونز", "الخشب", "الرخام", "الجرانيت"], correctIndex: 2 },
+  { id: "q186", category: "فنون", difficulty: "hard", question: "كم عدد المفاتيح السوداء في البيانو؟", options: ["40", "30", "52", "36"], correctIndex: 3 },
+
+  // ── تكنولوجيا ─────────────────────────────────────────────────────────
+  { id: "q187", category: "تكنولوجيا", difficulty: "easy", question: "ما هو نظام التشغيل الأشهر للحواسيب الشخصية؟", options: ["ويندوز", "أندرويد", "iOS", "لينكس"], correctIndex: 0 },
+  { id: "q188", category: "تكنولوجيا", difficulty: "easy", question: "ماذا يعني الاختصار CPU؟", options: ["كرت الشاشة", "اللوحة الأم", "وحدة الذاكرة العشوائية", "وحدة المعالجة المركزية"], correctIndex: 3 },
+  { id: "q189", category: "تكنولوجيا", difficulty: "easy", question: "ما هو المتصفح الذي طوّرته جوجل؟", options: ["سفاري", "كروم", "فايرفوكس", "إيدج"], correctIndex: 1 },
+  { id: "q190", category: "تكنولوجيا", difficulty: "medium", question: "من هو مؤسس فيسبوك؟", options: ["جاك دورسي", "بيل غيتس", "إيلون ماسك", "مارك زوكربيرغ"], correctIndex: 3 },
+  { id: "q191", category: "تكنولوجيا", difficulty: "medium", question: "ماذا يعني الاختصار WWW؟", options: ["متصفح إنترنت", "الشبكة العنكبوتية العالمية", "بروتوكول نقل الملفات", "نظام تشغيل"], correctIndex: 1 },
+  { id: "q192", category: "تكنولوجيا", difficulty: "hard", question: "ما اسم أول معالج أنتجته شركة إنتل عام 1971؟", options: ["بنتيوم", "إنتل 4004", "إنتل 8086", "كور i3"], correctIndex: 1 },
+
+  // ── أفلام ومسلسلات ────────────────────────────────────────────────────
+  { id: "q193", category: "أفلام ومسلسلات", difficulty: "easy", question: "من هو الممثل الذي لعب دور «جون ويك»؟", options: ["كيانو ريفز", "جيسون ستاثام", "توم كروز", "ليام نيسون"], correctIndex: 0 },
+  { id: "q194", category: "أفلام ومسلسلات", difficulty: "easy", question: "في فيلم «شريك»، ما اسم صديق شريك الحمار؟", options: ["دونكي", "فيونا", "لورد فاركواد", "بينوكيو"], correctIndex: 0 },
+  { id: "q195", category: "أفلام ومسلسلات", difficulty: "easy", question: "في سلسلة «هاري بوتر»، ما اسم مدرسة السحر؟", options: ["دورمسترانغ", "بيوباتون", "هوغوورتس", "أكاديمية كايام"], correctIndex: 2 },
+  { id: "q196", category: "أفلام ومسلسلات", difficulty: "medium", question: "من هو مخرج فيلم «أفاتار»؟", options: ["جيمس كاميرون", "كريستوفر نولان", "ستيفن سبيلبرغ", "ريدلي سكوت"], correctIndex: 0 },
+  { id: "q197", category: "أفلام ومسلسلات", difficulty: "medium", question: "من هو بطل فيلم «غلاديتور»؟", options: ["هيو جاكمان", "براد بيت", "ميل غيبسون", "راسل كرو"], correctIndex: 3 },
+  { id: "q198", category: "أفلام ومسلسلات", difficulty: "medium", question: "من هي الممثلة التي لعبت دور «هيرميون» في هاري بوتر؟", options: ["إيما واتسون", "كيرا نايتلي", "آن هاثاواي", "إيما ستون"], correctIndex: 0 },
+
+  // ── طعام ومشروبات ─────────────────────────────────────────────────────
+  { id: "q199", category: "طعام ومشروبات", difficulty: "easy", question: "ما هو المشروب المصنوع من حبوب البن؟", options: ["القهوة", "الشاي", "العصير", "الحليب"], correctIndex: 0 },
+  { id: "q200", category: "طعام ومشروبات", difficulty: "easy", question: "ما هو الطبق الإيطالي المصنوع من العجين؟", options: ["الباستا", "السوشي", "الكسكس", "التاكو"], correctIndex: 0 },
+  { id: "q201", category: "طعام ومشروبات", difficulty: "medium", question: "مما يُصنع التوفو؟", options: ["فول الصويا", "الحليب", "الأرز", "العدس"], correctIndex: 0 },
+  { id: "q202", category: "طعام ومشروبات", difficulty: "medium", question: "ما هي الدولة الأولى عالمياً في إنتاج التمور؟", options: ["السعودية", "مصر", "العراق", "تونس"], correctIndex: 0 },
+  { id: "q203", category: "طعام ومشروبات", difficulty: "medium", question: "ما اسم الخبز الفرنسي الطويل والرفيع؟", options: ["البانيتون", "الباغيت", "الكرواسون", "البريوش"], correctIndex: 1 },
+
+  // ── حيوانات ───────────────────────────────────────────────────────────
+  { id: "q204", category: "حيوانات", difficulty: "easy", question: "ما هو الحيوان الملقَّب بـ«صديق الإنسان»؟", options: ["الكلب", "القط", "الحصان", "الببغاء"], correctIndex: 0 },
+  { id: "q205", category: "حيوانات", difficulty: "easy", question: "ما هو الحيوان الذي يخزّن الطعام في خدّيه؟", options: ["الهامستر", "الأرنب", "السنجاب", "الفأر"], correctIndex: 0 },
+  { id: "q206", category: "حيوانات", difficulty: "easy", question: "ما هو الطائر الذي يقلّد كلام الإنسان؟", options: ["الببغاء", "العصفور", "الحمام", "النسر"], correctIndex: 0 },
+  { id: "q207", category: "حيوانات", difficulty: "medium", question: "ما هو الحيوان الذي يغيّر لون جلده للتمويه؟", options: ["الحرباء", "الضفدع", "الأفعى", "السحلية"], correctIndex: 0 },
+  { id: "q208", category: "حيوانات", difficulty: "medium", question: "ما هو الحيوان الذي ينام وعيناه مفتوحتان؟", options: ["الأسماك", "القطط", "الكلاب", "الخيول"], correctIndex: 0 },
+  { id: "q209", category: "حيوانات", difficulty: "hard", question: "ما هو الحيوان الذي يمتلك ثلاثة قلوب؟", options: ["الحوت", "الفيل", "الأخطبوط", "الزرافة"], correctIndex: 2 },
+
+  // ── فضاء ──────────────────────────────────────────────────────────────
+  { id: "q210", category: "فضاء", difficulty: "easy", question: "ما هو الكوكب الملقَّب بـ«نجمة الصباح»؟", options: ["الزهرة", "المريخ", "المشتري", "عطارد"], correctIndex: 0 },
+  { id: "q211", category: "فضاء", difficulty: "easy", question: "ماذا نسمي الصخرة التي تسقط من الفضاء على الأرض؟", options: ["نيزك", "مذنب", "كوكب", "قمر صناعي"], correctIndex: 0 },
+  { id: "q212", category: "فضاء", difficulty: "easy", question: "ما هي وكالة الفضاء الأمريكية؟", options: ["ناسا", "إيسا", "روسكوزموس", "سبيس إكس"], correctIndex: 0 },
+  { id: "q213", category: "فضاء", difficulty: "medium", question: "كم يستغرق ضوء الشمس للوصول إلى الأرض؟", options: ["8 دقائق تقريباً", "ثانية واحدة", "ساعة كاملة", "يوم كامل"], correctIndex: 0 },
+  { id: "q214", category: "فضاء", difficulty: "medium", question: "ما هو الكوكب السابع من الشمس؟", options: ["زحل", "نبتون", "أورانوس", "بلوتو"], correctIndex: 2 },
+  { id: "q215", category: "فضاء", difficulty: "hard", question: "ما هو الكوكب الأبرد في المجموعة الشمسية؟", options: ["زحل", "نبتون", "بلوتو", "أورانوس"], correctIndex: 3 },
+
+  // ── موسيقى ────────────────────────────────────────────────────────────
+  { id: "q216", category: "موسيقى", difficulty: "easy", question: "ما هي الآلة التي تنفخ فيها لتعزف؟", options: ["الفلوت", "البيانو", "الجيتار", "الطبول"], correctIndex: 0 },
+  { id: "q217", category: "موسيقى", difficulty: "easy", question: "كم عدد أوتار الجيتار؟", options: ["6", "4", "8", "12"], correctIndex: 0 },
+  { id: "q218", category: "موسيقى", difficulty: "medium", question: "من هو الملحن الذي أصيب بالصمم في أواخر حياته؟", options: ["بيتهوفن", "موزارت", "باخ", "شوبان"], correctIndex: 0 },
+  { id: "q219", category: "موسيقى", difficulty: "medium", question: "ما هي الآلة الموسيقية العربية الشهيرة ذات العنق الطويل؟", options: ["العود", "القانون", "الناي", "الدربكة"], correctIndex: 0 },
+  { id: "q220", category: "موسيقى", difficulty: "medium", question: "من هو المغني المصري الملقَّب بـ«العندليب»؟", options: ["فريد الأطرش", "أم كلثوم", "محمد عبد الوهاب", "عبد الحليم حافظ"], correctIndex: 3 },
+
+  // ── دين وثقافة ────────────────────────────────────────────────────────
+  { id: "q221", category: "دين وثقافة", difficulty: "easy", question: "ما هو الكتاب المقدس للمسلمين؟", options: ["القرآن الكريم", "التوراة", "الإنجيل", "الزبور"], correctIndex: 0 },
+  { id: "q222", category: "دين وثقافة", difficulty: "easy", question: "كم عدد ركعات صلاة الفجر؟", options: ["ركعتان", "ثلاث", "أربع", "خمس"], correctIndex: 0 },
+  { id: "q223", category: "دين وثقافة", difficulty: "easy", question: "ما هي أول سورة في ترتيب المصحف؟", options: ["الفاتحة", "البقرة", "الإخلاص", "الناس"], correctIndex: 0 },
+  { id: "q224", category: "دين وثقافة", difficulty: "medium", question: "ما هو الشهر الذي يأتي قبل رمضان؟", options: ["رجب", "شعبان", "شوال", "محرم"], correctIndex: 1 },
+  { id: "q225", category: "دين وثقافة", difficulty: "medium", question: "في أي مدينة يقع المسجد الأقصى؟", options: ["القدس", "مكة المكرمة", "المدينة المنورة", "دمشق"], correctIndex: 0 },
+
+  // ── جسم الإنسان ───────────────────────────────────────────────────────
+  { id: "q226", category: "جسم الإنسان", difficulty: "easy", question: "ما هو العضو المسؤول عن الرؤية؟", options: ["الأذن", "العين", "الأنف", "اللسان"], correctIndex: 1 },
+  { id: "q227", category: "جسم الإنسان", difficulty: "easy", question: "ما هو المعدن المهم لتقوية العظام؟", options: ["الحديد", "البوتاسيوم", "الصوديوم", "الكالسيوم"], correctIndex: 3 },
+  { id: "q228", category: "جسم الإنسان", difficulty: "medium", question: "ما هي أكبر غدة في جسم الإنسان؟", options: ["البنكرياس", "الغدة الدرقية", "الكبد", "الطحال"], correctIndex: 2 },
+  { id: "q229", category: "جسم الإنسان", difficulty: "medium", question: "كم عدد عضلات جسم الإنسان تقريباً؟", options: ["أقل من 200", "حوالي 300", "أكثر من 600", "أكثر من 1000"], correctIndex: 2 },
+
+  // ── منوعات ────────────────────────────────────────────────────────────
+  { id: "q230", category: "منوعات", difficulty: "easy", question: "ما هو اللون الناتج عن خلط الأحمر مع الأصفر؟", options: ["البرتقالي", "الأخضر", "البنفسجي", "الوردي"], correctIndex: 0 },
+  { id: "q231", category: "منوعات", difficulty: "easy", question: "ما هو الشهر الأخير في السنة الميلادية؟", options: ["ديسمبر", "نوفمبر", "أكتوبر", "يناير"], correctIndex: 0 },
+  { id: "q232", category: "منوعات", difficulty: "medium", question: "ما هي العملة الرسمية للولايات المتحدة؟", options: ["الدولار", "اليورو", "الجنيه", "الين"], correctIndex: 0 },
+  { id: "q233", category: "منوعات", difficulty: "medium", question: "ما هي اللغة الأكثر تحدثاً في العالم كلغة أم؟", options: ["الإسبانية", "العربية", "الإنجليزية", "المندارية الصينية"], correctIndex: 3 },
 ];

@@ -31,6 +31,7 @@ import {
   XP_PER_CORRECT_ANSWER,
   XP_PER_GAME,
   XP_PERFECT_GAME,
+  levelFromXp,
 } from "./gameConfig";
 import { CATEGORIES, QUESTION_BANK, type Question } from "./questions";
 import { BADGE_MAP, type Badge } from "./stats";
@@ -805,6 +806,18 @@ export const finishGame = internalMutation({
       if (gamesAfter >= 50) next.add("games_50");
       if ((profile?.correctAnswers ?? 0) + correctCount >= 100) {
         next.add("answers_100");
+      }
+      const winsAfter = (profile?.gamesWon ?? 0) + (won ? 1 : 0);
+      if (winsAfter >= 5) next.add("wins_5");
+      if (levelFromXp((profile?.xp ?? 0) + xp) >= 10) {
+        next.add("level_10");
+      }
+      if (
+        correctCount === questionCount &&
+        questionCount >= 3 &&
+        answered.every((a) => a.elapsedMs <= game.settings.timePerQuestionMs / 2)
+      ) {
+        next.add("speed_demon");
       }
 
       const badgesEarned = [...next].filter((id) => !had.has(id));

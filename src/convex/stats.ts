@@ -23,6 +23,9 @@ export const BADGES: Badge[] = [
   { id: "games_10", name: "منافس نشط", description: "شارك في 10 جولات", emoji: "🎮" },
   { id: "games_50", name: "مخضرم", description: "شارك في 50 جولة", emoji: "👑" },
   { id: "answers_100", name: "موسوعة", description: "أجب صحيحاً عن 100 سؤال", emoji: "📚" },
+  { id: "wins_5", name: "بطل متوّج", description: "اربح 5 جولات في المجمل", emoji: "🥇" },
+  { id: "level_10", name: "العبقرية", description: "صل إلى المستوى 10", emoji: "💎" },
+  { id: "speed_demon", name: "سهم خاطف", description: "أجب عن كل الأسئلة صحيحاً في نصف الوقت", emoji: "🏹" },
 ];
 
 export const BADGE_MAP: Record<string, Badge> = Object.fromEntries(
