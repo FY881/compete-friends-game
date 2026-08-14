@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,12 @@ import {
   ArrowLeft,
   BrainCircuit,
   Copy,
+  Flame,
   Gamepad2,
   KeyRound,
   Loader2,
   LogOut,
+  Medal,
   Swords,
   Trophy,
   Users,
@@ -45,6 +48,8 @@ export default function Play() {
   const navigate = useNavigate();
   const createGame = useMutation(api.games.createGame);
   const joinGame = useMutation(api.games.joinGame);
+
+  const profile = useQuery(api.stats.getMyProfile);
 
   const displayName = user?.name ?? "";
   const [nickname, setNickname] = useState(() => {
@@ -170,6 +175,50 @@ export default function Play() {
           </p>
         </div>
 
+        {/* Profile strip */}
+        {profile && profile.gamesPlayed > 0 && (
+          <div className="mx-auto mt-8 max-w-3xl">
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="flex w-full items-center gap-4 rounded-2xl border border-primary/20 bg-card p-4 text-start shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">
+                {profile.level}
+              </span>
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-bold">المستوى {profile.level} — {profile.levelTitle}</p>
+                  <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
+                    <Trophy className="size-3.5" />
+                    {profile.gamesWon} فوز
+                  </span>
+                  <span className="flex items-center gap-1 text-xs font-semibold text-orange-600">
+                    <Flame className="size-3.5" />
+                    {profile.bestStreak} سلسلة
+                  </span>
+                  <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                    <Medal className="size-3.5" />
+                    {profile.badges.length} شارة
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-3">
+                  <Progress
+                    value={(profile.xpIntoLevel / Math.max(1, profile.xpForNextLevel)) * 100}
+                    className="h-1.5 flex-1"
+                  />
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                    {profile.xpIntoLevel}/{profile.xpForNextLevel} XP
+                  </span>
+                </div>
+              </div>
+              <span className="hidden text-xs font-semibold text-primary sm:block">
+                عرض ملفي ←
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Nickname */}
         <div className="mx-auto mt-10 max-w-xl">
           <label
@@ -209,7 +258,7 @@ export default function Play() {
             </p>
             <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
               <Users className="size-4 text-primary" />
-              1 – 10 لاعبين في الغرفة الواحدة
+              1 – 12 لاعباً في الغرفة الواحدة
             </div>
             <Button
               type="button"
@@ -273,9 +322,9 @@ export default function Play() {
         <div className="mx-auto mt-12 max-w-3xl rounded-2xl border border-border/70 bg-card/60 p-6">
           <div className="grid gap-6 sm:grid-cols-3">
             {[
-              { icon: Swords, title: "5 أسئلة سريعة", text: "فئات متنوعة في كل جولة" },
-              { icon: Zap, title: "السرعة تكسب", text: "حتى 200 نقطة للإجابة الصحيحة" },
-              { icon: Trophy, title: "منصة الفائزين", text: "ترتيب مباشر ومنصة في النهاية" },
+              { icon: Swords, title: "جولة مخصصة", text: "اضبط عدد الأسئلة والوقت والفئات" },
+              { icon: Zap, title: "نقاط حسب الصعوبة", text: "حتى 380 نقطة للأسئلة الصعبة السريعة" },
+              { icon: Flame, title: "سلاسل ومكافآت", text: "إجابات متتالية + منقّي 50/50" },
             ].map((item) => (
               <div key={item.title} className="flex items-start gap-3">
                 <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -290,7 +339,8 @@ export default function Play() {
           </div>
           <p className="mt-5 flex items-center gap-2 border-t border-border/70 pt-4 text-xs text-muted-foreground">
             <Copy className="size-3.5 text-primary" />
-            داخل الغرفة يمكنك نسخ رمز الدعوة أو رابط الانضمام بنقرة واحدة.
+            داخل الغرفة يمكنك نسخ رمز الدعوة أو رابط الانضمام، وكل جولة تمنح خبرة
+            تُضاف إلى مستواك وشاراتك.
           </p>
         </div>
       </main>

@@ -1,18 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { GameData, PlayerInfo } from "@/convex/games";
+import { burstConfetti } from "@/lib/confetti";
+import { sounds } from "@/lib/sounds";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Check,
+  Copy,
   Crown,
   Home,
   Loader2,
   Medal,
   PartyPopper,
   RefreshCw,
+  Share2,
+  Sparkles,
+  UserRound,
   X,
 } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -52,7 +58,10 @@ function PodiumCard({
       )}
     >
       <div className="relative">
-        <GameAvatar name={player.name} className={cn("size-14 text-lg", place === 1 && "size-16")} />
+        <GameAvatar
+          name={player.name}
+          className={cn("size-14 text-lg", place === 1 && "size-16")}
+        />
         {place === 1 && (
           <Crown className="absolute -top-4 start-1/2 size-6 -translate-x-1/2 text-amber-500" />
         )}
@@ -82,24 +91,68 @@ function PodiumCard({
 }
 
 export function ResultsStage({ game }: { game: GameData }) {
-  const createGame = useMutation(api.games.createGame);
+  const rematch = useMutation(api.games.rematch);
   const navigate = useNavigate();
   const [rematching, setRematching] = useState(false);
   const me = game.players.find((p) => p.isMe);
   const sorted = [...game.players].sort((a, b) => b.score - a.score);
   const winner = sorted[0];
+  const myResult = game.myResult;
+  const isHost = me?.isHost ?? false;
+  const won = winner?.isMe ?? false;
+
+  // Celebration / consolation feedback once.
+  useEffect(() => {
+    if (won) {
+      sounds.win();
+      burstConfetti();
+    } else {
+      sounds.lose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Everyone follows the host into a rematch automatically.
+  useEffect(() => {
+    if (game.game.rematchCode) {
+      navigate(`/game/${game.game.rematchCode}`);
+    }
+  }, [game.game.rematchCode, navigate]);
 
   const handleRematch = async () => {
     setRematching(true);
     try {
-      const { code } = await createGame({ name: me?.name });
+      const { code } = await rematch({ code: game.game.code });
       navigate(`/game/${code}`);
     } catch (error) {
       console.error(error);
       toast.error(
-        error instanceof Error ? error.message : "تعذّر إنشاء تحدٍّ جديد.",
+        error instanceof Error ? error.message : "تعذّر إنشاء جولة جديدة.",
       );
       setRematching(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const lines = sorted
+      .map((p, i) => `${i + 1}. ${p.name}: ${p.score} نقطة`)
+      .join("\n");
+    const text = `🏆 تحدّي العقول — النتيجة النهائية!\n\n${lines}\n\n${
+      won ? "أنا البطل! 🎉" : `الفائز: ${winner?.name ?? ""}`
+    }`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "تحدّي العقول", text });
+        return;
+      } catch {
+        // fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("تم نسخ النتيجة");
+    } catch {
+      toast.error("تعذّر نسخ النتيجة");
     }
   };
 
@@ -111,12 +164,52 @@ export function ResultsStage({ game }: { game: GameData }) {
           <PartyPopper className="size-7" />
         </span>
         <h2 className="mt-4 text-3xl font-bold tracking-tight">
-          {winner?.isMe ? "أنت البطل! 🏆" : `${winner?.name ?? ""} يتصدّر!`}
+          {won ? "أنت البطل! 🏆" : `${winner?.name ?? ""} يتصدّر!`}
         </h2>
         <p className="mt-2 text-muted-foreground">
           انتهت الجولة — {sorted.length} لاعب، {game.game.questionCount} أسئلة،
           ومنافسة لا تُنسى.
         </p>
+
+        {/* My rewards */}
+        {myResult && (
+          <div className="mx-auto mt-6 grid max-w-md gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-start">
+              <p className="text-xs font-semibold text-muted-foreground">
+                المركز {myResult.rank} من {myResult.playerCount} · +XP
+              </p>
+              <p className="mt-1 flex items-center gap-2 text-2xl font-bold text-primary">
+                <Sparkles className="size-5" />
+                +{myResult.xpEarned}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                خبرة مضافة إلى ملفك الشخصي
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-card p-4 text-start">
+              <p className="text-xs font-semibold text-muted-foreground">
+                شارات جديدة
+              </p>
+              {myResult.badgesEarned.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {myResult.badgesEarned.map((badge) => (
+                    <span
+                      key={badge.id}
+                      title={badge.description}
+                      className="flex items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-700"
+                    >
+                      {badge.emoji} {badge.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  لا شارات جديدة هذه الجولة — استمر!
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Podium */}
@@ -198,26 +291,117 @@ export function ResultsStage({ game }: { game: GameData }) {
         </ul>
       </div>
 
+      {/* Per-question review */}
+      {me && game.questions.length > 0 && (
+        <div className="mt-8 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
+          <div className="border-b border-border/70 px-6 py-4">
+            <p className="text-sm font-bold">مراجعة الأسئلة</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              إجاباتك بالتفصيل — ماذا أجبتم وكيف كانت الصحيحة؟
+            </p>
+          </div>
+          <ul className="divide-y divide-border/50">
+            {game.questions.map((question, i) => {
+              const answer = me.answers[i] ?? null;
+              return (
+                <li key={question.id} className="px-6 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold leading-relaxed">
+                      <span className="ms-1.5 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                        {i + 1}
+                      </span>
+                      {question.question}
+                    </p>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums",
+                        answer?.correct
+                          ? "bg-emerald-500/10 text-emerald-700"
+                          : answer
+                            ? "bg-rose-500/10 text-rose-700"
+                            : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {answer ? (answer.correct ? `+${answer.points}` : "0") : "—"}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
+                    <p className="flex items-center gap-1.5 text-muted-foreground">
+                      <span className="font-semibold text-foreground">إجابتك:</span>
+                      {answer ? (
+                        question.options[answer.selected]
+                      ) : (
+                        <span className="italic">لم تجب</span>
+                      )}
+                    </p>
+                    <p className="flex items-center gap-1.5 text-emerald-700">
+                      <Check className="size-3.5" />
+                      <span className="font-semibold">الصحيحة:</span>
+                      {question.options[question.correctIndex ?? 0]}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-        <Button size="lg" className="gap-2 rounded-xl text-base" onClick={handleRematch} disabled={rematching}>
-          {rematching ? (
-            <Loader2 className="size-4.5 animate-spin" />
-          ) : (
-            <RefreshCw className="size-4.5" />
-          )}
-          جولة جديدة بنفس اللاعبين
+        {isHost ? (
+          <Button
+            size="lg"
+            className="gap-2 rounded-xl text-base"
+            onClick={handleRematch}
+            disabled={rematching}
+          >
+            {rematching ? (
+              <Loader2 className="size-4.5 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4.5" />
+            )}
+            جولة جديدة بنفس اللاعبين
+          </Button>
+        ) : (
+          <div className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+            <RefreshCw className="size-4" />
+            بانتظار المضيف لبدء جولة جديدة…
+          </div>
+        )}
+        <Button
+          size="lg"
+          variant="outline"
+          className="gap-2 rounded-xl text-base"
+          onClick={handleShare}
+        >
+          <Share2 className="size-4.5" />
+          مشاركة النتيجة
         </Button>
         <Button
           size="lg"
           variant="outline"
           className="gap-2 rounded-xl text-base"
+          onClick={() => navigate("/profile")}
+        >
+          <UserRound className="size-4.5" />
+          ملفي الشخصي
+        </Button>
+        <Button
+          size="lg"
+          variant="ghost"
+          className="gap-2 rounded-xl text-base"
           onClick={() => navigate("/play")}
         >
           <Home className="size-4.5" />
-          العودة للرئيسية
+          الرئيسية
         </Button>
       </div>
+
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        <Copy className="ms-1 inline size-3" />
+        كل جولة تمنح خبرة تُضاف إلى مستواك وشاراتك في الملف الشخصي.
+      </p>
     </div>
   );
 }

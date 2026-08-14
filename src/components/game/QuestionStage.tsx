@@ -1,13 +1,22 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { ANSWER_MS } from "@/lib/game-config";
+import {
+  DIFFICULTY_BASE_POINTS,
+  DIFFICULTY_SPEED_BONUS,
+  MAX_STREAK_BONUS,
+  STREAK_BONUS_PER_STEP,
+} from "@/convex/gameConfig";
 import type { GameData, PlayerInfo } from "@/convex/games";
+import { sounds } from "@/lib/sounds";
+import { LIFELINES_PER_GAME } from "@/lib/game-config";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Check,
+  Eraser,
+  Flame,
   Hourglass,
   Loader2,
   Sparkles,
@@ -20,8 +29,32 @@ import { useNow } from "./ui";
 
 const OPTION_LETTERS = ["أ", "ب", "ج", "د"];
 
-function CountdownRing({ remainingMs }: { remainingMs: number }) {
-  const fraction = Math.max(0, Math.min(1, remainingMs / ANSWER_MS));
+const DIFFICULTY_STYLES = {
+  easy: {
+    label: "سهل",
+    badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700",
+    dot: "bg-emerald-500",
+  },
+  medium: {
+    label: "متوسط",
+    badge: "border-amber-500/30 bg-amber-500/10 text-amber-700",
+    dot: "bg-amber-500",
+  },
+  hard: {
+    label: "صعب",
+    badge: "border-rose-500/30 bg-rose-500/10 text-rose-700",
+    dot: "bg-rose-500",
+  },
+} as const;
+
+function CountdownRing({
+  remainingMs,
+  totalMs,
+}: {
+  remainingMs: number;
+  totalMs: number;
+}) {
+  const fraction = Math.max(0, Math.min(1, remainingMs / totalMs));
   const radius = 30;
   const circumference = 2 * Math.PI * radius;
   const urgent = fraction < 0.25;
@@ -70,15 +103,20 @@ export function QuestionStage({
   me: PlayerInfo;
 }) {
   const submitAnswer = useMutation(api.games.submitAnswer);
+  const useFiftyFifty = useMutation(api.games.useFiftyFifty);
   const [submitting, setSubmitting] = useState(false);
-  const now = useNow(250);
+  const [fiftyLoading, setFiftyLoading] = useState(false);
+  const [hiddenOptions, setHiddenOptions] = useState<number[]>([]);
+  const now = useNow(200);
+  const prevPhase = useRef(game.game.phase);
 
   const g = game.game;
   const index = g.currentQuestionIndex;
   const question = game.questions[index];
   const phase = g.phase;
   const startedAt = g.questionStartedAt;
-  const remaining = startedAt + ANSWER_MS - now;
+  const timePerQuestion = g.settings.timePerQuestionMs;
+  const remaining = startedAt + timePerQuestion - now;
   const timeUp = phase === "answering" && remaining <= 0;
 
   const myAnswer = me.answers[index] ?? null;
@@ -86,12 +124,41 @@ export function QuestionStage({
   const totalPlayers = game.players.length;
   const isRevealing = phase === "revealing";
 
+  // Fresh lifeline state for every question.
+  useEffect(() => {
+    setHiddenOptions([]);
+  }, [index]);
+
+  // Tick sound during the final five seconds.
+  const tickSecond = Math.floor(remaining / 1000);
+  useEffect(() => {
+    if (phase !== "answering" || myAnswer) return;
+    if (remaining > 0 && remaining <= 5000) {
+      sounds.tick();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickSecond, phase, myAnswer]);
+
+  // Feedback sounds when the correct answer is revealed.
+  useEffect(() => {
+    if (prevPhase.current === "answering" && phase === "revealing") {
+      if (myAnswer?.correct) {
+        sounds.correct();
+      } else if (myAnswer) {
+        sounds.wrong();
+      }
+      sounds.reveal();
+    }
+    prevPhase.current = phase;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   if (!question) {
     return null;
   }
 
   const submit = async (optionIndex: number) => {
-    if (submitting || myAnswer) return;
+    if (submitting || myAnswer || isRevealing) return;
     setSubmitting(true);
     try {
       await submitAnswer({
@@ -99,6 +166,7 @@ export function QuestionStage({
         questionIndex: index,
         optionIndex,
       });
+      sounds.select();
     } catch (error) {
       console.error(error);
       toast.error(
@@ -109,7 +177,53 @@ export function QuestionStage({
     }
   };
 
+  // Keyboard shortcuts: 1–4 pick an option.
+  useEffect(() => {
+    if (isRevealing || myAnswer || timeUp) return;
+    const handler = (event: KeyboardEvent) => {
+      const num = parseInt(event.key, 10);
+      if (num >= 1 && num <= 4 && !hiddenOptions.includes(num - 1)) {
+        void submit(num - 1);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRevealing, myAnswer, timeUp, hiddenOptions, submitting, question]);
+
+  const fiftyUsed = me.fiftyFiftyUsed;
+  const handleFifty = async () => {
+    if (fiftyLoading || fiftyUsed || myAnswer || isRevealing) return;
+    setFiftyLoading(true);
+    try {
+      const { hidden } = await useFiftyFifty({
+        code: g.code,
+        questionIndex: index,
+      });
+      setHiddenOptions(hidden);
+      sounds.lifeline();
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "تعذّر استخدام المنقّي.",
+      );
+    } finally {
+      setFiftyLoading(false);
+    }
+  };
+
+  const difficultyStyle = DIFFICULTY_STYLES[question.difficulty];
+  const nextStreakBonus = Math.min(
+    MAX_STREAK_BONUS,
+    Math.max(0, me.streak * STREAK_BONUS_PER_STEP),
+  );
+  const maxPoints =
+    DIFFICULTY_BASE_POINTS[question.difficulty] +
+    DIFFICULTY_SPEED_BONUS[question.difficulty] +
+    nextStreakBonus;
+
   const optionState = (optionIndex: number) => {
+    if (hiddenOptions.includes(optionIndex)) return "hidden";
     if (isRevealing) {
       const correct = question.correctIndex;
       if (optionIndex === correct) return "correct";
@@ -123,6 +237,8 @@ export function QuestionStage({
     }
     return "selectable";
   };
+
+  const progress = Math.round((answeredCount / Math.max(1, totalPlayers)) * 100);
 
   return (
     <div className="grid w-full items-start gap-6 lg:grid-cols-[1fr_20rem]">
@@ -140,12 +256,16 @@ export function QuestionStage({
               <Sparkles className="size-3" />
               {question.category}
             </Badge>
+            <Badge variant="outline" className={cn("gap-1.5", difficultyStyle.badge)}>
+              <span className={cn("size-1.5 rounded-full", difficultyStyle.dot)} />
+              {difficultyStyle.label}
+            </Badge>
             <Badge variant="secondary" className="gap-1.5">
               السؤال {index + 1} من {g.questionCount}
             </Badge>
           </div>
           {!isRevealing ? (
-            <CountdownRing remainingMs={remaining} />
+            <CountdownRing remainingMs={remaining} totalMs={timePerQuestion} />
           ) : (
             <Badge
               variant="outline"
@@ -162,8 +282,23 @@ export function QuestionStage({
           {question.question}
         </h2>
 
+        {/* Points + streak hint */}
+        <div className="relative mt-4 flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+            <Zap className="size-3.5" />
+            صحيحة = حتى {maxPoints} نقطة
+          </span>
+          {me.streak >= 1 && !isRevealing && (
+            <span className="flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-bold text-orange-600">
+              <Flame className="size-3.5" />
+              سلسلة {me.streak}
+              {me.streak >= 2 && ` — مكافأة +${nextStreakBonus}`}
+            </span>
+          )}
+        </div>
+
         {/* Options */}
-        <div className="relative mt-7 grid gap-3">
+        <div className="relative mt-6 grid gap-3">
           {question.options.map((option, i) => {
             const state = optionState(i);
             return (
@@ -171,9 +306,7 @@ export function QuestionStage({
                 key={i}
                 type="button"
                 onClick={() => submit(i)}
-                disabled={
-                  state === "selectable" ? submitting || !!myAnswer || timeUp : true
-                }
+                disabled={state !== "selectable" || submitting || timeUp}
                 className={cn(
                   "group flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-start text-base font-medium transition-all",
                   state === "selectable" &&
@@ -185,6 +318,8 @@ export function QuestionStage({
                   state === "wrong" &&
                     "border-rose-500/60 bg-rose-500/10 text-rose-700",
                   state === "idle" && "border-border/60 bg-muted/40 text-muted-foreground",
+                  state === "hidden" &&
+                    "border-dashed border-border/60 bg-muted/30 text-muted-foreground/40",
                 )}
               >
                 <span
@@ -196,11 +331,18 @@ export function QuestionStage({
                     state === "correct" && "border-emerald-600 bg-emerald-600 text-white",
                     state === "wrong" && "border-rose-600 bg-rose-600 text-white",
                     state === "idle" && "border-border/60 bg-card text-muted-foreground/60",
+                    state === "hidden" && "border-border/60 bg-muted text-muted-foreground/40",
                   )}
                 >
-                  {OPTION_LETTERS[i]}
+                  {state === "hidden" ? (
+                    <Eraser className="size-4" />
+                  ) : (
+                    OPTION_LETTERS[i]
+                  )}
                 </span>
-                <span className="flex-1">{option}</span>
+                <span className={cn("flex-1", state === "hidden" && "line-through")}>
+                  {state === "hidden" ? "إجابة مستبعدة" : option}
+                </span>
                 {state === "correct" && <Check className="size-5 shrink-0" />}
                 {state === "wrong" && <X className="size-5 shrink-0" />}
               </button>
@@ -247,9 +389,46 @@ export function QuestionStage({
             </span>
           ) : (
             <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              اختر إحدى الإجابات قبل انتهاء الوقت
+              اختر إحدى الإجابات قبل انتهاء الوقت (أو استخدم المفاتيح 1–4)
             </span>
           )}
+        </div>
+
+        {/* Lifeline + progress */}
+        <div className="relative mt-5 flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={handleFifty}
+            disabled={fiftyLoading || fiftyUsed || !!myAnswer || isRevealing}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all",
+              fiftyUsed
+                ? "border-border/60 bg-muted/40 text-muted-foreground/50"
+                : "border-primary/30 bg-primary/5 text-primary hover:border-primary/60 hover:bg-primary/10",
+            )}
+          >
+            {fiftyLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Eraser className="size-4" />
+            )}
+            منقّي 50/50
+            <span className="rounded-full bg-muted px-1.5 text-[10px]">
+              {fiftyUsed ? 0 : 1} / {LIFELINES_PER_GAME}
+            </span>
+          </button>
+
+          <div className="flex flex-1 items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+              {answeredCount}/{totalPlayers}
+            </span>
+          </div>
         </div>
       </div>
 

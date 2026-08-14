@@ -16,6 +16,22 @@ export const roleValidator = v.union(
 );
 export type Role = Infer<typeof roleValidator>;
 
+/** Room settings chosen by the host before the game starts. */
+export const gameSettingsValidator = v.object({
+  questionCount: v.number(), // 3 | 5 | 7 | 10
+  timePerQuestionMs: v.number(), // 10s | 15s | 20s | 30s
+  categories: v.array(v.string()), // empty array = all categories
+});
+
+/** One recorded answer inside a player's answers array. */
+export const answerValidator = v.object({
+  questionId: v.string(),
+  selected: v.number(),
+  correct: v.boolean(),
+  points: v.number(),
+  elapsedMs: v.number(),
+});
+
 const schema = defineSchema(
   {
     // default auth tables using convex auth.
@@ -49,9 +65,12 @@ const schema = defineSchema(
       currentQuestionIndex: v.number(),
       questionStartedAt: v.number(), // server timestamp when the current question started
       createdAt: v.number(),
+      settings: gameSettingsValidator, // room rules chosen by the host
+      rematchOf: v.optional(v.id("games")), // set when this game is a rematch of another
     })
       .index("by_code", ["code"])
-      .index("by_host", ["hostId"]),
+      .index("by_host", ["hostId"])
+      .index("by_rematch", ["rematchOf"]),
 
     // One row per player per game.
     gamePlayers: defineTable({
@@ -59,6 +78,8 @@ const schema = defineSchema(
       userId: v.id("users"),
       name: v.string(), // display name taken when joining
       score: v.number(),
+      streak: v.number(), // current consecutive correct answers
+      bestStreak: v.number(), // longest streak reached in this game
       answers: v.array(
         v.union(
           v.null(),
@@ -67,11 +88,47 @@ const schema = defineSchema(
             selected: v.number(),
             correct: v.boolean(),
             points: v.number(),
+            elapsedMs: v.number(),
           }),
         ),
       ), // per-question answers indexed by question number
+      fiftyFiftyUsedFor: v.optional(v.number()), // question index where 50/50 was used
       joinedAt: v.number(),
     })
+      .index("by_game", ["gameId"])
+      .index("by_user_game", ["userId", "gameId"]),
+
+    // Per-user progression: XP, level, lifetime stats and earned badges.
+    profiles: defineTable({
+      userId: v.id("users"),
+      xp: v.number(),
+      gamesPlayed: v.number(),
+      gamesWon: v.number(),
+      bestScore: v.number(),
+      bestStreak: v.number(),
+      correctAnswers: v.number(),
+      totalAnswers: v.number(),
+      fastestAnswerMs: v.optional(v.number()),
+      badges: v.array(v.string()),
+      updatedAt: v.number(),
+    }).index("by_user", ["userId"]),
+
+    // One row per player per finished game, for history & the profile page.
+    gameHistory: defineTable({
+      gameId: v.id("games"),
+      userId: v.id("users"),
+      gameCode: v.string(),
+      rank: v.number(),
+      playerCount: v.number(),
+      score: v.number(),
+      correctCount: v.number(),
+      questionCount: v.number(),
+      xpEarned: v.number(),
+      won: v.boolean(),
+      badgesEarned: v.array(v.string()), // badges unlocked by this result
+      playedAt: v.number(),
+    })
+      .index("by_user", ["userId"])
       .index("by_game", ["gameId"])
       .index("by_user_game", ["userId", "gameId"]),
   },

@@ -4,12 +4,16 @@ import {
   BrainCircuit,
   Check,
   Crown,
+  Eraser,
+  Flame,
   Gamepad2,
   Gift,
   Hourglass,
+  Layers,
   Link2,
   Medal,
   Play,
+  Quote,
   Sparkles,
   Swords,
   Timer,
@@ -18,8 +22,10 @@ import {
   Zap,
 } from "lucide-react";
 import { Link } from "react-router";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CATEGORIES } from "@/convex/questions";
 
 const AVATAR_COLORS = [
   "bg-teal-600",
@@ -54,11 +60,20 @@ function HeroMock() {
         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
         className="relative rounded-3xl border border-border/80 bg-card p-6 shadow-2xl shadow-primary/10"
       >
-        <div className="flex items-center justify-between">
-          <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
-            <Sparkles className="size-3" />
-            جغرافيا · السؤال 2 من 5
-          </Badge>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
+              <Sparkles className="size-3" />
+              جغرافيا · السؤال 2 من 5
+            </Badge>
+            <Badge
+              variant="outline"
+              className="gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-700"
+            >
+              <span className="size-1.5 rounded-full bg-amber-500" />
+              متوسط
+            </Badge>
+          </div>
           <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm font-semibold tabular-nums text-foreground">
             <Timer className="size-3.5 text-primary" />
             0:12
@@ -134,6 +149,16 @@ function HeroMock() {
         <Zap className="size-4 text-amber-500" />
         أجبت أولاً! +185
       </motion.div>
+
+      {/* Floating streak chip */}
+      <motion.div
+        animate={{ y: [0, 8, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        className="absolute -bottom-6 -end-2 flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-card px-3.5 py-2 text-sm font-bold text-orange-600 shadow-lg shadow-primary/10 sm:-end-6"
+      >
+        <Flame className="size-4" />
+        سلسلة 3 · +40 إضافية
+      </motion.div>
     </div>
   );
 }
@@ -159,31 +184,41 @@ const STEPS = [
 const FEATURES = [
   {
     icon: Zap,
-    title: "السرعة = نقاط",
-    text: "كل إجابة صحيحة تكسبك 100 نقطة، وكلما أجبت أسرع زادت المكافأة حتى 100 نقطة إضافية.",
+    title: "نقاط حسب الصعوبة",
+    text: "الأسئلة تصنّف سهلة ومتوسطة وصعبة، والإجابة الصحيحة السريعة تصل إلى 380 نقطة.",
   },
   {
-    icon: BrainCircuit,
-    title: "فئات متجددة",
-    text: "عام، علوم، جغرافيا، رياضيات، لغة، منطق وتاريخ — جولة مختلفة في كل مرة، وأسئلة لا تتكرر.",
+    icon: Flame,
+    title: "سلاسل تكسب أكثر",
+    text: "الإجابات الصحيحة المتتالية تضاعف مكافآتك — لا تتوقف بعد أول إجابة صحيحة.",
   },
   {
-    icon: Users,
-    title: "ترتيب مباشر",
-    text: "شاهد تحرّك النقاط لحظة بلحظة واعرف من يتصدر قبل انتهاء الجولة.",
+    icon: Eraser,
+    title: "منقّي 50/50",
+    text: "في اللحظة الحاسمة امسح إجابتين خاطئتين وضيّق الخيارات قبل انتهاء الوقت.",
+  },
+  {
+    icon: Layers,
+    title: "غرف مخصصة",
+    text: "اختر عدد الأسئلة (3–10) والوقت لكل سؤال، وفلتر الفئات التي تريد المنافسة فيها.",
+  },
+  {
+    icon: Medal,
+    title: "خبرة ومستويات وشارات",
+    text: "كل جولة تمنح XP يرفع مستواك، وافتح 8 شارات إنجاز تعكس أسلوب لعبك.",
   },
   {
     icon: Trophy,
     title: "منصة الفائزين",
-    text: "في نهاية الجولة تتوّج القمة الثلاثية مع ملخص كامل لإجابات الجميع.",
+    text: "ترتيب مباشر خلال الجولة ومنصة ثلاثية في النهاية مع مراجعة كل سؤال بالتفصيل.",
   },
 ];
 
 const STATS = [
-  { value: "5", label: "أسئلة في كل جولة" },
-  { value: "15 ث", label: "لكل سؤال" },
-  { value: "200", label: "أقصى نقطة للسؤال" },
-  { value: "لانهائي", label: "أصدقاء يمكنهم اللعب" },
+  { value: "130+", label: "سؤالاً في البنك" },
+  { value: "18", label: "فئة معرفية" },
+  { value: "12", label: "لاعباً في الغرفة" },
+  { value: "380", label: "أقصى نقطة للسؤال" },
 ];
 
 const fadeUp = {
@@ -278,8 +313,9 @@ export default function Landing() {
               variants={fadeUp}
               className="mt-6 max-w-lg text-lg leading-relaxed text-muted-foreground"
             >
-              تحدٍّ سريع من خمسة أسئلة تتنافسون فيه مع أصدقائك لحظة بلحظة.
-              أنشئ غرفة، شارك الرمز، وأثبت أن بديهتك هي الأسرع.
+              تحدٍّ سريع تتنافسون فيه مع أصدقائك لحظة بلحظة: نفس الأسئلة، نفس
+              الوقت، وسلاسل ومكافآت ومنقّي 50/50 لمن يجرؤ. أنشئ غرفة مخصصة، شارك
+              الرمز، وأثبت أن بديهتك هي الأسرع.
             </motion.p>
 
             <motion.div variants={fadeUp} className="mt-9 flex flex-wrap items-center gap-3">
@@ -311,7 +347,11 @@ export default function Landing() {
               </span>
               <span className="flex items-center gap-2">
                 <Users className="size-4 text-primary" />
-                من 1 إلى 10 لاعبين
+                من 1 إلى 12 لاعباً
+              </span>
+              <span className="flex items-center gap-2">
+                <Medal className="size-4 text-primary" />
+                خبرة وشارات لكل جولة
               </span>
             </motion.div>
           </motion.div>
@@ -427,6 +467,169 @@ export default function Landing() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ── Categories ────────────────────────────────────────── */}
+      <section className="mx-auto max-w-6xl px-5 py-24">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6 }}
+          className="text-center"
+        >
+          <p className="text-sm font-semibold text-primary">بنك أسئلة ضخم</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+            من الفضاء إلى المطبخ…
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl leading-relaxed text-muted-foreground">
+            أكثر من 130 سؤالاً موزعة على 18 فئة. في الغرف المخصصة يمكنك تضييق
+            المنافسة على الفئات المفضلة لديك.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          className="mt-10 flex flex-wrap justify-center gap-2.5"
+        >
+          {CATEGORIES.map((category, i) => (
+            <span
+              key={category}
+              className="rounded-full border border-border/80 bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary"
+              style={{ transitionDelay: `${(i % 6) * 20}ms` }}
+            >
+              {category}
+            </span>
+          ))}
+        </motion.div>
+      </section>
+
+      {/* ── Testimonials ───────────────────────────────────────── */}
+      <section className="border-y border-border/70 bg-card/50">
+        <div className="mx-auto max-w-6xl px-5 py-24">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6 }}
+            className="text-center"
+          >
+            <p className="text-sm font-semibold text-primary">آراء اللاعبين</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              معارك الأصدقاء لا تُنسى
+            </h2>
+          </motion.div>
+
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
+            {[
+              {
+                name: "سارة",
+                role: "تلعب مع فريق عملها كل جمعة",
+                text: "أصبحت جولات الجمعة تقليداً عندنا. أكثر شيء أستمتع به هو منقّي 50/50 في السؤال الأخير — الضغط حقيقي!",
+              },
+              {
+                name: "خالد",
+                role: "تحدّى صديقه في 12 جولة متتالية",
+                text: "ظننت أني أعرف كل شيء عن أصدقائي، حتى أصبحت أطاردهم في الترتيب المباشر. السلاسل غيّرت طريقة لعبنا كلياً.",
+              },
+              {
+                name: "نور",
+                role: "جمعت 9 شارات",
+                text: "الخبرة والمستويات جعلتني أستمر — كل جولة أكتشف فئة جديدة أبدع فيها. حتى الأسئلة الصعبة صارت هوايتي.",
+              },
+            ].map((t, i) => (
+              <motion.figure
+                key={t.name}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className="flex flex-col rounded-2xl border border-border/80 bg-card p-7 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+              >
+                <Quote className="size-5 text-primary/50" />
+                <blockquote className="mt-4 flex-1 text-sm leading-relaxed text-foreground">
+                  {t.text}
+                </blockquote>
+                <figcaption className="mt-6 flex items-center gap-3 border-t border-border/70 pt-4">
+                  <Avatar name={t.name} index={i} />
+                  <div>
+                    <p className="text-sm font-bold">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.role}</p>
+                  </div>
+                </figcaption>
+              </motion.figure>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-3xl px-5 py-24">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6 }}
+          className="text-center"
+        >
+          <p className="text-sm font-semibold text-primary">أسئلة شائعة</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+            كل ما تريد معرفته
+          </h2>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mt-10"
+        >
+          <Accordion type="single" collapsible className="space-y-3">
+            {[
+              {
+                q: "كيف أبدأ جولة مع أصدقائي؟",
+                a: "اضغط «ابدأ التحدي»، اختر اسمك، وستحصل على رمز غرفة من 6 أحرف. أرسل الرمز أو رابط الدعوة لأصدقائك، وابدأ الجولة فور انضمامهم.",
+              },
+              {
+                q: "هل يمكنني تخصيص الجولة؟",
+                a: "نعم — المضيف يستطيع في الغرفة اختيار عدد الأسئلة (3، 5، 7 أو 10)، والوقت لكل سؤال (10–30 ثانية)، والفئات التي ستعتمدها الأسئلة.",
+              },
+              {
+                q: "كيف تُحتسب النقاط؟",
+                a: "الإجابة الصحيحة تمنح نقاطاً حسب صعوبة السؤال (حتى 200) بالإضافة إلى مكافأة سرعة تتناقص مع مرور الوقت (حتى 180). السلاسل المتتالية تضيف مكافآت إضافية حتى 100 نقطة.",
+              },
+              {
+                q: "ما هو منقّي 50/50؟",
+                a: "أداة تُستخدم مرة واحدة في كل جولة: تمسح إجابتين خاطئتين ليتبقى أمامك خياران فقط. الخادم هو من يختار الإجابات المستبعدة، فلا يمكن التلاعب بها.",
+              },
+              {
+                q: "ماذا تكسب من اللعب؟",
+                a: "كل جولة تمنحك نقاط خبرة (XP) ترفع مستواك، وشارات إنجاز تفتحها حسب أدائك — أول فوز، سلاسل، سرعة إجابة، والكثير غيرها. كل ذلك في ملفك الشخصي.",
+              },
+              {
+                q: "هل أحتاج تسجيل حساب؟",
+                a: "نعم، عبر بريد إلكتروني برمز تحقق سريع — أو يمكنك الدخول كضيف دون أي بيانات للعب مع أصدقائك.",
+              },
+            ].map((item) => (
+              <AccordionItem
+                key={item.q}
+                value={item.q}
+                className="rounded-2xl border border-border/80 bg-card px-5 shadow-sm"
+              >
+                <AccordionTrigger className="py-4 text-start text-sm font-bold">
+                  {item.q}
+                </AccordionTrigger>
+                <AccordionContent className="pb-4 text-sm leading-relaxed text-muted-foreground">
+                  {item.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </motion.div>
       </section>
 
       {/* ── CTA ────────────────────────────────────────────────── */}

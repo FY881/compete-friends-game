@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { sounds } from "@/lib/sounds";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Lobby } from "@/components/game/Lobby";
@@ -14,6 +15,9 @@ import {
   Loader2,
   LogOut,
   SearchX,
+  UserRound,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 
@@ -31,6 +35,11 @@ export default function Game() {
   const data = useQuery(api.games.getGame, { code });
   const leaveGame = useMutation(api.games.leaveGame);
   const [leaving, setLeaving] = useState(false);
+  const [muted, setMuted] = useState(sounds.isMuted());
+
+  const toggleMuted = () => {
+    setMuted(sounds.toggleMuted());
+  };
 
   const handleLeave = async () => {
     if (leaving) return;
@@ -78,6 +87,10 @@ export default function Game() {
   }
 
   const me = data.players.find((p) => p.isMe);
+  const progress =
+    data.game.status === "playing"
+      ? `سؤال ${data.game.currentQuestionIndex + 1} من ${data.game.questionCount}`
+      : null;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
@@ -97,7 +110,33 @@ export default function Game() {
             </span>
           </button>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            {progress && (
+              <Badge
+                variant="secondary"
+                className="hidden rounded-full px-3 py-1.5 text-xs sm:inline-flex"
+              >
+                {progress}
+              </Badge>
+            )}
+            <button
+              type="button"
+              onClick={toggleMuted}
+              className="flex size-9 items-center justify-center rounded-full border border-border/70 bg-card text-muted-foreground transition-colors hover:text-foreground"
+              title={muted ? "تشغيل الصوت" : "كتم الصوت"}
+            >
+              {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+            </button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate("/profile")}
+            >
+              <UserRound className="size-3.5" />
+              <span className="hidden sm:inline">ملفي</span>
+            </Button>
             <Badge
               variant="outline"
               className="cursor-pointer gap-1.5 rounded-full px-3 py-1.5 font-mono text-sm font-bold tracking-[0.2em] text-foreground"

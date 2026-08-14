@@ -1,4 +1,4 @@
-import { Crown, Trophy } from "lucide-react";
+import { Crown, Flame, Trophy } from "lucide-react";
 import type { PlayerInfo } from "@/convex/games";
 import { cn } from "@/lib/utils";
 import { GameAvatar } from "./ui";
@@ -54,6 +54,15 @@ export function Leaderboard({
                   </span>
                 )}
               </span>
+              {player.streak >= 2 && (
+                <span
+                  className="flex items-center gap-0.5 text-xs font-bold text-orange-500"
+                  title={`سلسلة ${player.streak} إجابات صحيحة`}
+                >
+                  <Flame className={cn("size-3.5", player.streak >= 4 && "animate-pulse")} />
+                  {player.streak}
+                </span>
+              )}
               {i === 0 && <Crown className="size-4 text-amber-500" />}
               <span className="text-sm font-bold tabular-nums text-foreground">
                 {player.score}
@@ -65,7 +74,7 @@ export function Leaderboard({
 
       {compact && (
         <p className="mt-4 border-t border-border/70 pt-3 text-center text-xs text-muted-foreground">
-          الإجابات الصحيحة السريعة تصعد بك
+          الإجابات الصحيحة السريعة تصعد بك — والسلاسل تمنح مكافآت إضافية 🔥
         </p>
       )}
     </div>
