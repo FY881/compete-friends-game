@@ -181,6 +181,7 @@ export type ModSettings = {
   announcementActive: boolean;
   antiCheatEnabled: boolean;
   disabledQuestions: string[];
+  siteUrl: string; // official web app URL — needed by the Android APK for downloads
 };
 
 export const DEFAULT_SETTINGS: ModSettings = {
@@ -192,6 +193,7 @@ export const DEFAULT_SETTINGS: ModSettings = {
   announcementActive: false,
   antiCheatEnabled: true,
   disabledQuestions: [],
+  siteUrl: "",
 };
 
 export async function getSettingsData(
@@ -217,6 +219,7 @@ export async function getSettingsData(
     announcementActive: read("announcementActive", DEFAULT_SETTINGS.announcementActive),
     antiCheatEnabled: read("antiCheatEnabled", DEFAULT_SETTINGS.antiCheatEnabled),
     disabledQuestions: read("disabledQuestions", DEFAULT_SETTINGS.disabledQuestions),
+    siteUrl: read("siteUrl", DEFAULT_SETTINGS.siteUrl),
   };
 }
 
@@ -952,6 +955,7 @@ export const updateSettings = mutation({
     announcementActive: v.optional(v.boolean()),
     antiCheatEnabled: v.optional(v.boolean()),
     disabledQuestions: v.optional(v.array(v.string())),
+    siteUrl: v.optional(v.string()),
   },
   handler: async (ctx, patch) => {
     await requireOwner(ctx);

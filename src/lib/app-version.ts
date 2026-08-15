@@ -17,6 +17,34 @@ export const APP_VERSION = "1.0.0";
 
 export const APP_VERSION_LABEL = `العبقري ${APP_VERSION}`;
 
+/**
+ * بناء رابط تحميل الـ APK الصحيح.
+ *
+ * كان الرابط القديم يُبنى من `SITE_URL` (متغير الخادم) الذي يشير إلى نطاق
+ * Convex — فيُفتح «No matching routes found» لأن خادم Convex لا يخدّم ملفات.
+ *
+ * القاعدة الآن:
+ * - المتصفح (ويب/PWA): يستخدم نطاق الموقع الحالي `window.location.origin` —
+ *   حيث يُخدَّم مجلد `public/downloads` فعلياً.
+ * - تطبيق أندرويد (WebView على https://localhost): يستخدم `siteUrl` الذي
+ *   يضبطه المالك من غرفة المالك (رابط الموقع الرسمي).
+ */
+export function resolveApkUrl(
+  fileName: string | null | undefined,
+  siteUrl?: string | null,
+): string {
+  const clean = (siteUrl ?? "").trim().replace(/\/+$/, "");
+  let base: string;
+  if (/^https?:\/\//.test(clean)) {
+    base = clean;
+  } else if (typeof window !== "undefined" && window.location?.origin) {
+    base = window.location.origin;
+  } else {
+    base = "";
+  }
+  return `${base}/downloads/${fileName ?? `al-abqari-v${APP_VERSION}.apk`}`;
+}
+
 /** تحليل رقم سيمانتك «x.y.z» إلى أرقام للمقارنة. */
 export function parseVersion(v: string): number[] {
   return v

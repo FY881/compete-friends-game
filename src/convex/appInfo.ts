@@ -1,4 +1,5 @@
 import { query } from "./_generated/server";
+import { getSettingsData } from "./owner";
 
 /**
  * معلومات الإصدار المنشورة — محور «خطة تحديث التطبيق».
@@ -8,8 +9,11 @@ import { query } from "./_generated/server";
  * 2. ارفع versionCode/versionName في `android/app/build.gradle`.
  * 3. أعد بناء الويب وبناء الـ APK (اسم الملف يحمل رقم الإصدار).
  *
- * كل النسخ القديمة المثبّتة تقرأ هذه الدالة، تقارن رقمها، وتظهر
- * لافتة «تحديث متاح» مع ملاحظات الإصدار الجديد ورابط التحميل.
+ * ملاحظة مهمة حول رابط التحميل: لا يُبنى الرابط من `SITE_URL` (متغير الخادم)
+ * لأنه يشير إلى نطاق Convex الذي لا يخدّم ملفات APK (كان ينتج «No matching
+ * routes found»). الرابط يُبنى في المتصفح من نطاق الموقع نفسه
+ * (`window.location.origin`) عبر `resolveApkUrl` في `src/lib/app-version.ts`،
+ * ولتطبيق أندرويد الأصلي يُستخدم `siteUrl` القابل للضبط من غرفة المالك.
  */
 const CURRENT_VERSION = "1.0.0";
 
@@ -21,16 +25,18 @@ const UPDATE_NOTES: string[] = [
 
 export const getAppInfo = query({
   handler: async (ctx) => {
-    // رابط التحميل المطلق يُبنى من SITE_URL (متغير بيئة Convex) إن وُجد،
-    // وإلا يرجع العميل لرابط نسبي على موقعه الحالي.
-    const siteUrl = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
+    // `siteUrl` = رابط الموقع الرسمي (يضبطه المالك من غرفة المالك).
+    // فارغ افتراضياً → المتصفح يستخدم نطاقه الحالي تلقائياً.
+    const settings = await getSettingsData(ctx);
+    const apkFileName = `al-abqari-v${CURRENT_VERSION}.apk`;
     return {
       version: CURRENT_VERSION,
       notes: UPDATE_NOTES,
-      apkFileName: `al-abqari-v${CURRENT_VERSION}.apk`,
-      apkUrl: siteUrl
-        ? `${siteUrl}/downloads/al-abqari-v${CURRENT_VERSION}.apk`
-        : `/downloads/al-abqari-v${CURRENT_VERSION}.apk`,
+      apkFileName,
+      // مسار نسبي — المتصفح يحلّه على نطاق الموقع نفسه. (كان يُبنى من
+      // SITE_URL الذي يشير لنطاق Convex فينتج «No matching routes found».)
+      apkUrl: `/downloads/${apkFileName}`,
+      siteUrl: settings.siteUrl,
     };
   },
 });

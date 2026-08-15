@@ -1,7 +1,7 @@
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { APP_VERSION, isNewerVersion } from "@/lib/app-version";
+import { APP_VERSION, isNewerVersion, resolveApkUrl } from "@/lib/app-version";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, RefreshCw, Sparkles, X } from "lucide-react";
@@ -38,7 +38,7 @@ export function UpdateBanner() {
     window.location.reload();
   };
 
-  const downloadUrl = info.apkUrl || `/downloads/${info.apkFileName}`;
+  const downloadUrl = resolveApkUrl(info.apkFileName, info.siteUrl);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-l from-primary/10 via-card to-card p-4 sm:p-5">

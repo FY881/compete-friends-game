@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import type { SettingsData } from "@/convex/owner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -20,6 +21,8 @@ import {
   Flag,
   Gamepad2,
   Gavel,
+  Globe,
+  Link2,
   Loader2,
   ShieldCheck,
   Sparkles,
@@ -138,8 +141,22 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
   const [running, setRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [siteUrl, setSiteUrl] = useState(settings.siteUrl);
 
   const latest = reports?.[0];
+
+  const saveSiteUrl = async () => {
+    setBusy(true);
+    try {
+      await updateSettings({ siteUrl: siteUrl.trim() });
+      toast.success("تم حفظ رابط الموقع الرسمي — روابط تحميل APK تعمل الآن من التطبيق.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "تعذّر الحفظ.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const toggleAdmin = async (v: boolean) => {
     setBusy(true);
@@ -183,6 +200,46 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
 
   return (
     <div className="space-y-5">
+      {/* Site URL — needed by the Android APK so in-app downloads work */}
+      <Card className="border-border/80 shadow-sm">
+        <CardContent className="space-y-4 p-5">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 font-mono text-xs font-bold text-primary">
+              AI-02
+            </span>
+            <div>
+              <h3 className="font-bold text-foreground">رابط الموقع الرسمي (لتطبيق أندرويد)</h3>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                رابط الموقع العام حيث يُخدَّم ملف APK — يلزم فقط لتطبيق أندرويد
+                ليحمّل التحديثات من داخل التطبيق. المتصفح يعرف نطاقه تلقائياً،
+                فاركه فارغاً إن لم تصدر تحديثات للتطبيق.
+              </p>
+            </div>
+          </div>
+          <div className="relative">
+            <Globe className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value)}
+              dir="ltr"
+              placeholder="https://alabqari.example.com"
+              className="rounded-xl ps-9 text-end font-mono text-sm"
+              disabled={busy}
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Link2 className="size-3.5 text-primary" />
+              مثال: https://alabqari.example.com — بدون شرطة مائلة في النهاية.
+            </p>
+            <Button onClick={saveSiteUrl} disabled={busy} variant="outline" className="gap-1.5 rounded-xl">
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
+              حفظ الرابط
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Master switch + schedule */}
       <Card className="border-border/80 shadow-sm">
         <CardContent className="space-y-5 p-5">

@@ -52,6 +52,8 @@ import {
   Flag,
   Gamepad2,
   Gavel,
+  Globe,
+  Link2,
   Loader2,
   Megaphone,
   MicOff,
@@ -1592,7 +1594,21 @@ function SettingsTab({ settings }: { settings: SettingsData }) {
   const updateSettings = useMutation(api.owner.updateSettings);
   const [announcement, setAnnouncement] = useState(settings.announcement);
   const [announcementActive, setAnnouncementActive] = useState(settings.announcementActive);
+  const [siteUrl, setSiteUrl] = useState(settings.siteUrl);
   const [busy, setBusy] = useState(false);
+
+  const saveSiteUrl = async () => {
+    setBusy(true);
+    try {
+      await updateSettings({ siteUrl: siteUrl.trim() });
+      toast.success("تم حفظ رابط الموقع الرسمي — روابط تحميل APK تعمل الآن من التطبيق.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "تعذّر الحفظ.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const saveAnnouncement = async () => {
     setBusy(true);

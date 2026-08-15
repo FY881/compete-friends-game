@@ -1,6 +1,6 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
+import { APP_VERSION, APP_VERSION_LABEL, resolveApkUrl } from "@/lib/app-version";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UpdateBanner } from "@/components/UpdateBanner";
@@ -27,7 +27,10 @@ export default function Download() {
   const navigate = useNavigate();
   const info = useQuery(api.appInfo.getAppInfo);
 
-  const apkUrl = info?.apkUrl || `/downloads/${info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`}`;
+  const apkUrl = resolveApkUrl(
+    info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`,
+    info?.siteUrl,
+  );
   const version = info?.version ?? APP_VERSION;
 
   return (

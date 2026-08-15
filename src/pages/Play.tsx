@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { resolveApkUrl } from "@/lib/app-version";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
@@ -715,7 +716,7 @@ export default function Play() {
               <div className="flex flex-wrap items-center gap-2">
                 <Button size="lg" className="gap-2 rounded-xl" asChild>
                   <a
-                    href={appInfo?.apkUrl ?? "/download"}
+                    href={resolveApkUrl(appInfo?.apkFileName, appInfo?.siteUrl)}
                     target="_blank"
                     rel="noreferrer"
                     download
