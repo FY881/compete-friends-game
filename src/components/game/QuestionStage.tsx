@@ -9,7 +9,7 @@ import {
 } from "@/convex/gameConfig";
 import type { GameData, PlayerInfo } from "@/convex/games";
 import { sounds } from "@/lib/sounds";
-import { LIFELINES_PER_GAME } from "@/lib/game-config";
+import { COUNTDOWN_MS, LIFELINES_PER_GAME } from "@/lib/game-config";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import {
   Hourglass,
   Loader2,
   Sparkles,
+  Trophy,
   Users,
   X,
   Zap,
@@ -126,6 +127,16 @@ export function QuestionStage({
   const answeredCount = game.players.filter((p) => p.answers[index] != null).length;
   const totalPlayers = game.players.length;
   const isRevealing = phase === "revealing";
+  const isCountdown = phase === "countdown";
+  const countdownLeft = isCountdown ? g.questionStartedAt - now : 0;
+  const countdownNumber = Math.max(0, Math.ceil(countdownLeft / 1000));
+
+  // Golden question: the last question of the round doubles all points.
+  const isGolden = question?.golden ?? false;
+  const firstCorrectId = g.firstCorrect[index];
+  const firstCorrectName = firstCorrectId
+    ? game.players.find((p) => p.id === firstCorrectId)?.name ?? null
+    : null;
 
   // Fresh lifeline + cheat notice state for every question.
   useEffect(() => {
@@ -173,6 +184,13 @@ export function QuestionStage({
     };
   }, [phase, myAnswer, index, g.code, recordCheat]);
 
+  // Countdown beeps (3-2-1) before the first question.
+  useEffect(() => {
+    if (!isCountdown || countdownNumber === 0) return;
+    sounds.countdown();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdownNumber, isCountdown]);
+
   // Tick sound during the final five seconds.
   const tickSecond = Math.floor(remaining / 1000);
   useEffect(() => {
@@ -183,13 +201,16 @@ export function QuestionStage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickSecond, phase, myAnswer]);
 
-  // Feedback sounds when the correct answer is revealed.
+  // Feedback sounds + haptics when the correct answer is revealed.
   useEffect(() => {
     if (prevPhase.current === "answering" && phase === "revealing") {
       if (myAnswer?.correct) {
         sounds.correct();
       } else if (myAnswer) {
         sounds.wrong();
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+          navigator.vibrate?.(90);
+        }
       }
       sounds.reveal();
     }
@@ -199,6 +220,39 @@ export function QuestionStage({
 
   if (!question) {
     return null;
+  }
+
+  // ── 3-2-1 countdown before the first question ────────────────────────
+  if (isCountdown) {
+    return (
+      <div className="flex w-full flex-col items-center justify-center gap-8 py-16 text-center sm:py-24">
+        <Badge variant="outline" className="gap-1.5 rounded-full text-primary">
+          <Sparkles className="size-3.5" />
+          استعدوا للمعركة…
+        </Badge>
+        <div className="relative flex size-44 items-center justify-center">
+          <CountdownRing remainingMs={countdownLeft} totalMs={COUNTDOWN_MS} />
+          <span className="absolute text-7xl font-bold tabular-nums tracking-tight">
+            {countdownNumber}
+          </span>
+        </div>
+        <div>
+          <p className="text-lg font-bold">السؤال الأول بعد {countdownNumber} ثانية</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            نفس السؤال · نفس الوقت · أسرع عقل يفوز
+          </p>
+        </div>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="size-2 animate-bounce rounded-full bg-primary"
+              style={{ animationDelay: `${i * 0.15}s` }}
+            />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const submit = async (optionIndex: number) => {
@@ -261,10 +315,11 @@ export function QuestionStage({
     MAX_STREAK_BONUS,
     Math.max(0, me.streak * STREAK_BONUS_PER_STEP),
   );
-  const maxPoints =
+  const baseMax =
     DIFFICULTY_BASE_POINTS[question.difficulty] +
     DIFFICULTY_SPEED_BONUS[question.difficulty] +
     nextStreakBonus;
+  const maxPoints = baseMax * (isGolden ? 2 : 1);
 
   const optionState = (optionIndex: number) => {
     if (hiddenOptions.includes(optionIndex)) return "hidden";
@@ -307,6 +362,12 @@ export function QuestionStage({
             <Badge variant="secondary" className="gap-1.5">
               السؤال {index + 1} من {g.questionCount}
             </Badge>
+            {isGolden && (
+              <Badge className="gap-1.5 border-amber-500/40 bg-amber-400/15 text-amber-700 hover:bg-amber-400/15">
+                <Trophy className="size-3" />
+                السؤال الذهبي · نقاط ×2
+              </Badge>
+            )}
           </div>
           {!isRevealing ? (
             <CountdownRing remainingMs={remaining} totalMs={timePerQuestion} />
@@ -345,7 +406,7 @@ export function QuestionStage({
         <div className="relative mt-4 flex flex-wrap items-center gap-2">
           <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
             <Zap className="size-3.5" />
-            صحيحة = حتى {maxPoints} نقطة
+            صحيحة = حتى {maxPoints} نقطة{isGolden ? " (مضاعفة!)" : ""}
           </span>
           {me.streak >= 1 && !isRevealing && (
             <span className="flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-bold text-orange-600">
@@ -417,24 +478,32 @@ export function QuestionStage({
           </div>
 
           {isRevealing ? (
-            myAnswer ? (
-              myAnswer.correct ? (
-                <span className="flex items-center gap-2 rounded-full bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-700">
-                  <Zap className="size-4" />
-                  إجابة صحيحة! +{myAnswer.points} نقطة
-                </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {myAnswer ? (
+                myAnswer.correct ? (
+                  <span className="flex items-center gap-2 rounded-full bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-700">
+                    <Zap className="size-4" />
+                    إجابة صحيحة! +{myAnswer.points} نقطة
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-sm font-bold text-rose-700">
+                    <X className="size-4" />
+                    إجابة خاطئة — 0 نقطة
+                  </span>
+                )
               ) : (
-                <span className="flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-sm font-bold text-rose-700">
-                  <X className="size-4" />
-                  إجابة خاطئة — 0 نقطة
+                <span className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground">
+                  <Hourglass className="size-4" />
+                  لم تجب على هذا السؤال
                 </span>
-              )
-            ) : (
-              <span className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground">
-                <Hourglass className="size-4" />
-                لم تجب على هذا السؤال
-              </span>
-            )
+              )}
+              {firstCorrectName && (
+                <span className="flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-2 text-xs font-bold text-amber-700">
+                  <Zap className="size-3.5" />
+                  أول إجابة صحيحة: {firstCorrectName} +50
+                </span>
+              )}
+            </div>
           ) : timeUp ? (
             <span className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground">
               <Hourglass className="size-4" />

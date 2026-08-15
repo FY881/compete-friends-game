@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -64,6 +65,7 @@ export default function Play() {
 
   const profile = useQuery(api.stats.getMyProfile);
   const discipline = useQuery(api.owner.getMyDiscipline);
+  const topPlayers = useQuery(api.stats.getTopPlayers, { limit: 5 });
 
   const displayName = user?.name ?? "";
   const [nickname, setNickname] = useState(() => {
@@ -563,6 +565,76 @@ export default function Play() {
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
             </motion.div>
           ))}
+        </section>
+
+        {/* ── Elite leaderboard ────────────────────────────────── */}
+        <section className="mt-16">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-primary">نخبة العقول</p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+                متصدرو التحدي على المنصة
+              </h2>
+            </div>
+            <Badge variant="outline" className="hidden rounded-full sm:inline-flex">
+              تُحدَّث فور انتهاء كل جولة
+            </Badge>
+          </div>
+
+          {topPlayers === undefined ? (
+            <div className="mt-8 flex items-center justify-center gap-2 rounded-2xl border border-border/80 bg-card py-10 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              جارٍ جمع أرقام النخبة…
+            </div>
+          ) : topPlayers.length === 0 ? (
+            <div className="mt-8 rounded-2xl border border-dashed border-border/80 bg-card/60 p-10 text-center">
+              <Trophy className="mx-auto size-8 text-muted-foreground/50" />
+              <p className="mt-3 text-sm font-semibold text-muted-foreground">
+                لا متصدرين بعد — أول جولة ستكتب الاسم الأول هنا!
+              </p>
+            </div>
+          ) : (
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {topPlayers.map((player, i) => (
+                <motion.div
+                  key={`${player.name}-${i}`}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.4, delay: i * 0.06 }}
+                  className={cn(
+                    "flex items-center gap-4 rounded-2xl border bg-card p-4 shadow-sm",
+                    i === 0 ? "border-amber-400/40 bg-amber-400/5" : "border-border/80",
+                  )}
+                >
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl text-lg">
+                    {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (
+                      <span className="flex size-9 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground">
+                        {i + 1}
+                      </span>
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 truncate text-sm font-bold text-foreground">
+                      {player.name}
+                      {i === 0 && <Crown className="size-4 shrink-0 text-amber-500" />}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      المستوى {player.level} — {player.levelTitle}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-end">
+                    <p className="text-base font-bold tabular-nums text-foreground">
+                      {player.xp.toLocaleString("ar")} XP
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {player.gamesWon} فوز · {player.badgeCount} شارة
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ── Laws reminder ────────────────────────────────────── */}

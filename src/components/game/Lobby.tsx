@@ -148,6 +148,9 @@ function HostSettings({
               )}
             >
               {formatTimeOption(ms)}
+              {ms === 5000 && (
+                <span className="ms-1 text-[10px] font-extrabold tracking-wide">⚡ برق</span>
+              )}
             </button>
           ))}
         </div>

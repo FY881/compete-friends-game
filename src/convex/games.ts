@@ -11,12 +11,17 @@ import {
 } from "./_generated/server";
 import {
   ANSWER_MS,
+  BLOWOUT_MARGIN,
   CODE_ALPHABET,
   CODE_LENGTH,
+  COUNTDOWN_MS,
   DIFFICULTY_BASE_POINTS,
   DIFFICULTY_SPEED_BONUS,
   FAST_ANSWER_MS,
+  FIRST_BLOOD_BONUS,
+  GOLDEN_QUESTION_MULTIPLIER,
   LIFELINES_PER_GAME,
+  MAX_ACTIVE_ROOMS,
   MAX_NAME_LENGTH,
   MAX_PLAYERS,
   MAX_STREAK_BONUS,
@@ -56,6 +61,7 @@ export type GameQuestion = {
   question: string;
   options: string[];
   correctIndex: number | null; // hidden until the question is revealed
+  golden: boolean; // the last question of the round (points ×2)
 };
 
 export type GameSettings = {
@@ -69,6 +75,7 @@ export type MyResult = {
   rank: number;
   playerCount: number;
   won: boolean;
+  stars: number;
   badgesEarned: Badge[];
 };
 
@@ -89,11 +96,12 @@ export type GameData = {
     id: string;
     code: string;
     status: "waiting" | "playing" | "finished";
-    phase: "answering" | "revealing";
+    phase: "countdown" | "answering" | "revealing";
     currentQuestionIndex: number;
     questionStartedAt: number;
     questionCount: number;
     settings: GameSettings;
+    firstCorrect: (string | null)[];
     rematchCode: string | null;
   };
   me: string;
@@ -293,6 +301,25 @@ export const createGame = mutation({
     }
     await assertNotBanned(ctx, userId);
 
+    // Lazy-cleanup stale waiting rooms, then enforce the per-player cap so
+    // nobody can hoard rooms.
+    const now = Date.now();
+    const mine = await ctx.db
+      .query("games")
+      .withIndex("by_host", (q) => q.eq("hostId", userId))
+      .collect();
+    for (const g of mine) {
+      if (g.status === "waiting" && now - g.createdAt > 3 * 60 * 60 * 1000) {
+        await ctx.db.delete(g._id);
+      }
+    }
+    const active = mine.filter((g) => g.status !== "finished");
+    if (active.length >= MAX_ACTIVE_ROOMS) {
+      throw new Error(
+        `لديك ${MAX_ACTIVE_ROOMS} غرف نشطة — أنهِ إحداها أو اتركها قبل إنشاء غرفة جديدة`,
+      );
+    }
+
     const safeSettings = validateSettings(
       settings ?? {
         questionCount: QUESTION_COUNT,
@@ -315,6 +342,7 @@ export const createGame = mutation({
       questionIds,
       currentQuestionIndex: 0,
       questionStartedAt: 0,
+      firstCorrect: [],
       createdAt: Date.now(),
       settings: safeSettings,
     });
@@ -467,18 +495,42 @@ export const startGame = mutation({
     }
 
     const now = Date.now();
+    // A 3-2-1 countdown plays before the first question, then the answer
+    // window opens (questionStartedAt already points at the moment the
+    // window opens, so the timer is accurate for every player).
     await ctx.db.patch(game._id, {
       status: "playing",
-      phase: "answering",
+      phase: "countdown",
       currentQuestionIndex: 0,
-      questionStartedAt: now,
+      questionStartedAt: now + COUNTDOWN_MS,
     });
 
+    await ctx.scheduler.runAfter(COUNTDOWN_MS, internal.games.beginQuestion, {
+      gameId: game._id,
+      index: 0,
+    });
     await ctx.scheduler.runAfter(
-      game.settings.timePerQuestionMs,
+      COUNTDOWN_MS + game.settings.timePerQuestionMs,
       internal.games.revealQuestion,
       { gameId: game._id, index: 0 },
     );
+  },
+});
+
+/** Countdown over → open the answer window for the first question. */
+export const beginQuestion = internalMutation({
+  args: { gameId: v.id("games"), index: v.number() },
+  handler: async (ctx, { gameId, index }) => {
+    const game = await ctx.db.get(gameId);
+    if (
+      !game ||
+      game.status !== "playing" ||
+      game.currentQuestionIndex !== index ||
+      game.phase !== "countdown"
+    ) {
+      return; // stale job
+    }
+    await ctx.db.patch(gameId, { phase: "answering" });
   },
 });
 
@@ -540,6 +592,7 @@ export const submitAnswer = mutation({
     let points = 0;
     let streak = 0;
     let bestStreak = player.bestStreak;
+    let firstBlood = false;
     if (correct) {
       points += DIFFICULTY_BASE_POINTS[question.difficulty];
       points += Math.round(DIFFICULTY_SPEED_BONUS[question.difficulty] * remainingRatio);
@@ -549,6 +602,21 @@ export const submitAnswer = mutation({
         MAX_STREAK_BONUS,
         Math.max(0, (streak - 1) * STREAK_BONUS_PER_STEP),
       );
+
+      // First-blood bonus: the first correct answer in the question wins it.
+      const firstCorrect = game.firstCorrect ?? [];
+      if (firstCorrect[questionIndex] == null) {
+        firstCorrect[questionIndex] = userId;
+        points += FIRST_BLOOD_BONUS;
+        firstBlood = true;
+        await ctx.db.patch(game._id, { firstCorrect });
+      }
+    }
+
+    // Golden question: the final question of the round doubles all points,
+    // keeping every comeback alive until the last second.
+    if (correct && questionIndex === game.questionIds.length - 1) {
+      points *= GOLDEN_QUESTION_MULTIPLIER;
     }
 
     const answers = Array.from(
@@ -562,6 +630,7 @@ export const submitAnswer = mutation({
       points,
       elapsedMs: elapsed,
     };
+    void firstBlood; // info is surfaced via the firstCorrect list in getGame
 
     await ctx.db.patch(player._id, {
       answers,
@@ -823,6 +892,16 @@ export const finishGame = internalMutation({
       if (answered.some((a) => a.correct && a.elapsedMs <= FAST_ANSWER_MS)) {
         next.add("fast");
       }
+      if ((game.firstCorrect ?? []).includes(p.userId)) {
+        next.add("first_blood");
+      }
+      if (p.answers[questionCount - 1]?.correct) {
+        next.add("golden_answer");
+      }
+      if (won && sorted.length > 1) {
+        const margin = p.score - sorted[1].score;
+        if (margin >= BLOWOUT_MARGIN) next.add("blowout");
+      }
       const gamesAfter = (profile?.gamesPlayed ?? 0) + 1;
       if (gamesAfter >= 10) next.add("games_10");
       if (gamesAfter >= 50) next.add("games_50");
@@ -870,6 +949,10 @@ export const finishGame = internalMutation({
         await ctx.db.insert("profiles", patch);
       }
 
+      const correctRatio = questionCount > 0 ? correctCount / questionCount : 0;
+      const stars =
+        rank === 1 && correctRatio >= 0.6 ? 3 : rank === 1 || correctRatio >= 0.6 ? 2 : 1;
+
       await ctx.db.insert("gameHistory", {
         gameId,
         userId: p.userId,
@@ -881,6 +964,7 @@ export const finishGame = internalMutation({
         questionCount,
         xpEarned: xp,
         won,
+        stars,
         badgesEarned,
         playedAt: now,
       });
@@ -926,6 +1010,7 @@ export const getGame = query({
           question: q.question,
           options: q.options,
           correctIndex: revealed ? q.correctIndex : null,
+          golden: i === game.questionIds.length - 1,
         };
       });
 
@@ -966,6 +1051,7 @@ export const getGame = query({
           rank: row.rank,
           playerCount: row.playerCount,
           won: row.won,
+          stars: row.stars ?? 1,
           badgesEarned: row.badgesEarned
             .map((id) => BADGE_MAP[id])
             .filter(Boolean),
@@ -983,6 +1069,10 @@ export const getGame = query({
         questionStartedAt: game.questionStartedAt,
         questionCount: game.questionIds.length,
         settings: game.settings,
+        firstCorrect: Array.from(
+          { length: game.questionIds.length },
+          (_, i) => game.firstCorrect?.[i] ?? null,
+        ),
         rematchCode,
       },
       me: userId,

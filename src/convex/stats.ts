@@ -26,6 +26,9 @@ export const BADGES: Badge[] = [
   { id: "wins_5", name: "بطل متوّج", description: "اربح 5 جولات في المجمل", emoji: "🥇" },
   { id: "level_10", name: "العبقرية", description: "صل إلى المستوى 10", emoji: "💎" },
   { id: "speed_demon", name: "سهم خاطف", description: "أجب عن كل الأسئلة صحيحاً في نصف الوقت", emoji: "🏹" },
+  { id: "first_blood", name: "الضربة الأولى", description: "كن أول من يجيب صحيحاً في أي سؤال", emoji: "⚔️" },
+  { id: "golden_answer", name: "الإجابة الذهبية", description: "أجب صحيحاً عن السؤال الذهبي الأخير (نقاط مضاعفة)", emoji: "🌟" },
+  { id: "blowout", name: "الحسم الساحق", description: "اربح بفارق 200+ نقطة عن صاحب المركز الثاني", emoji: "💥" },
 ];
 
 export const BADGE_MAP: Record<string, Badge> = Object.fromEntries(
@@ -127,6 +130,7 @@ export type HistoryEntry = {
   questionCount: number;
   xpEarned: number;
   won: boolean;
+  stars: number;
   badgesEarned: Badge[];
   playedAt: number;
 };
@@ -155,8 +159,46 @@ export const getMyHistory = query({
       questionCount: row.questionCount,
       xpEarned: row.xpEarned,
       won: row.won,
+      stars: row.stars ?? 1,
       badgesEarned: row.badgesEarned.map((id) => BADGE_MAP[id]).filter(Boolean),
       playedAt: row.playedAt,
     }));
+  },
+});
+
+export type TopPlayer = {
+  name: string;
+  xp: number;
+  level: number;
+  levelTitle: string;
+  gamesWon: number;
+  badgeCount: number;
+};
+
+/** Global leaderboard: the strongest minds on the platform. */
+export const getTopPlayers = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }): Promise<TopPlayer[]> => {
+    const profiles = await ctx.db
+      .query("profiles")
+      .withIndex("by_xp", (q) => q.gte("xp", 0))
+      .order("desc")
+      .take(Math.min(limit ?? 10, 20));
+
+    const rows: TopPlayer[] = [];
+    for (const profile of profiles) {
+      const user = await ctx.db.get(profile.userId);
+      if (!user) continue;
+      const level = levelFromXp(profile.xp);
+      rows.push({
+        name: user.name ?? "لاعب مجهول",
+        xp: profile.xp,
+        level,
+        levelTitle: levelTitle(level),
+        gamesWon: profile.gamesWon,
+        badgeCount: profile.badges.length,
+      });
+    }
+    return rows;
   },
 });

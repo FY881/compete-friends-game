@@ -20,6 +20,7 @@ import {
   Medal,
   ShieldCheck,
   Sparkles,
+  Star,
   Target,
   Timer,
   Trophy,
@@ -348,8 +349,21 @@ export default function Profile() {
                     {entry.won ? <Trophy className="size-5" /> : `#${entry.rank}`}
                   </span>
                   <div className="flex-1">
-                    <p className="text-sm font-bold">
+                    <p className="flex items-center gap-2 text-sm font-bold">
                       {entry.won ? "فوز 🎉" : `المركز ${entry.rank} من ${entry.playerCount}`}
+                      <span className="flex gap-0.5" title={`${entry.stars} من 3 نجوم`}>
+                        {[1, 2, 3].map((star) => (
+                          <Star
+                            key={star}
+                            className={cn(
+                              "size-3.5",
+                              star <= entry.stars
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-muted-foreground/25",
+                            )}
+                          />
+                        ))}
+                      </span>
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {entry.correctCount}/{entry.questionCount} صحيحة · {entry.score} نقطة ·{" "}

@@ -13,11 +13,24 @@ export const MAX_PLAYERS = 12;
 export const QUESTION_COUNT = 5; // default questions per game
 export const ANSWER_MS = 15_000; // default answer window
 export const REVEAL_MS = 5_000; // how long the correct answer stays on screen
+export const COUNTDOWN_MS = 3_000; // 3-2-1 countdown before the first question
 
 export const QUESTION_COUNT_OPTIONS = [3, 5, 7, 10] as const;
-export const TIME_OPTIONS = [10_000, 15_000, 20_000, 30_000] as const;
+export const TIME_OPTIONS = [5_000, 10_000, 15_000, 20_000, 30_000] as const; // 5s = "blitz"
 
 export const LIFELINES_PER_GAME = 1; // 50/50 uses per player per game
+
+// ── Bonus systems ────────────────────────────────────────────────────────
+// The first player to answer a question correctly earns a bonus on top of
+// their normal points, rewarding speed over guessing.
+export const FIRST_BLOOD_BONUS = 50;
+// The last question of a round is the "golden question": all points are
+// doubled, so the comeback is always alive until the final second.
+export const GOLDEN_QUESTION_MULTIPLIER = 2;
+// Winning margin needed for the "blowout" badge (2nd place at least this far).
+export const BLOWOUT_MARGIN = 200;
+// Maximum simultaneously active rooms a single player may own.
+export const MAX_ACTIVE_ROOMS = 3;
 
 // ── Scoring by difficulty ────────────────────────────────────────────────
 // A correct answer earns the base points plus a speed bonus scaled by how
@@ -64,11 +77,14 @@ export function levelFromXp(xp: number): number {
 
 /** Human titles shown next to a player's level. */
 export function levelTitle(level: number): string {
-  if (level >= 21) return "فيلسوف العقول";
-  if (level >= 16) return "أسطورة";
-  if (level >= 11) return "نابغة";
-  if (level >= 8) return "عبقري";
-  if (level >= 5) return "ذكي";
-  if (level >= 3) return "متعلم";
+  if (level >= 60) return "إمبراطور العقول";
+  if (level >= 45) return "فيلسوف العقول";
+  if (level >= 30) return "أسطورة حية";
+  if (level >= 21) return "أسطورة";
+  if (level >= 16) return "نابغة";
+  if (level >= 11) return "عبقري";
+  if (level >= 8) return "ذكي";
+  if (level >= 5) return "متعلم";
+  if (level >= 3) return "واعد";
   return "مبتدئ";
 }

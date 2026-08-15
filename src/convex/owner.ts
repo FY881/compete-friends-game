@@ -576,7 +576,7 @@ export type LiveGame = {
   id: string;
   code: string;
   status: "waiting" | "playing" | "finished";
-  phase: "answering" | "revealing";
+  phase: "countdown" | "answering" | "revealing";
   hostName: string;
   hostId: string;
   playerCount: number;

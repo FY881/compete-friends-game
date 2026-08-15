@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Share2,
   Sparkles,
+  Star,
   UserRound,
   X,
 } from "lucide-react";
@@ -173,17 +174,39 @@ export function ResultsStage({ game }: { game: GameData }) {
 
         {/* My rewards */}
         {myResult && (
-          <div className="mx-auto mt-6 grid max-w-md gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-start">
+          <div className="mx-auto mt-6 grid max-w-2xl gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-start">
               <p className="text-xs font-semibold text-muted-foreground">
-                المركز {myResult.rank} من {myResult.playerCount} · +XP
+                المركز {myResult.rank} من {myResult.playerCount}
               </p>
+              <p className="mt-1 flex items-center gap-1 text-xl font-bold text-amber-600">
+                {[1, 2, 3].map((star) => (
+                  <Star
+                    key={star}
+                    className={cn(
+                      "size-5",
+                      star <= myResult.stars
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-muted-foreground/30",
+                    )}
+                  />
+                ))}
+                <span className="ms-1 text-xs font-semibold text-muted-foreground">
+                  {myResult.stars}/3 نجوم
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                فوز + دقة 60% فأعلى = 3 نجوم
+              </p>
+            </div>
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-start">
+              <p className="text-xs font-semibold text-muted-foreground">خبرة الجولة</p>
               <p className="mt-1 flex items-center gap-2 text-2xl font-bold text-primary">
                 <Sparkles className="size-5" />
                 +{myResult.xpEarned}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                خبرة مضافة إلى ملفك الشخصي
+                تُضاف إلى مستواك في الملف الشخصي
               </p>
             </div>
             <div className="rounded-2xl border border-border/80 bg-card p-4 text-start">
@@ -204,7 +227,7 @@ export function ResultsStage({ game }: { game: GameData }) {
                 </div>
               ) : (
                 <p className="mt-2 text-sm text-muted-foreground">
-                  لا شارات جديدة هذه الجولة — استمر!
+                  لا شارات جديدة — استمر!
                 </p>
               )}
             </div>

@@ -133,12 +133,14 @@ const schema = defineSchema(
         v.literal("finished"), // results are shown
       ),
       phase: v.union(
+        v.literal("countdown"), // 3-2-1 before the first question
         v.literal("answering"), // answer window is open
         v.literal("revealing"), // showing correct answer before next question
       ),
       questionIds: v.array(v.string()), // ids into the shared QUESTION_BANK
       currentQuestionIndex: v.number(),
       questionStartedAt: v.number(), // server timestamp when the current question started
+      firstCorrect: v.optional(v.array(v.union(v.string(), v.null()))), // per-question first correct userId
       createdAt: v.number(),
       settings: gameSettingsValidator, // room rules chosen by the host
       rematchOf: v.optional(v.id("games")), // set when this game is a rematch of another
@@ -186,7 +188,9 @@ const schema = defineSchema(
       fastestAnswerMs: v.optional(v.number()),
       badges: v.array(v.string()),
       updatedAt: v.number(),
-    }).index("by_user", ["userId"]),
+    })
+      .index("by_user", ["userId"])
+      .index("by_xp", ["xp"]),
 
     // One row per player per finished game, for history & the profile page.
     gameHistory: defineTable({
@@ -200,6 +204,7 @@ const schema = defineSchema(
       questionCount: v.number(),
       xpEarned: v.number(),
       won: v.boolean(),
+      stars: v.optional(v.number()), // 1-3 stars rating for the round
       badgesEarned: v.array(v.string()), // badges unlocked by this result
       playedAt: v.number(),
     })
