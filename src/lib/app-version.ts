@@ -17,10 +17,11 @@
  * لماذا يُستورد الملف كأصل (asset) بدل وضعه في `public/downloads`؟
  * - `public/downloads/...` مسار مباشر قد لا يخدمه بعض مزوّدي الاستضافة
  *   (كان ينتج صفحة «No matching routes found» عند فتحه).
- * - الاستيراد عبر Vite يضع الملف تحت `/assets/` بنفس مسار ملفات التطبيق
- *   نفسها — وهو المسار الذي يخدمه أي مزوّد يعرض التطبيق أصلاً.
+ * - الاستيراد عبر Vite بـ `?url` يضع الملف تحت `/assets/` بنفس مسار ملفات
+ *   التطبيق نفسها — وهو المسار الذي يخدمه أي مزوّد يعرض التطبيق أصلاً.
+ *   (بدون `?url` يفشل البناء لأن Rollup يحاول قراءة الـ APK كوحدة JS.)
  */
-import apkAssetUrlRaw from "@/assets/al-abqari-v1.0.0.apk";
+import apkAssetUrlRaw from "@/assets/al-abqari-v1.0.0.apk?url";
 
 /** مسار الملف الفعلي — بدون استعلامات Vite (مثل ?import) التي تفشل في fetch. */
 const apkAssetUrl = apkAssetUrlRaw.split("?")[0];

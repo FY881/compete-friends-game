@@ -5,7 +5,7 @@
 // Bump this cache name whenever you ship a new version — it forces every
 // installed PWA to discard the old app shell and fetch the fresh one.
 // (Part of the app update plan: web/PWA clients self-update on reload.)
-const CACHE = "mindclash-v2";
+const CACHE = "mindclash-v3";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {

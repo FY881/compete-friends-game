@@ -5,3 +5,8 @@ declare module "*.apk" {
   const src: string;
   export default src;
 }
+
+declare module "*.apk?url" {
+  const src: string;
+  export default src;
+}
