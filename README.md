@@ -270,3 +270,43 @@ When using convex, make sure:
 - This includes importing generated files like `@/convex/_generated/server`, `@/convex/_generated/api`
 - Remember to import functions like useQuery, useMutation, useAction, etc. from `convex/react`
 - NEVER have return type validators.
+
+# 📱 Android APK
+
+The game ships as an installable PWA and as a native Android app via Capacitor.
+
+## Install on your phone right now (PWA — no APK needed)
+
+Open the deployed site on your Android phone, tap the browser menu →
+**«إضافة إلى الشاشة الرئيسية» / “Add to Home screen”**. The app opens
+full-screen with its own icon and works offline for the app shell.
+
+PWA files: `public/manifest.webmanifest`, `public/sw.js`, icons in
+`public/icons` (regenerate with `bun scripts/generate-icons.mjs`).
+
+## Build the APK in the cloud (GitHub Actions — recommended)
+
+1. Push this repo to GitHub.
+2. Add a repository secret `VITE_CONVEX_URL` with your Convex site URL
+   (same value as your local `VITE_CONVEX_URL` — it is baked into the app
+   at build time).
+3. Run the **Build Android APK** workflow (Actions tab → workflow_dispatch,
+   or it runs automatically on push to `main`).
+4. Download `mindclash-apk/app-debug.apk` from the workflow's Artifacts and
+   install it on your phone (allow “install unknown apps”).
+
+## Build the APK locally
+
+Requires Android Studio / SDK + Java 17 on your machine:
+
+```bash
+bun install
+VITE_CONVEX_URL="https://<your-project>.convex.site" bun run build
+bunx cap sync android
+cd android && ./gradlew assembleDebug
+# APK → android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Native config lives in `capacitor.config.ts` (app id `com.mindclash.quiz`,
+app name «تحدّي العقول», web dir `dist`).
+
