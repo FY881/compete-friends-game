@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ import {
   Loader2,
   LogOut,
   Medal,
+  ShieldCheck,
   Swords,
   Trophy,
   Users,
@@ -50,6 +52,7 @@ export default function Play() {
   const joinGame = useMutation(api.games.joinGame);
 
   const profile = useQuery(api.stats.getMyProfile);
+  const discipline = useQuery(api.owner.getMyDiscipline);
 
   const displayName = user?.name ?? "";
   const [nickname, setNickname] = useState(() => {
@@ -132,6 +135,18 @@ export default function Play() {
           </button>
 
           <div className="flex items-center gap-3">
+            {discipline?.isOwner && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-primary"
+                onClick={() => navigate("/owner")}
+              >
+                <ShieldCheck className="size-3.5" />
+                <span className="hidden sm:inline">غرفة المالك</span>
+              </Button>
+            )}
             <div className="hidden items-center gap-2.5 sm:flex">
               <Avatar className="size-8">
                 {user?.image && <AvatarImage src={user.image} alt={displayName} />}
@@ -159,7 +174,51 @@ export default function Play() {
         </div>
       </header>
 
+      <AnnouncementBanner />
+
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-14">
+        {/* Discipline status banner */}
+        {discipline && (discipline.bannedPermanent || (discipline.bannedUntil ?? 0) > Date.now()) && (
+          <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5">
+            <p className="flex items-center gap-2 text-sm font-bold text-rose-700">
+              <ShieldCheck className="size-4" />
+              حسابك محظور {discipline.bannedPermanent ? "نهائياً" : `حتى ${new Date(discipline.bannedUntil ?? 0).toLocaleString("ar-EG")}`}
+            </p>
+            {discipline.banReason && (
+              <p className="mt-1 text-xs text-rose-700/80">السبب: {discipline.banReason}</p>
+            )}
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              لا يمكنك إنشاء أو الانضمام إلى الجولات حتى انتهاء الحظر. إذا كنت تعتقد أن
+              العقوبة خاطئة، راسل الإدارة عبر البريد الإلكتروني.
+            </p>
+          </div>
+        )}
+        {discipline && (discipline.mutedUntil ?? 0) > Date.now() && (
+          <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-orange-500/30 bg-orange-500/10 p-5">
+            <p className="flex items-center gap-2 text-sm font-bold text-orange-700">
+              <ShieldCheck className="size-4" />
+              أنت مكتوم حتى {new Date(discipline.mutedUntil ?? 0).toLocaleString("ar-EG")}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              تم تقييد تواصلك بسبب مخالفة قوانين اللعب. يمكنك اللعب بشكل طبيعي.
+            </p>
+          </div>
+        )}
+        {discipline && discipline.warnings > 0 && (
+          <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
+            <p className="flex items-center gap-2 text-sm font-bold text-amber-700">
+              <ShieldCheck className="size-4" />
+              لديك {discipline.warnings} تحذير رسمي
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              الالتزام بقوانين اللعب يمنع تصاعد العقوبات. اطّلع على{" "}
+              <a href="/rules" className="font-bold text-primary underline underline-offset-2">
+                قوانين اللعب
+              </a>
+              .
+            </p>
+          </div>
+        )}
         {/* Intro */}
         <div className="text-center">
           <Badge variant="outline" className="mb-5 gap-1.5 rounded-full text-primary">

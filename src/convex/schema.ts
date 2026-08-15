@@ -46,7 +46,82 @@ const schema = defineSchema(
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
+
+      // ── Discipline & punishment state (managed by the owner room) ──
+      warnings: v.optional(v.number()), // formal warnings issued
+      mutedUntil: v.optional(v.number()), // ms timestamp — chat muted until this time
+      bannedUntil: v.optional(v.number()), // ms timestamp — account suspended until this time
+      bannedPermanent: v.optional(v.boolean()), // permanent ban flag
+      banReason: v.optional(v.string()), // why the user was punished
+      cheatStrikes: v.optional(v.number()), // anti-cheat detections (tab-switch while answering)
     }).index("email", ["email"]), // index for the email. do not remove or modify
+
+    // The site laws: essential rules, prohibitions and the punishment ladder.
+    // Editable by the owner, shown publicly on /rules.
+    rules: defineTable({
+      title: v.string(),
+      category: v.union(
+        v.literal("essential"), // قوانين أساسية
+        v.literal("prohibited"), // ممنوعات
+        v.literal("punishment"), // العقوبات
+      ),
+      description: v.string(),
+      severity: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+      order: v.number(),
+      active: v.boolean(),
+    }).index("by_category", ["category"]),
+
+    // User-submitted reports against other players.
+    reports: defineTable({
+      reporterId: v.id("users"),
+      reporterName: v.string(),
+      targetId: v.id("users"),
+      targetName: v.string(),
+      reason: v.string(),
+      details: v.optional(v.string()),
+      status: v.union(
+        v.literal("open"), // awaiting review
+        v.literal("reviewed"), // AI/owner decided and acted
+        v.literal("dismissed"), // no violation found
+      ),
+      aiVerdict: v.optional(
+        v.object({
+          compliant: v.boolean(),
+          violation: v.optional(v.string()),
+          severity: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+          suggestedAction: v.union(
+            v.literal("none"),
+            v.literal("warn"),
+            v.literal("mute"),
+            v.literal("ban"),
+          ),
+          suggestedDurationMs: v.optional(v.number()),
+          reasoning: v.string(),
+        }),
+      ),
+      createdAt: v.number(),
+    })
+      .index("by_status", ["status"])
+      .index("by_created", ["createdAt"]),
+
+    // Every punishment / AI decision, for the owner's audit log.
+    moderationLogs: defineTable({
+      actorType: v.union(v.literal("ai"), v.literal("owner"), v.literal("system")),
+      actorName: v.string(),
+      action: v.string(), // e.g. warn | mute | ban | pardon | cheat | review
+      targetId: v.optional(v.id("users")),
+      targetName: v.string(),
+      reason: v.string(),
+      severity: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+      gameCode: v.optional(v.string()),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // Simple key/value store for owner-configurable settings.
+    settings: defineTable({
+      key: v.string(),
+      value: v.string(), // JSON-encoded value
+    }).index("by_key", ["key"]),
 
     // A competitive challenge room created by a host.
     games: defineTable({

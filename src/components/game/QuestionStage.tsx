@@ -104,9 +104,12 @@ export function QuestionStage({
 }) {
   const submitAnswer = useMutation(api.games.submitAnswer);
   const useFiftyFifty = useMutation(api.games.useFiftyFifty);
+  const recordCheat = useMutation(api.owner.recordCheat);
   const [submitting, setSubmitting] = useState(false);
   const [fiftyLoading, setFiftyLoading] = useState(false);
   const [hiddenOptions, setHiddenOptions] = useState<number[]>([]);
+  const [cheatNotice, setCheatNotice] = useState<string | null>(null);
+  const reportedFor = useRef<number | null>(null);
   const now = useNow(200);
   const prevPhase = useRef(game.game.phase);
 
@@ -124,10 +127,51 @@ export function QuestionStage({
   const totalPlayers = game.players.length;
   const isRevealing = phase === "revealing";
 
-  // Fresh lifeline state for every question.
+  // Fresh lifeline + cheat notice state for every question.
   useEffect(() => {
     setHiddenOptions([]);
+    setCheatNotice(null);
   }, [index]);
+
+  // Anti-cheat: leaving the game window during a question is treated as using
+  // the internet to look up the answer. The server applies an automatic,
+  // escalating punishment (warn → score penalty → ban).
+  useEffect(() => {
+    if (phase !== "answering" || myAnswer) return;
+    if (reportedFor.current === index) return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const detect = () => {
+      const away = document.hidden || !document.hasFocus();
+      if (!away || reportedFor.current === index) return;
+      // Only flag after the player stays away for a moment, to avoid
+      // punishing accidental focus loss (notifications, window drag, …).
+      timer = setTimeout(() => {
+        if (reportedFor.current === index) return;
+        reportedFor.current = index;
+        recordCheat({ code: g.code })
+          .then((result) => {
+            if (result) setCheatNotice(result.message);
+          })
+          .catch(() => undefined);
+      }, 1500);
+    };
+    const cancel = () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+    document.addEventListener("visibilitychange", detect);
+    window.addEventListener("blur", detect);
+    window.addEventListener("focus", cancel);
+    return () => {
+      document.removeEventListener("visibilitychange", detect);
+      window.removeEventListener("blur", detect);
+      window.removeEventListener("focus", cancel);
+      if (timer) clearTimeout(timer);
+    };
+  }, [phase, myAnswer, index, g.code, recordCheat]);
 
   // Tick sound during the final five seconds.
   const tickSecond = Math.floor(remaining / 1000);
@@ -276,6 +320,21 @@ export function QuestionStage({
             </Badge>
           )}
         </div>
+
+        {/* Automatic anti-cheat notice */}
+        {cheatNotice && (
+          <div className="relative mt-4 flex items-start gap-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3">
+            <Eraser className="mt-0.5 size-4 shrink-0 text-rose-600" />
+            <div>
+              <p className="text-sm font-bold text-rose-700">
+                🚨 تم رصد مغادرة نافذة اللعب أثناء السؤال
+              </p>
+              <p className="mt-0.5 text-xs font-medium leading-relaxed text-rose-700/80">
+                {cheatNotice}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Question */}
         <h2 className="relative mt-8 text-2xl font-bold leading-relaxed tracking-tight sm:text-[1.7rem]">

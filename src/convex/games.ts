@@ -35,6 +35,7 @@ import {
 } from "./gameConfig";
 import { CATEGORIES, QUESTION_BANK, type Question } from "./questions";
 import { BADGE_MAP, type Badge } from "./stats";
+import { isUserBanned } from "./owner";
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -197,6 +198,23 @@ async function makeUniqueCode(ctx: DbCtx): Promise<string> {
   throw new Error("تعذّر إنشاء التحدي، حاول مجدداً");
 }
 
+/** Throw unless the signed-in user is allowed to play (not banned). */
+async function assertNotBanned(ctx: MutationCtx, userId: Id<"users">): Promise<void> {
+  const user = await ctx.db.get(userId);
+  if (!user) return;
+  const { banned, reason } = isUserBanned(user);
+  if (banned) {
+    const until = user.bannedPermanent
+      ? "نهائياً"
+      : user.bannedUntil
+        ? `حتى ${new Date(user.bannedUntil).toISOString().slice(0, 16).replace("T", " ")}`
+        : "";
+    throw new Error(
+      `حسابك محظور (${reason ?? "مخالفة القوانين"}) ${until}${user.banReason ? ` — السبب: ${user.banReason}` : ""}. تواصل مع المالك عبر البريد الإلكتروني.`,
+    );
+  }
+}
+
 function sanitizeName(raw: string | undefined): string {
   const name = (raw ?? "").trim().replace(/\s+/g, " ").slice(0, MAX_NAME_LENGTH);
   if (name.length >= 2) {
@@ -273,6 +291,7 @@ export const createGame = mutation({
     if (userId === null) {
       throw new Error("يجب تسجيل الدخول أولاً");
     }
+    await assertNotBanned(ctx, userId);
 
     const safeSettings = validateSettings(
       settings ?? {
@@ -323,6 +342,7 @@ export const joinGame = mutation({
     if (userId === null) {
       throw new Error("يجب تسجيل الدخول أولاً");
     }
+    await assertNotBanned(ctx, userId);
 
     const game = await getGameByCode(ctx, code);
     if (!game) {
@@ -478,6 +498,7 @@ export const submitAnswer = mutation({
     if (userId === null) {
       throw new Error("يجب تسجيل الدخول أولاً");
     }
+    await assertNotBanned(ctx, userId);
 
     const game = await getGameByCode(ctx, code);
     if (!game) {
@@ -576,6 +597,7 @@ export const useFiftyFifty = mutation({
     if (userId === null) {
       throw new Error("يجب تسجيل الدخول أولاً");
     }
+    await assertNotBanned(ctx, userId);
 
     const game = await getGameByCode(ctx, code);
     if (!game) {

@@ -18,6 +18,7 @@ import {
   Lock,
   LogOut,
   Medal,
+  ShieldCheck,
   Sparkles,
   Target,
   Timer,
@@ -117,6 +118,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const profile = useQuery(api.stats.getMyProfile);
   const history = useQuery(api.stats.getMyHistory, { limit: 12 });
+  const discipline = useQuery(api.owner.getMyDiscipline);
 
   const displayName = user?.name ?? "ضيف";
   const initial = displayName.slice(0, 1);
@@ -151,6 +153,18 @@ export default function Profile() {
           </button>
 
           <div className="flex items-center gap-3">
+            {discipline?.isOwner && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-primary"
+                onClick={() => navigate("/owner")}
+              >
+                <ShieldCheck className="size-3.5" />
+                <span className="hidden sm:inline">غرفة المالك</span>
+              </Button>
+            )}
             <div className="hidden items-center gap-2.5 sm:flex">
               <Avatar className="size-8">
                 {user?.image && <AvatarImage src={user.image} alt={displayName} />}
@@ -177,6 +191,42 @@ export default function Profile() {
       </header>
 
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
+        {/* Discipline status */}
+        {discipline && (discipline.bannedPermanent || (discipline.bannedUntil ?? 0) > Date.now()) && (
+          <div className="mb-8 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5">
+            <p className="flex items-center gap-2 text-sm font-bold text-rose-700">
+              <ShieldCheck className="size-4" />
+              حسابك محظور {discipline.bannedPermanent ? "نهائياً" : `حتى ${new Date(discipline.bannedUntil ?? 0).toLocaleString("ar-EG")}`}
+            </p>
+            {discipline.banReason && (
+              <p className="mt-1 text-xs text-rose-700/80">السبب: {discipline.banReason}</p>
+            )}
+          </div>
+        )}
+        {discipline && (discipline.mutedUntil ?? 0) > Date.now() && (
+          <div className="mb-8 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-5">
+            <p className="flex items-center gap-2 text-sm font-bold text-orange-700">
+              <ShieldCheck className="size-4" />
+              أنت مكتوم حتى {new Date(discipline.mutedUntil ?? 0).toLocaleString("ar-EG")}
+            </p>
+          </div>
+        )}
+        {discipline && discipline.warnings > 0 && (
+          <div className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
+            <p className="flex items-center gap-2 text-sm font-bold text-amber-700">
+              <ShieldCheck className="size-4" />
+              لديك {discipline.warnings} تحذير رسمي
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              الالتزام بقوانين اللعب يمنع تصاعد العقوبات. اطّلع على{" "}
+              <a href="/rules" className="font-bold text-primary underline underline-offset-2">
+                قوانين اللعب
+              </a>
+              .
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">ملفي الشخصي</h1>

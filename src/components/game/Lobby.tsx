@@ -10,23 +10,50 @@ import {
 } from "@/lib/game-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   Check,
   Crown,
   Copy,
+  Flag,
   Gauge,
   Link2,
   ListChecks,
   Loader2,
   Play,
   Share2,
+  ShieldCheck,
   SlidersHorizontal,
   Users,
   UserRoundPlus,
 } from "lucide-react";
 import { GameAvatar, copyText } from "./ui";
+
+const REPORT_REASONS = [
+  "اسم مسيء أو غير لائق",
+  "إساءة أو تنمر",
+  "غش",
+  "إزعاج أو سبام",
+  "سلوك آخر يخالف القوانين",
+];
 
 function SettingsSummary({ settings }: { settings: GameSettings }) {
   return (
@@ -173,6 +200,97 @@ function HostSettings({
   );
 }
 
+function ReportPlayerDialog({
+  target,
+  onClose,
+}: {
+  target: { id: string; name: string } | null;
+  onClose: () => void;
+}) {
+  const submitReport = useMutation(api.owner.submitReport);
+  const [reason, setReason] = useState(REPORT_REASONS[0]);
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!target) return;
+    setBusy(true);
+    try {
+      await submitReport({
+        targetId: target.id as never,
+        reason,
+        details: details.trim() || undefined,
+      });
+      toast.success("تم إرسال البلاغ — الرقيب الآلي سيراجعه فوراً.");
+      setDetails("");
+      onClose();
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "تعذّر إرسال البلاغ.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={target != null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Flag className="size-4 text-rose-500" />
+            الإبلاغ عن {target?.name}
+          </DialogTitle>
+          <DialogDescription>
+            البلاغ يُرسل إلى الإدارة ويُفحص تلقائياً بالذكاء الاصطناعي حسب قوانين
+            الموقع. البلاغات الكاذبة تُعاقب أيضاً.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold">سبب البلاغ</Label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {REPORT_REASONS.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold">تفاصيل إضافية (اختياري)</Label>
+            <Textarea
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              rows={3}
+              placeholder="اشرح ما حدث…"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:justify-between">
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            إلغاء
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={busy}
+            className="gap-1.5 bg-rose-600 hover:bg-rose-700"
+          >
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <Flag className="size-4" />}
+            إرسال البلاغ
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function Lobby({
   game,
   me,
@@ -187,6 +305,7 @@ export function Lobby({
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null);
 
   const host = game.players.find((p) => p.isHost);
   const isHost = me?.isHost ?? false;
@@ -354,9 +473,30 @@ export function Lobby({
                   المضيف
                 </span>
               )}
+              {!player.isMe && (
+                <button
+                  type="button"
+                  title="الإبلاغ عن اللاعب"
+                  aria-label={`الإبلاغ عن ${player.name}`}
+                  className="rounded-lg p-1.5 text-muted-foreground/50 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                  onClick={() => setReportTarget({ id: player.id, name: player.name })}
+                >
+                  <Flag className="size-3.5" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
+
+        <p className="mt-4 flex items-center gap-2 rounded-xl bg-muted/50 px-4 py-2.5 text-xs text-muted-foreground">
+          <ShieldCheck className="size-3.5 shrink-0 text-primary" />
+          اللعب النزيه إلزامي: مغادرة نافذة اللعب أثناء الأسئلة تُعتبر غشاً وتُعاقَب
+          تلقائياً. اطّلع على{" "}
+          <a href="/rules" className="font-bold text-primary underline underline-offset-2">
+            قوانين اللعب
+          </a>
+          .
+        </p>
 
         {host && !isHost && (
           <p className="mt-5 rounded-xl bg-muted/60 px-4 py-3 text-center text-sm text-muted-foreground">
@@ -397,6 +537,8 @@ export function Lobby({
           يمكنك البدء وحدك للتدريب، لكن التحدي يكون أجمل مع صديق واحد على الأقل.
         </p>
       )}
+
+      <ReportPlayerDialog target={reportTarget} onClose={() => setReportTarget(null)} />
     </div>
   );
 }

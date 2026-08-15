@@ -14,6 +14,7 @@ import {
   Medal,
   Play,
   Quote,
+  Scale,
   Sparkles,
   Swords,
   Timer,
@@ -22,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Link } from "react-router";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -229,6 +231,8 @@ const fadeUp = {
 export default function Landing() {
   return (
     <div dir="rtl" className="min-h-screen overflow-x-hidden bg-background text-foreground">
+      <AnnouncementBanner />
+
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
@@ -249,6 +253,10 @@ export default function Landing() {
             <a href="#cta" className="transition-colors hover:text-foreground">
               ابدأ الآن
             </a>
+            <Link to="/rules" className="flex items-center gap-1 transition-colors hover:text-foreground">
+              <Scale className="size-3.5" />
+              القوانين
+            </Link>
           </nav>
 
           <div className="flex items-center gap-2">
@@ -615,6 +623,10 @@ export default function Landing() {
                 q: "هل أحتاج تسجيل حساب؟",
                 a: "نعم، عبر بريد إلكتروني برمز تحقق سريع — أو يمكنك الدخول كضيف دون أي بيانات للعب مع أصدقائك.",
               },
+              {
+                q: "ما هي قوانين اللعب؟ وهل هناك عقوبات؟",
+                a: "اللعب النزيه إلزامي: ممنوع الإساءة والغش والمحتوى غير اللائق. يرصد النظام تلقائياً مغادرة نافذة اللعب أثناء الأسئلة، وتُطبَّق عقوبات تصاعدية (تحذير ← خصم نقاط ← حظر) تلقائياً، ويديرها رقيب آلي بالذكاء الاصطناعي. اطّلع على القوانين كاملة من صفحة «القوانين».",
+              },
             ].map((item) => (
               <AccordionItem
                 key={item.q}
@@ -685,6 +697,15 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Medal className="size-4 text-primary" />
             صُنع بحب لمن يحبون التحديات
+          </div>
+          <div className="flex items-center gap-4">
+            <Link to="/rules" className="flex items-center gap-1.5 transition-colors hover:text-foreground">
+              <Scale className="size-3.5" />
+              قوانين اللعب
+            </Link>
+            <Link to="/rules" className="transition-colors hover:text-foreground">
+              السياسة والعقوبات
+            </Link>
           </div>
         </div>
       </footer>
