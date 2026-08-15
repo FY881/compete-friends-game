@@ -1170,6 +1170,21 @@ function AiTab({ settings }: { settings: SettingsData }) {
 
   return (
     <div className="space-y-5">
+      {!settings.aiKeyConfigured && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-rose-600" />
+            <div>
+              <p className="text-sm font-bold text-rose-700">مفتاح OpenRouter غير مضبوط</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                أضِف المفتاح الكامل في تبويب «المفاتيح / API Keys» في المنصة تحت الاسم{" "}
+                <span className="font-mono font-bold text-foreground">OPENROUTER_API_KEY</span>
+                . حتى ذلك الحين سيتعذر على الرقيب الآلي فحص البلاغات أو تطبيق العقوبات.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <FeatureTitle
         n="12"
         title="إعدادات الرقابة الذكية"

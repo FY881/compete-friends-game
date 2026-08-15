@@ -184,7 +184,7 @@ export type ModSettings = {
 
 export const DEFAULT_SETTINGS: ModSettings = {
   aiEnabled: true,
-  aiAutoApply: false, // the owner opts in to automatic AI punishments
+  aiAutoApply: true, // the AI guardian applies punishments automatically
   aiModel: "openrouter/auto",
   announcement: "",
   announcementActive: false,
@@ -522,7 +522,10 @@ export const getRules = query({
   },
 });
 
-export type SettingsData = ModSettings & { rulesCount: number };
+export type SettingsData = ModSettings & {
+  rulesCount: number;
+  aiKeyConfigured: boolean;
+};
 
 export const getSettings = query({
   args: {},
@@ -533,7 +536,11 @@ export const getSettings = query({
     if (!isStaffUser(me)) return null;
     const settings = await getSettingsData(ctx);
     const rules = await ctx.db.query("rules").collect();
-    return { ...settings, rulesCount: rules.filter((r) => r.active).length };
+    return {
+      ...settings,
+      rulesCount: rules.filter((r) => r.active).length,
+      aiKeyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
+    };
   },
 });
 
