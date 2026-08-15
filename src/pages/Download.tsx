@@ -27,7 +27,7 @@ export default function Download() {
   const navigate = useNavigate();
   const info = useQuery(api.appInfo.getAppInfo);
 
-  const apkUrl = info?.apkUrl || `/downloads/${info?.apkFileName ?? `tahadi-alouqoul-v${APP_VERSION}.apk`}`;
+  const apkUrl = info?.apkUrl || `/downloads/${info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`}`;
   const version = info?.version ?? APP_VERSION;
 
   return (
@@ -39,7 +39,7 @@ export default function Download() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">تحميل تحدّي العقول</span>
+            <span className="text-lg font-bold tracking-tight">تحميل العبقري</span>
           </button>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="gap-1.5 rounded-xl">
@@ -197,7 +197,7 @@ export default function Download() {
                 icon: PackageX,
                 title: "«التطبيق غير مثبت» بسبب نسخة قديمة مثبتة",
                 steps: [
-                  "إذا كان لديك إصدار سابق مثبت، احذفه أولاً (الإعدادات ← التطبيقات ← تحدّي العقول ← إلغاء التثبيت) ثم ثبّت الجديد.",
+                  "إذا كان لديك إصدار سابق مثبت، احذفه أولاً (الإعدادات ← التطبيقات ← العبقري ← إلغاء التثبيت) ثم ثبّت الجديد.",
                   "سبب ذلك أن التوقيع الرقمي للإصدار الجديد مختلف عن القديم.",
                 ],
               },

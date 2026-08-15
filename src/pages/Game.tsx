@@ -227,7 +227,7 @@ export default function Game() {
               <BrainCircuit className="size-5" />
             </span>
             <span className="hidden text-lg font-bold tracking-tight sm:block">
-              تحدّي العقول
+              العبقري
             </span>
           </button>
 

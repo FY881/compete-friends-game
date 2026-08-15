@@ -138,12 +138,12 @@ export function ResultsStage({ game }: { game: GameData }) {
     const lines = sorted
       .map((p, i) => `${i + 1}. ${p.name}: ${p.score} نقطة`)
       .join("\n");
-    const text = `🏆 تحدّي العقول — النتيجة النهائية!\n\n${lines}\n\n${
+    const text = `🏆 العبقري — النتيجة النهائية!\n\n${lines}\n\n${
       won ? "أنا البطل! 🎉" : `الفائز: ${winner?.name ?? ""}`
     }`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: "تحدّي العقول", text });
+        await navigator.share({ title: "العبقري", text });
         return;
       } catch {
         // fall through to clipboard

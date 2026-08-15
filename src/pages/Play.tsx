@@ -172,7 +172,7 @@ export default function Play() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">تحدّي العقول</span>
+            <span className="text-lg font-bold tracking-tight">العبقري</span>
           </button>
 
           <div className="flex items-center gap-2.5">
@@ -701,7 +701,7 @@ export default function Play() {
                   <Smartphone className="size-6" />
                 </span>
                 <div className="max-w-md">
-                  <p className="text-lg font-bold">نزّل تحدّي العقول على هاتفك</p>
+                  <p className="text-lg font-bold">نزّل العبقري على هاتفك</p>
                   <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     نسخة أندرويد أصلية (APK) بنفس حسابك وأصدقائك، مع تحديثات
                     تلقائية تصلك داخل التطبيق. أو ثبّت نسخة الويب من المتصفح

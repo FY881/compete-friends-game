@@ -318,7 +318,7 @@ cd android && ./gradlew assembleDebug
 ```
 
 Native config lives in `capacitor.config.ts` (app id `com.mindclash.quiz`,
-app name «تحدّي العقول», web dir `dist`).
+app name «العبقري», web dir `dist`).
 
 # 🔄 App Update Plan (خطة تحديث التطبيق)
 
@@ -346,7 +346,7 @@ for web/PWA users, and a guided download for Android APK users.
 3. Rebuild: `bun run build`, then `rm -f dist/downloads/*.apk` (so the APK
    doesn't embed itself), then `bunx cap sync android` and rebuild the APK
    (local: `cd android && ./gradlew assembleDebug`).
-4. Copy the new APK to `public/downloads/tahadi-alouqoul-v<version>.apk` and
+4. Copy the new APK to `public/downloads/al-abqari-v<version>.apk` and
    rebuild the web bundle once more so the hosted site serves it — the
    download page and update banner pick it up automatically.
 5. Bump the cache name in `public/sw.js`.

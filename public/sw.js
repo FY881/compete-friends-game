@@ -1,4 +1,4 @@
-/* تحدّي العقول — service worker
+/* العبقري — service worker
  * Network-first for navigations (the shell is always fresh), cache-first for
  * hashed static assets (safe: Vite fingerprints filenames), and the Convex
  * API (different origin) is never touched. */

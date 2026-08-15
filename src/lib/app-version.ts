@@ -15,7 +15,7 @@
  */
 export const APP_VERSION = "1.0.0";
 
-export const APP_VERSION_LABEL = `تحدّي العقول ${APP_VERSION}`;
+export const APP_VERSION_LABEL = `العبقري ${APP_VERSION}`;
 
 /** تحليل رقم سيمانتك «x.y.z» إلى أرقام للمقارنة. */
 export function parseVersion(v: string): number[] {

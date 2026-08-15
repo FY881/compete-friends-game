@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * Capacitor configuration for «تحدّي العقول» (Mind Clash).
+ * Capacitor configuration for «العبقري» (Al-Abqari).
  *
  * - The web build (Vite) outputs to `dist/` — Capacitor bundles it into the APK.
  * - `VITE_CONVEX_URL` is baked into the web build at build time, so the app
@@ -11,7 +11,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  */
 const config: CapacitorConfig = {
   appId: "com.mindclash.quiz",
-  appName: "تحدّي العقول",
+  appName: "العبقري",
   webDir: "dist",
   server: {
     // Serve the bundled app over https://localhost inside the WebView.

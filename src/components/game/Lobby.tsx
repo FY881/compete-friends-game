@@ -412,8 +412,8 @@ export function Lobby({
               onClick={() => {
                 navigator
                   .share({
-                    title: "تحدّي العقول",
-                    text: `انضم إليّ في تحدي العقول! رمز الغرفة: ${code}`,
+                    title: "العبقري",
+                    text: `انضم إليّ في العبقري! رمز الغرفة: ${code}`,
                     url: inviteLink,
                   })
                   .catch(() => undefined);

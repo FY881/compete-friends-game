@@ -232,7 +232,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
                   <BrainCircuit className="size-7" />
                 </div>
-                <CardTitle className="text-2xl">مرحباً بك في تحدّي العقول</CardTitle>
+                <CardTitle className="text-2xl">مرحباً بك في العبقري</CardTitle>
                 <CardDescription className="leading-relaxed">
                   اختر الطريقة الأسرع لك — كلها بدون بريد إلكتروني.
                 </CardDescription>

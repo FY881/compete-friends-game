@@ -14,7 +14,7 @@ import { query } from "./_generated/server";
 const CURRENT_VERSION = "1.0.0";
 
 const UPDATE_NOTES: string[] = [
-  "إصدار أندرويد الأول — تطبيق أصلي كامل للعبة تحدّي العقول.",
+  "إصدار أندرويد الأول — تطبيق أصلي كامل للعبة العبقري.",
   "العب مباشرة من التطبيق: غرف فورية، أسئلة من 230+ سؤال، ترتيب مباشر، مستويات وشارات.",
   "يتحدّث التطبيق تلقائياً: تظهر لافتة داخل اللعبة عند توفر نسخة جديدة.",
 ];
@@ -27,10 +27,10 @@ export const getAppInfo = query({
     return {
       version: CURRENT_VERSION,
       notes: UPDATE_NOTES,
-      apkFileName: `tahadi-alouqoul-v${CURRENT_VERSION}.apk`,
+      apkFileName: `al-abqari-v${CURRENT_VERSION}.apk`,
       apkUrl: siteUrl
-        ? `${siteUrl}/downloads/tahadi-alouqoul-v${CURRENT_VERSION}.apk`
-        : `/downloads/tahadi-alouqoul-v${CURRENT_VERSION}.apk`,
+        ? `${siteUrl}/downloads/al-abqari-v${CURRENT_VERSION}.apk`
+        : `/downloads/al-abqari-v${CURRENT_VERSION}.apk`,
     };
   },
 });
