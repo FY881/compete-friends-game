@@ -4,6 +4,8 @@ import { api } from "@/convex/_generated/api";
 import { sounds } from "@/lib/sounds";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Lobby } from "@/components/game/Lobby";
 import { QuestionStage } from "@/components/game/QuestionStage";
 import { ResultsStage } from "@/components/game/ResultsStage";
@@ -15,12 +17,17 @@ import {
   Loader2,
   LogOut,
   SearchX,
+  ShieldCheck,
   Smartphone,
   UserRound,
+  UserRoundPlus,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
+
+const NICKNAME_KEY = "mindclash.nickname";
 
 function RoomShell({ children }: { children: React.ReactNode }) {
   return (
@@ -35,8 +42,46 @@ export default function Game() {
   const navigate = useNavigate();
   const data = useQuery(api.games.getGame, { code });
   const leaveGame = useMutation(api.games.leaveGame);
+  const joinGame = useMutation(api.games.joinGame);
   const [leaving, setLeaving] = useState(false);
   const [muted, setMuted] = useState(sounds.isMuted());
+  const [joinName, setJoinName] = useState(() => {
+    try {
+      return localStorage.getItem(NICKNAME_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [joining, setJoining] = useState(false);
+
+  /**
+   * الدخول من رابط دعوة مباشر: اللاعب غير منضم بعد، فيضغط زراً واحداً
+   * ليدخل الغرفة بنفس الاسم المحفوظ — ثم تتحدث الغرفة فوراً (Convex reactive)
+   * ويظهر في اللائحة ويمكنه اللعب.
+   */
+  const handleJoinRoom = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (joining) return;
+    setJoining(true);
+    try {
+      const name = joinName.trim();
+      if (name) {
+        try {
+          localStorage.setItem(NICKNAME_KEY, name);
+        } catch {
+          // تجاهل فشل التخزين
+        }
+      }
+      await joinGame({ code, name });
+      toast.success("تم انضمامك إلى الغرفة 🎉");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "تعذّر الانضمام إلى الغرفة.",
+      );
+      setJoining(false);
+    }
+  };
 
   const toggleMuted = () => {
     setMuted(sounds.toggleMuted());
@@ -92,6 +137,81 @@ export default function Game() {
     data.game.status === "playing"
       ? `سؤال ${data.game.currentQuestionIndex + 1} من ${data.game.questionCount}`
       : null;
+
+  // وصل اللاعب عبر رابط دعوة لكنه ليس ضمن اللاعبين بعد:
+  // الغرفة تنتظر → نافذة انضمام سريعة؛ الغرفة بدأت → تنبيه واضح.
+  if (!me && data.game.status === "waiting") {
+    return (
+      <RoomShell>
+        <Card className="mx-auto w-full max-w-md border-border/80 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center text-center">
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <UserRoundPlus className="size-7" />
+              </span>
+              <h1 className="mt-4 text-2xl font-bold tracking-tight">
+                انضم إلى غرفة {data.game.code}
+              </h1>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                وصلك رابط دعوة من صديق! اكتب اسمك واضغط زراً واحداً لتدخل
+                الغرفة قبل انطلاق التحدي.
+              </p>
+              <form onSubmit={handleJoinRoom} className="mt-6 w-full">
+                <Input
+                  value={joinName}
+                  onChange={(e) => setJoinName(e.target.value)}
+                  placeholder="اسمك في التحدي — مثال: الصقر الجريء"
+                  maxLength={24}
+                  className="h-12 rounded-xl bg-background text-base"
+                  disabled={joining}
+                  required
+                />
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="mt-3 w-full gap-2 rounded-xl"
+                  disabled={joining || joinName.trim().length === 0}
+                >
+                  {joining ? (
+                    <Loader2 className="size-4.5 animate-spin" />
+                  ) : (
+                    <UserRoundPlus className="size-4.5" />
+                  )}
+                  {joining ? "جارٍ الدخول…" : "انضم الآن"}
+                </Button>
+              </form>
+              <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
+                اسم لائق إلزامي — الأسماء المسيئة تُعاقَب تلقائياً حسب قوانين
+                اللعب.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </RoomShell>
+    );
+  }
+
+  if (!me && data.game.status !== "waiting") {
+    return (
+      <RoomShell>
+        <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+          <span className="flex size-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <ShieldCheck className="size-8" />
+          </span>
+          <h1 className="mt-6 text-2xl font-bold">هذه الغرفة بدأت بالفعل</h1>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+            لم تكن من ضمن اللاعبين عندما انطلق التحدي. اطلب من صديق أن يرسل
+            لك رمز غرفة جديدة لم تبدأ بعد.
+          </p>
+          <Button className="mt-8 gap-2 rounded-xl" onClick={() => navigate("/play")}>
+            <Home className="size-4" />
+            إنشاء غرفة جديدة
+          </Button>
+        </div>
+      </RoomShell>
+    );
+  }
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
