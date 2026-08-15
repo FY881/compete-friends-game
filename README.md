@@ -282,26 +282,36 @@ Open the deployed site on your Android phone, tap the browser menu →
 full-screen with its own icon and works offline for the app shell.
 
 PWA files: `public/manifest.webmanifest`, `public/sw.js`, icons in
-`public/icons` (regenerate with `bun scripts/generate-icons.mjs`).
+`public/icons`.
 
 ## Build the APK in the cloud (GitHub Actions — recommended)
+
+The Android SDK and Java 17 are not available inside the Freebuff web
+sandbox, so the APK is compiled by GitHub Actions in the cloud. Everything
+is already wired up in `.github/workflows/build-apk.yml`:
 
 1. Push this repo to GitHub.
 2. Add a repository secret `VITE_CONVEX_URL` with your Convex site URL
    (same value as your local `VITE_CONVEX_URL` — it is baked into the app
-   at build time).
+   at build time). Optional: `VITE_VLY_APP_ID` and `VITE_VLY_MONITORING_URL`
+   (error reporting; the app works without them).
 3. Run the **Build Android APK** workflow (Actions tab → workflow_dispatch,
    or it runs automatically on push to `main`).
-4. Download `mindclash-apk/app-debug.apk` from the workflow's Artifacts and
-   install it on your phone (allow “install unknown apps”).
+4. Download the `mindclash-apk` artifact → `app-debug.apk` and install it
+   on your phone (allow “install unknown apps”).
 
-## Build the APK locally
+The workflow installs dependencies, runs `bun run build` with the secret
+baked in, generates the native project with `cap add android`, and compiles
+`assembleDebug` — no setup on your machine.
+
+## Build the APK locally (optional)
 
 Requires Android Studio / SDK + Java 17 on your machine:
 
 ```bash
 bun install
 VITE_CONVEX_URL="https://<your-project>.convex.site" bun run build
+bunx cap add android
 bunx cap sync android
 cd android && ./gradlew assembleDebug
 # APK → android/app/build/outputs/apk/debug/app-debug.apk

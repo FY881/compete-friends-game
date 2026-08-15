@@ -1,63 +1,81 @@
 name: Build Android APK
 
+# Produces a ready-to-install «تحدّي العقول» APK (app-debug.apk).
+#
+# Why this workflow exists:
+#   The game is a Vite + React web app. Capacitor wraps the production web
+#   build (`dist/`) into a native Android project, and Gradle compiles it into
+#   an installable APK. This runs in the cloud so no Android SDK is needed on
+#   your machine.
+#
+# How to use:
+#   1. Push this repository to GitHub.
+#   2. Add a repository secret named VITE_CONVEX_URL with your Convex site URL
+#      (the same value used by the hosted app — it is baked into the APK).
+#      Optional secrets: VITE_VLY_APP_ID, VITE_VLY_MONITORING_URL (error
+#      reporting; the app works without them).
+#   3. Run this workflow from the Actions tab (workflow_dispatch), or push to
+#      `main`.
+#   4. Download `mindclash-apk` artifact → install `app-debug.apk` on your
+#      Android phone (allow "install unknown apps").
 on:
   workflow_dispatch:
   push:
     branches: [main]
 
-permissions:
-  contents: read
-
 jobs:
   build-apk:
+    name: Build APK
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Set up Bun
+      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
-      - name: Set up Java
+      - name: Setup Java 17 (required by Android Gradle Plugin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Add Android platform (if missing)
+      - name: Verify VITE_CONVEX_URL secret is set
         run: |
-          if [ ! -d android ]; then
-            bunx cap add android
+          if [ -z "${{ secrets.VITE_CONVEX_URL }}" ]; then
+            echo "::error::Missing repository secret VITE_CONVEX_URL (your Convex site URL). Add it under Settings → Secrets and variables → Actions, then re-run this workflow."
+            exit 1
           fi
 
-      - name: Build web app
-        run: VITE_CONVEX_URL="${{ secrets.VITE_CONVEX_URL }}" bun run build
+      - name: Install dependencies
+        run: bun install
 
-      - name: Sync web assets into Android project
+      - name: Build the web app (dist/)
+        run: |
+          VITE_CONVEX_URL="${{ secrets.VITE_CONVEX_URL }}" \
+          VITE_VLY_APP_ID="${{ secrets.VITE_VLY_APP_ID }}" \
+          VITE_VLY_MONITORING_URL="${{ secrets.VITE_VLY_MONITORING_URL }}" \
+          bun run build
+
+      - name: Add Capacitor Android platform
+        run: bunx cap add android
+
+      - name: Sync web assets + plugins into the native project
         run: bunx cap sync android
 
-      - name: Build debug APK
+      - name: Build the APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: mindclash-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
