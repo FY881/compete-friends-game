@@ -60,6 +60,11 @@ jobs:
           VITE_VLY_MONITORING_URL="${{ secrets.VITE_VLY_MONITORING_URL }}" \
           bun run build
 
+      # The downloadable APK lives in public/downloads for the hosted site, but
+      # must NOT be embedded inside the app's own APK (recursive packaging).
+      - name: Strip downloadable APKs from the app bundle
+        run: rm -f dist/downloads/*.apk
+
       - name: Add Capacitor Android platform
         run: bunx cap add android
 

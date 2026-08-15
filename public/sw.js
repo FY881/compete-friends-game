@@ -2,7 +2,10 @@
  * Network-first for navigations (the shell is always fresh), cache-first for
  * hashed static assets (safe: Vite fingerprints filenames), and the Convex
  * API (different origin) is never touched. */
-const CACHE = "mindclash-v1";
+// Bump this cache name whenever you ship a new version — it forces every
+// installed PWA to discard the old app shell and fetch the fresh one.
+// (Part of the app update plan: web/PWA clients self-update on reload.)
+const CACHE = "mindclash-v2";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {

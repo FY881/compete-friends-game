@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +140,11 @@ export default function Play() {
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
       <AnnouncementBanner />
+
+      {/* ── Update notice (server-driven version check) ────────── */}
+      <div className="mx-auto max-w-6xl px-5 pt-5">
+        <UpdateBanner />
+      </div>
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-md">

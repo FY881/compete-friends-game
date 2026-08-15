@@ -320,3 +320,43 @@ cd android && ./gradlew assembleDebug
 Native config lives in `capacitor.config.ts` (app id `com.mindclash.quiz`,
 app name «تحدّي العقول», web dir `dist`).
 
+# 🔄 App Update Plan (خطة تحديث التطبيق)
+
+Updates flow through a server-driven version check — no manual installs needed
+for web/PWA users, and a guided download for Android APK users.
+
+## How it works
+
+- `src/lib/app-version.ts` → `APP_VERSION` — the version baked into this build.
+- `src/convex/appInfo.ts` → `getAppInfo` — the **published** version, release
+  notes and APK download URL, served from the backend.
+- `src/components/UpdateBanner.tsx` compares the two. When the server version
+  is newer, every page shows a dismissible «تحديث متاح» banner with:
+  - **تحديث الآن** (web/PWA): unregisters the service worker, clears caches
+    and reloads with the new version.
+  - **تنزيل APK** (Android): links to the new APK on the `/download` page.
+- `public/sw.js` cache name (`mindclash-v2`) is bumped per release so installed
+  PWAs always fetch the fresh app shell.
+
+## Releasing a new version (checklist)
+
+1. Bump `APP_VERSION` in `src/lib/app-version.ts` and `CURRENT_VERSION` in
+   `src/convex/appInfo.ts` (same semver). Update `UPDATE_NOTES`.
+2. Bump `versionCode` (+1) and `versionName` in `android/app/build.gradle`.
+3. Rebuild: `bun run build`, then `rm -f dist/downloads/*.apk` (so the APK
+   doesn't embed itself), then `bunx cap sync android` and rebuild the APK
+   (local: `cd android && ./gradlew assembleDebug`).
+4. Copy the new APK to `public/downloads/tahadi-alouqoul-v<version>.apk` and
+   rebuild the web bundle once more so the hosted site serves it — the
+   download page and update banner pick it up automatically.
+5. Bump the cache name in `public/sw.js`.
+6. Deploy. Old clients see the banner; `/download` always serves the latest.
+
+## Update targets
+
+| Target | How it updates |
+|---|---|
+| Web browser | Always fresh on load |
+| Installed PWA | Cache bumped per release + «تحديث الآن» button clears and reloads |
+| Android APK | In-app banner → downloads the new APK from `/download` |
+

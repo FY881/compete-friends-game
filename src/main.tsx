@@ -17,6 +17,7 @@ const Game = lazy(() => import("./pages/Game.tsx"));
 const Profile = lazy(() => import("./pages/Profile.tsx"));
 const Owner = lazy(() => import("./pages/Owner.tsx"));
 const Rules = lazy(() => import("./pages/Rules.tsx"));
+const Download = lazy(() => import("./pages/Download.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -169,6 +170,7 @@ createRoot(document.getElementById("root")!).render(
                 }
               />
               <Route path="/rules" element={<Rules />} />
+              <Route path="/download" element={<Download />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

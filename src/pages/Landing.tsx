@@ -7,7 +7,6 @@ import {
   Eraser,
   Flame,
   Gamepad2,
-  Gift,
   Hourglass,
   Layers,
   Link2,
@@ -15,6 +14,7 @@ import {
   Play,
   Quote,
   Scale,
+  Smartphone,
   Sparkles,
   Swords,
   Timer,
@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -233,6 +234,11 @@ export default function Landing() {
     <div dir="rtl" className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <AnnouncementBanner />
 
+      {/* ── Update notice (server-driven version check) ────────── */}
+      <div className="mx-auto max-w-6xl px-5 pt-5">
+        <UpdateBanner />
+      </div>
+
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
@@ -262,6 +268,12 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" className="hidden sm:inline-flex">
               <Link to="/auth">تسجيل الدخول</Link>
+            </Button>
+            <Button asChild variant="outline" className="hidden gap-1.5 rounded-xl md:inline-flex">
+              <Link to="/download">
+                <Smartphone className="size-4" />
+                حمّل التطبيق
+              </Link>
             </Button>
             <Button asChild className="gap-1.5">
               <Link to="/play">
@@ -345,10 +357,10 @@ export default function Landing() {
               variants={fadeUp}
               className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-muted-foreground"
             >
-              <span className="flex items-center gap-2">
-                <Gift className="size-4 text-primary" />
-                لا حاجة لتحميل تطبيق
-              </span>
+              <Link to="/download" className="flex items-center gap-2 transition-colors hover:text-primary">
+                <Smartphone className="size-4 text-primary" />
+                تطبيق أندرويد جاهز للتحميل
+              </Link>
               <span className="flex items-center gap-2">
                 <Hourglass className="size-4 text-primary" />
                 جولة كاملة في دقيقتين
@@ -699,6 +711,10 @@ export default function Landing() {
             صُنع بحب لمن يحبون التحديات
           </div>
           <div className="flex items-center gap-4">
+            <Link to="/download" className="flex items-center gap-1.5 transition-colors hover:text-foreground">
+              <Smartphone className="size-3.5" />
+              تحميل التطبيق
+            </Link>
             <Link to="/rules" className="flex items-center gap-1.5 transition-colors hover:text-foreground">
               <Scale className="size-3.5" />
               قوانين اللعب
