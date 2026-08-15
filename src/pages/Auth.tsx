@@ -25,6 +25,8 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { useAuth } from "@/hooks/use-auth";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { ArrowLeft, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -48,6 +50,7 @@ function resolveRedirectAfterAuth(
 
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+  const setDisplayName = useMutation(api.profile.setDisplayName);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = resolveRedirectAfterAuth(
@@ -92,6 +95,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         }
       }
       await signIn("anonymous");
+      // احفظ الاسم على الحساب نفسه حتى يظهر في ملفك وترتيب النخبة
+      // على أي جهاز — بدون بريد إطلاقاً.
+      try {
+        await setDisplayName({ name: name.trim() });
+      } catch {
+        // الاسم يبقى محفوظاً محلياً حتى لو تأخر التزامن — الدخول نجح.
+      }
       navigate(redirect);
     } catch (signInError) {
       console.error("Quick play sign-in error:", signInError);

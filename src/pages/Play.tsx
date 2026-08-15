@@ -64,6 +64,7 @@ export default function Play() {
   const navigate = useNavigate();
   const createGame = useMutation(api.games.createGame);
   const joinGame = useMutation(api.games.joinGame);
+  const setDisplayName = useMutation(api.profile.setDisplayName);
   const joinRef = useRef<HTMLInputElement>(null);
 
   const profile = useQuery(api.stats.getMyProfile);
@@ -92,10 +93,20 @@ export default function Play() {
     }
   };
 
+  /** احفظ الاسم على الحساب نفسه (ملف اللاعب + ترتيب النخبة). */
+  const syncAccountName = (value: string) => {
+    const clean = value.trim();
+    if (clean.length < 2 || clean === displayName) return;
+    setDisplayName({ name: clean }).catch(() => {
+      // الاسم محفوظ محلياً على أي حال — يُزامَن لاحقاً عند الدخول.
+    });
+  };
+
   const handleCreate = async () => {
     if (creating) return;
     setCreating(true);
     try {
+      syncAccountName(nickname);
       const { code: roomCode } = await createGame({ name: nickname.trim() });
       navigate(`/game/${roomCode}`);
     } catch (error) {
@@ -115,6 +126,7 @@ export default function Play() {
     }
     setJoining(true);
     try {
+      syncAccountName(nickname);
       const { code: roomCode } = await joinGame({
         code: code.trim(),
         name: nickname.trim(),
@@ -451,6 +463,7 @@ export default function Play() {
                 id="nickname"
                 value={nickname}
                 onChange={(e) => persistNickname(e.target.value)}
+                onBlur={(e) => syncAccountName(e.target.value)}
                 maxLength={24}
                 placeholder="مثال: الصقر الجريء"
                 className="mt-4 h-11 rounded-xl bg-background text-base"
