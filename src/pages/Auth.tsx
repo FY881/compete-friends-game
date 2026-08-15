@@ -1,4 +1,4 @@
-import { BrainCircuit } from "lucide-react";
+import { BrainCircuit, Loader2, Mail, ShieldCheck, Sparkles, UserRound, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,13 +15,16 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Loader2, Mail, UserX } from "lucide-react";
+import { ArrowLeft, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 interface AuthProps {
   redirectAfterAuth?: string;
 }
+
+/** نفس المفتاح المستخدم في صفحة اللعب — الاسم يُحفظ محلياً على الجهاز. */
+const NICKNAME_KEY = "mindclash.nickname";
 
 function resolveRedirectAfterAuth(
   returnTo: string | null,
@@ -45,12 +48,51 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quickName, setQuickName] = useState(() => {
+    try {
+      return localStorage.getItem(NICKNAME_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       navigate(redirect);
     }
   }, [authLoading, isAuthenticated, navigate, redirect]);
+
+  /**
+   * «العب فوراً باسمك فقط» — الطريقة الأسرع للدخول:
+   * اسم واحد → هوية ضيف فورية → ساحة اللعب. لا بريد، لا كلمة مرور، لا رمز.
+   * إذا أراد اللاعب لاحقاً حفظ تقدمه على كل أجهزته، يسجّل بحساب بريد
+   * في أي وقت وترتبط هويته تلقائياً (Convex Auth linking).
+   */
+  const handleQuickPlay = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const name = quickName.trim();
+      if (name) {
+        try {
+          localStorage.setItem(NICKNAME_KEY, name);
+        } catch {
+          // تجاهل فشل التخزين — الدخول يعمل على أي حال
+        }
+      }
+      await signIn("anonymous");
+      navigate(redirect);
+    } catch (signInError) {
+      console.error("Quick play sign-in error:", signInError);
+      setError(
+        `تعذّر الدخول السريع: ${
+          signInError instanceof Error ? signInError.message : "خطأ غير معروف"
+        }`,
+      );
+      setIsLoading(false);
+    }
+  };
 
   const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -130,61 +172,113 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 </div>
                 <CardTitle className="text-2xl">مرحباً بك في تحدّي العقول</CardTitle>
                 <CardDescription className="leading-relaxed">
-                  أدخل بريدك الإلكتروني لتسجيل الدخول أو إنشاء حساب جديد
+                  اكتب اسمك واضغط زراً واحداً — وادخل ساحة التحدي فوراً، بلا بريد
+                  ولا كلمة مرور ولا انتظار.
                 </CardDescription>
               </CardHeader>
-              <form onSubmit={handleEmailSubmit}>
-                <CardContent>
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        name="email"
-                        placeholder="name@example.com"
-                        type="email"
-                        className="pr-9"
+
+              <CardContent>
+                {/* ── الدخول السريع بالاسم فقط ─────────────────────── */}
+                <form onSubmit={handleQuickPlay}>
+                  <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Zap className="size-4" />
+                      <p className="text-sm font-bold">العب فوراً باسمك فقط</p>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <UserRound className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          value={quickName}
+                          onChange={(e) => setQuickName(e.target.value)}
+                          placeholder="مثال: الصقر الجريء"
+                          maxLength={24}
+                          className="pr-9"
+                          disabled={isLoading}
+                          required
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        disabled={isLoading || quickName.trim().length === 0}
+                        className="gap-1.5"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArrowLeft className="h-4 w-4" />
+                        )}
+                        ابدأ
+                      </Button>
+                    </div>
+                    <p className="mt-2.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                      <ShieldCheck className="mt-0.5 size-3 shrink-0" />
+                      اسمك يُحفظ على جهازك فقط. تريد حفظ تقدمك على كل أجهزتك؟
+                      سجّل بريدك لاحقاً في أي وقت وستُربط هويتك تلقائياً.
+                    </p>
+                  </div>
+                </form>
+
+                {error && (
+                  <p className="mt-3 text-sm text-destructive">{error}</p>
+                )}
+
+                {/* ── فاصل ────────────────────────────────────────── */}
+                <div className="relative mt-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-card px-3 text-muted-foreground">أو</span>
+                  </div>
+                </div>
+
+                {/* ── البريد: خيار الحساب الكامل ───────────────────── */}
+                <div className="mt-5">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <Mail className="size-3.5" />
+                    سجّل بحساب بريد لحفظ تقدمك أينما كنت
+                  </p>
+                  <form onSubmit={handleEmailSubmit} className="mt-2.5">
+                    <div className="relative flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Mail className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          name="email"
+                          placeholder="name@example.com"
+                          type="email"
+                          className="pr-9"
+                          disabled={isLoading}
+                          required
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        size="icon"
                         disabled={isLoading}
-                        required
-                      />
+                        aria-label="إرسال رمز التحقق"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArrowLeft className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
-                    <Button
-                      type="submit"
-                      size="icon"
-                      disabled={isLoading}
-                      aria-label="إرسال"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ArrowLeft className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {error && (
-                    <p className="mt-2 text-sm text-destructive">{error}</p>
-                  )}
-
-                  <div className="relative mt-6">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs">
-                      <span className="bg-card px-3 text-muted-foreground">أو</span>
-                    </div>
-                  </div>
-
+                  </form>
                   <Button
                     type="button"
-                    variant="outline"
-                    className="mt-5 w-full gap-2"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 w-full gap-1.5 text-xs text-muted-foreground"
                     onClick={handleGuestLogin}
                     disabled={isLoading}
                   >
-                    <UserX className="h-4 w-4" />
-                    المتابعة كضيف
+                    <UserX className="size-3.5" />
+                    الدخول كضيف بدون اسم
                   </Button>
-                </CardContent>
-              </form>
+                </div>
+              </CardContent>
             </>
           ) : (
             <>
@@ -270,14 +364,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           )}
 
           <div className="border-t bg-muted/60 px-6 py-4 text-center text-xs text-muted-foreground">
-            <a
-              href="https://freebuff.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline transition-colors hover:text-foreground"
-            >
-              freebuff.com
-            </a>
+            <Sparkles className="mx-auto mb-1 size-3.5 text-primary" />
+            لعب سريع للضيوف · حساب كامل بالبريد لمن يريد حفظ تقدمه
           </div>
         </Card>
       </div>

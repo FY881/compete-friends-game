@@ -15,6 +15,7 @@ import {
   Loader2,
   LogOut,
   SearchX,
+  Smartphone,
   UserRound,
   Volume2,
   VolumeX,
@@ -119,6 +120,14 @@ export default function Game() {
                 {progress}
               </Badge>
             )}
+            <button
+              type="button"
+              onClick={() => navigate("/download")}
+              className="flex size-9 items-center justify-center rounded-full border border-border/70 bg-card text-muted-foreground transition-colors hover:text-foreground"
+              title="تحميل التطبيق"
+            >
+              <Smartphone className="size-4" />
+            </button>
             <button
               type="button"
               onClick={toggleMuted}

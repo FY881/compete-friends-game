@@ -17,6 +17,7 @@ import {
   BrainCircuit,
   Copy,
   Crown,
+  Download,
   Flame,
   Gamepad2,
   KeyRound,
@@ -26,13 +27,14 @@ import {
   Medal,
   Scale,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   Swords,
   Trophy,
   Users,
   Zap,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 const NICKNAME_KEY = "mindclash.nickname";
 
@@ -67,6 +69,7 @@ export default function Play() {
   const profile = useQuery(api.stats.getMyProfile);
   const discipline = useQuery(api.owner.getMyDiscipline);
   const topPlayers = useQuery(api.stats.getTopPlayers, { limit: 5 });
+  const appInfo = useQuery(api.appInfo.getAppInfo);
 
   const displayName = user?.name ?? "";
   const [nickname, setNickname] = useState(() => {
@@ -161,6 +164,12 @@ export default function Play() {
           </button>
 
           <div className="flex items-center gap-2.5">
+            <Button asChild variant="ghost" size="sm" className="gap-1.5">
+              <Link to="/download">
+                <Smartphone className="size-3.5" />
+                <span className="hidden md:inline">تحميل التطبيق</span>
+              </Link>
+            </Button>
             {discipline?.isOwner && (
               <Button
                 type="button"
@@ -664,6 +673,53 @@ export default function Play() {
               القوانين كاملة
             </a>
           </Button>
+        </section>
+
+        {/* ── In-game app download ────────────────────────────── */}
+        <section className="mt-12">
+          <div className="relative overflow-hidden rounded-3xl border border-primary/25 bg-card p-6 sm:p-7">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-16 -end-16 size-44 rounded-full bg-primary/10 blur-2xl"
+            />
+            <div className="relative flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                  <Smartphone className="size-6" />
+                </span>
+                <div className="max-w-md">
+                  <p className="text-lg font-bold">نزّل تحدّي العقول على هاتفك</p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    نسخة أندرويد أصلية (APK) بنفس حسابك وأصدقائك، مع تحديثات
+                    تلقائية تصلك داخل التطبيق. أو ثبّت نسخة الويب من المتصفح
+                    بلا ملفات.
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    الإصدار الحالي: {appInfo?.version ?? "1.0.0"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="lg" className="gap-2 rounded-xl" asChild>
+                  <a
+                    href={appInfo?.apkUrl ?? "/download"}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                  >
+                    <Download className="size-4.5" />
+                    تنزيل APK الآن
+                  </a>
+                </Button>
+                <Button size="lg" variant="outline" className="gap-2 rounded-xl" asChild>
+                  <Link to="/download">
+                    <Smartphone className="size-4.5" />
+                    صفحة التحميل
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* ── Footer note ──────────────────────────────────────── */}
