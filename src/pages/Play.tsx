@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { motion } from "framer-motion";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
@@ -13,13 +14,17 @@ import {
   ArrowLeft,
   BrainCircuit,
   Copy,
+  Crown,
   Flame,
   Gamepad2,
   KeyRound,
+  Link2,
   Loader2,
   LogOut,
   Medal,
+  Scale,
   ShieldCheck,
+  Sparkles,
   Swords,
   Trophy,
   Users,
@@ -45,11 +50,17 @@ function avatarColor(name: string) {
   return colors[hash % colors.length];
 }
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
+
 export default function Play() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const createGame = useMutation(api.games.createGame);
   const joinGame = useMutation(api.games.joinGame);
+  const joinRef = useRef<HTMLInputElement>(null);
 
   const profile = useQuery(api.stats.getMyProfile);
   const discipline = useQuery(api.owner.getMyDiscipline);
@@ -76,6 +87,7 @@ export default function Play() {
   };
 
   const handleCreate = async () => {
+    if (creating) return;
     setCreating(true);
     try {
       const { code: roomCode } = await createGame({ name: nickname.trim() });
@@ -117,12 +129,18 @@ export default function Play() {
   };
 
   const headerInitial = (nickname || displayName || "أنت").slice(0, 1);
+  const banned =
+    discipline?.bannedPermanent ||
+    ((discipline?.bannedUntil ?? 0) > Date.now());
+  const muted = (discipline?.mutedUntil ?? 0) > Date.now();
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
+      <AnnouncementBanner />
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <button
             type="button"
             onClick={() => navigate("/")}
@@ -134,7 +152,7 @@ export default function Play() {
             <span className="text-lg font-bold tracking-tight">تحدّي العقول</span>
           </button>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {discipline?.isOwner && (
               <Button
                 type="button"
@@ -174,15 +192,16 @@ export default function Play() {
         </div>
       </header>
 
-      <AnnouncementBanner />
-
-      <main className="mx-auto max-w-5xl px-5 pb-24 pt-14">
-        {/* Discipline status banner */}
-        {discipline && (discipline.bannedPermanent || (discipline.bannedUntil ?? 0) > Date.now()) && (
-          <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5">
+      <main className="mx-auto max-w-6xl px-5 pb-24 pt-12">
+        {/* ── Discipline banners ───────────────────────────────── */}
+        {discipline && banned && (
+          <div className="mb-8 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5">
             <p className="flex items-center gap-2 text-sm font-bold text-rose-700">
               <ShieldCheck className="size-4" />
-              حسابك محظور {discipline.bannedPermanent ? "نهائياً" : `حتى ${new Date(discipline.bannedUntil ?? 0).toLocaleString("ar-EG")}`}
+              حسابك محظور{" "}
+              {discipline.bannedPermanent
+                ? "نهائياً"
+                : `حتى ${new Date(discipline.bannedUntil ?? 0).toLocaleString("ar-EG")}`}
             </p>
             {discipline.banReason && (
               <p className="mt-1 text-xs text-rose-700/80">السبب: {discipline.banReason}</p>
@@ -193,11 +212,12 @@ export default function Play() {
             </p>
           </div>
         )}
-        {discipline && (discipline.mutedUntil ?? 0) > Date.now() && (
-          <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-orange-500/30 bg-orange-500/10 p-5">
+        {discipline && muted && (
+          <div className="mb-8 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-5">
             <p className="flex items-center gap-2 text-sm font-bold text-orange-700">
               <ShieldCheck className="size-4" />
-              أنت مكتوم حتى {new Date(discipline.mutedUntil ?? 0).toLocaleString("ar-EG")}
+              أنت مكتوم حتى{" "}
+              {new Date(discipline.mutedUntil ?? 0).toLocaleString("ar-EG")}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               تم تقييد تواصلك بسبب مخالفة قوانين اللعب. يمكنك اللعب بشكل طبيعي.
@@ -205,7 +225,7 @@ export default function Play() {
           </div>
         )}
         {discipline && discipline.warnings > 0 && (
-          <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
+          <div className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
             <p className="flex items-center gap-2 text-sm font-bold text-amber-700">
               <ShieldCheck className="size-4" />
               لديك {discipline.warnings} تحذير رسمي
@@ -219,188 +239,359 @@ export default function Play() {
             </p>
           </div>
         )}
-        {/* Intro */}
-        <div className="text-center">
-          <Badge variant="outline" className="mb-5 gap-1.5 rounded-full text-primary">
-            <Zap className="size-3.5" />
-            جاهز للمنافسة؟
-          </Badge>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            أنشئ غرفة، أو انضم لأصدقائك
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl leading-relaxed text-muted-foreground">
-            كل غرفة تُلعب فيها خمسة أسئلة سريعة، والفوز لمن يجيب أسرع وبأكبر
-            قدر من الصحة. أرسل الرمز لأصدقائك ودع المنافسة تبدأ.
-          </p>
-        </div>
 
-        {/* Profile strip */}
-        {profile && profile.gamesPlayed > 0 && (
-          <div className="mx-auto mt-8 max-w-3xl">
-            <button
-              type="button"
-              onClick={() => navigate("/profile")}
-              className="flex w-full items-center gap-4 rounded-2xl border border-primary/20 bg-card p-4 text-start shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
-            >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">
-                {profile.level}
-              </span>
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-bold">المستوى {profile.level} — {profile.levelTitle}</p>
-                  <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
-                    <Trophy className="size-3.5" />
-                    {profile.gamesWon} فوز
-                  </span>
-                  <span className="flex items-center gap-1 text-xs font-semibold text-orange-600">
-                    <Flame className="size-3.5" />
-                    {profile.bestStreak} سلسلة
-                  </span>
-                  <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-                    <Medal className="size-3.5" />
-                    {profile.badges.length} شارة
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center gap-3">
-                  <Progress
-                    value={(profile.xpIntoLevel / Math.max(1, profile.xpForNextLevel)) * 100}
-                    className="h-1.5 flex-1"
-                  />
-                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                    {profile.xpIntoLevel}/{profile.xpForNextLevel} XP
-                  </span>
-                </div>
-              </div>
-              <span className="hidden text-xs font-semibold text-primary sm:block">
-                عرض ملفي ←
-              </span>
-            </button>
-          </div>
-        )}
-
-        {/* Nickname */}
-        <div className="mx-auto mt-10 max-w-xl">
-          <label
-            htmlFor="nickname"
-            className="mb-2 block text-sm font-semibold text-foreground"
+        {/* ── Hero + player card ───────────────────────────────── */}
+        <section className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+          <motion.div
+            initial="hidden"
+            animate="show"
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
           >
-            اسمك في التحدي
-          </label>
-          <Input
-            id="nickname"
-            value={nickname}
-            onChange={(e) => persistNickname(e.target.value)}
-            maxLength={24}
-            placeholder="مثال: الصقر الجريء"
-            className="h-11 rounded-xl bg-card text-base"
-          />
-          <p className="mt-2 text-xs text-muted-foreground">
-            سيظهر هذا الاسم لأصدقائك في الترتيب، ويمكنك تغييره في أي وقت.
-          </p>
-        </div>
+            <motion.div variants={fadeUp}>
+              <Badge variant="outline" className="mb-5 gap-1.5 rounded-full px-3.5 py-1.5 text-primary">
+                <Sparkles className="size-3.5" />
+                ساحة الانطلاق
+              </Badge>
+            </motion.div>
+            <motion.h1
+              variants={fadeUp}
+              className="text-4xl font-bold leading-[1.2] tracking-tight sm:text-5xl"
+            >
+              أين يذهب لقب
+              <br />
+              <span className="text-primary">العبقرية الليلة؟</span>
+            </motion.h1>
+            <motion.p variants={fadeUp} className="mt-5 max-w-lg text-lg leading-relaxed text-muted-foreground">
+              أنشئ غرفة في ثانية، شارك الرمز مع أصدقائك، ودع الأسئلة السريعة
+              تحسم من هو الأسرع والأذكى في المجموعة.
+            </motion.p>
+            <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-3">
+              <Button
+                size="lg"
+                className="gap-2 rounded-xl px-7 text-base"
+                onClick={handleCreate}
+                disabled={creating || banned}
+              >
+                {creating ? (
+                  <Loader2 className="size-4.5 animate-spin" />
+                ) : (
+                  <Gamepad2 className="size-4.5" />
+                )}
+                أنشئ غرفة فورية
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 rounded-xl px-7 text-base"
+                onClick={() => joinRef.current?.focus()}
+              >
+                <Link2 className="size-4.5" />
+                انضم برمز
+              </Button>
+            </motion.div>
+            <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <Users className="size-4 text-primary" />
+                1 – 12 لاعباً
+              </span>
+              <span className="flex items-center gap-2">
+                <Zap className="size-4 text-primary" />
+                حتى 380 نقطة للسؤال
+              </span>
+              <span className="flex items-center gap-2">
+                <Flame className="size-4 text-primary" />
+                سلاسل ومكافآت
+              </span>
+            </motion.div>
+          </motion.div>
 
-        {/* Action cards */}
-        <div className="mx-auto mt-8 grid max-w-3xl gap-5 md:grid-cols-2">
-          {/* Create */}
-          <div className="relative flex flex-col overflow-hidden rounded-2xl border border-primary/25 bg-card p-7 shadow-sm transition-all hover:shadow-md hover:shadow-primary/5">
+          {/* Player card */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="relative"
+          >
             <div
               aria-hidden
-              className="pointer-events-none absolute -top-16 -start-16 size-48 rounded-full bg-primary/10 blur-2xl"
+              className="pointer-events-none absolute -inset-6 rounded-[2.5rem] bg-gradient-to-tr from-primary/10 via-transparent to-amber-400/10 blur-2xl"
             />
-            <span className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <Gamepad2 className="size-6" />
-            </span>
-            <h2 className="mt-5 text-xl font-bold">أنشئ تحدياً جديداً</h2>
-            <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
-              توليد رمز خاص لغرفتك خلال ثانية. شاركه مع أصدقائك وابدأ أول
-              سؤال فور أن يكون الجميع جاهزاً.
-            </p>
-            <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
-              <Users className="size-4 text-primary" />
-              1 – 12 لاعباً في الغرفة الواحدة
-            </div>
-            <Button
-              type="button"
-              size="lg"
-              className="mt-4 gap-2 rounded-xl"
-              onClick={handleCreate}
-              disabled={creating}
-            >
-              {creating ? (
-                <Loader2 className="size-4.5 animate-spin" />
+            <div className="relative rounded-3xl border border-border/80 bg-card p-6">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold">بطاقة اللاعب</p>
+                <Badge variant="outline" className="gap-1.5 rounded-full text-primary">
+                  <Sparkles className="size-3" />
+                  {profile && profile.gamesPlayed > 0 ? "منافس جاهز" : "جاهز للانطلاق"}
+                </Badge>
+              </div>
+
+              {profile ? (
+                <div className="mt-5 flex items-center gap-4">
+                  <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-2xl font-bold text-primary">
+                    {profile.level}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold">{displayName || "ضيف"}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      المستوى {profile.level} — {profile.levelTitle}
+                    </p>
+                    <div className="mt-2.5 flex items-center gap-3">
+                      <Progress
+                        value={(profile.xpIntoLevel / Math.max(1, profile.xpForNextLevel)) * 100}
+                        className="h-1.5 flex-1"
+                      />
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                        {profile.xp.toLocaleString("ar")} XP
+                      </span>
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <Gamepad2 className="size-4.5" />
+                <div className="mt-5 flex items-center gap-4">
+                  <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-2xl font-bold text-primary">
+                    1
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold">{displayName || "ضيف"}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">مستوى 1 — مبتدئ</p>
+                  </div>
+                </div>
               )}
-              إنشاء الغرفة
-            </Button>
+
+              <div className="mt-5 grid grid-cols-3 gap-2 border-t border-border/70 pt-4">
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile")}
+                  className="group rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-center transition-colors hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <Trophy className="mx-auto size-4 text-amber-600" />
+                  <p className="mt-1 text-sm font-bold tabular-nums">{profile?.gamesWon ?? 0}</p>
+                  <p className="text-[10px] text-muted-foreground">فوز</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile")}
+                  className="group rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-center transition-colors hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <Flame className="mx-auto size-4 text-orange-500" />
+                  <p className="mt-1 text-sm font-bold tabular-nums">{profile?.bestStreak ?? 0}</p>
+                  <p className="text-[10px] text-muted-foreground">أفضل سلسلة</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile")}
+                  className="group rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-center transition-colors hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <Medal className="mx-auto size-4 text-primary" />
+                  <p className="mt-1 text-sm font-bold tabular-nums">{profile?.badges.length ?? 0}</p>
+                  <p className="text-[10px] text-muted-foreground">شارات</p>
+                </button>
+              </div>
+
+              {profile && profile.gamesPlayed > 0 && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile")}
+                  className="mt-3 flex w-full items-center justify-between rounded-xl bg-primary/5 px-4 py-2.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+                >
+                  عرض الملف الكامل وسجل الجولات
+                  <ArrowLeft className="size-3.5" />
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </section>
+
+        {/* ── Launch deck (nickname + create/join) ─────────────── */}
+        <section className="mt-16">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-primary">ساحة الانطلاق</p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+                جهّز اسمك وادخل الحلبة
+              </h2>
+            </div>
+            <Badge variant="outline" className="hidden rounded-full sm:inline-flex">
+              نفس الأسئلة · نفس الوقت · أسرع عقل يفوز
+            </Badge>
           </div>
 
-          {/* Join */}
-          <form
-            onSubmit={handleJoin}
-            className="flex flex-col rounded-2xl border border-border/80 bg-card p-7 shadow-sm transition-all hover:shadow-md"
-          >
-            <span className="flex size-12 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600">
-              <KeyRound className="size-6" />
-            </span>
-            <h2 className="mt-5 text-xl font-bold">انضم برمز</h2>
-            <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
-              وصلك رمز من صديق؟ أدخله هنا وادخل الغرفة فوراً قبل أن يبدأ
-              التحدي.
-            </p>
-            <Input
-              value={code}
-              onChange={(e) =>
-                setCode(
-                  e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6),
-                )
-              }
-              placeholder="K7P2MX"
-              maxLength={6}
-              className="mt-6 h-12 rounded-xl bg-background text-center text-lg font-bold tracking-[0.3em]"
-              aria-label="رمز التحدي"
-            />
-            <Button
-              type="submit"
-              size="lg"
-              variant="secondary"
-              className="mt-4 gap-2 rounded-xl"
-              disabled={joining}
-            >
-              {joining ? (
-                <Loader2 className="size-4.5 animate-spin" />
-              ) : (
-                <ArrowLeft className="size-4.5" />
-              )}
-              انضمام
-            </Button>
-          </form>
-        </div>
-
-        {/* Reminder strip */}
-        <div className="mx-auto mt-12 max-w-3xl rounded-2xl border border-border/70 bg-card/60 p-6">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {[
-              { icon: Swords, title: "جولة مخصصة", text: "اضبط عدد الأسئلة والوقت والفئات" },
-              { icon: Zap, title: "نقاط حسب الصعوبة", text: "حتى 380 نقطة للأسئلة الصعبة السريعة" },
-              { icon: Flame, title: "سلاسل ومكافآت", text: "إجابات متتالية + منقّي 50/50" },
-            ].map((item) => (
-              <div key={item.title} className="flex items-start gap-3">
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <item.icon className="size-4.5" />
+          <div className="mt-8 grid items-start gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+            {/* Nickname */}
+            <div className="rounded-3xl border border-border/80 bg-card p-6">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Crown className="size-5" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{item.text}</p>
+                  <p className="text-sm font-bold">اسمك في التحدي</p>
+                  <p className="text-xs text-muted-foreground">
+                    سيظهر لأصدقائك في الترتيب المباشر
+                  </p>
                 </div>
               </div>
-            ))}
+              <Input
+                id="nickname"
+                value={nickname}
+                onChange={(e) => persistNickname(e.target.value)}
+                maxLength={24}
+                placeholder="مثال: الصقر الجريء"
+                className="mt-4 h-11 rounded-xl bg-background text-base"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                اسم لائق إلزامي — الأسماء المسيئة تُعاقَب تلقائياً حسب قوانين اللعب.
+              </p>
+            </div>
+
+            {/* Create / Join */}
+            <div className="grid gap-5 sm:grid-cols-2">
+              {/* Create */}
+              <div className="relative flex flex-col overflow-hidden rounded-3xl border border-primary/25 bg-card p-6">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -top-16 -start-16 size-44 rounded-full bg-primary/10 blur-2xl"
+                />
+                <div className="relative">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                    <Gamepad2 className="size-5.5" />
+                  </span>
+                  <h3 className="mt-4 text-lg font-bold">أنشئ تحدياً جديداً</h3>
+                  <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+                    رمز خاص لغرفتك خلال ثانية. شاركه مع أصدقائك وابدأ أول سؤال
+                    فور أن يكون الجميع جاهزاً.
+                  </p>
+                  <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Users className="size-4 text-primary" />
+                    1 – 12 لاعباً في الغرفة
+                  </p>
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="mt-4 w-full gap-2 rounded-xl"
+                    onClick={handleCreate}
+                    disabled={creating || banned}
+                  >
+                    {creating ? (
+                      <Loader2 className="size-4.5 animate-spin" />
+                    ) : (
+                      <Gamepad2 className="size-4.5" />
+                    )}
+                    إنشاء الغرفة
+                  </Button>
+                </div>
+              </div>
+
+              {/* Join */}
+              <form
+                onSubmit={handleJoin}
+                className="flex flex-col rounded-3xl border border-border/80 bg-card p-6"
+              >
+                <span className="flex size-11 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600">
+                  <KeyRound className="size-5.5" />
+                </span>
+                <h3 className="mt-4 text-lg font-bold">انضم برمز</h3>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+                  وصلك رمز من صديق؟ أدخله هنا وادخل الغرفة فوراً قبل أن يبدأ
+                  التحدي.
+                </p>
+                <Input
+                  ref={joinRef}
+                  value={code}
+                  onChange={(e) =>
+                    setCode(
+                      e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6),
+                    )
+                  }
+                  placeholder="K7P2MX"
+                  maxLength={6}
+                  className="mt-4 h-12 rounded-xl bg-background text-center text-lg font-bold tracking-[0.3em]"
+                  aria-label="رمز التحدي"
+                />
+                <Button
+                  type="submit"
+                  size="lg"
+                  variant="secondary"
+                  className="mt-4 w-full gap-2 rounded-xl"
+                  disabled={joining || banned}
+                >
+                  {joining ? (
+                    <Loader2 className="size-4.5 animate-spin" />
+                  ) : (
+                    <ArrowLeft className="size-4.5" />
+                  )}
+                  انضمام
+                </Button>
+              </form>
+            </div>
           </div>
-          <p className="mt-5 flex items-center gap-2 border-t border-border/70 pt-4 text-xs text-muted-foreground">
-            <Copy className="size-3.5 text-primary" />
-            داخل الغرفة يمكنك نسخ رمز الدعوة أو رابط الانضمام، وكل جولة تمنح خبرة
-            تُضاف إلى مستواك وشاراتك.
-          </p>
+        </section>
+
+        {/* ── How it works ─────────────────────────────────────── */}
+        <section className="mt-16 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              icon: Gamepad2,
+              title: "أنشئ الغرفة",
+              text: "اختر اسمك واضغط «إنشاء» — يصلك رمز من 6 أحرف فوراً.",
+            },
+            {
+              icon: Link2,
+              title: "شارك الرمز",
+              text: "أرسله لأصدقائك أو انسخ رابط الدعوة المباشر في مجموعة الواتساب.",
+            },
+            {
+              icon: Swords,
+              title: "تنافسوا على القمة",
+              text: "الترتيب يتحدث لحظياً — والسلاسل والمنقّي يقلبان الطاولة في اللحظات الأخيرة.",
+            },
+          ].map((step, i) => (
+            <motion.div
+              key={step.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.45, delay: i * 0.08 }}
+              className="rounded-2xl border border-border/80 bg-card p-6"
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <step.icon className="size-5" />
+                </span>
+                <span className="text-4xl font-bold text-border/70">0{i + 1}</span>
+              </div>
+              <h3 className="mt-4 font-bold">{step.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
+            </motion.div>
+          ))}
+        </section>
+
+        {/* ── Laws reminder ────────────────────────────────────── */}
+        <section className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-border/80 bg-card p-6">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Scale className="size-5" />
+            </span>
+            <div>
+              <p className="text-sm font-bold">اللعب النزيه إلزامي</p>
+              <p className="mt-0.5 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                مغادرة نافذة اللعب أثناء الأسئلة تُعتبر غشاً وتُعاقَب تلقائياً
+                (تحذير ← خصم نقاط ← حظر). الإساءة والأسماء غير اللائقة تُعاقب
+                أيضاً بواسطة الرقيب الآلي.
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline" className="gap-1.5 rounded-xl">
+            <a href="/rules">
+              <Scale className="size-4" />
+              القوانين كاملة
+            </a>
+          </Button>
+        </section>
+
+        {/* ── Footer note ──────────────────────────────────────── */}
+        <div className="mt-12 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <Copy className="size-3.5 text-primary" />
+          كل جولة تمنح خبرة (XP) تُضاف إلى مستواك وشاراتك — جولة كاملة في دقيقتين.
         </div>
       </main>
     </div>
