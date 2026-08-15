@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import { resolveApkUrl } from "@/lib/app-version";
+import { downloadApk } from "@/lib/app-version";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
@@ -84,6 +84,7 @@ export default function Play() {
   const [code, setCode] = useState("");
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [downloadingApk, setDownloadingApk] = useState(false);
 
   const persistNickname = (value: string) => {
     setNickname(value);
@@ -145,6 +146,23 @@ export default function Play() {
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  /** تنزيل APK عبر JavaScript (fetch + Blob) — لا يفتح أي صفحة ولا مسار قد يفشل. */
+  const handleDownloadApk = async () => {
+    if (downloadingApk) return;
+    setDownloadingApk(true);
+    try {
+      await downloadApk(appInfo?.apkFileName, appInfo?.siteUrl);
+      toast.success("بدأ تنزيل ملف APK — افحص شريط التنزيل في متصفحك.");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "تعذّر التنزيل، حاول مرة أخرى.",
+      );
+    } finally {
+      setDownloadingApk(false);
+    }
   };
 
   const headerInitial = (nickname || displayName || "أنت").slice(0, 1);
@@ -714,16 +732,18 @@ export default function Play() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="lg" className="gap-2 rounded-xl" asChild>
-                  <a
-                    href={resolveApkUrl(appInfo?.apkFileName, appInfo?.siteUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                    download
-                  >
+                <Button
+                  size="lg"
+                  className="gap-2 rounded-xl"
+                  onClick={handleDownloadApk}
+                  disabled={downloadingApk}
+                >
+                  {downloadingApk ? (
+                    <Loader2 className="size-4.5 animate-spin" />
+                  ) : (
                     <Download className="size-4.5" />
-                    تنزيل APK الآن
-                  </a>
+                  )}
+                  {downloadingApk ? "جارٍ تجهيز الملف…" : "تنزيل APK الآن"}
                 </Button>
                 <Button size="lg" variant="outline" className="gap-2 rounded-xl" asChild>
                   <Link to="/download">

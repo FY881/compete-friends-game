@@ -1671,6 +1671,37 @@ function SettingsTab({ settings }: { settings: SettingsData }) {
         <CardContent className="space-y-4 p-5">
           <FeatureTitle
             n="19"
+            title="رابط الموقع الرسمي (لتطبيق أندرويد)"
+            desc="رابط الويب الرسمي الذي يُخدَّم منه ملف APK. يُستخدم داخل تطبيق أندرويد الأصلي فقط لتحميل التحديثات؛ المتصفح يستخدم نطاقه الحالي تلقائياً ولا يحتاج هذا الحقل."
+          />
+          <Input
+            value={siteUrl}
+            onChange={(e) => setSiteUrl(e.target.value)}
+            dir="ltr"
+            placeholder="https://your-game-site.example"
+            className="h-11 rounded-xl bg-background text-base"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Globe className="size-4 text-primary" />
+              فارغ = يستخدم التطبيق الملف المضمّن بداخله تلقائياً.
+            </p>
+            <Button onClick={saveSiteUrl} disabled={busy} className="gap-1.5 rounded-xl">
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Globe className="size-4" />
+              )}
+              حفظ الرابط
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 shadow-sm">
+        <CardContent className="space-y-4 p-5">
+          <FeatureTitle
+            n="20"
             title="نظام مكافحة الغش (عقوبة الإنترنت التلقائية)"
             desc="يرصد تلقائياً أي لاعب يغادر نافذة اللعب أثناء سؤال (للبحث عن الإجابة عبر الإنترنت) ويطبّق العقوبة فوراً."
           />

@@ -1,9 +1,16 @@
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { APP_VERSION, APP_VERSION_LABEL, resolveApkUrl } from "@/lib/app-version";
+import {
+  APP_VERSION,
+  APP_VERSION_LABEL,
+  downloadApk,
+  resolveApkUrl,
+} from "@/lib/app-version";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -11,6 +18,7 @@ import {
   Check,
   Download as DownloadIcon,
   FileWarning,
+  Loader2,
   MonitorSmartphone,
   PackageX,
   RefreshCw,
@@ -26,12 +34,30 @@ import { Link, useNavigate } from "react-router";
 export default function Download() {
   const navigate = useNavigate();
   const info = useQuery(api.appInfo.getAppInfo);
+  const [downloading, setDownloading] = useState(false);
 
   const apkUrl = resolveApkUrl(
     info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`,
     info?.siteUrl,
   );
   const version = info?.version ?? APP_VERSION;
+
+  /** تنزيل عبر JavaScript (fetch + Blob) — لا يفتح أي صفحة ولا مسار قد يفشل. */
+  const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await downloadApk(info?.apkFileName, info?.siteUrl);
+      toast.success("بدأ تنزيل ملف APK — افحص شريط التنزيل في متصفحك.");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "تعذّر التنزيل، حاول مرة أخرى.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
@@ -117,12 +143,15 @@ export default function Download() {
               <Button
                 size="lg"
                 className="w-full gap-2 rounded-xl"
-                asChild
+                onClick={handleDownload}
+                disabled={downloading}
               >
-                <a href={apkUrl} download>
+                {downloading ? (
+                  <Loader2 className="size-4.5 animate-spin" />
+                ) : (
                   <DownloadIcon className="size-4.5" />
-                  تنزيل APK — الإصدار {version}
-                </a>
+                )}
+                {downloading ? "جارٍ تجهيز الملف…" : `تنزيل APK — الإصدار ${version}`}
               </Button>
               <Button size="lg" variant="outline" className="w-full gap-2 rounded-xl" asChild>
                 <Link to="/rules">
@@ -132,6 +161,19 @@ export default function Download() {
               </Button>
             </div>
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+              لا يعمل الزر؟ استخدم{" "}
+              <a
+                href={apkUrl}
+                download
+                target="_blank"
+                rel="noreferrer"
+                className="font-bold text-primary underline underline-offset-2"
+              >
+                الرابط المباشر للملف
+              </a>
+              .
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               ملاحظة: التطبيق يحتاج اتصالاً بالإنترنت (الأسئلة والترتيب يعملان عبر
               خادم Convex). عند توفر إصدار جديد ستظهر لافتة داخل التطبيق توجهك
               لتحميله من هذه الصفحة.

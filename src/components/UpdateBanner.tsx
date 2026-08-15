@@ -1,10 +1,11 @@
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { APP_VERSION, isNewerVersion, resolveApkUrl } from "@/lib/app-version";
+import { APP_VERSION, downloadApk, isNewerVersion } from "@/lib/app-version";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, RefreshCw, Sparkles, X } from "lucide-react";
+import { toast } from "sonner";
+import { Download, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 
 /**
  * لافتة «تحديث متاح» — قلب خطة تحديث التطبيق.
@@ -17,10 +18,28 @@ import { Download, RefreshCw, Sparkles, X } from "lucide-react";
 export function UpdateBanner() {
   const info = useQuery(api.appInfo.getAppInfo);
   const [dismissed, setDismissed] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   if (!info || dismissed || !isNewerVersion(info.version, APP_VERSION)) {
     return null;
   }
+
+  /** تنزيل APK عبر JavaScript (fetch + Blob) — لا يفتح أي صفحة قد تعرض خطأ. */
+  const handleDownloadApk = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await downloadApk(info.apkFileName, info.siteUrl);
+      toast.success("بدأ تنزيل ملف APK — افحص شريط التنزيل في متصفحك.");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "تعذّر التنزيل، حاول مرة أخرى.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const refreshWebApp = async () => {
     try {
@@ -37,8 +56,6 @@ export function UpdateBanner() {
     }
     window.location.reload();
   };
-
-  const downloadUrl = resolveApkUrl(info.apkFileName, info.siteUrl);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-l from-primary/10 via-card to-card p-4 sm:p-5">
@@ -78,11 +95,18 @@ export function UpdateBanner() {
             <RefreshCw className="size-3.5" />
             تحديث الآن
           </Button>
-          <Button size="sm" className="gap-1.5 rounded-xl" asChild>
-            <a href={downloadUrl} target="_blank" rel="noreferrer">
+          <Button
+            size="sm"
+            className="gap-1.5 rounded-xl"
+            onClick={handleDownloadApk}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
               <Download className="size-3.5" />
-              تنزيل APK
-            </a>
+            )}
+            {downloading ? "جارٍ التجهيز…" : "تنزيل APK"}
           </Button>
         </div>
       </div>
