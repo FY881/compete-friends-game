@@ -175,6 +175,7 @@ export function isUserBanned(user: {
 export type ModSettings = {
   aiEnabled: boolean;
   aiAutoApply: boolean;
+  aiAdminEnabled: boolean; // the autonomous AI administrator (15-min sweep)
   aiModel: string;
   announcement: string;
   announcementActive: boolean;
@@ -185,6 +186,7 @@ export type ModSettings = {
 export const DEFAULT_SETTINGS: ModSettings = {
   aiEnabled: true,
   aiAutoApply: true, // the AI guardian applies punishments automatically
+  aiAdminEnabled: true, // autonomous sweep every 15 minutes
   aiModel: "openrouter/auto",
   announcement: "",
   announcementActive: false,
@@ -209,6 +211,7 @@ export async function getSettingsData(
   return {
     aiEnabled: read("aiEnabled", DEFAULT_SETTINGS.aiEnabled),
     aiAutoApply: read("aiAutoApply", DEFAULT_SETTINGS.aiAutoApply),
+    aiAdminEnabled: read("aiAdminEnabled", DEFAULT_SETTINGS.aiAdminEnabled),
     aiModel: read("aiModel", DEFAULT_SETTINGS.aiModel),
     announcement: read("announcement", DEFAULT_SETTINGS.announcement),
     announcementActive: read("announcementActive", DEFAULT_SETTINGS.announcementActive),
@@ -541,6 +544,31 @@ export const getSettings = query({
       rulesCount: rules.filter((r) => r.active).length,
       aiKeyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
     };
+  },
+});
+
+/** Reports from the autonomous AI administrator (latest first). */
+export const getAdminReports = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!isStaffUser(me)) return null;
+
+    const rows = await ctx.db
+      .query("adminReports")
+      .withIndex("by_created", (q) => q.gte("createdAt", 0))
+      .order("desc")
+      .take(Math.min(limit ?? 20, 50));
+
+    return rows.map((r) => ({
+      id: r._id,
+      summary: r.summary,
+      stats: r.stats,
+      issues: r.issues,
+      createdAt: r.createdAt,
+    }));
   },
 });
 
@@ -918,6 +946,7 @@ export const updateSettings = mutation({
   args: {
     aiEnabled: v.optional(v.boolean()),
     aiAutoApply: v.optional(v.boolean()),
+    aiAdminEnabled: v.optional(v.boolean()),
     aiModel: v.optional(v.string()),
     announcement: v.optional(v.string()),
     announcementActive: v.optional(v.boolean()),

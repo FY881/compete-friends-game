@@ -71,6 +71,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { AdminAiTab } from "@/components/AdminAiTab";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -1869,6 +1870,9 @@ export default function Owner() {
               <TabsTrigger value="ai" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Bot className="size-4" /> الرقابة الذكية
               </TabsTrigger>
+              <TabsTrigger value="aiadmin" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <BrainCircuit className="size-4" /> المدير الآلي
+              </TabsTrigger>
               <TabsTrigger value="games" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Gamepad2 className="size-4" /> الغرف
               </TabsTrigger>
@@ -1895,6 +1899,13 @@ export default function Owner() {
               <TabsContent value="ai">
                 {settings ? (
                   <AiTab settings={settings} />
+                ) : (
+                  <Loader2 className="mx-auto my-12 size-6 animate-spin" />
+                )}
+              </TabsContent>
+              <TabsContent value="aiadmin">
+                {settings ? (
+                  <AdminAiTab settings={settings} />
                 ) : (
                   <Loader2 className="mx-auto my-12 size-6 animate-spin" />
                 )}

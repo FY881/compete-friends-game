@@ -5,14 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import {
+  AlertTriangle,
   ArrowLeft,
   BrainCircuit,
   Check,
   Download as DownloadIcon,
+  FileWarning,
   MonitorSmartphone,
+  PackageX,
   RefreshCw,
   Rocket,
   ShieldCheck,
+  ShieldAlert,
   Smartphone,
   Sparkles,
   Swords,
@@ -149,6 +153,96 @@ export default function Download() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* APK install troubleshooting */}
+        <section className="mt-10">
+          <div className="flex items-center gap-3">
+            <span className="flex size-11 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600">
+              <AlertTriangle className="size-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-bold">صادفت مشكلة أثناء التثبيت؟</h2>
+              <p className="text-xs text-muted-foreground">أغلب أخطاء التثبيت أسبابها بسيطة — إليك الحل لكل حالة</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2.5">
+            {[
+              {
+                icon: ShieldAlert,
+                title: "«لم يُثبَّت التطبيق» / «يوجد مشكلة في الحزمة»",
+                steps: [
+                  "امسح مساحة التخزين: الإعدادات ← التطبيقات ← مدير الملفات ← مسح البيانات.",
+                  "أعد تحميل الملف من هذه الصفحة (تأكد من اكتمال التحميل 100% — انتبه لشريط التنزيل).",
+                  "إذا استمر الخطأ: أعد تشغيل الهاتف ثم حاول التثبيت مجدداً.",
+                ],
+              },
+              {
+                icon: FileWarning,
+                title: "«الملف تالف» أو «لا يمكن فتح الملف»",
+                steps: [
+                  "غالباً التحميل انقطع أو الملف لم يكتمل — احذفه وحمّله من جديد على اتصال مستقر.",
+                  "تأكد أنك فتحت ملف .apk نفسه وليس نسخة قديمة من تحميل سابق.",
+                ],
+              },
+              {
+                icon: ShieldCheck,
+                title: "تحذير «التثبيت من مصادر غير معروفة»",
+                steps: [
+                  "اضغط «الإعدادات» في التحذير وفعّل «السماح من هذا المصدر» (Chrome أو مدير الملفات).",
+                  "ثم ارجع واضغط «تثبيت» — هذا طبيعي لأن الملف خارج متجر Play.",
+                ],
+              },
+              {
+                icon: PackageX,
+                title: "«التطبيق غير مثبت» بسبب نسخة قديمة مثبتة",
+                steps: [
+                  "إذا كان لديك إصدار سابق مثبت، احذفه أولاً (الإعدادات ← التطبيقات ← تحدّي العقول ← إلغاء التثبيت) ثم ثبّت الجديد.",
+                  "سبب ذلك أن التوقيع الرقمي للإصدار الجديد مختلف عن القديم.",
+                ],
+              },
+              {
+                icon: MonitorSmartphone,
+                title: "ملاحظة Play Protect («قد يكون هذا التطبيق ضاراً»)",
+                steps: [
+                  "هذا فحص تلقائي من جوجل للملفات خارج المتجر — اضغط «التثبيت على أي حال».",
+                  "الملف موقّع رقمياً وآمن، وجميع ملفات المشروع مفتوحة المصدر أمامك.",
+                ],
+              },
+              {
+                icon: Smartphone,
+                title: "التطبيق لا يفتح أو يظهر أسود",
+                steps: [
+                  "تأكد أن الهاتف يعمل بنظام أندرويد 7.0 أو أحدث.",
+                  "التطبيق يحتاج إنترنت لتحميل الأسئلة — جرّب إعادة فتحه بعد تأكد الاتصال.",
+                ],
+              },
+            ].map((item) => (
+              <details
+                key={item.title}
+                className="group rounded-2xl border border-border/80 bg-card p-4 open:shadow-sm"
+              >
+                <summary className="flex cursor-pointer list-none items-center gap-3 text-sm font-bold">
+                  <item.icon className="size-4.5 shrink-0 text-rose-500" />
+                  <span className="flex-1">{item.title}</span>
+                  <span className="text-xs text-muted-foreground transition-transform group-open:rotate-180">
+                    ▼
+                  </span>
+                </summary>
+                <ul className="mt-3 space-y-1.5 border-t border-border/60 pt-3">
+                  {item.steps.map((step) => (
+                    <li key={step} className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+                      <span className="mt-1 size-1 shrink-0 rounded-full bg-primary" />
+                      {step}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            لم يحل المشكلة؟ صوّر الرسالة الظاهرة وأرسلها لنا — ونضيف حلها هنا مباشرة.
+          </p>
         </section>
 
         {/* What's new */}

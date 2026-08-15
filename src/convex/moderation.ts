@@ -58,7 +58,7 @@ const MODERATION_SYSTEM_PROMPT = (rulesText: RulesText) =>
   `أنت "رقيب العقول"، ذكاء اصطناعي مكلّف بمراقبة قوانين لعبة "تحدّي العقول" وتطبيقها تلقائياً. كن حازماً وعادلاً ولا تتساهل مع المخالفات الواضحة.\n\n${RULES_SUMMARY}\n\nالقوانين المفعّلة حالياً في الموقع:\n${rulesText.length > 0 ? rulesText.map((r) => `- ${r}`).join("\n") : "(لا قوانين إضافية)"}\n\n${OUTPUT_CONTRACT}`;
 
 /** Robust JSON extraction from an LLM reply (it may wrap JSON in fences). */
-function parseVerdict(raw: string): AiVerdict {
+export function parseVerdict(raw: string): AiVerdict {
   let text = raw.trim();
   // Strip markdown fences if present.
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -93,7 +93,7 @@ function parseVerdict(raw: string): AiVerdict {
   };
 }
 
-async function callOpenRouter(
+export async function callOpenRouter(
   apiKey: string,
   model: string,
   rulesText: RulesText,

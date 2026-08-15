@@ -192,6 +192,31 @@ const schema = defineSchema(
       .index("by_user", ["userId"])
       .index("by_xp", ["xp"]),
 
+    // Reports produced by the autonomous AI administrator (runs every 15 min).
+    // Each sweep reviews open reports, applies punishments, cleans stale
+    // rooms and writes a fix-ready report the owner can hand to the dev.
+    adminReports: defineTable({
+      summary: v.string(), // one-line Arabic summary of the sweep
+      stats: v.object({
+        reportsReviewed: v.number(),
+        punishmentsApplied: v.number(),
+        roomsCleaned: v.number(),
+        usersEscalated: v.number(),
+        bannedUsers: v.number(),
+        activeRooms: v.number(),
+        openReportsLeft: v.number(),
+      }),
+      issues: v.array(
+        v.object({
+          severity: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+          title: v.string(),
+          detail: v.string(),
+          fix: v.string(), // actionable fix, often a code snippet to hand to the dev
+        }),
+      ),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
     // One row per player per finished game, for history & the profile page.
     gameHistory: defineTable({
       gameId: v.id("games"),
