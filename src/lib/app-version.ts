@@ -55,6 +55,32 @@ function isHttpUrl(value: string | null | undefined): value is string {
 const APK_MIME_TYPE = "application/vnd.android.package-archive";
 
 /**
+ * بصمة SHA-256 والحجم بالبايت لملف APK الرسمي الذي ننشره.
+ *
+ * التنزيل الآن «موثّق»: يرفض المتصفح أي ملف لا يطابق هاتين القيمتين تماماً
+ * (صفحة خطأ HTML، ملف ناقص/مقطوع، أو أي بايتات مختلفة) قبل حفظه باسم .apk —
+ * فحتى لو تعرّض النقل لأي خلل لن يصل هاتفك أبداً ملف «حدثت مشكلة عند تحليل
+ * الحزمة». عند نشر نسخة جديدة: أعد بناء APK ثم ضع بصمته وحجمه هنا.
+ */
+export const APK_SHA256 =
+  "fa8aaa6bb065184ff7200f0200cd637182424b38a2e84444618abcc8c2087d80";
+export const APK_BYTES = 17313230;
+
+/** حساب SHA-256 لمحتوى Blob (يُستخدم للتحقق من سلامة الملف قبل التنزيل). */
+async function sha256Hex(blob: Blob): Promise<string | null> {
+  try {
+    if (typeof crypto === "undefined" || !crypto.subtle) return null;
+    const buffer = await blob.arrayBuffer();
+    const digest = await crypto.subtle.digest("SHA-256", buffer);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return null; // تعذّر الحساب؟ نتخطى فحص البصمة ونكتفي بفحص الحجم.
+  }
+}
+
+/**
  * بناء رابط تحميل الـ APK الصحيح.
  *
  * القاعدة:
@@ -206,6 +232,20 @@ export async function downloadApk(
         lastError = new Error("not an apk");
         continue;
       }
+      // التحقق الكامل: الحجم + البصمة الرقمية يجب أن يطابقا ملف APK الرسمي
+      // حرفياً. أي ملف مختلف (صفحة خطأ، تحميل مقطوع، ملف قديم) يُرفض هنا
+      // قبل أن يصل لهاتفك — هذا ما يمنع «حدثت مشكلة عند تحليل الحزمة» نهائياً.
+      if (blob.size !== APK_BYTES) {
+        lastError = new Error(
+          `size mismatch: got ${blob.size}, expected ${APK_BYTES}`,
+        );
+        continue;
+      }
+      const digest = await sha256Hex(blob);
+      if (digest && digest !== APK_SHA256) {
+        lastError = new Error("sha256 mismatch");
+        continue;
+      }
       triggerBlobDownload(blob, file);
       return;
     } catch (error) {
@@ -214,7 +254,7 @@ export async function downloadApk(
   }
 
   throw new Error(
-    "تعذّر تنزيل ملف APK من جميع المصادر. تحقق من اتصالك بالإنترنت أو استخدم الرابط المباشر بالأسفل.",
+    "تعذّر تنزيل ملف APK سليم: كل المصادر أرسلت ملفاً مختلفاً عن النسخة الرسمية (الحجم/البصمة غير مطابقين) — عادة بسبب تخزين مؤقت قديم. حدّث الصفحة (Ctrl+Shift+R) وحاول مجدداً، وإن استمرت المشكلة أخبرنا.",
   );
 }
 

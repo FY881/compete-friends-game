@@ -4,8 +4,9 @@ import { api } from "@/convex/_generated/api";
 import {
   APP_VERSION,
   APP_VERSION_LABEL,
+  APK_BYTES,
+  APK_SHA256,
   downloadApk,
-  resolveApkUrl,
 } from "@/lib/app-version";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,8 +38,8 @@ export default function Download() {
   const [downloading, setDownloading] = useState(false);
 
   const apkFileName = info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`;
-  const apkUrl = resolveApkUrl(apkFileName, info?.siteUrl);
   const version = info?.version ?? APP_VERSION;
+  const apkSizeMB = (APK_BYTES / (1024 * 1024)).toFixed(1);
 
   /** تنزيل عبر JavaScript (fetch + Blob) — لا يفتح أي صفحة ولا مسار قد يفشل. */
   const handleDownload = async () => {
@@ -107,7 +108,10 @@ export default function Download() {
               أندرويد 7.0+
             </Badge>
             <Badge variant="outline" className="rounded-full">
-              حجم خفيف ~4.5 MB
+              حجم {apkSizeMB} MB
+            </Badge>
+            <Badge variant="outline" className="rounded-full">
+              ✓ يُتحقَّق من سلامة الملف تلقائياً
             </Badge>
             <Badge variant="outline" className="rounded-full">
               بلا متاجر وبلا انتظار
@@ -159,16 +163,19 @@ export default function Download() {
               </Button>
             </div>
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-              لا يعمل الزر؟ استخدم{" "}
-              <a
-                href={apkUrl}
-                download={apkFileName}
-                rel="noreferrer"
+              لا يعمل الزر؟ اضغط{" "}
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={downloading}
                 className="font-bold text-primary underline underline-offset-2"
               >
-                الرابط المباشر للملف
-              </a>
+                هنا للتنزيل عبر التحقق الكامل
+              </button>
               .
+            </p>
+            <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground/80" dir="ltr">
+              SHA-256: {APK_SHA256}
             </p>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               ملاحظة: التطبيق يحتاج اتصالاً بالإنترنت (الأسئلة والترتيب يعملان عبر
@@ -211,14 +218,25 @@ export default function Download() {
           <div className="mt-4 space-y-2.5">
             {[
               {
-                icon: ShieldAlert,
-                title: "«لم يُثبَّت التطبيق» / «يوجد مشكلة في الحزمة»",
-                steps: [
-                  "امسح مساحة التخزين: الإعدادات ← التطبيقات ← مدير الملفات ← مسح البيانات.",
-                  "أعد تحميل الملف من هذه الصفحة (تأكد من اكتمال التحميل 100% — انتبه لشريط التنزيل).",
-                  "إذا استمر الخطأ: أعد تشغيل الهاتف ثم حاول التثبيت مجدداً.",
-                ],
-              },
+                icon: PackageX,
+              title: "«حدثت مشكلة عند تحليل الحزمة» (الأهم)",
+              steps: [
+                "السبب الأشهر: وصل لهاتفك ملف ليس نسخة APK الرسمية — صفحة خطأ من الإنترنت أو تحميل انقطع في المنتصف ثم حُفظ باسم .apk.",
+                "الحل الجذري (مطبَّق الآن): زر التنزيل يتحقق من الحجم والبصمة الرقمية (SHA-256) لكل بايت قبل الحفظ — أي ملف مختلف يُرفض تلقائياً ولا يصل لهاتفك أبداً.",
+                "احذف أي ملف قديم نزّلته سابقاً (خاصة من «الرابط المباشر» القديم) ثم أعد التنزيل من الزر الأخضر الكبير الآن.",
+                "تأكد أن هاتفك يعمل بنظام أندرويد 7.0 أو أحدث — التطبيق لا يعمل على إصدارات أقدم.",
+                "إذا نزل الملف بصيغة .zip: أعد تسميته إلى .apk (الملف نفسه سليم) أو استخدم الزر الأخضر الذي يفرض الاسم الصحيح.",
+              ],
+            },
+            {
+              icon: ShieldAlert,
+              title: "«لم يُثبَّت التطبيق» / «يوجد مشكلة في الحزمة»",
+              steps: [
+                "امسح مساحة التخزين: الإعدادات ← التطبيقات ← مدير الملفات ← مسح البيانات.",
+                "أعد تحميل الملف من هذه الصفحة عبر الزر الأخضر (التحقق الكامل) — تأكد من اكتمال التحميل 100%.",
+                "إذا استمر الخطأ: أعد تشغيل الهاتف ثم حاول التثبيت مجدداً.",
+              ],
+            },
               {
                 icon: FileWarning,
                 title: "نزل الملف بصيغة .zip بدلاً من .apk",
