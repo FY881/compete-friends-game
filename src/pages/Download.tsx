@@ -36,10 +36,8 @@ export default function Download() {
   const info = useQuery(api.appInfo.getAppInfo);
   const [downloading, setDownloading] = useState(false);
 
-  const apkUrl = resolveApkUrl(
-    info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`,
-    info?.siteUrl,
-  );
+  const apkFileName = info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`;
+  const apkUrl = resolveApkUrl(apkFileName, info?.siteUrl);
   const version = info?.version ?? APP_VERSION;
 
   /** تنزيل عبر JavaScript (fetch + Blob) — لا يفتح أي صفحة ولا مسار قد يفشل. */
@@ -164,8 +162,7 @@ export default function Download() {
               لا يعمل الزر؟ استخدم{" "}
               <a
                 href={apkUrl}
-                download
-                target="_blank"
+                download={apkFileName}
                 rel="noreferrer"
                 className="font-bold text-primary underline underline-offset-2"
               >
@@ -220,6 +217,15 @@ export default function Download() {
                   "امسح مساحة التخزين: الإعدادات ← التطبيقات ← مدير الملفات ← مسح البيانات.",
                   "أعد تحميل الملف من هذه الصفحة (تأكد من اكتمال التحميل 100% — انتبه لشريط التنزيل).",
                   "إذا استمر الخطأ: أعد تشغيل الهاتف ثم حاول التثبيت مجدداً.",
+                ],
+              },
+              {
+                icon: FileWarning,
+                title: "نزل الملف بصيغة .zip بدلاً من .apk",
+                steps: [
+                  "سببها أن الخادم يرسل ملفات APK بدون نوع MIME، فيفسّرها المتصفح كملف zip — لا تقلق، الملف نفسه سليم.",
+                  "استخدم زر «تنزيل APK» الأخضر الكبير (لا الرابط المباشر) — الإصدار الحالي يفرض اسم .apk تلقائياً.",
+                  "لو نزل الملف .zip على أي حال: أعد تسميته يدوياً من .zip إلى .apk وسيعمل التثبيت مباشرة.",
                 ],
               },
               {

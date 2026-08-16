@@ -51,6 +51,9 @@ function isHttpUrl(value: string | null | undefined): value is string {
   return typeof value === "string" && /^https?:\/\//i.test(value.trim());
 }
 
+/** نوع MIME الرسمي لملفات أندرويد — يمنع المتصفح من تحويل الملف إلى .zip. */
+const APK_MIME_TYPE = "application/vnd.android.package-archive";
+
 /**
  * بناء رابط تحميل الـ APK الصحيح.
  *
@@ -120,15 +123,39 @@ export function getApkDownloadCandidates(
 }
 
 function triggerBlobDownload(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
+  // إصلاح مهم: خادم الاستضافة يرسل ملفات .apk بدون Content-Type (أو بنوع
+  // zip لأن الـ APK حاوية ZIP)، فيشمّه المتصفح كـ zip ويحوّل اسم الملف إلى
+  // `.zip` — هذا سبب «الملف نزل بصيغة zip». الحل: إعادة بناء الـ Blob بنوع
+  // MIME الرسمي للـ APK، فيحفظه المتصفح بامتداد .apk كما هو تماماً.
+  const apkBlob =
+    blob.type === APK_MIME_TYPE ? blob : new Blob([blob], { type: APK_MIME_TYPE });
+  // تأكيد أن الاسم ينتهي بـ .apk مهما فعل المتصفح (إزالة أي .zip ملتصق).
+  const safeName = fileName.endsWith(".apk")
+    ? fileName
+    : `${fileName.replace(/\.zip$/i, "")}.apk`;
+  const url = URL.createObjectURL(apkBlob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = fileName;
+  anchor.download = safeName;
   anchor.rel = "noopener";
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/**
+ * هل الملف يبدأ بتوقيع ZIP/APK الحقيقي (البايتان «PK»)?
+ * يرفض صفحات HTML الخطأ («No matching routes found») التي قد يعيدها الخادم
+ * لمسار لا يعرفه — حتى لا ينزل المستخدم صفحة خطأ باسم ملف تثبيت.
+ */
+async function looksLikeApk(blob: Blob): Promise<boolean> {
+  try {
+    const head = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+    return head[0] === 0x50 && head[1] === 0x4b; // "PK"
+  } catch {
+    return true; // تعذّر الفحص؟ لا نمنع التنزيل.
+  }
 }
 
 /**
@@ -145,6 +172,14 @@ export async function downloadApk(
   const file = fileName ?? `al-abqari-v${APP_VERSION}.apk`;
 
   if (isNativeApp()) {
+    // افتح صفحة التحميل الرسمية في المتصفح الخارجي. زرّها ينزّل الملف عبر
+    // fetch + Blob باسم .apk صريح. (فتح رابط الملف المباشر قد يتحول إلى
+    // .zip لأن الخادم يرسله بدون Content-Type فيشمّه المتصفح كملف zip.)
+    const cleanSite = (siteUrl ?? "").trim().replace(/\/+$/, "");
+    if (isHttpUrl(cleanSite)) {
+      window.open(`${cleanSite}/download`, "_blank", "noopener");
+      return;
+    }
     const url = resolveApkUrl(file, siteUrl);
     window.open(url, "_blank", "noopener");
     return;
@@ -161,9 +196,14 @@ export async function downloadApk(
         continue;
       }
       const blob = await response.blob();
-      // فحص سريع: ملف APK حقيقي أكبر من 100 كيلوبايت (يحمي من صفحات HTML خاطئة).
+      // فحص سريع: ملف APK حقيقي أكبر من 100 كيلوبايت ويبدأ بتوقيع PK
+      // (يحمي من صفحات HTML الخاطئة أو ملفات ناقصة).
       if (blob.size < 100_000) {
         lastError = new Error("empty blob");
+        continue;
+      }
+      if (!(await looksLikeApk(blob))) {
+        lastError = new Error("not an apk");
         continue;
       }
       triggerBlobDownload(blob, file);
