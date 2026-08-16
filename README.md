@@ -302,7 +302,14 @@ is already wired up in `.github/workflows/build-apk.yml`:
 
 The workflow installs dependencies, runs `bun run build` with the secret
 baked in, generates the native project with `cap add android`, and compiles
-`assembleDebug` — no setup on your machine.
+the APK — no setup on your machine.
+
+> ⚠️ **التوقيع إلزامي (السبب الجذري لمشكلة «تحليل الحزمة»)**
+> أندرويد يرفض أي APK غير موقّع برسالة «حدثت مشكلة عند تحليل الحزمة».
+> كل نسخة APK يجب أن تُوقَّع بمفتاح المشروع الرسمي
+> `android/keystore/al-abqari-release.jks` (البيانات الكاملة في
+> `android/keystore/README.md`). لا تُنشئ مفتاحاً جديداً أبداً — التحديثات
+> تُرفض ما لم يكن التوقيع مطابقاً تماماً للنسخة المثبّتة.
 
 ## Build the APK locally (optional)
 
@@ -315,6 +322,12 @@ bunx cap add android
 bunx cap sync android
 cd android && ./gradlew assembleDebug
 # APK → android/app/build/outputs/apk/debug/app-debug.apk
+# ثم وقّعه بالمفتاح الرسمي (انظر android/keystore/README.md):
+zipalign -f -p 4 app-debug.apk app-aligned.apk
+apksigner sign --ks ../android/keystore/al-abqari-release.jks \
+  --ks-pass pass:AlAbqari2026! --key-pass pass:AlAbqari2026! \
+  --ks-key-alias alabqari --out al-abqari-signed.apk app-aligned.apk
+apksigner verify -v al-abqari-signed.apk
 ```
 
 Native config lives in `capacitor.config.ts` (app id `com.mindclash.quiz`,
@@ -345,7 +358,9 @@ for web/PWA users, and a guided download for Android APK users.
 2. Bump `versionCode` (+1) and `versionName` in `android/app/build.gradle`.
 3. Rebuild: `bun run build`, then `rm -f dist/downloads/*.apk` (so the APK
    doesn't embed itself), then `bunx cap sync android` and rebuild the APK
-   (local: `cd android && ./gradlew assembleDebug`).
+   (local: `cd android && ./gradlew assembleDebug`). **وقّع الملف الناتج
+   بمفتاح المشروع الرسمي `android/keystore/al-abqari-release.jks`** — نفس
+   التوقيع لكل النسخ (التعليمات في `android/keystore/README.md`).
 4. Copy the new APK to `public/downloads/al-abqari-v<version>.apk` and
    rebuild the web bundle once more so the hosted site serves it — the
    download page and update banner pick it up automatically.

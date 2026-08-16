@@ -63,8 +63,8 @@ const APK_MIME_TYPE = "application/vnd.android.package-archive";
  * الحزمة». عند نشر نسخة جديدة: أعد بناء APK ثم ضع بصمته وحجمه هنا.
  */
 export const APK_SHA256 =
-  "fa8aaa6bb065184ff7200f0200cd637182424b38a2e84444618abcc8c2087d80";
-export const APK_BYTES = 17313230;
+  "b5948b25bfbf4aa1369f4d7ab5f100fc55746fea29641925ffe7de91169ee68e";
+export const APK_BYTES = 4605484;
 
 /** حساب SHA-256 لمحتوى Blob (يُستخدم للتحقق من سلامة الملف قبل التنزيل). */
 async function sha256Hex(blob: Blob): Promise<string | null> {
