@@ -45,7 +45,7 @@ function fmtDate(ts: number | null | undefined): string {
  * كل 15 دقيقة تلقائياً، وهنا يرى المالك ما حدث ولماذا.
  */
 export function DownloadsTab() {
-  const health = useQuery(api.owner.getDownloadHealth);
+  const health = useQuery(api.owner.getDownloadHealth, {});
 
   if (health === undefined) {
     return (

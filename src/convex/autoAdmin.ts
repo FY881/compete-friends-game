@@ -415,6 +415,7 @@ async function performSweep(ctx: {
       activeRooms: counts.activeRooms,
       openReportsLeft: counts.openReportsLeft,
       autoFixes,
+      downloadFailures: recentDownloadFailures.length,
     },
     issues,
   });

@@ -64,6 +64,7 @@ import {
   Search,
   Shield,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   Trash2,
   UserCheck,
@@ -1928,12 +1929,14 @@ export default function Owner() {
                 <Database className="size-4" /> الأسئلة
               </TabsTrigger>
               {access.isOwner && (
-              <TabsTrigger value="downloads" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Smartphone className="size-4" /> التحميل
-              </TabsTrigger>
-                <TabsTrigger value="settings" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <Megaphone className="size-4" /> الإعدادات
-                </TabsTrigger>
+                <>
+                  <TabsTrigger value="downloads" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <Smartphone className="size-4" /> التحميل
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <Megaphone className="size-4" /> الإعدادات
+                  </TabsTrigger>
+                </>
               )}
             </TabsList>
 
@@ -1968,16 +1971,18 @@ export default function Owner() {
                 <QuestionsTab />
               </TabsContent>
               {access.isOwner && (
-              <TabsContent value="downloads">
-                <DownloadsTab />
-              </TabsContent>
-                <TabsContent value="settings">
-                  {settings ? (
-                    <SettingsTab settings={settings} />
-                  ) : (
-                    <Loader2 className="mx-auto my-12 size-6 animate-spin" />
-                  )}
-                </TabsContent>
+                <>
+                  <TabsContent value="downloads">
+                    <DownloadsTab />
+                  </TabsContent>
+                  <TabsContent value="settings">
+                    {settings ? (
+                      <SettingsTab settings={settings} />
+                    ) : (
+                      <Loader2 className="mx-auto my-12 size-6 animate-spin" />
+                    )}
+                  </TabsContent>
+                </>
               )}
             </div>
           </Tabs>
