@@ -62,6 +62,24 @@ export const XP_PERFECT_GAME = 20;
 
 export const FAST_ANSWER_MS = 3_000; // answers under this count for the "fast hand" badge
 
+// ── Daily rewards («المكافأة اليومية») ──────────────────────────────────
+// Claiming the daily reward builds a login streak: each day grants base XP
+// plus a step per streak day, capped. Playing the first game of a day also
+// grants a small bonus and feeds the same streak calendar.
+export const DAILY_XP_BASE = 30;
+export const DAILY_XP_STEP = 10;
+export const DAILY_XP_CAP = 150;
+export const FIRST_GAME_OF_DAY_XP = 30;
+
+/** Day key (YYYY-MM-DD, UTC) used to compare calendar days for streaks. */
+export function dayKey(ts: number): string {
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+export function dailyRewardXp(streak: number): number {
+  return Math.min(DAILY_XP_BASE + (streak - 1) * DAILY_XP_STEP, DAILY_XP_CAP);
+}
+
 /** Cumulative XP required to *reach* a given level (level 1 starts at 0). */
 export function xpToReachLevel(level: number): number {
   return 50 * level * (level - 1);

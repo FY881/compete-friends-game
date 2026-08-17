@@ -19,6 +19,7 @@ import {
   Flame,
   Hourglass,
   Loader2,
+  RefreshCw,
   Sparkles,
   Trophy,
   Users,
@@ -124,6 +125,14 @@ export function QuestionStage({
   const timeUp = phase === "answering" && remaining <= 0;
 
   const myAnswer = me.answers[index] ?? null;
+  // Second chance («فرصة ثانية»): after a wrong answer the player may retry
+  // once while the answer window is still open — half points on a correct retry.
+  const canRetry =
+    phase === "answering" &&
+    !timeUp &&
+    myAnswer != null &&
+    !myAnswer.correct &&
+    !me.secondChanceUsed;
   const answeredCount = game.players.filter((p) => p.answers[index] != null).length;
   const totalPlayers = game.players.length;
   const isRevealing = phase === "revealing";
@@ -256,7 +265,8 @@ export function QuestionStage({
   }
 
   const submit = async (optionIndex: number) => {
-    if (submitting || myAnswer || isRevealing) return;
+    if (submitting || isRevealing) return;
+    if (myAnswer && !canRetry) return;
     setSubmitting(true);
     try {
       await submitAnswer({
@@ -277,7 +287,8 @@ export function QuestionStage({
 
   // Keyboard shortcuts: 1–4 pick an option.
   useEffect(() => {
-    if (isRevealing || myAnswer || timeUp) return;
+    if (isRevealing || timeUp) return;
+    if (myAnswer && !canRetry) return;
     const handler = (event: KeyboardEvent) => {
       const num = parseInt(event.key, 10);
       if (num >= 1 && num <= 4 && !hiddenOptions.includes(num - 1)) {
@@ -331,7 +342,7 @@ export function QuestionStage({
       }
       return "idle";
     }
-    if (myAnswer) {
+    if (myAnswer && !canRetry) {
       return optionIndex === myAnswer.selected ? "picked" : "idle";
     }
     return "selectable";
@@ -381,6 +392,21 @@ export function QuestionStage({
             </Badge>
           )}
         </div>
+
+        {/* Second-chance banner: one retry after a wrong answer */}
+        {canRetry && (
+          <div className="relative mt-4 flex items-start gap-2.5 rounded-xl border border-orange-500/40 bg-orange-500/10 px-4 py-3">
+            <RefreshCw className="mt-0.5 size-4 shrink-0 text-orange-600" />
+            <div>
+              <p className="text-sm font-bold text-orange-700">
+                إجابة خاطئة — لكن لديك فرصة ثانية! 🎯
+              </p>
+              <p className="mt-0.5 text-xs font-medium leading-relaxed text-orange-700/80">
+                جرّب إجابة أخرى خلال الوقت المتبقي — النقاط تُحتسب بنصف قيمتها.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Automatic anti-cheat notice */}
         {cheatNotice && (
@@ -508,6 +534,11 @@ export function QuestionStage({
             <span className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground">
               <Hourglass className="size-4" />
               انتهى الوقت!
+            </span>
+          ) : canRetry ? (
+            <span className="flex items-center gap-2 rounded-full bg-orange-500/10 px-4 py-2 text-sm font-bold text-orange-700">
+              <RefreshCw className="size-4" />
+              جرّب مرة أخرى — فرصتك الثانية متاحة الآن
             </span>
           ) : myAnswer ? (
             <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">

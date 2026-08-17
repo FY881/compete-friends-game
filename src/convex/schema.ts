@@ -54,6 +54,7 @@ const schema = defineSchema(
       bannedPermanent: v.optional(v.boolean()), // permanent ban flag
       banReason: v.optional(v.string()), // why the user was punished
       cheatStrikes: v.optional(v.number()), // anti-cheat detections (tab-switch while answering)
+      lastWarningAt: v.optional(v.number()), // when the last formal warning was issued (used by the auto-admin to decay old warnings)
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     // The site laws: essential rules, prohibitions and the punishment ladder.
@@ -170,6 +171,7 @@ const schema = defineSchema(
         ),
       ), // per-question answers indexed by question number
       fiftyFiftyUsedFor: v.optional(v.number()), // question index where 50/50 was used
+      secondChanceUsedFor: v.optional(v.number()), // question index where the second-chance retry was used (فرصة ثانية)
       joinedAt: v.number(),
     })
       .index("by_game", ["gameId"])
@@ -187,6 +189,10 @@ const schema = defineSchema(
       totalAnswers: v.number(),
       fastestAnswerMs: v.optional(v.number()),
       badges: v.array(v.string()),
+      // Daily rewards: a login streak that grants XP + badges each day.
+      dailyStreak: v.optional(v.number()), // consecutive days the reward was claimed
+      lastClaimDay: v.optional(v.string()), // YYYY-MM-DD of the last daily claim
+      lastPlayedDay: v.optional(v.string()), // YYYY-MM-DD of the last finished game
       updatedAt: v.number(),
     })
       .index("by_user", ["userId"])
@@ -205,6 +211,7 @@ const schema = defineSchema(
         bannedUsers: v.number(),
         activeRooms: v.number(),
         openReportsLeft: v.number(),
+        autoFixes: v.number(), // autonomous fixes applied by the sweep (spam warns, decay, cleanups, countdown rescue)
       }),
       issues: v.array(
         v.object({
@@ -231,11 +238,20 @@ const schema = defineSchema(
       won: v.boolean(),
       stars: v.optional(v.number()), // 1-3 stars rating for the round
       badgesEarned: v.array(v.string()), // badges unlocked by this result
+      firstOfDay: v.optional(v.boolean()), // true when this round earned the first-game-of-the-day bonus
       playedAt: v.number(),
     })
       .index("by_user", ["userId"])
       .index("by_game", ["gameId"])
       .index("by_user_game", ["userId", "gameId"]),
+
+    // Live emoji reactions inside a game lobby — friends hype each other up.
+    reactions: defineTable({
+      gameId: v.id("games"),
+      name: v.string(), // reacting player's display name
+      emoji: v.string(), // one emoji (e.g. 🔥 😂 🎉)
+      createdAt: v.number(),
+    }).index("by_game", ["gameId"]),
   },
   {
     schemaValidation: false,

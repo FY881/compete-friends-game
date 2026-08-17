@@ -36,6 +36,8 @@ import {
   XP_PER_CORRECT_ANSWER,
   XP_PER_GAME,
   XP_PERFECT_GAME,
+  FIRST_GAME_OF_DAY_XP,
+  dayKey,
   levelFromXp,
 } from "./gameConfig";
 import { CATEGORIES, QUESTION_BANK, type Question } from "./questions";
@@ -77,6 +79,7 @@ export type MyResult = {
   won: boolean;
   stars: number;
   badgesEarned: Badge[];
+  firstOfDay: boolean; // earned the first-game-of-the-day XP bonus
 };
 
 export type PlayerInfo = {
@@ -87,6 +90,7 @@ export type PlayerInfo = {
   streak: number;
   bestStreak: number;
   fiftyFiftyUsed: boolean; // the player has used their one 50/50 lifeline
+  secondChanceUsed: boolean; // the player used their second-chance retry (فرصة ثانية)
   isHost: boolean;
   isMe: boolean;
 };
@@ -108,6 +112,13 @@ export type GameData = {
   players: PlayerInfo[];
   questions: GameQuestion[];
   myResult: MyResult | null;
+};
+
+export type Reaction = {
+  id: string;
+  name: string;
+  emoji: string;
+  createdAt: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -576,9 +587,16 @@ export const submitAnswer = mutation({
     if (!player) {
       throw new Error("أنت لست ضمن لاعبي هذا التحدي");
     }
-    if (player.answers[questionIndex]) {
-      return; // already answered — keep the first pick
+
+    // Second-chance lifeline («فرصة ثانية»): after a wrong answer the player
+    // may retry the same question ONCE (only while the answer window is open),
+    // earning half the normal points on a correct retry.
+    const existing = player.answers[questionIndex];
+    const retryUsed = player.secondChanceUsedFor === questionIndex;
+    if (existing && (existing.correct || retryUsed)) {
+      return; // answered correctly, or the retry is already spent
     }
+    const isRetry = existing != null;
 
     const timePerQuestion = game.settings.timePerQuestionMs;
     const elapsed = Date.now() - game.questionStartedAt;
@@ -619,6 +637,11 @@ export const submitAnswer = mutation({
       points *= GOLDEN_QUESTION_MULTIPLIER;
     }
 
+    // A retry earns half points — the price of the second chance.
+    if (isRetry) {
+      points = Math.round(points / 2);
+    }
+
     const answers = Array.from(
       { length: questionIndex + 1 },
       (_, i) => player.answers[i] ?? null,
@@ -637,15 +660,23 @@ export const submitAnswer = mutation({
       score: player.score + points,
       streak,
       bestStreak,
+      secondChanceUsedFor: isRetry ? questionIndex : player.secondChanceUsedFor,
     });
 
     // If everyone has answered, reveal the correct answer early instead of
-    // making the last player wait out the full timer.
+    // making the last player wait out the full timer. A player who answered
+    // wrong and still has their second chance counts as pending — they may
+    // still retry before the reveal fires.
     const players = await ctx.db
       .query("gamePlayers")
       .withIndex("by_game", (q) => q.eq("gameId", game._id))
       .collect();
-    const allAnswered = players.every((p) => p.answers[questionIndex] != null);
+    const allAnswered = players.every((p) => {
+      const a = p.answers[questionIndex];
+      if (a == null) return false;
+      if (!a.correct && p.secondChanceUsedFor == null) return false;
+      return true;
+    });
     if (allAnswered && players.length > 0) {
       await ctx.scheduler.runAfter(REVEAL_MS, internal.games.revealQuestion, {
         gameId: game._id,
@@ -696,6 +727,107 @@ export const useFiftyFifty = mutation({
 
     await ctx.db.patch(player._id, { fiftyFiftyUsedFor: questionIndex });
     return { hidden };
+  },
+});
+
+/** Host starts a fresh round with the same players and the same settings. */
+/** Host kicks a player out of the waiting lobby. Waiting rooms only. */
+export const kickPlayerFromLobby = mutation({
+  args: { code: v.string(), userId: v.id("users") },
+  handler: async (ctx, { code, userId }) => {
+    const hostId = await getAuthUserId(ctx);
+    if (hostId === null) {
+      throw new Error("يجب تسجيل الدخول أولاً");
+    }
+
+    const game = await getGameByCode(ctx, code);
+    if (!game) {
+      throw new Error("التحدي غير موجود");
+    }
+    if (game.hostId !== hostId) {
+      throw new Error("أنت لست منشئ هذا التحدي");
+    }
+    if (game.status !== "waiting") {
+      throw new Error("لا يمكن طرد لاعبين بعد بدء التحدي");
+    }
+    if (userId === hostId) {
+      throw new Error("لا يمكنك طرد نفسك — استخدم زر الخروج");
+    }
+
+    const player = await getPlayer(ctx, game._id, userId);
+    if (!player) {
+      throw new Error("هذا اللاعب ليس في الغرفة");
+    }
+    await ctx.db.delete(player._id);
+    return { ok: true };
+  },
+});
+
+/** Send a quick emoji reaction into the game lobby (keeps newest 30). */
+export const sendReaction = mutation({
+  args: { code: v.string(), emoji: v.string() },
+  handler: async (ctx, { code, emoji }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new Error("يجب تسجيل الدخول أولاً");
+    }
+    if (!emoji || emoji.length > 8) {
+      throw new Error("رمز غير صالح");
+    }
+
+    const game = await getGameByCode(ctx, code);
+    if (!game) {
+      throw new Error("التحدي غير موجود");
+    }
+    const player = await getPlayer(ctx, game._id, userId);
+    if (!player) {
+      throw new Error("أنت لست ضمن لاعبي هذا التحدي");
+    }
+
+    const now = Date.now();
+    await ctx.db.insert("reactions", {
+      gameId: game._id,
+      name: player.name,
+      emoji,
+      createdAt: now,
+    });
+
+    // Keep the feed tight: drop the oldest beyond the newest 30.
+    const rows = await ctx.db
+      .query("reactions")
+      .withIndex("by_game", (q) => q.eq("gameId", game._id))
+      .collect();
+    const sorted = [...rows].sort((a, b) => b.createdAt - a.createdAt);
+    for (const row of sorted.slice(30)) {
+      await ctx.db.delete(row._id);
+    }
+  },
+});
+
+/** Live reaction feed for a game room (players only). */
+export const getReactions = query({
+  args: { code: v.string() },
+  handler: async (ctx, { code }): Promise<Reaction[]> => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return [];
+    const game = await getGameByCode(ctx, code);
+    if (!game) return [];
+    const player = await getPlayer(ctx, game._id, userId);
+    if (!player) return [];
+
+    const rows = await ctx.db
+      .query("reactions")
+      .withIndex("by_game", (q) => q.eq("gameId", game._id))
+      .collect();
+    return rows
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .slice(-30)
+      .map((r) => ({
+        id: r._id,
+        name: r.name,
+        emoji: r.emoji,
+        createdAt: r.createdAt,
+      }));
   },
 });
 
@@ -858,6 +990,7 @@ export const finishGame = internalMutation({
     );
     const questionCount = game.questionIds.length;
     const now = Date.now();
+    const today = dayKey(now);
 
     for (let i = 0; i < sorted.length; i++) {
       const p = sorted[i];
@@ -880,6 +1013,10 @@ export const finishGame = internalMutation({
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", p.userId))
         .first();
+      // First game of the day: a small bonus that also marks the calendar day
+      // (used by the daily-reward streak UI).
+      const firstOfDay = (profile?.lastPlayedDay ?? "") !== today;
+      if (firstOfDay) xp += FIRST_GAME_OF_DAY_XP;
       const had = new Set(profile?.badges ?? []);
       const next = new Set(had);
 
@@ -940,6 +1077,9 @@ export const finishGame = internalMutation({
             ? Math.min(profile?.fastestAnswerMs ?? Number.POSITIVE_INFINITY, fastest)
             : profile?.fastestAnswerMs,
         badges: [...next],
+        dailyStreak: profile?.dailyStreak ?? 0,
+        lastClaimDay: profile?.lastClaimDay,
+        lastPlayedDay: today,
         updatedAt: now,
       };
 
@@ -966,6 +1106,7 @@ export const finishGame = internalMutation({
         won,
         stars,
         badgesEarned,
+        firstOfDay,
         playedAt: now,
       });
     }
@@ -1023,6 +1164,7 @@ export const getGame = query({
         streak: p.streak,
         bestStreak: p.bestStreak,
         fiftyFiftyUsed: p.fiftyFiftyUsedFor != null,
+        secondChanceUsed: p.secondChanceUsedFor != null,
         isHost: p.userId === game.hostId,
         isMe: p.userId === userId,
       }))
@@ -1055,6 +1197,7 @@ export const getGame = query({
           badgesEarned: row.badgesEarned
             .map((id) => BADGE_MAP[id])
             .filter(Boolean),
+          firstOfDay: row.firstOfDay ?? false,
         };
       }
     }

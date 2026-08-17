@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { GameData, PlayerInfo } from "@/convex/games";
+import { FIRST_GAME_OF_DAY_XP } from "@/convex/gameConfig";
 import { burstConfetti } from "@/lib/confetti";
 import { sounds } from "@/lib/sounds";
 import { Button } from "@/components/ui/button";
@@ -231,6 +232,17 @@ export function ResultsStage({ game }: { game: GameData }) {
                 </p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* First game of the day bonus */}
+        {myResult?.firstOfDay && (
+          <div className="mx-auto mt-4 flex max-w-2xl items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-start">
+            <Sparkles className="size-5 shrink-0 text-primary" />
+            <p className="text-sm text-muted-foreground">
+              هذه أول جولة لك اليوم — حصلت على <b className="text-primary">+{FIRST_GAME_OF_DAY_XP} نقطة</b> مكافأة
+              «أول جولة في اليوم». عد غداً لاستلام المكافأة اليومية من ملفك الشخصي. ✨
+            </p>
           </div>
         )}
       </div>

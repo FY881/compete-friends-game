@@ -42,6 +42,7 @@ type AdminReportRow = {
     bannedUsers: number;
     activeRooms: number;
     openReportsLeft: number;
+    autoFixes: number;
   };
   issues: {
     severity: "low" | "medium" | "high";
@@ -84,6 +85,7 @@ function buildReportText(report: AdminReportRow): string {
     `• عقوبات طُبقت: ${report.stats.punishmentsApplied}`,
     `• غرف نُظفت: ${report.stats.roomsCleaned}`,
     `• مخالفون رُفعت عقوبتهم: ${report.stats.usersEscalated}`,
+    `• إصلاحات ذاتية: ${report.stats.autoFixes}`,
     `• حسابات محظورة: ${report.stats.bannedUsers}`,
     `• غرف نشطة: ${report.stats.activeRooms}`,
     `• بلاغات متبقية: ${report.stats.openReportsLeft}`,
@@ -356,6 +358,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
                 <StatCard icon={Gamepad2} label="غرف نشطة" value={latest.stats.activeRooms} hint="الآن" />
                 <StatCard icon={Flag} label="بلاغات متبقية" value={latest.stats.openReportsLeft} hint="مفتوحة" />
                 <StatCard icon={UserCog} label="مخالفون أُديروا" value={latest.stats.usersEscalated} hint="كتم تلقائي" />
+                <StatCard icon={Zap} label="إصلاحات ذاتية" value={latest.stats.autoFixes} hint="بدون تدخل" />
                 <StatCard icon={ShieldCheck} label="الوضع" value={1} hint="المدير يعمل" />
               </div>
 

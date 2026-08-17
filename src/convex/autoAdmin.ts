@@ -6,7 +6,12 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { getSettingsData, isOwnerEmail, type ModSettings } from "./owner";
+import {
+  getSettingsData,
+  isOwnerEmail,
+  isStaffUser,
+  type ModSettings,
+} from "./owner";
 import { callOpenRouter, parseVerdict, type AiVerdict } from "./moderation";
 
 // ---------------------------------------------------------------------------
@@ -26,6 +31,15 @@ const MAX_REPORTS_PER_SWEEP = 8; // cost cap per sweep
 const ESCALATION_WARNINGS = 3; // 3+ warnings → automatic 24h mute
 const ESCALATION_MUTE_MS = 24 * 60 * 60 * 1000;
 const REPORT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // keep reports 7 days
+
+// ── Autonomous housekeeping ──────────────────────────────────────────────
+const SPAM_WINDOW_MS = 24 * 60 * 60 * 1000; // report-spam window
+const SPAM_MIN_REPORTS = 3; // ≥3 reports in the window…
+const SPAM_MIN_DISMISSED = 2; // …with ≥2 dismissed → warn the reporter
+const WARNING_DECAY_MS = 30 * 24 * 60 * 60 * 1000; // warnings older than 30 days are forgiven
+const FINISHED_GAME_RETENTION_MS = 48 * 60 * 60 * 1000; // finished rooms kept 48h
+const REACTION_RETENTION_MS = 24 * 60 * 60 * 1000; // reactions kept 24h
+const STUCK_COUNTDOWN_MS = 2 * 60 * 1000; // countdown frozen >2 min → rescue
 
 type SweepIssue = {
   severity: "low" | "medium" | "high";
@@ -51,6 +65,7 @@ async function performSweep(ctx: {
   let punishmentsApplied = 0;
   let roomsCleaned = 0;
   let usersEscalated = 0;
+  let autoFixes = 0;
 
   // ── 1. Review open reports with the AI + auto-apply punishments ────────
   const openReports = await ctx.runQuery(internal.autoAdmin.getOpenReports, {
@@ -150,6 +165,73 @@ async function performSweep(ctx: {
     usersEscalated += 1;
   }
 
+  // ── 3.5. Warn report spammers (many reports, mostly dismissed) ─────────
+  const spammers = await ctx.runQuery(internal.autoAdmin.getReportSpammers, {
+    windowMs: SPAM_WINDOW_MS,
+    minReports: SPAM_MIN_REPORTS,
+    minDismissed: SPAM_MIN_DISMISSED,
+  });
+  for (const spammer of spammers) {
+    await ctx.runMutation(internal.autoAdmin.warnReporter, {
+      userId: spammer.reporterId,
+      total: spammer.total,
+      dismissed: spammer.dismissed,
+    });
+    autoFixes += 1;
+  }
+
+  // ── 3.6. Forgive warnings older than 30 days (clean slate) ─────────────
+  const decayed = await ctx.runQuery(internal.autoAdmin.getDecayedWarnings, {
+    olderThanMs: WARNING_DECAY_MS,
+  });
+  for (const user of decayed) {
+    await ctx.runMutation(internal.autoAdmin.clearWarnings, { userId: user._id });
+    autoFixes += 1;
+  }
+
+  // ── 3.7. Rescue stuck countdowns (phase=countdown frozen past 2 min) ───
+  const stuck = await ctx.runQuery(internal.autoAdmin.getStuckCountdowns, {
+    olderThanMs: STUCK_COUNTDOWN_MS,
+  });
+  for (const game of stuck) {
+    await ctx.runMutation(internal.autoAdmin.fixStuckCountdown, {
+      gameId: game._id,
+    });
+    roomsCleaned += 1;
+    autoFixes += 1;
+  }
+
+  // ── 3.8. Delete finished rooms older than 48h (keeps history) ──────────
+  const oldFinished = await ctx.runQuery(internal.autoAdmin.getOldFinishedGames, {
+    olderThanMs: FINISHED_GAME_RETENTION_MS,
+  });
+  for (const game of oldFinished) {
+    await ctx.runMutation(internal.autoAdmin.deleteFinishedGame, {
+      gameId: game._id,
+    });
+    roomsCleaned += 1;
+    autoFixes += 1;
+  }
+
+  // ── 3.9. Clean orphaned player rows (game was deleted) ─────────────────
+  const orphans = await ctx.runQuery(internal.autoAdmin.getOrphanPlayerRows, {});
+  if (orphans.length > 0) {
+    await ctx.runMutation(internal.autoAdmin.cleanupOrphanRows, {
+      ids: orphans.map((o: { _id: string }) => o._id),
+    });
+    autoFixes += 1;
+  }
+
+  // ── 3.10. Trim old reactions (TTL 24h) ─────────────────────────────────
+  const oldReactions = await ctx.runQuery(internal.autoAdmin.getOldReactions, {
+    olderThanMs: REACTION_RETENTION_MS,
+  });
+  for (const reaction of oldReactions) {
+    await ctx.runMutation(internal.autoAdmin.deleteReaction, {
+      reactionId: reaction._id,
+    });
+  }
+
   // ── 4. Health counts for the report ─────────────────────────────────────
   const counts = await ctx.runQuery(internal.autoAdmin.getSiteCounts, {});
 
@@ -189,6 +271,30 @@ async function performSweep(ctx: {
       fix: "عقوبة تلقائية مطبقة. إن استمر السلوك بعد الكتم، راجعهم في تبويب «المستخدمون» للنظر في حظر أطول.",
     });
   }
+  if (spammers.length > 0) {
+    issues.push({
+      severity: "medium",
+      title: "مُبلِّغون مزعجون حُذّروا تلقائياً",
+      detail: `حُذّر ${spammers.length} لاعباً لإرسال بلاغات مكررة (${SPAM_MIN_REPORTS}+) معظمها بلا مخالفة (${SPAM_MIN_DISMISSED}+ مرفوضة).`,
+      fix: "تحذير تلقائي مطبق لمنع إساءة استخدام صندوق البلاغات. إن تكرر الأمر بعد التحذير راجعهم في «المستخدمون» للنظر في كتم أطول.",
+    });
+  }
+  if (decayed.length > 0) {
+    issues.push({
+      severity: "low",
+      title: "تحذيرات قديمة أُسقطت تلقائياً",
+      detail: `أُسقطت التحذيرات الرسمية عن ${decayed.length} لاعباً لأنها تجاوزت 30 يوماً (فرصة جديدة للجميع).`,
+      fix: "لا حاجة لتدخل — سياسة الإسقاط التلقائي مطبقة.",
+    });
+  }
+  if (stuck.length > 0 || oldFinished.length > 0 || orphans.length > 0) {
+    issues.push({
+      severity: "low",
+      title: "تنظيف ذاتي للغرف والبيانات",
+      detail: `أنقذ المدير الآلي ${stuck.length} جولة عالقة، وحذف ${oldFinished.length} غرفة منتهية قديمة، ونظّف ${orphans.length} صف لاعب يتيم.`,
+      fix: "لا حاجة لتدخل — التنظيف تلقائي بالكامل.",
+    });
+  }
   if (counts.bannedUsers > 0) {
     issues.push({
       severity: "low",
@@ -226,6 +332,7 @@ async function performSweep(ctx: {
       bannedUsers: counts.bannedUsers,
       activeRooms: counts.activeRooms,
       openReportsLeft: counts.openReportsLeft,
+      autoFixes,
     },
     issues,
   });
@@ -287,6 +394,107 @@ export const getRepeatViolators = internalQuery({
         (u.bannedUntil == null || u.bannedUntil <= now) &&
         (u.mutedUntil == null || u.mutedUntil <= now),
     );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Autonomous housekeeping: internal queries (read-only lookups for the sweep)
+// ---------------------------------------------------------------------------
+
+/** Reporters who filed many reports in the window, most of which were dismissed. */
+export const getReportSpammers = internalQuery({
+  args: {
+    windowMs: v.number(),
+    minReports: v.number(),
+    minDismissed: v.number(),
+  },
+  handler: async (ctx, { windowMs, minReports, minDismissed }) => {
+    const now = Date.now();
+    const reports = await ctx.db.query("reports").collect();
+    const byReporter = new Map<
+      string,
+      { reporterId: string; total: number; dismissed: number }
+    >();
+    for (const r of reports) {
+      if (now - r.createdAt > windowMs) continue;
+      const entry = byReporter.get(r.reporterId) ?? {
+        reporterId: r.reporterId,
+        total: 0,
+        dismissed: 0,
+      };
+      entry.total += 1;
+      if (r.status === "dismissed") entry.dismissed += 1;
+      byReporter.set(r.reporterId, entry);
+    }
+    return [...byReporter.values()]
+      .filter((e) => e.total >= minReports && e.dismissed >= minDismissed)
+      .sort((a, b) => b.dismissed - a.dismissed);
+  },
+});
+
+/** Users whose warnings are old enough to be forgiven. */
+export const getDecayedWarnings = internalQuery({
+  args: { olderThanMs: v.number() },
+  handler: async (ctx, { olderThanMs }) => {
+    const now = Date.now();
+    const users = await ctx.db.query("users").collect();
+    return users.filter(
+      (u) =>
+        (u.warnings ?? 0) > 0 &&
+        u.lastWarningAt != null &&
+        now - u.lastWarningAt > olderThanMs &&
+        !isStaffUser(u),
+    );
+  },
+});
+
+/** Games frozen in the countdown phase for too long. */
+export const getStuckCountdowns = internalQuery({
+  args: { olderThanMs: v.number() },
+  handler: async (ctx, { olderThanMs }) => {
+    const now = Date.now();
+    const games = await ctx.db.query("games").collect();
+    return games.filter(
+      (g) =>
+        g.status === "playing" &&
+        g.phase === "countdown" &&
+        now - g.questionStartedAt > olderThanMs,
+    );
+  },
+});
+
+/** Finished games older than the retention window (their history is kept). */
+export const getOldFinishedGames = internalQuery({
+  args: { olderThanMs: v.number() },
+  handler: async (ctx, { olderThanMs }) => {
+    const now = Date.now();
+    const games = await ctx.db.query("games").collect();
+    return games.filter(
+      (g) => g.status === "finished" && now - g.createdAt > olderThanMs,
+    );
+  },
+});
+
+/** gamePlayers rows whose game no longer exists. */
+export const getOrphanPlayerRows = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const [players, games] = await Promise.all([
+      ctx.db.query("gamePlayers").collect(),
+      ctx.db.query("games").collect(),
+    ]);
+    const ids = new Set(games.map((g) => g._id));
+    return players.filter((p) => !ids.has(p.gameId));
+  },
+});
+
+/** Reactions older than the retention window. */
+export const getOldReactions = internalQuery({
+  args: { olderThanMs: v.number() },
+  handler: async (ctx, { olderThanMs }) => {
+    const now = Date.now();
+    const reactions = await ctx.db.query("reactions").collect();
+    return reactions.filter((r) => now - r.createdAt > olderThanMs);
   },
 });
 
@@ -379,6 +587,125 @@ export const escalateUser = internalMutation({
   },
 });
 
+// ---------------------------------------------------------------------------
+// Autonomous housekeeping: internal mutations (write actions for the sweep)
+// ---------------------------------------------------------------------------
+
+/** Issue a formal warning to a report spammer (never the staff). */
+export const warnReporter = internalMutation({
+  args: {
+    userId: v.id("users"),
+    total: v.number(),
+    dismissed: v.number(),
+  },
+  handler: async (ctx, { userId, total, dismissed }) => {
+    const user = await ctx.db.get(userId);
+    if (!user || isStaffUser(user)) return;
+    const now = Date.now();
+    await ctx.db.patch(userId, {
+      warnings: (user.warnings ?? 0) + 1,
+      lastWarningAt: now,
+    });
+    await ctx.db.insert("moderationLogs", {
+      actorType: "system",
+      actorName: "المدير الآلي",
+      action: "report_spam_warn",
+      targetId: userId,
+      targetName: user.name ?? "لاعب",
+      reason: `تحذير تلقائي: ${total} بلاغاً في 24 ساعة، ${dismissed} منها بلا مخالفة`,
+      severity: "medium",
+      createdAt: now,
+    });
+  },
+});
+
+/** Clear warnings that have passed the decay window. */
+export const clearWarnings = internalMutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user || (user.warnings ?? 0) === 0) return;
+    const now = Date.now();
+    await ctx.db.patch(userId, { warnings: 0 });
+    await ctx.db.insert("moderationLogs", {
+      actorType: "system",
+      actorName: "المدير الآلي",
+      action: "warning_decay",
+      targetId: userId,
+      targetName: user.name ?? "لاعب",
+      reason: "إسقاط تلقائي للتحذيرات بعد 30 يوماً بدون مخالفات جديدة",
+      severity: "low",
+      createdAt: now,
+    });
+  },
+});
+
+/** Rescue a game stuck in the countdown phase: open the answer window now. */
+export const fixStuckCountdown = internalMutation({
+  args: { gameId: v.id("games") },
+  handler: async (ctx, { gameId }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game || game.status !== "playing" || game.phase !== "countdown") return;
+    const now = Date.now();
+    await ctx.db.patch(gameId, {
+      phase: "answering",
+      questionStartedAt: now,
+    });
+    await ctx.scheduler.runAfter(
+      game.settings.timePerQuestionMs,
+      internal.games.revealQuestion,
+      { gameId, index: game.currentQuestionIndex },
+    );
+    await ctx.db.insert("moderationLogs", {
+      actorType: "system",
+      actorName: "المدير الآلي",
+      action: "countdown_fix",
+      targetName: "غرفة",
+      reason: `إنقاذ تلقائي: عدّاد جولة عالق (${game.code}) — فُتحت نافذة الإجابة`,
+      severity: "low",
+      createdAt: now,
+    });
+  },
+});
+
+/** Delete a finished room + its player rows + reactions (history stays). */
+export const deleteFinishedGame = internalMutation({
+  args: { gameId: v.id("games") },
+  handler: async (ctx, { gameId }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game || game.status !== "finished") return;
+    const players = await ctx.db
+      .query("gamePlayers")
+      .withIndex("by_game", (q) => q.eq("gameId", gameId))
+      .collect();
+    for (const p of players) await ctx.db.delete(p._id);
+    const reactions = await ctx.db
+      .query("reactions")
+      .withIndex("by_game", (q) => q.eq("gameId", gameId))
+      .collect();
+    for (const r of reactions) await ctx.db.delete(r._id);
+    await ctx.db.delete(gameId);
+  },
+});
+
+/** Delete orphaned gamePlayers rows. */
+export const cleanupOrphanRows = internalMutation({
+  args: { ids: v.array(v.id("gamePlayers")) },
+  handler: async (ctx, { ids }) => {
+    for (const id of ids) {
+      await ctx.db.delete(id);
+    }
+  },
+});
+
+/** Delete one stale reaction (TTL). */
+export const deleteReaction = internalMutation({
+  args: { reactionId: v.id("reactions") },
+  handler: async (ctx, { reactionId }) => {
+    await ctx.db.delete(reactionId);
+  },
+});
+
 /** Persist the sweep report (and trim history older than 7 days). */
 export const writeReport = internalMutation({
   args: {
@@ -391,6 +718,7 @@ export const writeReport = internalMutation({
       bannedUsers: v.number(),
       activeRooms: v.number(),
       openReportsLeft: v.number(),
+      autoFixes: v.number(),
     }),
     issues: v.array(
       v.object({

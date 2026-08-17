@@ -1,3 +1,4 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import {
   action,
@@ -6,7 +7,7 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { getSettingsData } from "./owner";
+import { getSettingsData, isStaffUser } from "./owner";
 
 // ---------------------------------------------------------------------------
 // AI moderation agent — "رقيب العقول".
@@ -236,7 +237,10 @@ export const recordAiReview = internalMutation({
     const defaultBan = 24 * 60 * 60 * 1000;
 
     if (verdict.suggestedAction === "warn") {
-      await ctx.db.patch(report.targetId, { warnings: (target.warnings ?? 0) + 1 });
+      await ctx.db.patch(report.targetId, {
+        warnings: (target.warnings ?? 0) + 1,
+        lastWarningAt: now,
+      });
     } else if (verdict.suggestedAction === "mute") {
       await ctx.db.patch(report.targetId, {
         mutedUntil: now + (verdict.suggestedDurationMs ?? defaultMute),
@@ -398,5 +402,89 @@ export const aiModerateContent = action({
     const text = data.choices?.[0]?.message?.content ?? "";
     if (!text) throw new Error("OpenRouter لم يُرجع رداً");
     return parseVerdict(text);
+  },
+});
+
+// ---------------------------------------------------------------------------
+// AI help-desk — «المساعد الذكي» in the owner room.
+// The owner (or an admin) asks how to manage the site and the AI answers with
+// concrete steps and ready-to-use code snippets through the same OpenRouter key.
+// ---------------------------------------------------------------------------
+
+const HELP_DESK_SYSTEM_PROMPT = `
+أنت "المساعد الذكي" للعبة «العبقري» — لعبة تحديات تنافسية بين الأصدقاء.
+المنصة: React + Vite + Tailwind + Convex (قاعدة بيانات و Backend) + Convex Auth،
+والذكاء الاصطناعي يعمل عبر OpenRouter (OPENROUTER_API_KEY).
+
+لديك صلاحيات المالك/المشرف في غرفة المالك: إدارة المستخدمين والعقوبات والبلاغات،
+القوانين، الرقيب الآلي (فحص البلاغات تلقائياً وتطبيق العقوبات)، المدير الآلي
+(فحص دوري كل 15 دقيقة)، بنك الأسئلة، الإعلانات، ومكافحة الغش.
+
+أجب بالعربية بوضوح وبخطوات عملية قابلة للتنفيذ فوراً. إذا طُلب حل برمجي
+فاكتب الكود جاهزاً (TypeScript/Convex) داخل كتلة \`\`\`. كن مختصراً ومحدداً:
+المشكلة، السبب المحتمل، الخطوات، ثم الكود إن لزم. إن كانت المشكلة خارج
+نطاقك (مثل خطأ في استضافة أندرويد) فاشرح السبب الأرجح والحل الأنسب.
+`;
+
+/** Ask the site-management AI for a fix/guide. Owner and admins only. */
+export const aiHelpDesk = action({
+  args: { question: v.string() },
+  handler: async (ctx, { question }): Promise<{ answer: string }> => {
+    const staff = await ctx.runQuery(internal.moderation.getStaffForHelp, {});
+    if (!staff) {
+      throw new Error("غير مصرح — هذه الميزة للمالك والمشرفين فقط");
+    }
+
+    const settings = await ctx.runQuery(
+      internal.moderation.getModSettingsForReview,
+      {},
+    );
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "مفتاح OpenRouter غير مضبوط — أضِفه في تبويب المفاتيح (OPENROUTER_API_KEY)",
+      );
+    }
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://mindclash.freebuff.app",
+        "X-Title": "العبقري",
+      },
+      body: JSON.stringify({
+        model: settings.aiModel,
+        temperature: 0.3,
+        messages: [
+          { role: "system", content: HELP_DESK_SYSTEM_PROMPT },
+          { role: "user", content: question },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`OpenRouter فشل: ${response.status} ${body.slice(0, 200)}`);
+    }
+
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const text = data.choices?.[0]?.message?.content ?? "";
+    if (!text) throw new Error("OpenRouter لم يُرجع رداً");
+    return { answer: text };
+  },
+});
+
+export const getStaffForHelp = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!me) return null;
+    return isStaffUser(me) ? { name: me.name ?? "المشرف" } : null;
   },
 });

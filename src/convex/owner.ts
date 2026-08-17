@@ -746,7 +746,10 @@ export const applyPunishment = mutation({
 
     const now = Date.now();
     if (type === "warn") {
-      await ctx.db.patch(userId, { warnings: (target.warnings ?? 0) + 1 });
+      await ctx.db.patch(userId, {
+        warnings: (target.warnings ?? 0) + 1,
+        lastWarningAt: now,
+      });
       await logModeration(ctx, {
         actorType: "owner",
         actorName: actor.name ?? "الإدارة",
@@ -1083,7 +1086,10 @@ export const recordCheat = mutation({
     // 1st → warning, 2nd → score penalty, 3rd → forfeit + 24h ban,
     // 4th → 7-day ban, 5th+ → permanent ban.
     if (strike === 1) {
-      await ctx.db.patch(userId, { warnings: (user.warnings ?? 0) + 1 });
+      await ctx.db.patch(userId, {
+        warnings: (user.warnings ?? 0) + 1,
+        lastWarningAt: now,
+      });
       await logModeration(ctx, {
         actorType: "system",
         actorName: "الرقيب الآلي",

@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
-import { levelFromXp, levelTitle, xpToReachLevel } from "./gameConfig";
+import { dailyRewardXp, dayKey, levelFromXp, levelTitle, xpToReachLevel } from "./gameConfig";
 
 // ---------------------------------------------------------------------------
 // Badge catalog — shared by the server (awards) and the client (rendering).
@@ -29,6 +29,9 @@ export const BADGES: Badge[] = [
   { id: "first_blood", name: "الضربة الأولى", description: "كن أول من يجيب صحيحاً في أي سؤال", emoji: "⚔️" },
   { id: "golden_answer", name: "الإجابة الذهبية", description: "أجب صحيحاً عن السؤال الذهبي الأخير (نقاط مضاعفة)", emoji: "🌟" },
   { id: "blowout", name: "الحسم الساحق", description: "اربح بفارق 200+ نقطة عن صاحب المركز الثاني", emoji: "💥" },
+  { id: "daily_3", name: "مواظب", description: "استلم المكافأة اليومية 3 أيام متتالية", emoji: "📅" },
+  { id: "daily_7", name: "أسبوع العباقرة", description: "استلم المكافأة اليومية 7 أيام متتالية", emoji: "🗓️" },
+  { id: "daily_30", name: "شهر النخبة", description: "استلم المكافأة اليومية 30 يوماً متتالياً", emoji: "👑" },
 ];
 
 export const BADGE_MAP: Record<string, Badge> = Object.fromEntries(
@@ -55,6 +58,11 @@ export type ProfileStats = {
   accuracy: number;
   fastestAnswerMs: number | null;
   badges: Badge[];
+  // Daily rewards
+  dailyStreak: number; // consecutive claimed days
+  canClaimDaily: boolean; // reward is waiting for today
+  nextDailyRewardXp: number; // XP the next claim grants
+  firstGameOfDayDone: boolean; // played the first round of today already
 };
 
 /** The signed-in user's profile, with derived stats for the profile page. */
@@ -70,6 +78,8 @@ export const getMyProfile = query({
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
+
+    const today = dayKey(Date.now());
 
     if (!profile) {
       return {
@@ -88,6 +98,10 @@ export const getMyProfile = query({
         accuracy: 0,
         fastestAnswerMs: null,
         badges: [],
+        dailyStreak: 0,
+        canClaimDaily: true,
+        nextDailyRewardXp: dailyRewardXp(1),
+        firstGameOfDayDone: false,
       };
     }
 
@@ -117,6 +131,10 @@ export const getMyProfile = query({
           : 0,
       fastestAnswerMs: profile.fastestAnswerMs ?? null,
       badges: profile.badges.map((id) => BADGE_MAP[id]).filter(Boolean),
+      dailyStreak: profile.dailyStreak ?? 0,
+      canClaimDaily: profile.lastClaimDay !== today,
+      nextDailyRewardXp: dailyRewardXp((profile.dailyStreak ?? 0) + 1),
+      firstGameOfDayDone: profile.lastPlayedDay === today,
     };
   },
 });

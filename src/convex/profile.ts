@@ -1,6 +1,13 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
+import { dailyRewardXp, dayKey } from "./gameConfig";
+
+const DAILY_BADGE_STEPS = [
+  { at: 30, id: "daily_30" },
+  { at: 7, id: "daily_7" },
+  { at: 3, id: "daily_3" },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Account display name — «العب فوراً باسمك فقط» + «الحساب الذكي».
@@ -26,5 +33,73 @@ export const setDisplayName = mutation({
 
     await ctx.db.patch(userId, { name: clean });
     return { ok: true };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Daily rewards — «المكافأة اليومية»: login streak that grants XP + badges.
+// ---------------------------------------------------------------------------
+
+/**
+ * Claim today's daily reward. Building a streak (claiming on consecutive
+ * days) increases the XP granted, capped, and unlocks streak badges at
+ * 3 / 7 / 30 days.
+ */
+export const claimDailyReward = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
+
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+
+    const now = Date.now();
+    const today = dayKey(now);
+    const yesterday = dayKey(now - 24 * 60 * 60 * 1000);
+
+    if (profile?.lastClaimDay === today) {
+      throw new Error("حصلت على مكافأة اليوم بالفعل — عد غداً ✨");
+    }
+
+    const streak =
+      profile?.lastClaimDay === yesterday ? (profile.dailyStreak ?? 0) + 1 : 1;
+    const xpEarned = dailyRewardXp(streak);
+
+    const had = new Set(profile?.badges ?? []);
+    const next = new Set(had);
+    for (const step of DAILY_BADGE_STEPS) {
+      if (streak >= step.at) next.add(step.id);
+    }
+    const badgesEarned = [...next].filter((id) => !had.has(id));
+
+    if (profile) {
+      await ctx.db.patch(profile._id, {
+        xp: profile.xp + xpEarned,
+        dailyStreak: streak,
+        lastClaimDay: today,
+        badges: [...next],
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("profiles", {
+        userId,
+        xp: xpEarned,
+        gamesPlayed: 0,
+        gamesWon: 0,
+        bestScore: 0,
+        bestStreak: 0,
+        correctAnswers: 0,
+        totalAnswers: 0,
+        badges: [...next],
+        dailyStreak: streak,
+        lastClaimDay: today,
+        updatedAt: now,
+      });
+    }
+
+    return { xpEarned, streak, badgesEarned };
   },
 });

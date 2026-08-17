@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { GameData, GameSettings } from "@/convex/games";
 import { CATEGORIES } from "@/convex/questions";
@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -44,7 +45,98 @@ import {
   SlidersHorizontal,
   Users,
   UserRoundPlus,
+  UserX,
 } from "lucide-react";
+
+const QUICK_REACTIONS = ["🔥", "😂", "👍", "🎉", "😱", "👏"];
+
+/** A reaction bubble that fades out after a few seconds. */
+function ReactionBubble({
+  id,
+  emoji,
+  name,
+}: {
+  id: string;
+  emoji: string;
+  name: string;
+}) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(false), 4000);
+    return () => clearTimeout(t);
+  }, [id]);
+  if (!visible) return null;
+  return (
+    <div
+      key={id}
+      className="pointer-events-none flex items-center gap-1.5 rounded-full border border-border/70 bg-card/90 px-3 py-1.5 text-sm shadow-md backdrop-blur animate-in fade-in slide-in-from-bottom-2"
+    >
+      <span className="text-base">{emoji}</span>
+      <span className="text-[11px] font-bold text-muted-foreground">{name}</span>
+    </div>
+  );
+}
+
+/** Quick emoji reactions shared by everyone in the lobby (live). */
+function ReactionsPanel({ code }: { code: string }) {
+  const reactions = useQuery(api.games.getReactions, { code });
+  const sendReaction = useMutation(api.games.sendReaction);
+  const [busy, setBusy] = useState<string | null>(null);
+  const shown = useRef<Set<string>>(new Set());
+
+  const handleSend = async (emoji: string) => {
+    if (busy) return;
+    setBusy(emoji);
+    try {
+      await sendReaction({ code, emoji });
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "تعذّر إرسال التفاعل.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const fresh = (reactions ?? []).filter((r) => {
+    if (shown.current.has(r.id)) return false;
+    if (Date.now() - r.createdAt > 5000) return false;
+    shown.current.add(r.id);
+    return true;
+  });
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border/80 bg-card p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <p className="flex items-center gap-2 text-sm font-bold">
+          <Sparkles className="size-4 text-primary" />
+          تفاعلات اللوبي
+        </p>
+        <span className="text-xs text-muted-foreground">تظهر للجميع فوراً</span>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {QUICK_REACTIONS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            onClick={() => handleSend(emoji)}
+            disabled={busy != null}
+            className="flex size-10 items-center justify-center rounded-xl border border-border/70 bg-muted/40 text-lg transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/10 disabled:opacity-50"
+            title={`أرسل ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+      {fresh.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {fresh.map((r) => (
+            <ReactionBubble key={r.id} id={r.id} emoji={r.emoji} name={r.name} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 import { GameAvatar, copyText } from "./ui";
 
 const REPORT_REASONS = [
@@ -305,6 +397,8 @@ export function Lobby({
 }) {
   const startGame = useMutation(api.games.startGame);
   const updateSettings = useMutation(api.games.updateSettings);
+  const kickPlayer = useMutation(api.games.kickPlayerFromLobby);
+  const [kicking, setKicking] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -476,7 +570,36 @@ export function Lobby({
                   المضيف
                 </span>
               )}
-              {!player.isMe && (
+              {!player.isMe && isHost && (
+                <button
+                  type="button"
+                  title="طرد اللاعب من الغرفة"
+                  aria-label={`طرد ${player.name}`}
+                  className="rounded-lg p-1.5 text-muted-foreground/50 transition-colors hover:bg-rose-500/10 hover:text-rose-500 disabled:opacity-50"
+                  disabled={kicking === player.id}
+                  onClick={async () => {
+                    setKicking(player.id);
+                    try {
+                      await kickPlayer({ code, userId: player.id as never });
+                      toast.success(`تم طرد ${player.name} من الغرفة.`);
+                    } catch (error) {
+                      console.error(error);
+                      toast.error(
+                        error instanceof Error ? error.message : "تعذّر الطرد.",
+                      );
+                    } finally {
+                      setKicking(null);
+                    }
+                  }}
+                >
+                  {kicking === player.id ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <UserX className="size-3.5" />
+                  )}
+                </button>
+              )}
+              {!player.isMe && !isHost && (
                 <button
                   type="button"
                   title="الإبلاغ عن اللاعب"
@@ -500,6 +623,9 @@ export function Lobby({
           </a>
           .
         </p>
+
+        {/* Live emoji reactions */}
+        <ReactionsPanel code={code} />
 
         {host && !isHost && (
           <p className="mt-5 rounded-xl bg-muted/60 px-4 py-3 text-center text-sm text-muted-foreground">
