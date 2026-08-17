@@ -21,7 +21,7 @@
  *   التطبيق نفسها — وهو المسار الذي يخدمه أي مزوّد يعرض التطبيق أصلاً.
  *   (بدون `?url` يفشل البناء لأن Rollup يحاول قراءة الـ APK كوحدة JS.)
  */
-import apkAssetUrlRaw from "@/assets/al-abqari-v1.0.1.apk?url";
+import apkAssetUrlRaw from "@/assets/al-abqari-v1.2.1.apk?url";
 
 /** مسار الملف الفعلي — بدون استعلامات Vite (مثل ?import) التي تفشل في fetch. */
 const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
@@ -36,10 +36,10 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
 export const APP_VERSION = "1.2.1"; // client version — matches server WEB_VERSION 1.2.1 (this build is current)
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
-export const APK_VERSION = "1.0.1";
+export const APK_VERSION = "1.2.1";
 
 /** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
-export const APK_FALLBACK_FILE = "al-abqari-v1.0.1.apk";
+export const APK_FALLBACK_FILE = "al-abqari-v1.2.1.apk";
 
 export const APP_VERSION_LABEL = `نُباهة ${APP_VERSION}`;
 
@@ -76,8 +76,8 @@ const APK_MIME_TYPE = "application/vnd.android.package-archive";
  * الحزمة». عند نشر نسخة جديدة: أعد بناء APK ثم ضع بصمته وحجمه هنا.
  */
 export const APK_SHA256 =
-  "107b78d61c4628c28906b2e7c2c4575d9262cdcbe182c118546c0bc685eccad1";
-export const APK_BYTES = 12037991;
+  "95d49886e71cd8818a25cbb60b275b3ed560a2829a8867052e42f0399f246c0b";
+export const APK_BYTES = 27033668;
 
 /** حساب SHA-256 لمحتوى Blob (يُستخدم للتحقق من سلامة الملف قبل التنزيل). */
 async function sha256Hex(blob: Blob): Promise<string | null> {

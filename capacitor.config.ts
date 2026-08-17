@@ -5,14 +5,14 @@ import type { CapacitorConfig } from "@capacitor/cli";
  *
  * - appId ثابتة (com.mindclash.quiz) — لا تُغيَّر أبداً وإلا اعتبرها أندرويد
  *   تطبيقاً مختلفاً ولن يستطيع المستخدمون تحديث نسختهم المثبّتة.
- * - appName «العبقري» — الاسم الذي يظهر تحت الأيقونة في هاتف المستخدم.
+ * - appName «نُباهة» — الاسم الذي يظهر تحت الأيقونة في هاتف المستخدم.
  * - عند بناء APK جديد: تأكد أن هذا الملف هو المستخدم في البناء (وليس نسخة
- *   قديمة بالاسم القديم «تحدّي العقول»)، ثم وقّع الملف الناتج بمفتاح
+ *   قديمة بالاسم القديم)، ثم وقّع الملف الناتج بمفتاح
  *   المشروع الرسمي (android/keystore/README.md).
  */
 const config: CapacitorConfig = {
   appId: "com.mindclash.quiz",
-  appName: "العبقري",
+  appName: "نُباهة",
   webDir: "dist",
   server: {
     androidScheme: "https",
