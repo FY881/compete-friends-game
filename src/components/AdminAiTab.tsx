@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Sparkles,
   Timer,
+  Smartphone,
   UserCog,
   Zap,
 } from "lucide-react";
@@ -43,6 +44,7 @@ type AdminReportRow = {
     activeRooms: number;
     openReportsLeft: number;
     autoFixes: number;
+    downloadFailures: number;
   };
   issues: {
     severity: "low" | "medium" | "high";
@@ -86,6 +88,7 @@ function buildReportText(report: AdminReportRow): string {
     `• غرف نُظفت: ${report.stats.roomsCleaned}`,
     `• مخالفون رُفعت عقوبتهم: ${report.stats.usersEscalated}`,
     `• إصلاحات ذاتية: ${report.stats.autoFixes}`,
+    `• محاولات تنزيل فاشلة (24 ساعة): ${report.stats.downloadFailures ?? 0}`,
     `• حسابات محظورة: ${report.stats.bannedUsers}`,
     `• غرف نشطة: ${report.stats.activeRooms}`,
     `• بلاغات متبقية: ${report.stats.openReportsLeft}`,
@@ -359,6 +362,12 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
                 <StatCard icon={Flag} label="بلاغات متبقية" value={latest.stats.openReportsLeft} hint="مفتوحة" />
                 <StatCard icon={UserCog} label="مخالفون أُديروا" value={latest.stats.usersEscalated} hint="كتم تلقائي" />
                 <StatCard icon={Zap} label="إصلاحات ذاتية" value={latest.stats.autoFixes} hint="بدون تدخل" />
+                <StatCard
+                  icon={Smartphone}
+                  label="فشل تنزيل APK"
+                  value={latest.stats.downloadFailures ?? 0}
+                  hint="آخر 24 ساعة"
+                />
                 <StatCard icon={ShieldCheck} label="الوضع" value={1} hint="المدير يعمل" />
               </div>
 

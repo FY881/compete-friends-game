@@ -992,6 +992,22 @@ export const finishGame = internalMutation({
     const now = Date.now();
     const today = dayKey(now);
 
+    // Scores at the halfway point — used for the «comeback win» badge.
+    const halfIndex = Math.floor(questionCount / 2);
+    const midpointScores = new Map<string, number>();
+    for (const p of sorted) {
+      const mid = p.answers.slice(0, halfIndex).reduce((sum, a) => {
+        const info = a as AnswerInfo | null;
+        return sum + (info?.points ?? 0);
+      }, 0);
+      midpointScores.set(p.userId, mid);
+    }
+    const maxMidpointOther = (winnerId: string) =>
+      sorted.reduce((max, p) => {
+        if (p.userId === winnerId) return max;
+        return Math.max(max, midpointScores.get(p.userId) ?? 0);
+      }, 0);
+
     for (let i = 0; i < sorted.length; i++) {
       const p = sorted[i];
       const rank = i + 1;
@@ -1029,6 +1045,9 @@ export const finishGame = internalMutation({
       if (answered.some((a) => a.correct && a.elapsedMs <= FAST_ANSWER_MS)) {
         next.add("fast");
       }
+      if (answered.some((a) => a.correct && a.elapsedMs <= 1_000)) {
+        next.add("sniper");
+      }
       if ((game.firstCorrect ?? []).includes(p.userId)) {
         next.add("first_blood");
       }
@@ -1039,17 +1058,28 @@ export const finishGame = internalMutation({
         const margin = p.score - sorted[1].score;
         if (margin >= BLOWOUT_MARGIN) next.add("blowout");
       }
+      // «بومة الليل» — جولة أُنهيت بين 21:00 و 04:00 (بتوقيت الخادم).
+      const hour = new Date(now).getHours();
+      if (hour >= 21 || hour < 4) next.add("night_owl");
+      // «العودة الأسطورية» — فوز بعد التأخر في منتصف الجولة.
+      if (won && sorted.length > 1) {
+        const myMid = midpointScores.get(p.userId) ?? 0;
+        if (myMid < maxMidpointOther(p.userId)) next.add("comeback_win");
+      }
       const gamesAfter = (profile?.gamesPlayed ?? 0) + 1;
       if (gamesAfter >= 10) next.add("games_10");
+      if (gamesAfter >= 25) next.add("games_25");
       if (gamesAfter >= 50) next.add("games_50");
       if ((profile?.correctAnswers ?? 0) + correctCount >= 100) {
         next.add("answers_100");
       }
       const winsAfter = (profile?.gamesWon ?? 0) + (won ? 1 : 0);
       if (winsAfter >= 5) next.add("wins_5");
-      if (levelFromXp((profile?.xp ?? 0) + xp) >= 10) {
-        next.add("level_10");
-      }
+      if (winsAfter >= 10) next.add("wins_10");
+      const levelAfter = levelFromXp((profile?.xp ?? 0) + xp);
+      if (levelAfter >= 10) next.add("level_10");
+      if (levelAfter >= 20) next.add("level_20");
+      if (levelAfter >= 50) next.add("level_50");
       if (
         correctCount === questionCount &&
         questionCount >= 3 &&

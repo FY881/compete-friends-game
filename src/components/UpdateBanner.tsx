@@ -1,7 +1,12 @@
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { APP_VERSION, downloadApk, isNewerVersion } from "@/lib/app-version";
+import {
+  APP_VERSION,
+  DownloadError,
+  downloadApk,
+  isNewerVersion,
+} from "@/lib/app-version";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -17,6 +22,7 @@ import { Download, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
  */
 export function UpdateBanner() {
   const info = useQuery(api.appInfo.getAppInfo);
+  const reportIssue = useMutation(api.owner.reportDownloadIssue);
   const [dismissed, setDismissed] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -29,13 +35,32 @@ export function UpdateBanner() {
     if (downloading) return;
     setDownloading(true);
     try {
-      await downloadApk(info.apkFileName, info.siteUrl);
+      await downloadApk(info.apkFileName, info.siteUrl, {
+        sha256: info.apkSha256,
+        bytes: info.apkBytes,
+      });
       toast.success("بدأ تنزيل ملف APK — افحص شريط التنزيل في متصفحك.");
     } catch (error) {
       console.error(error);
-      toast.error(
-        error instanceof Error ? error.message : "تعذّر التنزيل، حاول مرة أخرى.",
-      );
+      if (error instanceof DownloadError) {
+        reportIssue({
+          url: error.sourceUrl ?? info.apkUrl ?? "",
+          error: error.message,
+          receivedSize: error.receivedSize,
+          receivedHash: error.receivedHash,
+          expectedSize: info.apkBytes,
+          expectedHash: info.apkSha256,
+        }).catch(() => undefined);
+        toast.error(
+          error.healed
+            ? "أصلح النظام التخزين المؤقت تلقائياً — أعد الضغط على زر التنزيل الآن."
+            : error.message,
+        );
+      } else {
+        toast.error(
+          error instanceof Error ? error.message : "تعذّر التنزيل، حاول مرة أخرى.",
+        );
+      }
     } finally {
       setDownloading(false);
     }

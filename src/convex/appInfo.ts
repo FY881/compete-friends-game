@@ -1,11 +1,21 @@
 import { query } from "./_generated/server";
 import { getSettingsData } from "./owner";
+import {
+  APK_BYTES,
+  APK_FILE_NAME,
+  APK_SHA256,
+  BUILD_ID,
+  CURRENT_VERSION,
+  UPDATE_NOTES,
+} from "./apkRelease";
 
 /**
  * معلومات الإصدار المنشورة — محور «خطة تحديث التطبيق».
  *
  * عندما تريد إطلاق نسخة جديدة:
- * 1. ارفع CURRENT_VERSION هنا و APP_VERSION في `src/lib/app-version.ts` معاً.
+ * 1. ارفع CURRENT_VERSION/APK_FILE_NAME/APK_SHA256/APK_BYTES في
+ *    `src/convex/apkRelease.ts` (مصدر الحقيقة الوحيد) و APP_VERSION في
+ *    `src/lib/app-version.ts` معاً.
  * 2. ارفع versionCode/versionName في `android/app/build.gradle`.
  * 3. أعد بناء الويب وبناء الـ APK (اسم الملف يحمل رقم الإصدار).
  *
@@ -14,29 +24,26 @@ import { getSettingsData } from "./owner";
  * routes found»). الرابط يُبنى في المتصفح من نطاق الموقع نفسه
  * (`window.location.origin`) عبر `resolveApkUrl` في `src/lib/app-version.ts`،
  * ولتطبيق أندرويد الأصلي يُستخدم `siteUrl` القابل للضبط من غرفة المالك.
+ *
+ * البصمة والحجم يُرسلان للعميل أيضاً — فيتحقق زر التنزيل من الملف الفعلي
+ * مقابل قيم الخادم (وليس فقط الثوابت المبنية داخل الكود)، فتظل القيم
+ * متزامنة دائماً حتى بعد تحديث الملف.
  */
-const CURRENT_VERSION = "1.0.1";
-
-const UPDATE_NOTES: string[] = [
-  "إعادة بناء كاملة لتطبيق أندرويد من أحدث إصدار للموقع — كل تحسينات الويب (الذكاء الاصطناعي، غرفة المالك، التسجيل السريع بالاسم) أصبحت داخل التطبيق الآن.",
-  "موقّع بالتوقيع الرسمي للعبة (v2+v3 بنفس المفتاح) — ثبّت النسخة الجديدة فوق القديمة مباشرة بدون حذف التطبيق.",
-  "التنزيل موثّق بالبصمة الرقمية SHA-256: أي ملف لا يطابق النسخة الرسمية تماماً يُرفض قبل وصوله لهاتفك.",
-  "إصلاح مشكلة «حدثت مشكلة عند تحليل الحزمة» نهائياً: الملف الذي يصلك من زر التنزيل هو نسخة APK حقيقية موقّعة، وليست صفحة خطأ أو ملف ZIP.",
-];
-
 export const getAppInfo = query({
   handler: async (ctx) => {
     // `siteUrl` = رابط الموقع الرسمي (يضبطه المالك من غرفة المالك).
     // فارغ افتراضياً → المتصفح يستخدم نطاقه الحالي تلقائياً.
     const settings = await getSettingsData(ctx);
-    const apkFileName = `al-abqari-v${CURRENT_VERSION}.apk`;
     return {
       version: CURRENT_VERSION,
+      buildId: BUILD_ID,
       notes: UPDATE_NOTES,
-      apkFileName,
+      apkFileName: APK_FILE_NAME,
       // مسار نسبي — المتصفح يحلّه على نطاق الموقع نفسه. (كان يُبنى من
       // SITE_URL الذي يشير لنطاق Convex فينتج «No matching routes found».)
-      apkUrl: `/downloads/${apkFileName}`,
+      apkUrl: `/downloads/${APK_FILE_NAME}`,
+      apkSha256: APK_SHA256,
+      apkBytes: APK_BYTES,
       siteUrl: settings.siteUrl,
     };
   },

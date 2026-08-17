@@ -37,6 +37,31 @@ export const setDisplayName = mutation({
 });
 
 // ---------------------------------------------------------------------------
+// Avatar emoji — «صورتك الرمزية»: يختار اللاعب رمزاً تعبيرياً يظهر في ملفه.
+// ---------------------------------------------------------------------------
+
+export const AVATAR_EMOJIS = [
+  "🦅", "🦁", "🐺", "🦊", "🐯", "🦈", "🐉", "🦄", "🐎", "🐪",
+  "🤖", "👑", "⚡", "🔥", "🌙", "⭐", "🎯", "🚀", "💎", "🧠",
+] as const;
+
+export const setAvatarEmoji = mutation({
+  args: { emoji: v.string() },
+  handler: async (ctx, { emoji }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
+    const clean = emoji.trim().slice(0, 8);
+    if (!(AVATAR_EMOJIS as readonly string[]).includes(clean)) {
+      throw new Error("اختر رمزاً من قائمة الصور الرمزية.");
+    }
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("الحساب غير موجود");
+    await ctx.db.patch(userId, { avatarEmoji: clean });
+    return { ok: true };
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Daily rewards — «المكافأة اليومية»: login streak that grants XP + badges.
 // ---------------------------------------------------------------------------
 

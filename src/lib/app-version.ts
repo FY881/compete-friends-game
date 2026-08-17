@@ -199,17 +199,86 @@ async function looksLikeApk(blob: Blob): Promise<boolean> {
 }
 
 /**
+ * قيم السلامة الرسمية للـ APK — تُرسل من الخادم (مصدر الحقيقة) وترجح على
+ * الثوابت المبنية داخل الكود، فتظل القيم متزامنة دائماً مع الإصدار المنشور.
+ */
+export type ApkIntegrity = {
+  sha256?: string | null;
+  bytes?: number | null;
+};
+
+/** خطأ تنزيل يحمل تشخيصاً كاملاً (الحجم/البصمة المستلمة) للإبلاغ الآلي. */
+export class DownloadError extends Error {
+  receivedSize?: number;
+  receivedHash?: string;
+  sourceUrl?: string;
+  healed: boolean;
+  constructor(
+    message: string,
+    opts: {
+      receivedSize?: number;
+      receivedHash?: string;
+      sourceUrl?: string;
+      healed?: boolean;
+    } = {},
+  ) {
+    super(message);
+    this.name = "DownloadError";
+    this.receivedSize = opts.receivedSize;
+    this.receivedHash = opts.receivedHash;
+    this.sourceUrl = opts.sourceUrl;
+    this.healed = opts.healed ?? false;
+  }
+}
+
+/**
+ * الشفاء الذاتي من التخزين المؤقت العالق: يسجّل إلغاء كل الـ Service Workers
+ * ويمسح كل الكاش — فيتحرر المتصفح فوراً من أي نسخة قديمة كانت تُسلّم ملفات
+ * تالفة، ويعيد التحميل نسخة طازجة من الشبكة. هذا هو الإصلاح الدائم لمشكلة
+ * «حدثت مشكلة عند تحليل الحزمة» الناتجة عن كاش قديم.
+ */
+export async function selfHealStaleCache(): Promise<boolean> {
+  let touched = false;
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      if (registrations.length > 0) {
+        await Promise.all(registrations.map((reg) => reg.unregister()));
+        touched = true;
+      }
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      if (keys.length > 0) {
+        await Promise.all(keys.map((key) => caches.delete(key)));
+        touched = true;
+      }
+    }
+  } catch {
+    // تجاهل — الشفاء يعمل حتى لو تعذر التنظيف
+  }
+  return touched;
+}
+
+/**
  * تنزيل ملف APK بطريقة لا تفتح أي صفحة:
  * - ويب/PWA: `fetch` الملف من أول رابط ناجح ثم تنزيله كـ Blob.
  * - تطبيق أندرويد: فتح رابط الموقع الرسمي في المتصفح الخارجي (أكثر موثوقية).
  *
- * @throws خطأ عربي واضح إن فشلت كل المصادر.
+ * عند فشل كل المصادر: يمسح النظام التخزين المؤقت العالق (Service Worker +
+ * كاش) تلقائياً ثم يعيد المحاولة — بلا أي تدخل يدوي من المستخدم.
+ *
+ * @throws DownloadError يحمل التشخيص الكامل للفشل (للإبلاغ الآلي لغرفة المالك).
  */
 export async function downloadApk(
   fileName: string | null | undefined,
   siteUrl?: string | null,
+  integrity?: ApkIntegrity,
 ): Promise<void> {
   const file = fileName ?? `al-abqari-v${APP_VERSION}.apk`;
+  // القيم الرسمية: قيم الخادم إن وصلت (مصدر الحقيقة)، وإلا ثوابت الكود.
+  const expectedBytes = integrity?.bytes ?? APK_BYTES;
+  const expectedSha = integrity?.sha256 ?? APK_SHA256;
 
   if (isNativeApp()) {
     // افتح صفحة التحميل الرسمية في المتصفح الخارجي. زرّها ينزّل الملف عبر
@@ -226,57 +295,94 @@ export async function downloadApk(
   }
 
   const candidates = getApkDownloadCandidates(file, siteUrl);
-  let lastError: unknown = null;
+  // ملاحظة: «null as DownloadError | null» وليس «: DownloadError | null = null»
+  // لأن التضييق النوعي في TypeScript يحوّل الأخيرة إلى null نهائياً فلا تصل
+  // خصائص التشخيص (receivedSize…) — أما الصيغة الحالية فتبقي النوع كاتحاد.
+  let lastError = null as DownloadError | null;
 
-  for (const url of candidates) {
-    try {
-      // كاسر التخزين المؤقت: يضمن أن حتى الـ Service Worker القديم المثبت
-      // لن يجد نسخة قديمة مخزنة، فيُحضّر الملف من الشبكة دائماً.
-      const bustedUrl = withCacheBuster(url);
-      const response = await fetch(bustedUrl, {
-        cache: "no-store",
-        headers: {
-          Accept: "application/vnd.android.package-archive, application/octet-stream, */*",
-        },
-      });
-      if (!response.ok) {
-        lastError = new Error(`HTTP ${response.status}`);
-        continue;
-      }
-      const blob = await response.blob();
-      // فحص سريع: ملف APK حقيقي أكبر من 100 كيلوبايت ويبدأ بتوقيع PK
-      // (يحمي من صفحات HTML الخاطئة أو ملفات ناقصة).
-      if (blob.size < 100_000) {
-        lastError = new Error("empty blob");
-        continue;
-      }
-      if (!(await looksLikeApk(blob))) {
-        lastError = new Error("not an apk");
-        continue;
-      }
-      // التحقق الكامل: الحجم + البصمة الرقمية يجب أن يطابقا ملف APK الرسمي
-      // حرفياً. أي ملف مختلف (صفحة خطأ، تحميل مقطوع، ملف قديم) يُرفض هنا
-      // قبل أن يصل لهاتفك — هذا ما يمنع «حدثت مشكلة عند تحليل الحزمة» نهائياً.
-      if (blob.size !== APK_BYTES) {
-        lastError = new Error(
-          `size mismatch: got ${blob.size}, expected ${APK_BYTES}`,
+  /** محاولة واحدة على كل الروابط — تعيد true عند النجاح وتُحدّث التشخيص. */
+  const tryDownload = async (): Promise<boolean> => {
+    for (const url of candidates) {
+      try {
+        // كاسر التخزين المؤقت: يضمن أن حتى الـ Service Worker القديم المثبت
+        // لن يجد نسخة قديمة مخزنة، فيُحضّر الملف من الشبكة دائماً.
+        const bustedUrl = withCacheBuster(url);
+        const response = await fetch(bustedUrl, {
+          cache: "no-store",
+          headers: {
+            Accept: "application/vnd.android.package-archive, application/octet-stream, */*",
+          },
+        });
+        if (!response.ok) {
+          lastError = new DownloadError(`HTTP ${response.status}`, {
+            sourceUrl: url,
+          });
+          continue;
+        }
+        const blob = await response.blob();
+        // فحص سريع: ملف APK حقيقي أكبر من 100 كيلوبايت ويبدأ بتوقيع PK
+        // (يحمي من صفحات HTML الخاطئة أو ملفات ناقصة).
+        if (blob.size < 100_000) {
+          lastError = new DownloadError("ملف فارغ أو ناقص", {
+            receivedSize: blob.size,
+            sourceUrl: url,
+          });
+          continue;
+        }
+        if (!(await looksLikeApk(blob))) {
+          lastError = new DownloadError("الملف ليس حزمة APK", {
+            receivedSize: blob.size,
+            sourceUrl: url,
+          });
+          continue;
+        }
+        // التحقق الكامل: الحجم + البصمة الرقمية يجب أن يطابقا ملف APK الرسمي
+        // حرفياً. أي ملف مختلف (صفحة خطأ، تحميل مقطوع، ملف قديم) يُرفض هنا
+        // قبل أن يصل لهاتفك — هذا ما يمنع «حدثت مشكلة عند تحليل الحزمة» نهائياً.
+        if (blob.size !== expectedBytes) {
+          lastError = new DownloadError(
+            `اختلاف الحجم: استُلم ${blob.size} بايت والمتوقع ${expectedBytes}`,
+            { receivedSize: blob.size, sourceUrl: url },
+          );
+          continue;
+        }
+        const digest = await sha256Hex(blob);
+        if (digest && digest !== expectedSha) {
+          lastError = new DownloadError("اختلاف البصمة الرقمية", {
+            receivedSize: blob.size,
+            receivedHash: digest,
+            sourceUrl: url,
+          });
+          continue;
+        }
+        triggerBlobDownload(blob, file);
+        return true;
+      } catch (error) {
+        lastError = new DownloadError(
+          error instanceof Error ? error.message : "خطأ شبكة",
+          { sourceUrl: url },
         );
-        continue;
       }
-      const digest = await sha256Hex(blob);
-      if (digest && digest !== APK_SHA256) {
-        lastError = new Error("sha256 mismatch");
-        continue;
-      }
-      triggerBlobDownload(blob, file);
-      return;
-    } catch (error) {
-      lastError = error;
     }
-  }
+    return false;
+  };
 
-  throw new Error(
-    "تعذّر تنزيل ملف APK سليم: كل المصادر أرسلت ملفاً مختلفاً عن النسخة الرسمية (الحجم/البصمة غير مطابقين). أُصلح هذا تلقائياً الآن — حدّث الصفحة مرة واحدة (Ctrl+Shift+R) لتفعيل الإصلاح ثم اضغط زر التنزيل مجدداً، وإن استمرت المشكلة أخبرنا.",
+  if (await tryDownload()) return;
+
+  // ── الشفاء الذاتي الدائم ────────────────────────────────────────────
+  // عند الفشل: مسح كل الـ Service Workers والكاش (سبب «الملف التالف» الأشهر)
+  // ثم إعادة المحاولة فوراً — بدون حاجة لتحديث الصفحة أو أي تدخل يدوي.
+  const healed = await selfHealStaleCache();
+  if (healed && (await tryDownload())) return;
+
+  throw new DownloadError(
+    "تعذّر تنزيل ملف APK سليم: كل المصادر أرسلت ملفاً مختلفاً عن النسخة الرسمية (الحجم/البصمة غير مطابقين). أصلح النظام التخزين المؤقت تلقائياً وأعاد المحاولة — اضغط الزر مرة أخرى الآن، وإن تكررت المشكلة أُرسل تشخيص كامل تلقائياً إلى غرفة المالك.",
+    {
+      receivedSize: lastError?.receivedSize,
+      receivedHash: lastError?.receivedHash,
+      sourceUrl: lastError?.sourceUrl,
+      healed,
+    },
   );
 }
 

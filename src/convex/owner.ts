@@ -11,6 +11,13 @@ import {
 import { getCurrentUser } from "./users";
 import { levelFromXp } from "./gameConfig";
 import { QUESTION_BANK } from "./questions";
+import {
+  APK_BYTES,
+  APK_FILE_NAME,
+  APK_SHA256,
+  BUILD_ID,
+  CURRENT_VERSION,
+} from "./apkRelease";
 
 // ---------------------------------------------------------------------------
 // Owner identity — the permanent owner email. Sign in with this email to open
@@ -572,6 +579,96 @@ export const getAdminReports = query({
       issues: r.issues,
       createdAt: r.createdAt,
     }));
+  },
+});
+
+// ---------------------------------------------------------------------------
+// APK download health — clients report failed downloads so the auto-admin
+// sweep can diagnose & fix them, and the owner sees everything in one panel.
+// ---------------------------------------------------------------------------
+
+/**
+ * Any player can report a failed APK download. The client sends what it
+ * actually received (size/hash) so the owner room & the AI admin can tell
+ * exactly why the file was rejected (stale cache, truncated transfer, …).
+ */
+export const reportDownloadIssue = mutation({
+  args: {
+    url: v.string(),
+    error: v.string(),
+    receivedSize: v.optional(v.number()),
+    receivedHash: v.optional(v.string()),
+    expectedSize: v.optional(v.number()),
+    expectedHash: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return { ok: false };
+    const user = await ctx.db.get(userId);
+    if (!user) return { ok: false };
+
+    // Rate-limit: max 5 reports per user per hour.
+    const hourAgo = Date.now() - 60 * 60 * 1000;
+    const recent = await ctx.db
+      .query("downloadReports")
+      .withIndex("by_created", (q) => q.gte("createdAt", hourAgo))
+      .collect();
+    const mine = recent.filter((r) => r.userId === userId).length;
+    if (mine >= 5) return { ok: false };
+
+    await ctx.db.insert("downloadReports", {
+      userId,
+      userName: user.name ?? "لاعب",
+      url: args.url.slice(0, 500),
+      receivedSize: args.receivedSize,
+      receivedHash: args.receivedHash,
+      expectedSize: args.expectedSize,
+      expectedHash: args.expectedHash,
+      error: args.error.slice(0, 300),
+      userAgent:
+        typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 300) : undefined,
+      createdAt: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
+/** Owner-only view: official APK values + recent failure reports. */
+export const getDownloadHealth = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!isStaffUser(me)) return null;
+
+    const rows = await ctx.db
+      .query("downloadReports")
+      .withIndex("by_created", (q) => q.gte("createdAt", 0))
+      .order("desc")
+      .take(Math.min(limit ?? 15, 50));
+
+    return {
+      official: {
+        fileName: APK_FILE_NAME,
+        sha256: APK_SHA256,
+        bytes: APK_BYTES,
+        version: CURRENT_VERSION,
+        buildId: BUILD_ID,
+      },
+      reports: rows.map((r) => ({
+        id: r._id,
+        userName: r.userName,
+        url: r.url,
+        receivedSize: r.receivedSize ?? null,
+        receivedHash: r.receivedHash ?? null,
+        expectedSize: r.expectedSize ?? null,
+        expectedHash: r.expectedHash ?? null,
+        error: r.error,
+        userAgent: r.userAgent ?? null,
+        createdAt: r.createdAt,
+      })),
+    };
   },
 });
 

@@ -11,8 +11,10 @@ import {
   isOwnerEmail,
   isStaffUser,
   type ModSettings,
+  setSetting,
 } from "./owner";
 import { callOpenRouter, parseVerdict, type AiVerdict } from "./moderation";
+import { APK_BYTES, APK_FILE_NAME, APK_SHA256 } from "./apkRelease";
 
 // ---------------------------------------------------------------------------
 // «المدير الآلي» — ذكاء اصطناعي يدير شؤون الموقع تلقائياً.
@@ -39,6 +41,9 @@ const SPAM_MIN_DISMISSED = 2; // …with ≥2 dismissed → warn the reporter
 const WARNING_DECAY_MS = 30 * 24 * 60 * 60 * 1000; // warnings older than 30 days are forgiven
 const FINISHED_GAME_RETENTION_MS = 48 * 60 * 60 * 1000; // finished rooms kept 48h
 const REACTION_RETENTION_MS = 24 * 60 * 60 * 1000; // reactions kept 24h
+const DOWNLOAD_REPORT_WINDOW_MS = 24 * 60 * 60 * 1000; // failures to watch
+const DOWNLOAD_REPORT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // keep reports 7 days
+const APK_CHECK_INTERVAL_MS = 60 * 60 * 1000; // integrity check at most hourly
 const STUCK_COUNTDOWN_MS = 2 * 60 * 1000; // countdown frozen >2 min → rescue
 
 type SweepIssue = {
@@ -232,6 +237,47 @@ async function performSweep(ctx: {
     });
   }
 
+  // ── 3.11. APK integrity check — the official file on the live site ────
+  const siteUrlClean = (settings.siteUrl ?? "").trim().replace(/\/+$/, "");
+  const hasSiteUrl = /^https?:\/\//i.test(siteUrlClean);
+  const lastApkCheckAt = await ctx.runQuery(
+    internal.autoAdmin.getApkCheckTimestamp,
+    {},
+  );
+  let apkCheckDetail: string | null = null;
+  if (
+    hasSiteUrl &&
+    Date.now() - (lastApkCheckAt ?? 0) > APK_CHECK_INTERVAL_MS
+  ) {
+    try {
+      const res = await fetch(`${siteUrlClean}/downloads/${APK_FILE_NAME}`, {
+        cache: "no-store",
+      });
+      const buf = new Uint8Array(await res.arrayBuffer());
+      const digest = await sha256Hex(buf);
+      const ok = res.ok && buf.length === APK_BYTES && digest === APK_SHA256;
+      apkCheckDetail = ok
+        ? `ملف APK الرسمي سليم: ${buf.length} بايت والبصمة مطابقة للنسخة المنشورة.`
+        : `ملف APK المنشور مختلف عن النسخة الرسمية: استُلم ${buf.length} بايت والبصمة ${digest ?? "غير محسوبة"} (المتوقع ${APK_BYTES}).`;
+      await ctx.runMutation(internal.autoAdmin.recordApkCheck, {
+        ok,
+        detail: apkCheckDetail,
+      });
+      autoFixes += 1;
+    } catch (error) {
+      apkCheckDetail = `تعذّر فحص ملف APK على الموقع الرسمي (${siteUrlClean}): ${error instanceof Error ? error.message : "خطأ غير معروف"}.`;
+    }
+  }
+
+  // ── 3.12. Download failure reports from real players ──────────────────
+  const recentDownloadFailures = await ctx.runQuery(
+    internal.autoAdmin.getRecentDownloadFailures,
+    { sinceMs: DOWNLOAD_REPORT_WINDOW_MS },
+  );
+  await ctx.runMutation(internal.autoAdmin.deleteOldDownloadReports, {
+    olderThanMs: DOWNLOAD_REPORT_RETENTION_MS,
+  });
+
   // ── 4. Health counts for the report ─────────────────────────────────────
   const counts = await ctx.runQuery(internal.autoAdmin.getSiteCounts, {});
 
@@ -303,6 +349,39 @@ async function performSweep(ctx: {
       fix: "حالة طبيعية — ترفع العقوبات تلقائياً بانتهاء مدتها.",
     });
   }
+  if (!hasSiteUrl) {
+    issues.push({
+      severity: "medium",
+      title: "الفحص الآلي لملف APK معطّل (لا يوجد رابط موقع رسمي)",
+      detail: "اضبط رابط الموقع الرسمي ليتمكن المدير الآلي من التحقق دورياً (كل ساعة) من سلامة ملف APK المنشور: الحجم + البصمة الرقمية.",
+      fix: "الصق رابط الموقع الرسمي (مثل https://alabqari.example.com) في تبويب «المدير الآلي» ثم اضغط «تشغيل الفحص الآن» — سيُفحص الملف ويُكتب التقرير تلقائياً.",
+    });
+  }
+  if (apkCheckDetail) {
+    const ok = apkCheckDetail.includes("سليم");
+    issues.push({
+      severity: ok ? "low" : "high",
+      title: ok ? "فحص سلامة ملف APK" : "تنبيه: ملف APK المنشور غير مطابق للنسخة الرسمية",
+      detail: apkCheckDetail,
+      fix: ok
+        ? "لا حاجة لتدخل — الملف المنشور مطابق للبصمة الرسمية."
+        : "أعد رفع ملف APK الرسمي إلى public/downloads/ و src/assets/ وحدّث البصمة والحجم في src/convex/apkRelease.ts، ثم أعد البناء.",
+    });
+  }
+  if (recentDownloadFailures.length > 0) {
+    const byError = new Map<string, number>();
+    for (const r of recentDownloadFailures) {
+      const key = r.error.slice(0, 60);
+      byError.set(key, (byError.get(key) ?? 0) + 1);
+    }
+    const topError = [...byError.entries()].sort((a, b) => b[1] - a[1])[0];
+    issues.push({
+      severity: recentDownloadFailures.length >= 5 ? "high" : "medium",
+      title: "فشل تنزيل APK لدى المستخدمين",
+      detail: `${recentDownloadFailures.length} محاولة تنزيل فاشلة خلال 24 ساعة${topError ? ` — أشهر سبب: «${topError[0]}» (${topError[1]} مرة)` : ""}. التفاصيل الكاملة في تبويب «التحميلات» بغرفة المالك.`,
+      fix: "السبب الأشهر: تخزين مؤقت قديم من Service Worker. الإصدار الحالي يشفي نفسه ذاتياً (مسح الكاش وإعادة المحاولة تلقائياً). إن تكرر الأمر، انسخ تقرير تبويب «التحميلات» وأرسله للمطوّر.",
+    });
+  }
   if (issues.length === 0) {
     issues.push({
       severity: "low",
@@ -317,6 +396,9 @@ async function performSweep(ctx: {
   if (punishmentsApplied > 0) summaryParts.push(`طبّق ${punishmentsApplied} عقوبة`);
   if (roomsCleaned > 0) summaryParts.push(`نظّف ${roomsCleaned} غرفة`);
   if (usersEscalated > 0) summaryParts.push(`أدار ${usersEscalated} مخالفاً`);
+  if (recentDownloadFailures.length > 0) {
+    summaryParts.push(`عالج ${recentDownloadFailures.length} تقرير تنزيل فاشل`);
+  }
   const summary =
     summaryParts.length > 0
       ? `المدير الآلي: ${summaryParts.join("، ")}.`
@@ -719,6 +801,7 @@ export const writeReport = internalMutation({
       activeRooms: v.number(),
       openReportsLeft: v.number(),
       autoFixes: v.number(),
+      downloadFailures: v.number(),
     }),
     issues: v.array(
       v.object({
@@ -755,6 +838,85 @@ export const writeReport = internalMutation({
     }
   },
 });
+
+// ---------------------------------------------------------------------------
+// Autonomous housekeeping: APK download health (queries & writes)
+// ---------------------------------------------------------------------------
+
+/** Failure reports from the last window (error text + count). */
+export const getRecentDownloadFailures = internalQuery({
+  args: { sinceMs: v.number() },
+  handler: async (ctx, { sinceMs }) => {
+    const since = Date.now() - sinceMs;
+    const rows = await ctx.db
+      .query("downloadReports")
+      .withIndex("by_created", (q) => q.gte("createdAt", since))
+      .collect();
+    return rows.map((r) => ({ error: r.error, createdAt: r.createdAt }));
+  },
+});
+
+/** Timestamp of the last APK integrity check (settings store). */
+export const getApkCheckTimestamp = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const row = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "apk_last_check_at"))
+      .first();
+    if (!row) return null;
+    const n = Number(row.value);
+    return Number.isFinite(n) ? n : null;
+  },
+});
+
+/** Record an APK integrity check (timestamp + audit log). */
+export const recordApkCheck = internalMutation({
+  args: { ok: v.boolean(), detail: v.string() },
+  handler: async (ctx, { ok, detail }) => {
+    await setSetting(ctx, "apk_last_check_at", Date.now());
+    await ctx.db.insert("moderationLogs", {
+      actorType: "system",
+      actorName: "المدير الآلي",
+      action: "apk_check",
+      targetName: "ملف APK",
+      reason: detail,
+      severity: ok ? "low" : "high",
+      createdAt: Date.now(),
+    });
+  },
+});
+
+/** Delete download-failure reports older than the retention window. */
+export const deleteOldDownloadReports = internalMutation({
+  args: { olderThanMs: v.number() },
+  handler: async (ctx, { olderThanMs }) => {
+    const cutoff = Date.now() - olderThanMs;
+    const rows = await ctx.db
+      .query("downloadReports")
+      .withIndex("by_created", (q) => q.lte("createdAt", cutoff))
+      .collect();
+    for (const r of rows) await ctx.db.delete(r._id);
+  },
+});
+
+/** SHA-256 of a byte array (best-effort, null when unavailable). */
+async function sha256Hex(bytes: Uint8Array): Promise<string | null> {
+  try {
+    const cryptoApi = (globalThis as { crypto?: Crypto }).crypto;
+    if (!cryptoApi?.subtle) return null;
+    const buf = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+    const digest = await cryptoApi.subtle.digest("SHA-256", buf);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Public entry points

@@ -74,6 +74,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AdminAiTab } from "@/components/AdminAiTab";
+import { DownloadsTab } from "@/components/DownloadsTab";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -1927,6 +1928,9 @@ export default function Owner() {
                 <Database className="size-4" /> الأسئلة
               </TabsTrigger>
               {access.isOwner && (
+              <TabsTrigger value="downloads" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Smartphone className="size-4" /> التحميل
+              </TabsTrigger>
                 <TabsTrigger value="settings" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <Megaphone className="size-4" /> الإعدادات
                 </TabsTrigger>
@@ -1964,6 +1968,9 @@ export default function Owner() {
                 <QuestionsTab />
               </TabsContent>
               {access.isOwner && (
+              <TabsContent value="downloads">
+                <DownloadsTab />
+              </TabsContent>
                 <TabsContent value="settings">
                   {settings ? (
                     <SettingsTab settings={settings} />

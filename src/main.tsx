@@ -95,6 +95,22 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     // مؤقت، فتصل إصلاحات التنزيل (منع اعتراض ملفات APK) لكل الأجهزة فوراً.
     navigator.serviceWorker
       .register("/sw.js", { updateViaCache: "none" })
+      .then(() => {
+        // التحديث الفوري للنسخة: عند تفعيل Service Worker جديد، يُعاد تحميل
+        // الصفحة تلقائياً بنسخة طازجة من الشبكة — فلا يبقى أحد عالقاً على
+        // نسخة قديمة («قشرة» مخزنة) تسبب مشاكل التنزيل. محمي من التكرار
+        // اللانهائي بعلامة جلسة: إعادة تحميل واحدة فقط لكل تفعيل.
+        if (!sessionStorage.getItem("mindclash.sw-reloaded")) {
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            try {
+              sessionStorage.setItem("mindclash.sw-reloaded", "1");
+            } catch {
+              // ignore
+            }
+            window.location.reload();
+          });
+        }
+      })
       .catch(() => undefined);
   });
 }

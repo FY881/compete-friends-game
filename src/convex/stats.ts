@@ -32,6 +32,16 @@ export const BADGES: Badge[] = [
   { id: "daily_3", name: "مواظب", description: "استلم المكافأة اليومية 3 أيام متتالية", emoji: "📅" },
   { id: "daily_7", name: "أسبوع العباقرة", description: "استلم المكافأة اليومية 7 أيام متتالية", emoji: "🗓️" },
   { id: "daily_30", name: "شهر النخبة", description: "استلم المكافأة اليومية 30 يوماً متتالياً", emoji: "👑" },
+  { id: "daily_first", name: "فتّاحة التحدي", description: "أنجز تحدي اليوم لأول مرة", emoji: "🌅" },
+  { id: "daily_perfect", name: "الكمال اليومي", description: "أجب عن جميع أسئلة تحدي اليوم بشكل صحيح", emoji: "💯" },
+  { id: "daily_7_days", name: "أسبوع التحديات", description: "أنجز تحدي اليوم في 7 أيام مختلفة", emoji: "📆" },
+  { id: "games_25", name: "محارب الحلبة", description: "شارك في 25 جولة", emoji: "⚔️" },
+  { id: "wins_10", name: "العقل المدبّر", description: "اربح 10 جولات في المجمل", emoji: "🧠" },
+  { id: "level_20", name: "الذكاء الخارق", description: "صل إلى المستوى 20", emoji: "🔮" },
+  { id: "level_50", name: "عبقري مطلق", description: "صل إلى المستوى 50", emoji: "👑" },
+  { id: "sniper", name: "قنّاص", description: "أجب صحيحاً خلال ثانية واحدة أو أقل", emoji: "🎯" },
+  { id: "night_owl", name: "بومة الليل", description: "أنهِ جولة بين منتصف الليل والفجر", emoji: "🦉" },
+  { id: "comeback_win", name: "العودة الأسطورية", description: "اربح بعد أن كنت متأخراً في منتصف الجولة", emoji: "🐉" },
 ];
 
 export const BADGE_MAP: Record<string, Badge> = Object.fromEntries(
@@ -56,6 +66,7 @@ export type ProfileStats = {
   correctAnswers: number;
   totalAnswers: number;
   accuracy: number;
+  avgRank: number | null; // متوسط المركز عبر كل الجولات
   fastestAnswerMs: number | null;
   badges: Badge[];
   // Daily rewards
@@ -96,6 +107,7 @@ export const getMyProfile = query({
         correctAnswers: 0,
         totalAnswers: 0,
         accuracy: 0,
+        avgRank: null,
         fastestAnswerMs: null,
         badges: [],
         dailyStreak: 0,
@@ -108,6 +120,18 @@ export const getMyProfile = query({
     const level = levelFromXp(profile.xp);
     const levelStart = xpToReachLevel(level); // xp needed to enter this level
     const levelEnd = xpToReachLevel(level + 1); // xp needed for the next level
+
+    // متوسط المركز عبر كل الجولات (أقل = أفضل).
+    const historyRows = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const avgRank =
+      historyRows.length > 0
+        ? Math.round(
+            (historyRows.reduce((sum, r) => sum + r.rank, 0) / historyRows.length) * 10,
+          ) / 10
+        : null;
 
     return {
       xp: profile.xp,
@@ -129,6 +153,7 @@ export const getMyProfile = query({
         profile.totalAnswers > 0
           ? Math.round((profile.correctAnswers / profile.totalAnswers) * 100)
           : 0,
+      avgRank,
       fastestAnswerMs: profile.fastestAnswerMs ?? null,
       badges: profile.badges.map((id) => BADGE_MAP[id]).filter(Boolean),
       dailyStreak: profile.dailyStreak ?? 0,

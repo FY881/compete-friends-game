@@ -45,6 +45,8 @@ const schema = defineSchema(
       emailVerificationTime: v.optional(v.number()), // email verification time. do not remove
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
+      avatarEmoji: v.optional(v.string()), // chosen avatar emoji (e.g. 🦅) shown on profile & leaderboard
+
       role: v.optional(roleValidator), // role of the user. do not remove
 
       // ── Discipline & punishment state (managed by the owner room) ──
@@ -212,6 +214,7 @@ const schema = defineSchema(
         activeRooms: v.number(),
         openReportsLeft: v.number(),
         autoFixes: v.number(), // autonomous fixes applied by the sweep (spam warns, decay, cleanups, countdown rescue)
+        downloadFailures: v.number(), // failed APK downloads reported in the last 24h
       }),
       issues: v.array(
         v.object({
@@ -252,6 +255,34 @@ const schema = defineSchema(
       emoji: v.string(), // one emoji (e.g. 🔥 😂 🎉)
       createdAt: v.number(),
     }).index("by_game", ["gameId"]),
+
+    // Automated reports of failed APK downloads, sent by the client so the
+    // auto-admin sweep can diagnose & fix download issues without human help.
+    downloadReports: defineTable({
+      userId: v.id("users"),
+      userName: v.string(),
+      url: v.string(), // which candidate URL was tried
+      receivedSize: v.optional(v.number()),
+      receivedHash: v.optional(v.string()),
+      expectedSize: v.optional(v.number()),
+      expectedHash: v.optional(v.string()),
+      error: v.string(),
+      userAgent: v.optional(v.string()),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // «تحدي اليوم» — one row per player per calendar day (best attempt kept).
+    dailyChallenges: defineTable({
+      userId: v.id("users"),
+      day: v.string(), // YYYY-MM-DD
+      score: v.number(), // best score achieved that day
+      correctCount: v.number(),
+      bestStreak: v.number(),
+      xpEarned: v.number(),
+      playedAt: v.number(),
+    })
+      .index("by_user_day", ["userId", "day"])
+      .index("by_day", ["day"]),
   },
   {
     schemaValidation: false,

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   APP_VERSION,
   APP_VERSION_LABEL,
   APK_BYTES,
   APK_SHA256,
+  DownloadError,
   downloadApk,
 } from "@/lib/app-version";
 import { Badge } from "@/components/ui/badge";
@@ -35,24 +36,48 @@ import { Link, useNavigate } from "react-router";
 export default function Download() {
   const navigate = useNavigate();
   const info = useQuery(api.appInfo.getAppInfo);
+  const reportIssue = useMutation(api.owner.reportDownloadIssue);
   const [downloading, setDownloading] = useState(false);
 
   const apkFileName = info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`;
   const version = info?.version ?? APP_VERSION;
-  const apkSizeMB = (APK_BYTES / (1024 * 1024)).toFixed(1);
+  // القيم الرسمية من الخادم (مصدر الحقيقة) مع احتياط من ثوابت الكود.
+  const apkBytes = info?.apkBytes ?? APK_BYTES;
+  const apkSha256 = info?.apkSha256 ?? APK_SHA256;
+  const apkSizeMB = (apkBytes / (1024 * 1024)).toFixed(1);
 
   /** تنزيل عبر JavaScript (fetch + Blob) — لا يفتح أي صفحة ولا مسار قد يفشل. */
   const handleDownload = async () => {
     if (downloading) return;
     setDownloading(true);
     try {
-      await downloadApk(info?.apkFileName, info?.siteUrl);
+      await downloadApk(info?.apkFileName, info?.siteUrl, {
+        sha256: info?.apkSha256,
+        bytes: info?.apkBytes,
+      });
       toast.success("بدأ تنزيل ملف APK — افحص شريط التنزيل في متصفحك.");
     } catch (error) {
       console.error(error);
-      toast.error(
-        error instanceof Error ? error.message : "تعذّر التنزيل، حاول مرة أخرى.",
-      );
+      if (error instanceof DownloadError) {
+        // إبلاغ آلي لغرفة المالك: التشخيص الكامل (الحجم/البصمة المستلمة).
+        reportIssue({
+          url: error.sourceUrl ?? info?.apkUrl ?? "",
+          error: error.message,
+          receivedSize: error.receivedSize,
+          receivedHash: error.receivedHash,
+          expectedSize: apkBytes,
+          expectedHash: apkSha256,
+        }).catch(() => undefined);
+        toast.error(
+          error.healed
+            ? "أصلح النظام التخزين المؤقت تلقائياً — اضغط زر التنزيل مرة أخرى الآن."
+            : error.message,
+        );
+      } else {
+        toast.error(
+          error instanceof Error ? error.message : "تعذّر التنزيل، حاول مرة أخرى.",
+        );
+      }
     } finally {
       setDownloading(false);
     }
@@ -175,7 +200,7 @@ export default function Download() {
               .
             </p>
             <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground/80" dir="ltr">
-              SHA-256: {APK_SHA256}
+              SHA-256: {apkSha256}
             </p>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               ملاحظة: التطبيق يحتاج اتصالاً بالإنترنت (الأسئلة والترتيب يعملان عبر
