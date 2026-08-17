@@ -1,4 +1,4 @@
-/* العبقري — service worker
+/* نباهة — service worker
  * Network-first for navigations (the shell is always fresh), cache-first for
  * hashed static assets (safe: Vite fingerprints filenames), and the Convex
  * API (different origin) is never touched.
@@ -13,7 +13,9 @@
 // (Part of the app update plan: web/PWA clients self-update on reload.)
 // v7: forces every installed PWA to drop the old app shell & fetch the
 // fresh one (part of the stale-shell fix that was breaking downloads).
-const CACHE = "mindclash-v7";
+// v8: new build (renamed to نباهة + new features) — every installed PWA
+// drops the old shell and fetches the fresh one automatically.
+const CACHE = "nabaha-v8";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
