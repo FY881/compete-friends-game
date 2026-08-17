@@ -27,7 +27,7 @@ export type AiVerdict = {
 };
 
 const RULES_SUMMARY = `
-قوانين الموقع (العبقري):
+قوانين الموقع (نباهة):
 1. احترام الآخرين — ممنوع الإساءة أو التنمر أو السخرية من أي لاعب.
 2. الأسماء والكلمات النظيفة — ممنوع الأسماء المسيئة أو البذيئة أو العنصرية أو الدينية الهجومية.
 3. ممنوع الغش — الخروج من نافذة اللعب أثناء السؤال (للبحث عن الإجابة) أو استخدام أدوات خارجية.
@@ -55,8 +55,7 @@ const OUTPUT_CONTRACT = `
 
 type RulesText = string[];
 
-const MODERATION_SYSTEM_PROMPT = (rulesText: RulesText) =>
-  `أنت "رقيب العقول"، ذكاء اصطناعي مكلّف بمراقبة قوانين لعبة "العبقري" وتطبيقها تلقائياً. كن حازماً وعادلاً ولا تتساهل مع المخالفات الواضحة.\n\n${RULES_SUMMARY}\n\nالقوانين المفعّلة حالياً في الموقع:\n${rulesText.length > 0 ? rulesText.map((r) => `- ${r}`).join("\n") : "(لا قوانين إضافية)"}\n\n${OUTPUT_CONTRACT}`;
+const MODERATION_SYSTEM_PROMPT = (rulesText: RulesText) =>      `أنت "رقيب العقول"، ذكاء اصطناعي مكلّف بمراقبة قوانين لعبة "نباهة" وتطبيقها تلقائياً. كن حازماً وعادلاً ولا تتساهل مع المخالفات الواضحة.\n\n${RULES_SUMMARY}\n\nالقوانين المفعّلة حالياً في الموقع:\n${rulesText.length > 0 ? rulesText.map((r) => `- ${r}`).join("\n") : "(لا قوانين إضافية)"}\n\n${OUTPUT_CONTRACT}`;
 
 /** Robust JSON extraction from an LLM reply (it may wrap JSON in fences). */
 export function parseVerdict(raw: string): AiVerdict {
@@ -105,8 +104,8 @@ export async function callOpenRouter(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://mindclash.freebuff.app",
-      "X-Title": "العبقري",
+      "HTTP-Referer": "https://nabaha.freebuff.app",
+      "X-Title": "نباهة",
     },
     body: JSON.stringify({
       model,
@@ -374,8 +373,8 @@ export const aiModerateContent = action({
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://mindclash.freebuff.app",
-        "X-Title": "العبقري",
+        "HTTP-Referer": "https://nabaha.freebuff.app",
+        "X-Title": "نباهة",
       },
       body: JSON.stringify({
         model: settings.aiModel,
@@ -412,7 +411,7 @@ export const aiModerateContent = action({
 // ---------------------------------------------------------------------------
 
 const HELP_DESK_SYSTEM_PROMPT = `
-أنت "المساعد الذكي" للعبة «العبقري» — لعبة تحديات تنافسية بين الأصدقاء.
+أنت "المساعد الذكي" للعبة «نباهة» — لعبة تحديات تنافسية بين الأصدقاء.
 المنصة: React + Vite + Tailwind + Convex (قاعدة بيانات و Backend) + Convex Auth،
 والذكاء الاصطناعي يعمل عبر OpenRouter (OPENROUTER_API_KEY).
 
@@ -451,8 +450,8 @@ export const aiHelpDesk = action({
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://mindclash.freebuff.app",
-        "X-Title": "العبقري",
+        "HTTP-Referer": "https://nabaha.freebuff.app",
+        "X-Title": "نباهة",
       },
       body: JSON.stringify({
         model: settings.aiModel,

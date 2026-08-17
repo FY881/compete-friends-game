@@ -24,7 +24,7 @@ export const BADGES: Badge[] = [
   { id: "games_50", name: "مخضرم", description: "شارك في 50 جولة", emoji: "👑" },
   { id: "answers_100", name: "موسوعة", description: "أجب صحيحاً عن 100 سؤال", emoji: "📚" },
   { id: "wins_5", name: "بطل متوّج", description: "اربح 5 جولات في المجمل", emoji: "🥇" },
-  { id: "level_10", name: "العبقرية", description: "صل إلى المستوى 10", emoji: "💎" },
+  { id: "level_10", name: "النباهة", description: "صل إلى المستوى 10", emoji: "💎" },
   { id: "speed_demon", name: "سهم خاطف", description: "أجب عن كل الأسئلة صحيحاً في نصف الوقت", emoji: "🏹" },
   { id: "first_blood", name: "الضربة الأولى", description: "كن أول من يجيب صحيحاً في أي سؤال", emoji: "⚔️" },
   { id: "golden_answer", name: "الإجابة الذهبية", description: "أجب صحيحاً عن السؤال الذهبي الأخير (نقاط مضاعفة)", emoji: "🌟" },

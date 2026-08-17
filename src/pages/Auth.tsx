@@ -115,7 +115,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   };
 
   /**
-   * «حسابك بدون بريد» — الطريقة العبقرية:
+   * «حسابك بدون بريد» — الطريقة الذكية:
    * اسم دخول فريد + رمز سري = حسابك على أي جهاز، بدون بريد نهائياً.
    * نفس الاسم والرمز يفتحان حسابك من أي هاتف أو جهاز.
    */
@@ -232,7 +232,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
                   <BrainCircuit className="size-7" />
                 </div>
-                <CardTitle className="text-2xl">مرحباً بك في العبقري</CardTitle>
+                <CardTitle className="text-2xl">مرحباً بك في نباهة</CardTitle>
                 <CardDescription className="leading-relaxed">
                   اختر الطريقة الأسرع لك — كلها بدون بريد إلكتروني.
                 </CardDescription>

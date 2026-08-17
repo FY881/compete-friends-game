@@ -191,7 +191,7 @@ export default function Play() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">العبقري</span>
+            <span className="text-lg font-bold tracking-tight">نباهة</span>
           </button>
 
           <div className="flex items-center gap-2.5">
@@ -307,7 +307,7 @@ export default function Play() {
             >
               أين يذهب لقب
               <br />
-              <span className="text-primary">العبقرية الليلة؟</span>
+              <span className="text-primary">النباهة الليلة؟</span>
             </motion.h1>
             <motion.p variants={fadeUp} className="mt-5 max-w-lg text-lg leading-relaxed text-muted-foreground">
               أنشئ غرفة في ثانية، شارك الرمز مع أصدقائك، ودع الأسئلة السريعة
@@ -720,7 +720,7 @@ export default function Play() {
                   <Smartphone className="size-6" />
                 </span>
                 <div className="max-w-md">
-                  <p className="text-lg font-bold">نزّل العبقري على هاتفك</p>
+                  <p className="text-lg font-bold">نزّل نباهة على هاتفك</p>
                   <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     نسخة أندرويد أصلية (APK) بنفس حسابك وأصدقائك، مع تحديثات
                     تلقائية تصلك داخل التطبيق. أو ثبّت نسخة الويب من المتصفح

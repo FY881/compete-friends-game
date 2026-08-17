@@ -7,6 +7,7 @@ import {
   BUILD_ID,
   CURRENT_VERSION,
   UPDATE_NOTES,
+  WEB_VERSION,
 } from "./apkRelease";
 
 /**
@@ -35,7 +36,10 @@ export const getAppInfo = query({
     // فارغ افتراضياً → المتصفح يستخدم نطاقه الحالي تلقائياً.
     const settings = await getSettingsData(ctx);
     return {
-      version: CURRENT_VERSION,
+      // إصدار الويب (يقارنه العميل لإظهار لافتة التحديث).
+      version: WEB_VERSION,
+      // إصدار ملف APK الفعلي المنشور (يُعرض في صفحة التحميل ولوحة المالك).
+      apkVersion: CURRENT_VERSION,
       buildId: BUILD_ID,
       notes: UPDATE_NOTES,
       apkFileName: APK_FILE_NAME,

@@ -26,9 +26,22 @@ import apkAssetUrlRaw from "@/assets/al-abqari-v1.0.1.apk?url";
 /** مسار الملف الفعلي — بدون استعلامات Vite (مثل ?import) التي تفشل في fetch. */
 const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
 
-export const APP_VERSION = "1.0.1";
+/**
+ * إصدار الويب الحالي (يدفع لافتة «تحديث متاح» عبر مقارنته بإصدار الخادم).
+ * ارفعه مع `WEB_VERSION` في `src/convex/apkRelease.ts` عند إطلاق نسخة ويب جديدة.
+ *
+ * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
+ * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
+ */
+export const APP_VERSION = "1.1.0";
 
-export const APP_VERSION_LABEL = `العبقري ${APP_VERSION}`;
+/** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
+export const APK_VERSION = "1.0.1";
+
+/** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
+export const APK_FALLBACK_FILE = "al-abqari-v1.0.1.apk";
+
+export const APP_VERSION_LABEL = `نُباهة ${APP_VERSION}`;
 
 /** هل هذه نسخة تطبيق أندرويد الأصلية (WebView على https://localhost)؟ */
 function isNativeApp(): boolean {
@@ -94,7 +107,7 @@ export function resolveApkUrl(
   fileName: string | null | undefined,
   siteUrl?: string | null,
 ): string {
-  const file = fileName ?? `al-abqari-v${APP_VERSION}.apk`;
+  const file = fileName ?? APK_FALLBACK_FILE;
   const cleanSite = (siteUrl ?? "").trim().replace(/\/+$/, "");
 
   if (typeof window !== "undefined" && window.location?.origin && !isNativeApp()) {
@@ -122,7 +135,7 @@ export function getApkDownloadCandidates(
   fileName: string | null | undefined,
   siteUrl?: string | null,
 ): string[] {
-  const file = fileName ?? `al-abqari-v${APP_VERSION}.apk`;
+  const file = fileName ?? APK_FALLBACK_FILE;
   const cleanSite = (siteUrl ?? "").trim().replace(/\/+$/, "");
   const origin =
     typeof window !== "undefined" && window.location?.origin
@@ -275,7 +288,7 @@ export async function downloadApk(
   siteUrl?: string | null,
   integrity?: ApkIntegrity,
 ): Promise<void> {
-  const file = fileName ?? `al-abqari-v${APP_VERSION}.apk`;
+  const file = fileName ?? APK_FALLBACK_FILE;
   // القيم الرسمية: قيم الخادم إن وصلت (مصدر الحقيقة)، وإلا ثوابت الكود.
   const expectedBytes = integrity?.bytes ?? APK_BYTES;
   const expectedSha = integrity?.sha256 ?? APK_SHA256;

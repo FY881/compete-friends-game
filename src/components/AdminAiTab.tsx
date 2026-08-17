@@ -10,14 +10,20 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CATEGORIES } from "@/convex/questions";
+import { APP_VERSION } from "@/lib/app-version";
 import {
   Activity,
   AlertTriangle,
+  Archive,
   Ban,
+  BarChart3,
   Bot,
   Check,
   Copy,
+  Database,
   Eraser,
+  FileDown,
   Flag,
   Gamepad2,
   Gavel,
@@ -141,6 +147,8 @@ function StatCard({
 export function AdminAiTab({ settings }: { settings: SettingsData }) {
   const updateSettings = useMutation(api.owner.updateSettings);
   const reports = useQuery(api.owner.getAdminReports, {});
+  const rules = useQuery(api.owner.getRules);
+  const questionBank = useQuery(api.owner.getQuestionBank);
   const runSweepNow = useAction(api.autoAdmin.runSweepNow);
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
@@ -203,6 +211,62 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
     }
   };
 
+  /** Feature 23: تصدير نسخة احتياطية كاملة (الإعدادات + القوانين + حالة بنك الأسئلة). */
+  const handleExportBackup = async () => {
+    if (rules == null || questionBank == null) {
+      toast.error("البيانات لم تُحمَّل بعد — انتظر لحظة وأعد المحاولة.");
+      return;
+    }
+    const payload = {
+      app: "نباهة",
+      version: APP_VERSION,
+      exportedAt: new Date().toISOString(),
+      settings: {
+        announcement: settings.announcement,
+        announcementActive: settings.announcementActive,
+        siteUrl: settings.siteUrl,
+        aiEnabled: settings.aiEnabled,
+        aiAutoApply: settings.aiAutoApply,
+        aiAdminEnabled: settings.aiAdminEnabled,
+        antiCheatEnabled: settings.antiCheatEnabled,
+        aiModel: settings.aiModel,
+      },
+      rules: rules.map((r) => ({
+        title: r.title,
+        category: r.category,
+        description: r.description,
+        severity: r.severity,
+        order: r.order,
+      })),
+      questionBank: questionBank.map((q) => ({
+        id: q.id,
+        category: q.category,
+        difficulty: q.difficulty,
+        disabled: q.disabled,
+      })),
+    };
+    try {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `nabaha-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast.success("نُسِّخت النسخة الاحتياطية — احفظ الملف في مكان آمن.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "تعذّر التصدير.");
+    }
+  };
+
+  const bankTotal = questionBank?.length ?? 0;
+  const bankDisabled = (questionBank ?? []).filter((q) => q.disabled).length;
+
   return (
     <div className="space-y-5">
       {/* Site URL — needed by the Android APK so in-app downloads work */}
@@ -227,7 +291,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
               value={siteUrl}
               onChange={(e) => setSiteUrl(e.target.value)}
               dir="ltr"
-              placeholder="https://alabqari.example.com"
+              placeholder="https://nabaha.example.com"
               className="rounded-xl ps-9 text-end font-mono text-sm"
               disabled={busy}
             />
@@ -235,7 +299,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <Link2 className="size-3.5 text-primary" />
-              مثال: https://alabqari.example.com — بدون شرطة مائلة في النهاية.
+              مثال: https://nabaha.example.com — بدون شرطة مائلة في النهاية.
             </p>
             <Button onClick={saveSiteUrl} disabled={busy} variant="outline" className="gap-1.5 rounded-xl">
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
@@ -480,6 +544,104 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
               </div>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      {/* Feature 22: question-bank health — per-category coverage at a glance */}
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <BarChart3 className="size-4" />
+            </span>
+            <span>صحة بنك الأسئلة (ميزة 22)</span>
+            <span className="ms-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              {bankTotal} سؤال
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <p className="text-lg font-bold tabular-nums">{bankTotal}</p>
+              <p className="text-[11px] font-medium text-muted-foreground">إجمالي الأسئلة</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <p className="text-lg font-bold tabular-nums">{bankTotal - bankDisabled}</p>
+              <p className="text-[11px] font-medium text-muted-foreground">نشطة في الجولات</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <p className="text-lg font-bold tabular-nums text-amber-600">{bankDisabled}</p>
+              <p className="text-[11px] font-medium text-muted-foreground">معطّلة مؤقتاً</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <p className="text-lg font-bold tabular-nums text-primary">{CATEGORIES.length}</p>
+              <p className="text-[11px] font-medium text-muted-foreground">فئة معرفية</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORIES.map((c) => {
+              const count = (questionBank ?? []).filter(
+                (q) => q.category === c && !q.disabled,
+              ).length;
+              return (
+                <span
+                  key={c}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                    count === 0
+                      ? "border-rose-500/30 bg-rose-500/10 text-rose-600"
+                      : count < 5
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700"
+                        : "border-border/70 bg-card text-foreground",
+                  )}
+                >
+                  {c} · {count}
+                </span>
+              );
+            })}
+          </div>
+          {(CATEGORIES.some((c) => !(questionBank ?? []).some((q) => q.category === c && !q.disabled)) ||
+            bankTotal - bankDisabled < 20) && (
+            <p className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3.5 py-2.5 text-[11px] leading-relaxed text-amber-700">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              بعض الفئات بلا أسئلة نشطة، أو البنك صغير — قد تصدر جولات بدون أسئلة
+              من فئة معينة عند اختيارها. أعد تفعيل أسئلة من تلك الفئة، أو أبلغ
+              المطوّر ليضيف أسئلة جديدة.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Feature 23: backup & export center */}
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Archive className="size-4" />
+            </span>
+            <span>النسخ الاحتياطي (ميزة 23)</span>
+            <Badge variant="outline" className="ms-auto rounded-full text-[10px]">
+              الإصدار {APP_VERSION}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            صدِّر كل إعدادات الموقع (الإعلان، الرابط الرسمي، إعدادات الرقابة
+            والذكاء الاصطناعي) مع القوانين النشطة وحالة بنك الأسئلة في ملف JSON
+            واحد — لنسخه احتياطياً أو نقله إلى نسخة أخرى من الموقع.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" className="gap-1.5 rounded-xl" onClick={handleExportBackup}>
+              <FileDown className="size-4" />
+              تصدير نسخة احتياطية
+            </Button>
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Database className="size-3.5 text-primary" />
+              {rules?.length ?? 0} قانون · {bankTotal} سؤال · إعدادات كاملة
+            </span>
+          </div>
         </CardContent>
       </Card>
     </div>

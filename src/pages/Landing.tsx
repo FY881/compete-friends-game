@@ -246,7 +246,7 @@ export default function Landing() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">العبقري</span>
+            <span className="text-lg font-bold tracking-tight">نباهة</span>
           </Link>
 
           <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
@@ -254,7 +254,7 @@ export default function Landing() {
               كيف تلعب
             </a>
             <a href="#features" className="transition-colors hover:text-foreground">
-              لماذا العبقري
+              لماذا نباهة
             </a>
             <a href="#cta" className="transition-colors hover:text-foreground">
               ابدأ الآن
@@ -449,7 +449,7 @@ export default function Landing() {
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.6 }}
             >
-              <p className="text-sm font-semibold text-primary">لماذا العبقري؟</p>
+              <p className="text-sm font-semibold text-primary">لماذا نباهة؟</p>
               <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
                 ليست مسابقة معلومات…
                 <br />
@@ -703,7 +703,7 @@ export default function Landing() {
             <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <BrainCircuit className="size-4" />
             </span>
-            <span className="font-semibold text-foreground">العبقري</span>
+            <span className="font-semibold text-foreground">نباهة</span>
           </div>
           <p>معركة الأصدقاء الفكرية — العب، تحدَّ، وافز.</p>
           <div className="flex items-center gap-2">

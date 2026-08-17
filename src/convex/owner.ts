@@ -749,6 +749,71 @@ export const getLiveGames = query({
   },
 });
 
+/** جولة منتهية (من أرشيف gameHistory الدائم — لا يُحذف مع تنظيف الغرف). */
+export type FinishedGameRow = {
+  id: string;
+  code: string;
+  playerCount: number;
+  questionCount: number;
+  playedAt: number;
+  players: {
+    name: string;
+    score: number;
+    rank: number;
+    correctCount: number;
+    won: boolean;
+    xpEarned: number;
+  }[];
+};
+
+/** أرشيف الجولات المنتهية — لكل جولة النتائج النهائية وترتيب اللاعبين. */
+export const getFinishedGames = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }): Promise<FinishedGameRow[] | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!isStaffUser(me)) return null;
+
+    const games = await ctx.db.query("games").collect();
+    const finished = games.filter((g) => g.status === "finished");
+    const rows: FinishedGameRow[] = [];
+
+    for (const g of finished) {
+      const history = await ctx.db
+        .query("gameHistory")
+        .withIndex("by_game", (q) => q.eq("gameId", g._id))
+        .collect();
+      if (history.length === 0) continue; // لا أرشيف بعد (جولة لم تُسجَّل نتائجها)
+
+      const players = await Promise.all(
+        history.map(async (h) => {
+          const u = await ctx.db.get(h.userId);
+          return {
+            name: u?.name ?? "لاعب",
+            score: h.score,
+            rank: h.rank,
+            correctCount: h.correctCount,
+            won: h.won,
+            xpEarned: h.xpEarned,
+          };
+        }),
+      );
+      rows.push({
+        id: g._id,
+        code: g.code,
+        playerCount: history.length,
+        questionCount: g.questionIds.length,
+        playedAt: Math.max(...history.map((h) => h.playedAt)),
+        players: players.sort((a, b) => a.rank - b.rank),
+      });
+    }
+
+    rows.sort((a, b) => b.playedAt - a.playedAt);
+    return rows.slice(0, limit ?? 20);
+  },
+});
+
 export type QuestionRow = {
   id: string;
   category: string;

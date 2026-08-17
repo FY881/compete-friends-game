@@ -5,7 +5,9 @@ import {
   APP_VERSION,
   APP_VERSION_LABEL,
   APK_BYTES,
+  APK_FALLBACK_FILE,
   APK_SHA256,
+  APK_VERSION,
   DownloadError,
   downloadApk,
 } from "@/lib/app-version";
@@ -39,8 +41,10 @@ export default function Download() {
   const reportIssue = useMutation(api.owner.reportDownloadIssue);
   const [downloading, setDownloading] = useState(false);
 
-  const apkFileName = info?.apkFileName ?? `al-abqari-v${APP_VERSION}.apk`;
+  const apkFileName = info?.apkFileName ?? APK_FALLBACK_FILE;
+  // إصدار الويب (الملاحظات/اللافتات) وإصدار ملف APK الفعلي — منفصلان عمداً.
   const version = info?.version ?? APP_VERSION;
+  const apkVersion = info?.apkVersion ?? APK_VERSION;
   // القيم الرسمية من الخادم (مصدر الحقيقة) مع احتياط من ثوابت الكود.
   const apkBytes = info?.apkBytes ?? APK_BYTES;
   const apkSha256 = info?.apkSha256 ?? APK_SHA256;
@@ -92,7 +96,7 @@ export default function Download() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">تحميل العبقري</span>
+            <span className="text-lg font-bold tracking-tight">تحميل نباهة</span>
           </button>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="gap-1.5 rounded-xl">
@@ -116,7 +120,7 @@ export default function Download() {
           />
           <Badge variant="outline" className="mb-4 gap-1.5 rounded-full text-primary">
             <Sparkles className="size-3.5" />
-            الإصدار {version}
+            الإصدار {apkVersion}
           </Badge>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             حمّل اللعبة على هاتفك…
@@ -178,7 +182,7 @@ export default function Download() {
                 ) : (
                   <DownloadIcon className="size-4.5" />
                 )}
-                {downloading ? "جارٍ تجهيز الملف…" : `تنزيل APK — الإصدار ${version}`}
+                {downloading ? "جارٍ تجهيز الملف…" : `تنزيل APK — الإصدار ${apkVersion}`}
               </Button>
               <Button size="lg" variant="outline" className="w-full gap-2 rounded-xl" asChild>
                 <Link to="/rules">
@@ -291,7 +295,7 @@ export default function Download() {
                 icon: PackageX,
                 title: "«التطبيق غير مثبت» بسبب نسخة قديمة مثبتة",
                 steps: [
-                  "إذا كان لديك إصدار سابق مثبت، احذفه أولاً (الإعدادات ← التطبيقات ← العبقري ← إلغاء التثبيت) ثم ثبّت الجديد.",
+                  "إذا كان لديك إصدار سابق مثبت، احذفه أولاً (الإعدادات ← التطبيقات ← نباهة ← إلغاء التثبيت) ثم ثبّت الجديد.",
                   "سبب ذلك أن التوقيع الرقمي للإصدار الجديد مختلف عن القديم.",
                 ],
               },

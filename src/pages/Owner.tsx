@@ -3,6 +3,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { AiVerdict } from "@/convex/moderation";
 import type {
+  FinishedGameRow,
   LiveGame,
   ModLogEntry,
   QuestionRow,
@@ -40,8 +41,10 @@ import { cn } from "@/lib/utils";
 import {
   Activity,
   AlertTriangle,
+  Archive,
   ArrowLeft,
   Ban,
+  BarChart3,
   Bot,
   BrainCircuit,
   Check,
@@ -49,6 +52,7 @@ import {
   Database,
   Eraser,
   EyeOff,
+  FileDown,
   Flag,
   Gamepad2,
   Gavel,
@@ -67,6 +71,7 @@ import {
   Smartphone,
   Sparkles,
   Trash2,
+  Trophy,
   UserCheck,
   UserCog,
   Users,
@@ -74,6 +79,8 @@ import {
   Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { CATEGORIES } from "@/convex/questions";
+import { APP_VERSION } from "@/lib/app-version";
 import { AdminAiTab } from "@/components/AdminAiTab";
 import { DownloadsTab } from "@/components/DownloadsTab";
 
@@ -1322,9 +1329,11 @@ function ModerationLogList({ logs, empty }: { logs: ModLogEntry[] | null | undef
 
 function GamesTab() {
   const games = useQuery(api.owner.getLiveGames);
+  const finishedGames = useQuery(api.owner.getFinishedGames, {});
   const abortGame = useMutation(api.owner.abortGame);
   const kickPlayer = useMutation(api.owner.kickPlayer);
   const [busy, setBusy] = useState<string | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   const handleAbort = async (game: LiveGame) => {
     setBusy(game.id);
@@ -1456,6 +1465,103 @@ function GamesTab() {
             title="التحكم الكامل في الغرف"
             desc="إيقاف الجولة ينهيها فوراً ويوزّع الخبرة المكتسبة على اللاعبين. الطرد يُزيل اللاعب من اللوبي أو يُلغي نتيجته في الجولة الجارية."
           />
+        </CardContent>
+      </Card>
+
+      {/* Feature 21: finished games archive (permanent history) */}
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Archive className="size-4" />
+            </span>
+            <span>أرشيف الجولات المنتهية (ميزة 21)</span>
+            <Badge variant="outline" className="rounded-full text-[10px]">
+              {(finishedGames?.length ?? 0)} جولة موثّقة
+            </Badge>
+            <button
+              type="button"
+              className="ms-auto flex items-center gap-1.5 text-xs font-semibold text-primary transition-colors hover:underline"
+              onClick={() => setArchiveOpen((v) => !v)}
+            >
+              <Trophy className="size-3.5" />
+              {archiveOpen ? "إخفاء السجل" : "عرض السجل"}
+            </button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {finishedGames == null ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : !archiveOpen ? (
+            <p className="flex items-start gap-2 rounded-xl bg-muted/50 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+              <Archive className="mt-0.5 size-3.5 shrink-0 text-primary" />
+              كل جولة تنتهي تُسجَّل نتائجها نهائياً هنا — لا تُحذف مع تنظيف الغرف
+              التلقائي (الذي يحذف الغرف بعد 48 ساعة فقط). اضغط «عرض السجل» لاستعراض
+              الفائزين والنتائج.
+            </p>
+          ) : finishedGames.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              لا توجد جولات منتهية موثّقة بعد — العب جولة لتظهر هنا.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {finishedGames.map((game) => (
+                <div
+                  key={game.id}
+                  className="rounded-2xl border border-border/70 bg-muted/20 p-4"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Trophy className="size-4" />
+                    </span>
+                    <p className="font-mono text-sm font-bold tracking-widest">{game.code}</p>
+                    <Badge variant="outline" className="rounded-full text-[10px]">
+                      {game.playerCount} لاعب · {game.questionCount} أسئلة
+                    </Badge>
+                    <span className="ms-auto text-[10px] text-muted-foreground">
+                      {fmtDate(game.playedAt)}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-1.5">
+                    {game.players.map((p) => (
+                      <div
+                        key={`${game.id}-${p.rank}-${p.name}`}
+                        className="flex flex-wrap items-center gap-2 rounded-xl border border-border/50 bg-card px-3 py-2"
+                      >
+                        <span
+                          className={cn(
+                            "flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                            p.rank === 1
+                              ? "bg-amber-500/15 text-amber-600"
+                              : p.rank === 2
+                                ? "bg-slate-500/15 text-slate-600"
+                                : p.rank === 3
+                                  ? "bg-orange-500/15 text-orange-600"
+                                  : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {p.rank}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                          {p.name}
+                          {p.won && <Crown className="ms-1 inline size-3.5 text-amber-500" />}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {p.correctCount} صحيحة
+                        </span>
+                        <span className="text-xs font-bold text-emerald-600">+{p.xpEarned} XP</span>
+                        <span className="font-mono text-sm font-bold tabular-nums text-primary">
+                          {p.score}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

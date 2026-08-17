@@ -506,8 +506,8 @@ export function Lobby({
               onClick={() => {
                 navigator
                   .share({
-                    title: "العبقري",
-                    text: `انضم إليّ في العبقري! رمز الغرفة: ${code}`,
+                    title: "نباهة",
+                    text: `انضم إليّ في نباهة! رمز الغرفة: ${code}`,
                     url: inviteLink,
                   })
                   .catch(() => undefined);
