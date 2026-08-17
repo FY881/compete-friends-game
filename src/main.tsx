@@ -91,7 +91,11 @@ const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 // it never interferes with the dev/preview server (HMR).
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    // updateViaCache: "none" — يجلب نسخة sw.js الجديدة دائماً بدون تخزين
+    // مؤقت، فتصل إصلاحات التنزيل (منع اعتراض ملفات APK) لكل الأجهزة فوراً.
+    navigator.serviceWorker
+      .register("/sw.js", { updateViaCache: "none" })
+      .catch(() => undefined);
   });
 }
 

@@ -1,11 +1,17 @@
 /* العبقري — service worker
  * Network-first for navigations (the shell is always fresh), cache-first for
  * hashed static assets (safe: Vite fingerprints filenames), and the Convex
- * API (different origin) is never touched. */
+ * API (different origin) is never touched.
+ *
+ * IMPORTANT (fixed 2026-08-17): binary downloads (.apk) are NEVER intercepted.
+ * The cache-first strategy would happily serve a stale or corrupted cached
+ * copy of the APK, making the phone save a broken file — that is exactly what
+ * causes "حدثت مشكلة عند تحليل الحزمة" (problem parsing the package). Every
+ * APK request now goes straight to the network, always, forever. */
 // Bump this cache name whenever you ship a new version — it forces every
 // installed PWA to discard the old app shell and fetch the fresh one.
 // (Part of the app update plan: web/PWA clients self-update on reload.)
-const CACHE = "mindclash-v5";
+const CACHE = "mindclash-v6";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -35,6 +41,14 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // never cache the Convex backend
+
+  // ── HARD RULE: never intercept APK/download requests ──────────────
+  // A cached APK that is stale, truncated, or was an HTML error page in a
+  // previous deployment breaks installation on the phone. Let the network
+  // serve these bytes directly, always.
+  if (url.pathname.endsWith(".apk") || url.pathname.includes("/downloads/")) {
+    return;
+  }
 
   // Navigations: always try the network first, fall back to the cached shell.
   if (request.mode === "navigate") {

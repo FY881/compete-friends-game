@@ -148,6 +148,20 @@ export function getApkDownloadCandidates(
   return candidates;
 }
 
+/**
+ * إضافة كاسر تخزين مؤقت لرابط التحميل.
+ *
+ * حتى مع خدمة العامل (Service Worker) القديمة المثبتة على جهاز المستخدم
+ * (التي قد تعترض ملفات APK وتُسلّم نسخة قديمة/تالفة)، أي استعلام إضافي
+ * فريد يجعل `caches.match()` لا يجد مفتاحاً قديماً — فيُسحب الملف من
+ * الشبكة دائماً بالبايتات الصحيحة. هذا يمنع «حدثت مشكلة عند تحليل
+ * الحزمة» الناتجة عن التخزين المؤقت نهائياً، الآن وفي كل تحديث مستقبلي.
+ */
+function withCacheBuster(url: string): string {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}_mc=${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function triggerBlobDownload(blob: Blob, fileName: string): void {
   // إصلاح مهم: خادم الاستضافة يرسل ملفات .apk بدون Content-Type (أو بنوع
   // zip لأن الـ APK حاوية ZIP)، فيشمّه المتصفح كـ zip ويحوّل اسم الملف إلى
@@ -216,7 +230,15 @@ export async function downloadApk(
 
   for (const url of candidates) {
     try {
-      const response = await fetch(url, { cache: "no-store" });
+      // كاسر التخزين المؤقت: يضمن أن حتى الـ Service Worker القديم المثبت
+      // لن يجد نسخة قديمة مخزنة، فيُحضّر الملف من الشبكة دائماً.
+      const bustedUrl = withCacheBuster(url);
+      const response = await fetch(bustedUrl, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/vnd.android.package-archive, application/octet-stream, */*",
+        },
+      });
       if (!response.ok) {
         lastError = new Error(`HTTP ${response.status}`);
         continue;
@@ -254,7 +276,7 @@ export async function downloadApk(
   }
 
   throw new Error(
-    "تعذّر تنزيل ملف APK سليم: كل المصادر أرسلت ملفاً مختلفاً عن النسخة الرسمية (الحجم/البصمة غير مطابقين) — عادة بسبب تخزين مؤقت قديم. حدّث الصفحة (Ctrl+Shift+R) وحاول مجدداً، وإن استمرت المشكلة أخبرنا.",
+    "تعذّر تنزيل ملف APK سليم: كل المصادر أرسلت ملفاً مختلفاً عن النسخة الرسمية (الحجم/البصمة غير مطابقين). أُصلح هذا تلقائياً الآن — حدّث الصفحة مرة واحدة (Ctrl+Shift+R) لتفعيل الإصلاح ثم اضغط زر التنزيل مجدداً، وإن استمرت المشكلة أخبرنا.",
   );
 }
 
