@@ -33,7 +33,7 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "1.1.0"; // client version — server WEB_VERSION (1.2.0) is newer → update banner fires
+export const APP_VERSION = "1.2.1"; // client version — matches server WEB_VERSION 1.2.1 (this build is current)
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
 export const APK_VERSION = "1.0.1";

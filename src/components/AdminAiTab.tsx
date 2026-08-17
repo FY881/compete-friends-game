@@ -21,6 +21,7 @@ import {
   BarChart3,
   Bot,
   BrainCircuit,
+  Bug,
   Check,
   Copy,
   Database,
@@ -155,6 +156,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
   const rules = useQuery(api.owner.getRules);
   const questionBank = useQuery(api.owner.getQuestionBank);
   const aiQueue = useQuery(api.aiQuestions.getAiQuestionQueue);
+  const clientErrors = useQuery(api.owner.listClientErrors);
   const runSweepNow = useAction(api.autoAdmin.runSweepNow);
   const generateQuestions = useAction(api.aiQuestions.generateQuestions);
   const approveQuestion = useMutation(api.aiQuestions.approveQuestion);
@@ -871,6 +873,75 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Client error inbox: auto-captured runtime errors from devices */}
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600">
+              <Bug className="size-4" />
+            </span>
+            <span>صندوق أخطاء الأجهزة</span>
+            <Badge
+              variant="outline"
+              className="ms-auto gap-1 rounded-full text-[10px]"
+            >
+              {(clientErrors ?? []).length} خطأ مسجّل
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            أي خطأ يحدث في متصفح أو تطبيق أي لاعب يُرسل هنا تلقائياً (مجمّع
+            ومكرّره محسوب) — فتعرف فوراً بأي مشكلة تقنية قبل أن يشكو أحد.
+          </p>
+          {clientErrors === undefined ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (clientErrors ?? []).length === 0 ? (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 bg-muted/30 px-4 py-6 text-xs text-muted-foreground">
+              <ShieldCheck className="size-4 text-emerald-600" />
+              لا أخطاء مسجّلة — كل شيء يعمل بسلاسة.
+            </div>
+          ) : (
+            <ul className="max-h-72 space-y-2 overflow-auto">
+              {(clientErrors ?? []).map((err) => (
+                <li
+                  key={err._id}
+                  className="rounded-xl border border-border/60 bg-muted/30 p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-xs font-bold text-foreground" dir="ltr">
+                      {err.message}
+                    </p>
+                    <span className="shrink-0 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                      ×{err.count}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                    <span>{fmtDate(err.lastSeen)}</span>
+                    {err.route && <span className="font-mono" dir="ltr">{err.route}</span>}
+                    {err.stack && (
+                      <details className="flex-1">
+                        <summary className="cursor-pointer font-semibold text-primary">
+                          التفاصيل
+                        </summary>
+                        <pre
+                          dir="ltr"
+                          className="mt-1.5 max-h-28 overflow-auto rounded-lg border border-border/60 bg-background/60 p-2 text-[9px] leading-4"
+                        >
+                          {err.stack}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 

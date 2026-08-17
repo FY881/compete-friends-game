@@ -1352,3 +1352,63 @@ export const recordCheat = mutation({
     };
   },
 });
+
+// ---------------------------------------------------------------------------
+// Client error reporting — تُلتقط أخطاء المتصفح/التطبيق تلقائياً وتصل إلى
+// غرفة المالك، فلا يتكرر أي خطأ غامض (شاشة بيضاء/تعطل) دون أثر يمكن رؤيته.
+
+/** A public, deduped sink for client-side runtime errors (fire-and-forget). */
+export const reportClientError = mutation({
+  args: {
+    message: v.string(),
+    stack: v.optional(v.string()),
+    url: v.optional(v.string()),
+    route: v.optional(v.string()),
+  },
+  handler: async (ctx, { message, stack, url, route }) => {
+    const clean = message.trim().slice(0, 500);
+    if (!clean) return;
+    const key = `${clean.slice(0, 200)}|${(stack ?? "").slice(0, 150)}`;
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("clientErrors")
+      .withIndex("by_key", (q) => q.eq("key", key))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        count: Math.min((existing.count ?? 1) + 1, 1000),
+        lastSeen: now,
+        stack: stack?.slice(0, 2000) ?? existing.stack,
+        url: url?.slice(0, 500) ?? existing.url,
+        route: route?.slice(0, 200) ?? existing.route,
+      });
+    } else {
+      await ctx.db.insert("clientErrors", {
+        key,
+        message: clean,
+        stack: stack?.slice(0, 2000),
+        url: url?.slice(0, 500),
+        route: route?.slice(0, 200),
+        count: 1,
+        firstSeen: now,
+        lastSeen: now,
+      });
+    }
+  },
+});
+
+/** Recent client errors, newest first — owner/admin only. */
+export const listClientErrors = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!isStaffUser(me)) return null;
+    return await ctx.db
+      .query("clientErrors")
+      .withIndex("by_last", (q) => q.gte("lastSeen", 0))
+      .order("desc")
+      .take(20);
+  },
+});

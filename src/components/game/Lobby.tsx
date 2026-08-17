@@ -4,7 +4,9 @@ import { api } from "@/convex/_generated/api";
 import type { GameData, GameSettings } from "@/convex/games";
 import { CATEGORIES } from "@/convex/questions";
 import {
+  ANSWER_MS,
   formatTimeOption,
+  QUESTION_COUNT,
   QUESTION_COUNT_OPTIONS,
   TIME_OPTIONS,
 } from "@/lib/game-config";
@@ -407,6 +409,13 @@ export function Lobby({
   const host = game.players.find((p) => p.isHost);
   const isHost = me?.isHost ?? false;
   const code = game.game.code;
+  // Legacy rooms may lack the settings field — fall back to game defaults so
+  // the lobby never crashes on an old game row.
+  const settings = game.game.settings ?? {
+    questionCount: QUESTION_COUNT,
+    timePerQuestionMs: ANSWER_MS,
+    categories: [],
+  };
   const inviteLink =
     typeof window !== "undefined"
       ? `${window.location.origin}/game/${code}`
@@ -523,7 +532,7 @@ export function Lobby({
       {/* Room rules */}
       {isHost ? (
         <HostSettings
-          settings={game.game.settings}
+          settings={settings}
           disabled={savingSettings}
           onChange={handleSettingsChange}
         />
@@ -533,7 +542,7 @@ export function Lobby({
             <Gauge className="size-4 text-primary" />
             إعدادات الجولة
           </p>
-          <SettingsSummary settings={game.game.settings} />
+          <SettingsSummary settings={settings} />
         </div>
       )}
 

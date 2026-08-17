@@ -773,7 +773,7 @@ export const fixStuckCountdown = internalMutation({
       questionStartedAt: now,
     });
     await ctx.scheduler.runAfter(
-      game.settings.timePerQuestionMs,
+      game.settings?.timePerQuestionMs ?? 15_000,
       internal.games.revealQuestion,
       { gameId, index: game.currentQuestionIndex },
     );

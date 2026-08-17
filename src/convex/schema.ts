@@ -304,6 +304,21 @@ const schema = defineSchema(
       .index("by_qid", ["qid"])
       .index("by_status", ["status"])
       .index("by_category_status", ["category", "status"]),
+
+    // أخطاء جافاسكريبت تلقائية من أجهزة اللاعبين (تُلتقط من المتصفح/التطبيق
+    // وتصل هنا ليراجعها المالك — فلا يتكرر أي خطأ غامض دون أثر).
+    clientErrors: defineTable({
+      key: v.string(), // message + stack مقطوعان — للتجميع/منع التكرار
+      message: v.string(),
+      stack: v.optional(v.string()),
+      url: v.optional(v.string()),
+      route: v.optional(v.string()),
+      count: v.number(), // كم مرة تكرر الخطأ
+      firstSeen: v.number(),
+      lastSeen: v.number(),
+    })
+      .index("by_key", ["key"])
+      .index("by_last", ["lastSeen"]),
   },
   {
     schemaValidation: false,

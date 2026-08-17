@@ -293,6 +293,17 @@ function normalizeCode(code: string): string {
   return code.trim().toUpperCase();
 }
 
+/** Settings fallback for legacy game rows created before room settings existed. */
+const DEFAULT_SETTINGS: GameSettings = {
+  questionCount: QUESTION_COUNT,
+  timePerQuestionMs: ANSWER_MS,
+  categories: [],
+};
+
+function settingsOf(game: { settings?: GameSettings }): GameSettings {
+  return game.settings ?? DEFAULT_SETTINGS;
+}
+
 /** Structural db accessor so the helper works from both queries and mutations. */
 type DbCtx = { db: QueryCtx["db"] | MutationCtx["db"] };
 
@@ -569,7 +580,7 @@ export const startGame = mutation({
       index: 0,
     });
     await ctx.scheduler.runAfter(
-      COUNTDOWN_MS + game.settings.timePerQuestionMs,
+      COUNTDOWN_MS + settingsOf(game).timePerQuestionMs,
       internal.games.revealQuestion,
       { gameId: game._id, index: 0 },
     );
@@ -646,7 +657,7 @@ export const submitAnswer = mutation({
     }
     const isRetry = existing != null;
 
-    const timePerQuestion = game.settings.timePerQuestionMs;
+    const timePerQuestion = settingsOf(game).timePerQuestionMs;
     const elapsed = Date.now() - game.questionStartedAt;
     if (elapsed > timePerQuestion) {
       throw new Error("انتهى وقت السؤال");
@@ -914,8 +925,8 @@ export const rematch = mutation({
     const newCode = await makeUniqueCode(ctx);
     const questionIds = await pickQuestions(
       ctx,
-      game.settings.categories,
-      game.settings.questionCount,
+      settingsOf(game).categories,
+      settingsOf(game).questionCount,
     );
 
     const gameId = await ctx.db.insert("games", {
@@ -1006,7 +1017,7 @@ export const advanceQuestion = internalMutation({
       questionStartedAt: now,
     });
     await ctx.scheduler.runAfter(
-      game.settings.timePerQuestionMs,
+      settingsOf(game).timePerQuestionMs,
       internal.games.revealQuestion,
       { gameId, index: nextIndex },
     );
@@ -1135,7 +1146,7 @@ export const finishGame = internalMutation({
       if (
         correctCount === questionCount &&
         questionCount >= 3 &&
-        answered.every((a) => a.elapsedMs <= game.settings.timePerQuestionMs / 2)
+        answered.every((a) => a.elapsedMs <= settingsOf(game).timePerQuestionMs / 2)
       ) {
         next.add("speed_demon");
       }
@@ -1297,7 +1308,7 @@ export const getGame = query({
         currentQuestionIndex: game.currentQuestionIndex,
         questionStartedAt: game.questionStartedAt,
         questionCount: game.questionIds.length,
-        settings: game.settings,
+        settings: settingsOf(game),
         firstCorrect: Array.from(
           { length: game.questionIds.length },
           (_, i) => game.firstCorrect?.[i] ?? null,

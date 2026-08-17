@@ -4,9 +4,11 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import "./index.css";
 
 // Lazy load route components for better code splitting
@@ -47,7 +49,22 @@ class ToolbarErrorBoundary extends React.Component<
   }
 }
 
-/** Hard guard so runtime errors never leave the preview as a blank page. */
+/** Fire-and-forget: send a runtime error to the owner room automatically. */
+function reportRuntimeError(message: string, stack?: string) {
+  try {
+    const route =
+      typeof window !== "undefined" ? window.location.pathname : undefined;
+    const url =
+      typeof window !== "undefined" ? window.location.href : undefined;
+    convex
+      .mutation(api.owner.reportClientError, { message, stack, url, route })
+      .catch(() => undefined);
+  } catch {
+    // reporting must never break the app
+  }
+}
+
+/** Hard guard so runtime errors never leave the app as a blank screen. */
 class RootErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; message: string; stack: string }
@@ -56,27 +73,44 @@ class RootErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) {
     return {
       hasError: true,
-      message: error.message || "Unknown runtime error",
+      message: error.message || "خطأ غير معروف",
       stack: error.stack || "",
     };
   }
   componentDidCatch(err: Error) {
-    console.error("[WebContainer preview] Root crash:", err);
+    console.error("[نباهة] Root crash:", err);
+    reportRuntimeError(err.message || "Unknown", err.stack);
   }
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
-          <div className="max-w-lg text-center">
-            <p className="text-sm font-semibold">Preview runtime error</p>
-            <p className="mt-2 text-xs text-muted-foreground break-words">
-              {this.state.message}
+        <div dir="rtl" className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+          <div className="w-full max-w-lg rounded-3xl border border-border/80 bg-card p-8 text-center shadow-sm">
+            <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600">
+              <AlertTriangle className="size-7" />
+            </span>
+            <h1 className="mt-5 text-xl font-bold">حدث خطأ غير متوقع</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              وقعت مشكلة تقنية أثناء عرض هذه الصفحة. أُبلغت الإدارة تلقائياً
+              بالتفاصيل — اضغط «إعادة التحميل» للمتابعة.
             </p>
-            {this.state.stack && (
-              <pre className="mt-3 text-left text-[10px] leading-4 text-muted-foreground/80 max-h-40 overflow-auto rounded border border-border/60 p-2">
-                {this.state.stack}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              <RotateCcw className="size-4" />
+              إعادة التحميل
+            </button>
+            <details className="mt-5 text-start">
+              <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">
+                تفاصيل تقنية (للإدارة)
+              </summary>
+              <pre className="mt-3 max-h-40 overflow-auto rounded-lg border border-border/60 bg-muted/40 p-3 text-left text-[10px] leading-4 text-muted-foreground/90">
+                {this.state.message}
+                {this.state.stack ? `\n\n${this.state.stack}` : ""}
               </pre>
-            )}
+            </details>
           </div>
         </div>
       );
@@ -86,6 +120,25 @@ class RootErrorBoundary extends React.Component<
 }
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
+
+// Global capture: any uncaught error or rejected promise anywhere in the app
+// lands in the owner room (deduped) so no failure stays invisible.
+window.addEventListener("error", (event) => {
+  reportRuntimeError(
+    event.message || "Uncaught error",
+    event.error instanceof Error ? event.error.stack : undefined,
+  );
+});
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason;
+  if (reason instanceof Error) {
+    reportRuntimeError(reason.message, reason.stack);
+  } else {
+    reportRuntimeError(
+      typeof reason === "string" && reason ? reason : "Unhandled promise rejection",
+    );
+  }
+});
 
 // Offline-capable app install (PWA). Registered only in production builds so
 // it never interferes with the dev/preview server (HMR).

@@ -9,7 +9,7 @@ import {
 } from "@/convex/gameConfig";
 import type { GameData, PlayerInfo } from "@/convex/games";
 import { sounds } from "@/lib/sounds";
-import { COUNTDOWN_MS, LIFELINES_PER_GAME } from "@/lib/game-config";
+import { ANSWER_MS, COUNTDOWN_MS, LIFELINES_PER_GAME } from "@/lib/game-config";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -119,8 +119,10 @@ export function QuestionStage({
   const index = g.currentQuestionIndex;
   const question = game.questions[index];
   const phase = g.phase;
-  const startedAt = g.questionStartedAt;
-  const timePerQuestion = g.settings.timePerQuestionMs;
+  // Fallbacks for legacy rooms: settings/questionStartedAt may be missing on
+  // very old game rows — never let that crash the game screen.
+  const startedAt = g.questionStartedAt || now;
+  const timePerQuestion = g.settings?.timePerQuestionMs ?? ANSWER_MS;
   const remaining = startedAt + timePerQuestion - now;
   const timeUp = phase === "answering" && remaining <= 0;
 
@@ -137,7 +139,7 @@ export function QuestionStage({
   const totalPlayers = game.players.length;
   const isRevealing = phase === "revealing";
   const isCountdown = phase === "countdown";
-  const countdownLeft = isCountdown ? g.questionStartedAt - now : 0;
+  const countdownLeft = isCountdown ? startedAt - now : 0;
   const countdownNumber = Math.max(0, Math.ceil(countdownLeft / 1000));
 
   // Golden question: the last question of the round doubles all points.
@@ -321,7 +323,8 @@ export function QuestionStage({
     }
   };
 
-  const difficultyStyle = DIFFICULTY_STYLES[question.difficulty];
+  const difficultyStyle =
+    DIFFICULTY_STYLES[question.difficulty] ?? DIFFICULTY_STYLES.medium;
   const nextStreakBonus = Math.min(
     MAX_STREAK_BONUS,
     Math.max(0, me.streak * STREAK_BONUS_PER_STEP),

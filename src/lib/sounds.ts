@@ -17,15 +17,25 @@ try {
 function getCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!ctx) {
-    const AC =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AC) return null;
-    ctx = new AC();
+    // The constructor can throw synchronously in some WebViews (hardware
+    // context limits, autoplay policy) — audio must never crash the game.
+    try {
+      const AC =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+    } catch {
+      return null;
+    }
   }
-  if (ctx.state === "suspended") {
-    void ctx.resume().catch(() => undefined);
+  try {
+    if (ctx.state === "suspended") {
+      void ctx.resume().catch(() => undefined);
+    }
+  } catch {
+    // ignore resume failures
   }
   return ctx;
 }
@@ -39,23 +49,27 @@ function tone(
   slideTo?: number,
 ) {
   if (muted) return;
-  const c = getCtx();
-  if (!c) return;
-  const t0 = c.currentTime + startAt;
-  const osc = c.createOscillator();
-  const gain = c.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(frequency, t0);
-  if (slideTo) {
-    osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + duration);
+  try {
+    const c = getCtx();
+    if (!c) return;
+    const t0 = c.currentTime + startAt;
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, t0);
+    if (slideTo) {
+      osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + duration);
+    }
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.05);
+  } catch {
+    // audio unavailable — never crash the game over a sound effect
   }
-  gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-  osc.connect(gain);
-  gain.connect(c.destination);
-  osc.start(t0);
-  osc.stop(t0 + duration + 0.05);
 }
 
 export const sounds = {
