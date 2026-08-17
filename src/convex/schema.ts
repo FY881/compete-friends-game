@@ -283,6 +283,27 @@ const schema = defineSchema(
     })
       .index("by_user_day", ["userId", "day"])
       .index("by_day", ["day"]),
+
+    // أسئلة يولّدها الذكاء الاصطناعي (OpenRouter) — تنتظر مراجعة المالك
+    // ثم تدخل بنك الأسئلة الحي. لا تُحذف أبداً (تبقى مرجعاً للجولات
+    // الجارية)، وحالتها فقط تتغير.
+    aiQuestions: defineTable({
+      qid: v.string(), // custom id مثل "ai-1a2b3c" — يُخزَّن في games.questionIds
+      category: v.string(), // must be one of CATEGORIES
+      difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+      question: v.string(),
+      options: v.array(v.string()), // exactly 4
+      correctIndex: v.number(), // 0-3
+      status: v.union(
+        v.literal("pending"), // بانتظار مراجعة المالك
+        v.literal("approved"), // معتمدة وتدخل الجولات
+        v.literal("rejected"), // مرفوضة — لا تدخل جولات جديدة
+      ),
+      createdAt: v.number(),
+    })
+      .index("by_qid", ["qid"])
+      .index("by_status", ["status"])
+      .index("by_category_status", ["category", "status"]),
   },
   {
     schemaValidation: false,

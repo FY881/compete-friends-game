@@ -57,6 +57,7 @@ type SweepIssue = {
 async function performSweep(ctx: {
   runQuery: (q: any, args: any) => Promise<any>;
   runMutation: (m: any, args: any) => Promise<any>;
+  runAction: (a: any, args: any) => Promise<any>;
 }): Promise<void> {
   const settings: ModSettings = await ctx.runQuery(
     internal.autoAdmin.getSettingsForSweep,
@@ -278,6 +279,30 @@ async function performSweep(ctx: {
     olderThanMs: DOWNLOAD_REPORT_RETENTION_MS,
   });
 
+  // ── 3.13. AI question-bank refill — auto-generate for weak categories ──
+  // إذا وُجدت فئة تحت الحد الأدنى من الأسئلة (والمفتاح مضبوط والمهلة انقضت)،
+  // يولّد المدير الآلي دفعة جديدة ويضعها في طابور مراجعة المالك.
+  let aiRefillResult: {
+    ok: boolean;
+    reason?: string;
+    category?: string;
+    count?: number;
+  } | null = null;
+  if (apiKey && settings.aiAdminEnabled) {
+    try {
+      aiRefillResult = await ctx.runAction(
+        internal.aiQuestions.autoRefillWeakCategory,
+        {},
+      );
+      if (aiRefillResult?.ok) autoFixes += 1;
+    } catch (error) {
+      aiRefillResult = {
+        ok: false,
+        reason: `خطأ: ${error instanceof Error ? error.message : "غير معروف"}`,
+      };
+    }
+  }
+
   // ── 4. Health counts for the report ─────────────────────────────────────
   const counts = await ctx.runQuery(internal.autoAdmin.getSiteCounts, {});
 
@@ -382,6 +407,14 @@ async function performSweep(ctx: {
       fix: "السبب الأشهر: تخزين مؤقت قديم من Service Worker. الإصدار الحالي يشفي نفسه ذاتياً (مسح الكاش وإعادة المحاولة تلقائياً). إن تكرر الأمر، انسخ تقرير تبويب «التحميلات» وأرسله للمطوّر.",
     });
   }
+  if (aiRefillResult?.ok) {
+    issues.push({
+      severity: "low",
+      title: "مولّد الأسئلة الذكي أضاف أسئلة جديدة",
+      detail: `فئة «${aiRefillResult.category}» كانت تحت الحد الأدنى — وُلّد ${aiRefillResult.count} سؤالاً جديداً بالذكاء الاصطناعي وأُضيفت لطابور المراجعة في تبويب «المدير الآلي».`,
+      fix: "راجع الأسئلة الجديدة في تبويب «المدير الآلي» واعتمد ما يناسب — المعتمد منها يدخل الجولات فوراً.",
+    });
+  }
   if (issues.length === 0) {
     issues.push({
       severity: "low",
@@ -398,6 +431,11 @@ async function performSweep(ctx: {
   if (usersEscalated > 0) summaryParts.push(`أدار ${usersEscalated} مخالفاً`);
   if (recentDownloadFailures.length > 0) {
     summaryParts.push(`عالج ${recentDownloadFailures.length} تقرير تنزيل فاشل`);
+  }
+  if (aiRefillResult?.ok) {
+    summaryParts.push(
+      `ولّد ${aiRefillResult.count} سؤالاً لفئة «${aiRefillResult.category}»`,
+    );
   }
   const summary =
     summaryParts.length > 0

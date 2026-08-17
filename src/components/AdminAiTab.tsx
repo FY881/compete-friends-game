@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import type { SettingsData } from "@/convex/owner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import {
   Ban,
   BarChart3,
   Bot,
+  BrainCircuit,
   Check,
   Copy,
   Database,
@@ -29,12 +31,15 @@ import {
   Gavel,
   Globe,
   Link2,
+  ListChecks,
   Loader2,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Timer,
   Smartphone,
   UserCog,
+  X,
   Zap,
 } from "lucide-react";
 
@@ -149,12 +154,20 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
   const reports = useQuery(api.owner.getAdminReports, {});
   const rules = useQuery(api.owner.getRules);
   const questionBank = useQuery(api.owner.getQuestionBank);
+  const aiQueue = useQuery(api.aiQuestions.getAiQuestionQueue);
   const runSweepNow = useAction(api.autoAdmin.runSweepNow);
+  const generateQuestions = useAction(api.aiQuestions.generateQuestions);
+  const approveQuestion = useMutation(api.aiQuestions.approveQuestion);
+  const rejectQuestion = useMutation(api.aiQuestions.rejectQuestion);
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [siteUrl, setSiteUrl] = useState(settings.siteUrl);
+  const [genCategory, setGenCategory] = useState<string>(CATEGORIES[0]);
+  const [genCount, setGenCount] = useState(6);
+  const [genBusy, setGenBusy] = useState(false);
+  const [actingId, setActingId] = useState<string | null>(null);
 
   const latest = reports?.[0];
 
@@ -264,6 +277,52 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
     }
   };
 
+  /** Feature 24: توليد دفعة أسئلة جديدة بالذكاء الاصطناعي (زر يدوي). */
+  const handleGenerate = async () => {
+    setGenBusy(true);
+    try {
+      const result = await generateQuestions({
+        category: genCategory,
+        count: genCount,
+      });
+      toast.success(
+        `وُلّد ${result.created} سؤالاً جديداً في فئة «${genCategory}» — راجعها واعتمدها بالأسفل.`,
+      );
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "تعذّر التوليد.");
+    } finally {
+      setGenBusy(false);
+    }
+  };
+
+  const handleApprove = async (id: Id<"aiQuestions">) => {
+    setActingId(id);
+    try {
+      await approveQuestion({ id });
+      toast.success("اعتُمد السؤال — يدخل الجولات فوراً ✨");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "تعذّر الاعتماد.");
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const handleReject = async (id: Id<"aiQuestions">) => {
+    setActingId(id);
+    try {
+      await rejectQuestion({ id });
+      toast.success("رُفض السؤال — لن يدخل الجولات.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "تعذّر الرفض.");
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const pendingCount = aiQueue?.pending.length ?? 0;
   const bankTotal = questionBank?.length ?? 0;
   const bankDisabled = (questionBank ?? []).filter((q) => q.disabled).length;
 
@@ -610,6 +669,208 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
               المطوّر ليضيف أسئلة جديدة.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Feature 24: AI question generator — auto-refills weak categories + owner review */}
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <BrainCircuit className="size-4" />
+            </span>
+            <span>مولّد الأسئلة الذكي (ميزة 24)</span>
+            <Badge variant="outline" className="ms-auto rounded-full text-[10px]">
+              OpenRouter
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            ذكاء اصطناعي يملأ بنك الأسئلة بنفسه: يراقب المدير الآلي صحة كل فئة
+            كل 15 دقيقة، وإن وجد فئة ضعيفة (أقل من 12 سؤالاً نشطاً) يولّد دفعة
+            جديدة تلقائياً هنا. اعتمد الأسئلة المناسبة بزر واحد فتدخل الجولات
+            فوراً.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <p className="text-lg font-bold tabular-nums text-primary">
+                {pendingCount}
+              </p>
+              <p className="text-[11px] font-medium text-muted-foreground">بانتظار المراجعة</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <p className="text-lg font-bold tabular-nums text-emerald-600">
+                {aiQueue?.approvedCount ?? 0}
+              </p>
+              <p className="text-[11px] font-medium text-muted-foreground">معتمدة في الجولات</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <p className="text-lg font-bold tabular-nums text-rose-600">
+                {aiQueue?.rejectedCount ?? 0}
+              </p>
+              <p className="text-[11px] font-medium text-muted-foreground">مرفوضة</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <p className="text-lg font-bold tabular-nums">
+                {Object.keys(aiQueue?.perCategory ?? {}).filter(
+                  (c) => (aiQueue?.perCategory[c] ?? 0) < 12,
+                ).length}
+              </p>
+              <p className="text-[11px] font-medium text-muted-foreground">فئات ضعيفة (أقل من 12)</p>
+            </div>
+          </div>
+
+          {/* Manual generation controls */}
+          <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+            <p className="flex items-center gap-1.5 text-xs font-bold">
+              <RefreshCw className="size-3.5 text-primary" />
+              توليد يدوي الآن
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-44">
+                <ListChecks className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <select
+                  value={genCategory}
+                  onChange={(e) => setGenCategory(e.target.value)}
+                  disabled={genBusy}
+                  className="h-9 w-full rounded-xl border border-border/70 bg-background ps-9 pe-3 text-sm font-medium outline-none transition-colors focus:border-primary disabled:opacity-50"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c} ({(aiQueue?.perCategory[c] ?? 0)} نشط)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <select
+                value={genCount}
+                onChange={(e) => setGenCount(Number(e.target.value))}
+                disabled={genBusy}
+                className="h-9 w-24 rounded-xl border border-border/70 bg-background px-3 text-sm font-medium outline-none transition-colors focus:border-primary disabled:opacity-50"
+              >
+                {[3, 6, 10].map((n) => (
+                  <option key={n} value={n}>
+                    {n} أسئلة
+                  </option>
+                ))}
+              </select>
+              <Button
+                onClick={handleGenerate}
+                disabled={genBusy || !settings.aiKeyConfigured}
+                className="gap-1.5 rounded-xl"
+              >
+                {genBusy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <BrainCircuit className="size-4" />
+                )}
+                {genBusy ? "جارٍ التوليد…" : "توليد الآن"}
+              </Button>
+            </div>
+            {!settings.aiKeyConfigured && (
+              <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-rose-600">
+                <AlertTriangle className="size-3.5 shrink-0" />
+                أضف OPENROUTER_API_KEY في تبويب «المفاتيح / API Keys» لتفعيل التوليد.
+              </p>
+            )}
+          </div>
+
+          {/* Review queue */}
+          <div>
+            <p className="flex items-center gap-1.5 text-xs font-bold">
+              <ListChecks className="size-3.5 text-primary" />
+              طابور المراجعة — اعتمد أو ارفض
+            </p>
+            {aiQueue === undefined ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : pendingCount === 0 ? (
+              <div className="mt-3 rounded-2xl border border-dashed border-border/70 py-8 text-center">
+                <Sparkles className="mx-auto size-6 text-muted-foreground/50" />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  لا أسئلة بانتظار المراجعة — كل شيء معتمد أو مرفوض.
+                </p>
+              </div>
+            ) : aiQueue === null ? (
+              <div className="mt-3 rounded-2xl border border-dashed border-border/70 py-8 text-center">
+                <ShieldCheck className="mx-auto size-6 text-muted-foreground/50" />
+                <p className="mt-2 text-xs text-muted-foreground">غير متاح.</p>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2.5">
+                {aiQueue.pending.map((q) => (
+                  <div
+                    key={q.id}
+                    className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className="rounded-full bg-primary/10 text-[10px] text-primary"
+                      >
+                        {q.category}
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full text-[10px]">
+                        {q.difficulty === "easy"
+                          ? "سهل"
+                          : q.difficulty === "medium"
+                            ? "متوسط"
+                            : "صعب"}
+                      </Badge>
+                      <span className="ms-auto text-[10px] text-muted-foreground">
+                        {fmtDate(q.createdAt)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold leading-relaxed">{q.question}</p>
+                    <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                      {q.options.map((opt, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs",
+                            i === q.correctIndex
+                              ? "border-emerald-500/40 bg-emerald-500/10 font-bold text-emerald-700"
+                              : "border-border/60 bg-background text-muted-foreground",
+                          )}
+                        >
+                          {i === q.correctIndex && <Check className="size-3 shrink-0" />}
+                          <span className="truncate">{opt}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1 rounded-lg text-xs"
+                        onClick={() => handleApprove(q.id)}
+                        disabled={actingId === q.id}
+                      >
+                        {actingId === q.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Check className="size-3.5" />
+                        )}
+                        اعتماد
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1 rounded-lg text-xs text-rose-600 hover:text-rose-700"
+                        onClick={() => handleReject(q.id)}
+                        disabled={actingId === q.id}
+                      >
+                        <X className="size-3.5" />
+                        رفض
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

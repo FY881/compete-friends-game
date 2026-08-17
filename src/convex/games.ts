@@ -168,9 +168,34 @@ function makeCode(): string {
   return code;
 }
 
+/**
+ * كل الأسئلة المتاحة = البنك الثابت + الأسئلة المولّدة بالذكاء الاصطناعي
+ * التي اعتمدها المالك من غرفة المالك. تُدمج هنا في جولة واحدة.
+ */
+async function getAllQuestions(ctx: DbCtx): Promise<Question[]> {
+  const approved = await ctx.db
+    .query("aiQuestions")
+    .withIndex("by_status", (q) => q.eq("status", "approved"))
+    .collect();
+  const aiQuestions: Question[] = approved.map((r) => ({
+    id: r.qid,
+    category: r.category,
+    difficulty: r.difficulty,
+    question: r.question,
+    options: r.options as [string, string, string, string],
+    correctIndex: r.correctIndex as 0 | 1 | 2 | 3,
+  }));
+  return [...QUESTION_BANK, ...aiQuestions];
+}
+
 /** Pick a question set that mixes difficulties and respects category filters. */
-function pickQuestions(categories: string[], count: number): string[] {
-  const pool = QUESTION_BANK.filter(
+async function pickQuestions(
+  ctx: DbCtx,
+  categories: string[],
+  count: number,
+): Promise<string[]> {
+  const all = await getAllQuestions(ctx);
+  const pool = all.filter(
     (q) => categories.length === 0 || categories.includes(q.category),
   );
   if (pool.length === 0) {
@@ -201,6 +226,28 @@ function pickQuestions(categories: string[], count: number): string[] {
     i += 1;
   }
   return picked.map((q) => q.id);
+}
+
+/** Resolve a question id from the static bank OR the AI-generated table. */
+async function resolveQuestion(
+  ctx: DbCtx,
+  questionId: string,
+): Promise<Question | null> {
+  const fromBank = QUESTION_MAP[questionId];
+  if (fromBank) return fromBank;
+  const row = await ctx.db
+    .query("aiQuestions")
+    .withIndex("by_qid", (q) => q.eq("qid", questionId))
+    .first();
+  if (!row || row.status !== "approved") return null;
+  return {
+    id: row.qid,
+    category: row.category,
+    difficulty: row.difficulty,
+    question: row.question,
+    options: row.options as [string, string, string, string],
+    correctIndex: row.correctIndex as 0 | 1 | 2 | 3,
+  };
 }
 
 async function makeUniqueCode(ctx: DbCtx): Promise<string> {
@@ -340,7 +387,8 @@ export const createGame = mutation({
     );
 
     const code = await makeUniqueCode(ctx);
-    const questionIds = pickQuestions(
+    const questionIds = await pickQuestions(
+      ctx,
       safeSettings.categories,
       safeSettings.questionCount,
     );
@@ -578,7 +626,7 @@ export const submitAnswer = mutation({
     }
 
     const questionId = game.questionIds[questionIndex];
-    const question = QUESTION_MAP[questionId];
+    const question = await resolveQuestion(ctx, questionId);
     if (!question) {
       throw new Error("سؤال غير موجود");
     }
@@ -721,7 +769,10 @@ export const useFiftyFifty = mutation({
       throw new Error("لا يمكن استخدام المنقّي بعد الإجابة");
     }
 
-    const question = QUESTION_MAP[game.questionIds[questionIndex]];
+    const question = await resolveQuestion(ctx, game.questionIds[questionIndex]);
+    if (!question) {
+      throw new Error("سؤال غير موجود");
+    }
     const wrong = [0, 1, 2, 3].filter((i) => i !== question.correctIndex);
     const hidden = shuffle(wrong).slice(0, 2);
 
@@ -861,7 +912,8 @@ export const rematch = mutation({
     }
 
     const newCode = await makeUniqueCode(ctx);
-    const questionIds = pickQuestions(
+    const questionIds = await pickQuestions(
+      ctx,
       game.settings.categories,
       game.settings.questionCount,
     );
@@ -1169,21 +1221,25 @@ export const getGame = query({
     const currentRevealed =
       game.status === "finished" || game.phase === "revealing";
     const visibleCount = game.status === "waiting" ? 0 : game.currentQuestionIndex + 1;
-    const questions: GameQuestion[] = game.questionIds
-      .slice(0, visibleCount)
-      .map((qid, i) => {
-        const q = QUESTION_MAP[qid];
-        const revealed = i < game.currentQuestionIndex || currentRevealed;
-        return {
-          id: q.id,
-          category: q.category,
-          difficulty: q.difficulty,
-          question: q.question,
-          options: q.options,
-          correctIndex: revealed ? q.correctIndex : null,
-          golden: i === game.questionIds.length - 1,
-        };
+    const visibleIds = game.questionIds.slice(0, visibleCount);
+    const resolved: (Question | null)[] = await Promise.all(
+      visibleIds.map((qid) => resolveQuestion(ctx, qid)),
+    );
+    const questions: GameQuestion[] = [];
+    for (let i = 0; i < resolved.length; i++) {
+      const q = resolved[i];
+      if (!q) continue;
+      const revealed = i < game.currentQuestionIndex || currentRevealed;
+      questions.push({
+        id: q.id,
+        category: q.category,
+        difficulty: q.difficulty,
+        question: q.question,
+        options: q.options,
+        correctIndex: revealed ? q.correctIndex : null,
+        golden: i === game.questionIds.length - 1,
       });
+    }
 
     const playerInfos: PlayerInfo[] = players
       .map((p) => ({
