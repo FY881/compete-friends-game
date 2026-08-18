@@ -55,10 +55,18 @@ export default function Download() {
     if (downloading) return;
     setDownloading(true);
     try {
-      await downloadApk(info?.apkFileName, info?.siteUrl, {
-        sha256: info?.apkSha256,
-        bytes: info?.apkBytes,
-      });
+      await downloadApk(
+        info?.apkFileName,
+        info?.siteUrl,
+        {
+          sha256: info?.apkSha256,
+          bytes: info?.apkBytes,
+        },
+        {
+          storageUrl: info?.apkStorageUrl,
+          mirrorUrl: info?.apkMirrorUrl,
+        },
+      );
       toast.success("بدأ تنزيل ملف APK — افحص شريط التنزيل في متصفحك.");
     } catch (error) {
       console.error(error);
@@ -203,6 +211,20 @@ export default function Download() {
               </button>
               .
             </p>
+            {info?.apkMirrorPageUrl && (
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                أو حمّله من{" "}
+                <a
+                  href={info.apkMirrorPageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-primary underline underline-offset-2"
+                >
+                  رابط التحميل الاحتياطي المباشر
+                </a>{" "}
+                (ملف مُتحقَّق منه بنفس البصمة الرسمية).
+              </p>
+            )}
             <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground/80" dir="ltr">
               SHA-256: {apkSha256}
             </p>

@@ -315,10 +315,22 @@ const schema = defineSchema(
       route: v.optional(v.string()),
       count: v.number(), // كم مرة تكرر الخطأ
       firstSeen: v.number(),
-      lastSeen: v.number(),
-    })
-      .index("by_key", ["key"])
+      lastSeen: v.number(),    }).index("by_key", ["key"])
       .index("by_last", ["lastSeen"]),
+
+    // حالة ملف APK الرسمي في تخزين Convex الدائم: يُحمَّل من المرآة الموثّقة
+    // ثم يُخزَّن هنا بعد التحقق من الحجم والبصمة — فيبقى التنزيل متاحاً
+    // ببايتات مطابقة للبصمة الرسمية مهما تعطّل خادم الملفات الثابت.
+    apkRelease: defineTable({
+      key: v.string(), // "current"
+      storageId: v.optional(v.string()),
+      storageUrl: v.optional(v.string()),
+      size: v.optional(v.number()),
+      sha256: v.optional(v.string()),
+      sourceUrl: v.optional(v.string()),
+      lastSyncAt: v.optional(v.number()),
+      lastError: v.optional(v.string()),
+    }).index("by_key", ["key"]),
   },
   {
     schemaValidation: false,

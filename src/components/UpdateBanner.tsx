@@ -35,10 +35,18 @@ export function UpdateBanner() {
     if (downloading) return;
     setDownloading(true);
     try {
-      await downloadApk(info.apkFileName, info.siteUrl, {
-        sha256: info.apkSha256,
-        bytes: info.apkBytes,
-      });
+      await downloadApk(
+        info.apkFileName,
+        info.siteUrl,
+        {
+          sha256: info.apkSha256,
+          bytes: info.apkBytes,
+        },
+        {
+          storageUrl: info.apkStorageUrl,
+          mirrorUrl: info.apkMirrorUrl,
+        },
+      );
       toast.success("بدأ تنزيل ملف APK — افحص شريط التنزيل في متصفحك.");
     } catch (error) {
       console.error(error);

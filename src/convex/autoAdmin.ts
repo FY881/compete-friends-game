@@ -14,7 +14,7 @@ import {
   setSetting,
 } from "./owner";
 import { callOpenRouter, parseVerdict, type AiVerdict } from "./moderation";
-import { APK_BYTES, APK_FILE_NAME, APK_SHA256 } from "./apkRelease";
+import { APK_BYTES, APK_FILE_NAME, APK_MIRROR_URL, APK_SHA256 } from "./apkRelease";
 
 // ---------------------------------------------------------------------------
 // «المدير الآلي» — ذكاء اصطناعي يدير شؤون الموقع تلقائياً.
@@ -245,13 +245,18 @@ async function performSweep(ctx: {
     internal.autoAdmin.getApkCheckTimestamp,
     {},
   );
+  // مصدر الفحص: المرآة الموثّقة أولاً (بايتات مطابقة للبصمة الرسمية)،
+  // ثم رابط الموقع الرسمي إن كان مضبوطاً.
+  const apkCheckUrl =
+    APK_MIRROR_URL ??
+    (hasSiteUrl ? `${siteUrlClean}/downloads/${APK_FILE_NAME}` : null);
   let apkCheckDetail: string | null = null;
   if (
-    hasSiteUrl &&
+    apkCheckUrl &&
     Date.now() - (lastApkCheckAt ?? 0) > APK_CHECK_INTERVAL_MS
   ) {
     try {
-      const res = await fetch(`${siteUrlClean}/downloads/${APK_FILE_NAME}`, {
+      const res = await fetch(apkCheckUrl, {
         cache: "no-store",
       });
       const buf = new Uint8Array(await res.arrayBuffer());
@@ -374,12 +379,12 @@ async function performSweep(ctx: {
       fix: "حالة طبيعية — ترفع العقوبات تلقائياً بانتهاء مدتها.",
     });
   }
-  if (!hasSiteUrl) {
+  if (!apkCheckUrl) {
     issues.push({
       severity: "medium",
-      title: "الفحص الآلي لملف APK معطّل (لا يوجد رابط موقع رسمي)",
-      detail: "اضبط رابط الموقع الرسمي ليتمكن المدير الآلي من التحقق دورياً (كل ساعة) من سلامة ملف APK المنشور: الحجم + البصمة الرقمية.",
-      fix: "الصق رابط الموقع الرسمي (مثل https://nabaha.example.com) في تبويب «المدير الآلي» ثم اضغط «تشغيل الفحص الآن» — سيُفحص الملف ويُكتب التقرير تلقائياً.",
+      title: "الفحص الآلي لملف APK معطّل (لا يوجد مصدر تحميل)",
+      detail: "لا توجد مرآة موثّقة ولا رابط موقع رسمي — لا يمكن للمدير الآلي التحقق من سلامة ملف APK المنشور.",
+      fix: "أضف APK_MIRROR_URL في src/convex/apkRelease.ts أو الصق رابط الموقع الرسمي في تبويب «المدير الآلي» ثم اضغط «تشغيل الفحص الآن».",
     });
   }
   if (apkCheckDetail) {

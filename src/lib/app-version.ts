@@ -33,13 +33,22 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "1.2.1"; // client version — matches server WEB_VERSION 1.2.1 (this build is current)
+export const APP_VERSION = "1.2.2"; // client version — matches server WEB_VERSION 1.2.2 (this build is current)
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
 export const APK_VERSION = "1.2.1";
 
 /** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
 export const APK_FALLBACK_FILE = "al-abqari-v1.2.1.apk";
+
+/**
+ * مرآة موثّقة احتياطية لملف APK (مصدرها `apkRelease.ts` على الخادم —
+ * مصدر الحقيقة). بايتاتها مطابقة للبصمة الرسمية، ويُرسلها الخادم كملف
+ * مرفق (`attachment`) فيبدأ التنزيل مباشرة حتى بدون دعم CORS — تُستخدم
+ * كملاذ أخير عندما تفشل كل مصادر fetch (تخزين Convex + المسار الثابت).
+ */
+export const APK_MIRROR_FALLBACK_URL =
+  "https://tmpfiles.org/dl/1787034496.f58f9719be8165c2/wfwkCsvTfLzg/al-abqari-v1.2.1.apk";
 
 export const APP_VERSION_LABEL = `نُباهة ${APP_VERSION}`;
 
@@ -283,15 +292,26 @@ export async function selfHealStaleCache(): Promise<boolean> {
  *
  * @throws DownloadError يحمل التشخيص الكامل للفشل (للإبلاغ الآلي لغرفة المالك).
  */
+export type ApkDownloadOptions = {
+  /** رابط تخزين Convex الدائم للملف (بايتات مُتحقَّق منها) — الأولوية الأولى. */
+  storageUrl?: string | null;
+  /** رابط المرآة الموثّقة — يُستخدم كملاذ أخير (تنزيل مباشر بدون CORS). */
+  mirrorUrl?: string | null;
+};
+
 export async function downloadApk(
   fileName: string | null | undefined,
   siteUrl?: string | null,
   integrity?: ApkIntegrity,
+  options?: ApkDownloadOptions,
 ): Promise<void> {
   const file = fileName ?? APK_FALLBACK_FILE;
   // القيم الرسمية: قيم الخادم إن وصلت (مصدر الحقيقة)، وإلا ثوابت الكود.
   const expectedBytes = integrity?.bytes ?? APK_BYTES;
   const expectedSha = integrity?.sha256 ?? APK_SHA256;
+  // مصادر موثّقة إضافية من الخادم (أولاً) ثم الاحتياط المضمّن في الكود.
+  const storageUrl = options?.storageUrl ?? null;
+  const mirrorUrl = options?.mirrorUrl ?? APK_MIRROR_FALLBACK_URL;
 
   if (isNativeApp()) {
     // افتح صفحة التحميل الرسمية في المتصفح الخارجي. زرّها ينزّل الملف عبر
@@ -307,7 +327,14 @@ export async function downloadApk(
     return;
   }
 
-  const candidates = getApkDownloadCandidates(file, siteUrl);
+  // ترتيب المصادر: تخزين Convex الدائم ← المسار الثابت/المضمّن ← المرآة.
+  // (المرآة أخيراً لأنها قد لا تدعم fetch عبر CORS — يُلجأ إليها بالتنقل
+  // المباشر الذي يبدأ التنزيل تلقائياً بفضل `attachment`.)
+  const candidates = [
+    ...(storageUrl && isHttpUrl(storageUrl) ? [storageUrl] : []),
+    ...getApkDownloadCandidates(file, siteUrl),
+    ...(mirrorUrl && isHttpUrl(mirrorUrl) ? [mirrorUrl] : []),
+  ];
   // ملاحظة: «null as DownloadError | null» وليس «: DownloadError | null = null»
   // لأن التضييق النوعي في TypeScript يحوّل الأخيرة إلى null نهائياً فلا تصل
   // خصائص التشخيص (receivedSize…) — أما الصيغة الحالية فتبقي النوع كاتحاد.
@@ -387,6 +414,21 @@ export async function downloadApk(
   // ثم إعادة المحاولة فوراً — بدون حاجة لتحديث الصفحة أو أي تدخل يدوي.
   const healed = await selfHealStaleCache();
   if (healed && (await tryDownload())) return;
+
+  // ── الملاذ الأخير: المرآة عبر تنقل مباشر ────────────────────────────
+  // المرآة ترسل الملف كـ `attachment` ببصمة مُتحقَّق منها (تحقّق الخادم منها
+  // قبل النشر) — فحتى لو حجب CORS الفحص عبر fetch، التنقل المباشر إليها
+  // يبدأ التنزيل فوراً بالبايتات الصحيحة بدون فتح أي صفحة.
+  if (mirrorUrl && isHttpUrl(mirrorUrl)) {
+    const anchor = document.createElement("a");
+    anchor.href = mirrorUrl;
+    anchor.download = file;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    return;
+  }
 
   throw new DownloadError(
     "تعذّر تنزيل ملف APK سليم: كل المصادر أرسلت ملفاً مختلفاً عن النسخة الرسمية (الحجم/البصمة غير مطابقين). أصلح النظام التخزين المؤقت تلقائياً وأعاد المحاولة — اضغط الزر مرة أخرى الآن، وإن تكررت المشكلة أُرسل تشخيص كامل تلقائياً إلى غرفة المالك.",

@@ -14,4 +14,14 @@ crons.interval(
   {},
 );
 
+// مزامنة ملف APK في تخزين Convex الدائم: يحمّل الملف من المرآة الموثّقة
+// ويتحقق من الحجم والبصمة ثم يخزّنه — فيبقى التنزيل متاحاً ببايتات سليمة
+// حتى لو تعطل خادم الملفات الثابت أو انتهت صلاحية المرآة المؤقتة.
+crons.interval(
+  "apk-release-sync",
+  { minutes: 10 },
+  internal.apkSync.syncApkFromSources,
+  {},
+);
+
 export default crons;
