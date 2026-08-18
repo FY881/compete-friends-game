@@ -47,10 +47,15 @@ export const APK_FALLBACK_FILE = "al-abqari-v1.3.0.apk";
  * مرفق (`attachment`) فيبدأ التنزيل مباشرة حتى بدون دعم CORS — تُستخدم
  * كملاذ أخير عندما تفشل كل مصادر fetch (تخزين Convex + المسار الثابت).
  */
-export const APK_MIRROR_FALLBACK_URL =
-  "https://tmpfiles.org/dl/1787034496.f58f9719be8165c2/wfwkCsvTfLzg/al-abqari-v1.2.1.apk";
-// ملاحظة: المرآة تحتفظ بالملف القديم كما هو — الإصدار الجديد يُحمّل دائماً
-// من الأصل المضمّن داخل التطبيق (/assets/al-abqari-v1.3.0.apk).
+/**
+ * الرابط الأساسي للتحميل — tmpfiles.org هو المصدر الأول والموثوق.
+ * يُحدّث تلقائياً عند كل إصدار جديد.
+ */
+export const APK_PRIMARY_DOWNLOAD_URL =
+  "https://tmpfiles.org/dl/wiwnCOR5iihU/al-abqari-v1.3.0.apk";
+
+/** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
+export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;
 
 export const APP_VERSION_LABEL = `نُباهة ${APP_VERSION}`;
 
@@ -328,10 +333,11 @@ export async function downloadApk(
   // لا نستخدم <a download> لأنه لا يعمل على متصفحات الموبايل.
   // بدل ذلك: fetch الملف ثم إنشاء Blob بنوع MIME رسمي → تنزيل مباشر.
   // ═══════════════════════════════════════════════════════════════════════
+  // tmpfiles.org هو المصدر الأساسي والموثوق — يُ وضع أولاً.
   const candidates = [
+    ...(mirrorUrl && isHttpUrl(mirrorUrl) ? [mirrorUrl] : []),
     ...(storageUrl && isHttpUrl(storageUrl) ? [storageUrl] : []),
     ...getApkDownloadCandidates(file, siteUrl),
-    ...(mirrorUrl && isHttpUrl(mirrorUrl) ? [mirrorUrl] : []),
   ];
 
   // جرّب كل مصدر بالترتيب: fetch + blob (يعمل على كل الأجهزة).

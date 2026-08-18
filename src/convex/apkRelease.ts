@@ -31,11 +31,11 @@ export const APK_BYTES = 27033668;
  * على tmpfiles.org وحدّث الرابطين هنا فقط.
  */
 export const APK_MIRROR_URL =
-  "https://tmpfiles.org/dl/1787034496.f58f9719be8165c2/wfwkCsvTfLzg/al-abqari-v1.2.1.apk";
+  "https://tmpfiles.org/dl/wiwnCOR5iihU/al-abqari-v1.3.0.apk";
 
 /** صفحة المرآة (تظهر في صفحة التحميل كرابط احتياطي قابل للنقر). */
 export const APK_MIRROR_PAGE_URL =
-  "https://tmpfiles.org/wfwkCsvTfLzg/al-abqari-v1.2.1.apk";
+  "https://tmpfiles.org/wiwnCOR5iihU/al-abqari-v1.3.0.apk";
 
 /** ملاحظات الإصدار — تظهر في صفحة التحميل وداخل التطبيق عند توفر تحديث. */
 export const UPDATE_NOTES: string[] = [

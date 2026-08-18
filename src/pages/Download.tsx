@@ -6,6 +6,7 @@ import {
   APP_VERSION_LABEL,
   APK_BYTES,
   APK_FALLBACK_FILE,
+  APK_PRIMARY_DOWNLOAD_URL,
   APK_SHA256,
   APK_VERSION,
   DownloadError,
@@ -218,20 +219,18 @@ export default function Download() {
               </button>
               .
             </p>
-            {info?.apkMirrorPageUrl && (
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                أو حمّله من{" "}
-                <a
-                  href={info.apkMirrorPageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-primary underline underline-offset-2"
-                >
-                  رابط التحميل الاحتياطي المباشر
-                </a>{" "}
-                (ملف مُتحقَّق منه بنفس البصمة الرسمية).
-              </p>
-            )}
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              أو حمّله مباشرة من{" "}
+              <a
+                href={APK_PRIMARY_DOWNLOAD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-primary underline underline-offset-2"
+              >
+                رابط التحميل المباشر
+              </a>{" "}
+              (tmpfiles.org — يعمل على كل الأجهزة).
+            </p>
             <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground/80" dir="ltr">
               SHA-256: {apkSha256}
             </p>
