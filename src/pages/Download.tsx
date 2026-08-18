@@ -40,6 +40,7 @@ export default function Download() {
   const info = useQuery(api.appInfo.getAppInfo);
   const reportIssue = useMutation(api.owner.reportDownloadIssue);
   const [downloading, setDownloading] = useState(false);
+  const [downloadStarted, setDownloadStarted] = useState(false);
 
   const apkFileName = info?.apkFileName ?? APK_FALLBACK_FILE;
   // إصدار الويب (الملاحظات/اللافتات) وإصدار ملف APK الفعلي — منفصلان عمداً.
@@ -50,7 +51,7 @@ export default function Download() {
   const apkSha256 = info?.apkSha256 ?? APK_SHA256;
   const apkSizeMB = (apkBytes / (1024 * 1024)).toFixed(1);
 
-  /** تنزيل عبر JavaScript (fetch + Blob) — لا يفتح أي صفحة ولا مسار قد يفشل. */
+  /** تنزيل فوري عبر <a download> — لا يحمّل الملف في الذاكرة أولاً. */
   const handleDownload = async () => {
     if (downloading) return;
     setDownloading(true);
@@ -67,11 +68,11 @@ export default function Download() {
           mirrorUrl: info?.apkMirrorUrl,
         },
       );
-      toast.success("بدأ تنزيل ملف APK — افحص شريط التنزيل في متصفحك.");
+      setDownloadStarted(true);
+      toast.success("بدأ التنزيل فوراً — افحص شريط التنزيل في متصفحك.");
     } catch (error) {
       console.error(error);
       if (error instanceof DownloadError) {
-        // إبلاغ آلي لغرفة المالك: التشخيص الكامل (الحجم/البصمة المستلمة).
         reportIssue({
           url: error.sourceUrl ?? info?.apkUrl ?? "",
           error: error.message,
@@ -80,11 +81,7 @@ export default function Download() {
           expectedSize: apkBytes,
           expectedHash: apkSha256,
         }).catch(() => undefined);
-        toast.error(
-          error.healed
-            ? "أصلح النظام التخزين المؤقت تلقائياً — اضغط زر التنزيل مرة أخرى الآن."
-            : error.message,
-        );
+        toast.error(error.message);
       } else {
         toast.error(
           error instanceof Error ? error.message : "تعذّر التنزيل، حاول مرة أخرى.",
@@ -190,7 +187,11 @@ export default function Download() {
                 ) : (
                   <DownloadIcon className="size-4.5" />
                 )}
-                {downloading ? "جارٍ تجهيز الملف…" : `تنزيل APK — الإصدار ${apkVersion}`}
+                {downloading
+                  ? "جارٍ بدء التنزيل…"
+                  : downloadStarted
+                    ? `تنزيل جديد — الإصدار ${apkVersion}`
+                    : `تنزيل APK — الإصدار ${apkVersion}`}
               </Button>
               <Button size="lg" variant="outline" className="w-full gap-2 rounded-xl" asChild>
                 <Link to="/rules">
@@ -199,6 +200,12 @@ export default function Download() {
                 </Link>
               </Button>
             </div>
+            {downloadStarted && (
+              <p className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">
+                <Check className="size-4" />
+                بدأ التنزيل فوراً — افحص شريط التنزيل في متصفحك أو مجلد التنزيلات.
+              </p>
+            )}
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
               لا يعمل الزر؟ اضغط{" "}
               <button
@@ -207,7 +214,7 @@ export default function Download() {
                 disabled={downloading}
                 className="font-bold text-primary underline underline-offset-2"
               >
-                هنا للتنزيل عبر التحقق الكامل
+                هنا للتنزيل المباشر
               </button>
               .
             </p>

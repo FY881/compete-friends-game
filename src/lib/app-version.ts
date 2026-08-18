@@ -306,17 +306,11 @@ export async function downloadApk(
   options?: ApkDownloadOptions,
 ): Promise<void> {
   const file = fileName ?? APK_FALLBACK_FILE;
-  // القيم الرسمية: قيم الخادم إن وصلت (مصدر الحقيقة)، وإلا ثوابت الكود.
-  const expectedBytes = integrity?.bytes ?? APK_BYTES;
-  const expectedSha = integrity?.sha256 ?? APK_SHA256;
-  // مصادر موثّقة إضافية من الخادم (أولاً) ثم الاحتياط المضمّن في الكود.
+  const safeName = file.endsWith(".apk") ? file : `${file}.apk`;
   const storageUrl = options?.storageUrl ?? null;
   const mirrorUrl = options?.mirrorUrl ?? APK_MIRROR_FALLBACK_URL;
 
   if (isNativeApp()) {
-    // افتح صفحة التحميل الرسمية في المتصفح الخارجي. زرّها ينزّل الملف عبر
-    // fetch + Blob باسم .apk صريح. (فتح رابط الملف المباشر قد يتحول إلى
-    // .zip لأن الخادم يرسله بدون Content-Type فيشمّه المتصفح كملف zip.)
     const cleanSite = (siteUrl ?? "").trim().replace(/\/+$/, "");
     if (isHttpUrl(cleanSite)) {
       window.open(`${cleanSite}/download`, "_blank", "noopener");
@@ -327,117 +321,68 @@ export async function downloadApk(
     return;
   }
 
-  // ترتيب المصادر: تخزين Convex الدائم ← المسار الثابت/المضمّن ← المرآة.
-  // (المرآة أخيراً لأنها قد لا تدعم fetch عبر CORS — يُلجأ إليها بالتنقل
-  // المباشر الذي يبدأ التنزيل تلقائياً بفضل `attachment`.)
+  // ═══════════════════════════════════════════════════════════════════════
+  // التنزيل المباشر الفوري — لا نحمّل الملف كاملاً في الذاكرة (27MB)
+  // ثم نحسب بصمته ثم نdownlod — هذا كان سبب الانتظار الطويل.
+  // بدل ذلك، نستخدم <a download> لبدء تنزيل المتصفح فوراً.
+  // ═══════════════════════════════════════════════════════════════════════
   const candidates = [
     ...(storageUrl && isHttpUrl(storageUrl) ? [storageUrl] : []),
     ...getApkDownloadCandidates(file, siteUrl),
     ...(mirrorUrl && isHttpUrl(mirrorUrl) ? [mirrorUrl] : []),
   ];
-  // ملاحظة: «null as DownloadError | null» وليس «: DownloadError | null = null»
-  // لأن التضييق النوعي في TypeScript يحوّل الأخيرة إلى null نهائياً فلا تصل
-  // خصائص التشخيص (receivedSize…) — أما الصيغة الحالية فتبقي النوع كاتحاد.
-  let lastError = null as DownloadError | null;
 
-  /** محاولة واحدة على كل الروابط — تعيد true عند النجاح وتُحدّث التشخيص. */
-  const tryDownload = async (): Promise<boolean> => {
-    for (const url of candidates) {
-      try {
-        // كاسر التخزين المؤقت: يضمن أن حتى الـ Service Worker القديم المثبت
-        // لن يجد نسخة قديمة مخزنة، فيُحضّر الملف من الشبكة دائماً.
-        const bustedUrl = withCacheBuster(url);
-        const response = await fetch(bustedUrl, {
-          cache: "no-store",
-          headers: {
-            Accept: "application/vnd.android.package-archive, application/octet-stream, */*",
-          },
-        });
-        if (!response.ok) {
-          lastError = new DownloadError(`HTTP ${response.status}`, {
-            sourceUrl: url,
-          });
-          continue;
-        }
-        const blob = await response.blob();
-        // فحص سريع: ملف APK حقيقي أكبر من 100 كيلوبايت ويبدأ بتوقيع PK
-        // (يحمي من صفحات HTML الخاطئة أو ملفات ناقصة).
-        if (blob.size < 100_000) {
-          lastError = new DownloadError("ملف فارغ أو ناقص", {
-            receivedSize: blob.size,
-            sourceUrl: url,
-          });
-          continue;
-        }
-        if (!(await looksLikeApk(blob))) {
-          lastError = new DownloadError("الملف ليس حزمة APK", {
-            receivedSize: blob.size,
-            sourceUrl: url,
-          });
-          continue;
-        }
-        // التحقق الكامل: الحجم + البصمة الرقمية يجب أن يطابقا ملف APK الرسمي
-        // حرفياً. أي ملف مختلف (صفحة خطأ، تحميل مقطوع، ملف قديم) يُرفض هنا
-        // قبل أن يصل لهاتفك — هذا ما يمنع «حدثت مشكلة عند تحليل الحزمة» نهائياً.
-        if (blob.size !== expectedBytes) {
-          lastError = new DownloadError(
-            `اختلاف الحجم: استُلم ${blob.size} بايت والمتوقع ${expectedBytes}`,
-            { receivedSize: blob.size, sourceUrl: url },
-          );
-          continue;
-        }
-        const digest = await sha256Hex(blob);
-        if (digest && digest !== expectedSha) {
-          lastError = new DownloadError("اختلاف البصمة الرقمية", {
-            receivedSize: blob.size,
-            receivedHash: digest,
-            sourceUrl: url,
-          });
-          continue;
-        }
-        triggerBlobDownload(blob, file);
-        return true;
-      } catch (error) {
-        lastError = new DownloadError(
-          error instanceof Error ? error.message : "خطأ شبكة",
-          { sourceUrl: url },
-        );
-      }
+  // الخطوة الأولى: تنزيل مباشر فوري عبر <a download> — بدون انتظار.
+  for (const url of candidates) {
+    try {
+      const anchor = document.createElement("a");
+      anchor.href = withCacheBuster(url);
+      anchor.download = safeName;
+      anchor.rel = "noopener";
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      // انتظار قصير للتأكد من أن المتصفح بدأ التنزيل.
+      await new Promise((r) => setTimeout(r, 300));
+      anchor.remove();
+      return;
+    } catch {
+      // جرّب الرابط التالي
     }
-    return false;
-  };
+  }
 
-  if (await tryDownload()) return;
-
-  // ── الشفاء الذاتي الدائم ────────────────────────────────────────────
-  // عند الفشل: مسح كل الـ Service Workers والكاش (سبب «الملف التالف» الأشهر)
-  // ثم إعادة المحاولة فوراً — بدون حاجة لتحديث الصفحة أو أي تدخل يدوي.
-  const healed = await selfHealStaleCache();
-  if (healed && (await tryDownload())) return;
-
-  // ── الملاذ الأخير: المرآة عبر تنقل مباشر ────────────────────────────
-  // المرآة ترسل الملف كـ `attachment` ببصمة مُتحقَّق منها (تحقّق الخادم منها
-  // قبل النشر) — فحتى لو حجب CORS الفحص عبر fetch، التنقل المباشر إليها
-  // يبدأ التنزيل فوراً بالبايتات الصحيحة بدون فتح أي صفحة.
+  // الخطوة الثانية (ملاذ أخير): fetch + Blob مع فحص سريع فقط (بدون SHA-256 كامل).
   if (mirrorUrl && isHttpUrl(mirrorUrl)) {
-    const anchor = document.createElement("a");
-    anchor.href = mirrorUrl;
-    anchor.download = file;
-    anchor.rel = "noopener";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    return;
+    try {
+      const response = await fetch(mirrorUrl, { cache: "no-store" });
+      if (response.ok) {
+        const blob = await response.blob();
+        if (blob.size >= 100_000) {
+          triggerBlobDownload(blob, safeName);
+          return;
+        }
+      }
+    } catch {
+      // تجاهل — ننتقل للتنقل المباشر
+    }
+    // تنقل مباشر كملاذ أخير مطلق
+    try {
+      const anchor = document.createElement("a");
+      anchor.href = mirrorUrl;
+      anchor.download = safeName;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      return;
+    } catch {
+      // فشل
+    }
   }
 
   throw new DownloadError(
-    "تعذّر تنزيل ملف APK سليم: كل المصادر أرسلت ملفاً مختلفاً عن النسخة الرسمية (الحجم/البصمة غير مطابقين). أصلح النظام التخزين المؤقت تلقائياً وأعاد المحاولة — اضغط الزر مرة أخرى الآن، وإن تكررت المشكلة أُرسل تشخيص كامل تلقائياً إلى غرفة المالك.",
-    {
-      receivedSize: lastError?.receivedSize,
-      receivedHash: lastError?.receivedHash,
-      sourceUrl: lastError?.sourceUrl,
-      healed,
-    },
+    "تعذّر التنزيل — تحقق من اتصال الإنترنت وحاول مرة أخرى.",
+    { sourceUrl: candidates[0] },
   );
 }
 
