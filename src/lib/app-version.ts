@@ -21,7 +21,7 @@
  *   التطبيق نفسها — وهو المسار الذي يخدمه أي مزوّد يعرض التطبيق أصلاً.
  *   (بدون `?url` يفشل البناء لأن Rollup يحاول قراءة الـ APK كوحدة JS.)
  */
-import apkAssetUrlRaw from "@/assets/al-abqari-v1.2.1.apk?url";
+import apkAssetUrlRaw from "@/assets/al-abqari-v1.3.0.apk?url";
 
 /** مسار الملف الفعلي — بدون استعلامات Vite (مثل ?import) التي تفشل في fetch. */
 const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
@@ -33,13 +33,13 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "1.2.2"; // client version — matches server WEB_VERSION 1.2.2 (this build is current)
+export const APP_VERSION = "1.3.0"; // client version — matches server WEB_VERSION 1.3.0
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
-export const APK_VERSION = "1.2.1";
+export const APK_VERSION = "1.3.0";
 
 /** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
-export const APK_FALLBACK_FILE = "al-abqari-v1.2.1.apk";
+export const APK_FALLBACK_FILE = "al-abqari-v1.3.0.apk";
 
 /**
  * مرآة موثّقة احتياطية لملف APK (مصدرها `apkRelease.ts` على الخادم —
@@ -49,6 +49,8 @@ export const APK_FALLBACK_FILE = "al-abqari-v1.2.1.apk";
  */
 export const APK_MIRROR_FALLBACK_URL =
   "https://tmpfiles.org/dl/1787034496.f58f9719be8165c2/wfwkCsvTfLzg/al-abqari-v1.2.1.apk";
+// ملاحظة: المرآة تحتفظ بالملف القديم كما هو — الإصدار الجديد يُحمّل دائماً
+// من الأصل المضمّن داخل التطبيق (/assets/al-abqari-v1.3.0.apk).
 
 export const APP_VERSION_LABEL = `نُباهة ${APP_VERSION}`;
 
@@ -322,9 +324,9 @@ export async function downloadApk(
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // التنزيل المباشر الفوري — لا نحمّل الملف كاملاً في الذاكرة (27MB)
-  // ثم نحسب بصمته ثم نdownlod — هذا كان سبب الانتظار الطويل.
-  // بدل ذلك، نستخدم <a download> لبدء تنزيل المتصفح فوراً.
+  // التنزيل الفوري — يعمل على جميع الأجهزة (ويب + موبايل + سطح المكتب).
+  // لا نستخدم <a download> لأنه لا يعمل على متصفحات الموبايل.
+  // بدل ذلك: fetch الملف ثم إنشاء Blob بنوع MIME رسمي → تنزيل مباشر.
   // ═══════════════════════════════════════════════════════════════════════
   const candidates = [
     ...(storageUrl && isHttpUrl(storageUrl) ? [storageUrl] : []),
@@ -332,51 +334,22 @@ export async function downloadApk(
     ...(mirrorUrl && isHttpUrl(mirrorUrl) ? [mirrorUrl] : []),
   ];
 
-  // الخطوة الأولى: تنزيل مباشر فوري عبر <a download> — بدون انتظار.
+  // جرّب كل مصدر بالترتيب: fetch + blob (يعمل على كل الأجهزة).
   for (const url of candidates) {
     try {
-      const anchor = document.createElement("a");
-      anchor.href = withCacheBuster(url);
-      anchor.download = safeName;
-      anchor.rel = "noopener";
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      // انتظار قصير للتأكد من أن المتصفح بدأ التنزيل.
-      await new Promise((r) => setTimeout(r, 300));
-      anchor.remove();
+      const response = await fetch(withCacheBuster(url), {
+        mode: "cors",
+        cache: "no-store",
+        redirect: "follow",
+      });
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      // تأكد أن الملف حجمه معقول (أكبر من 100KB — APK حقيقي).
+      if (blob.size < 100_000) continue;
+      triggerBlobDownload(blob, safeName);
       return;
     } catch {
-      // جرّب الرابط التالي
-    }
-  }
-
-  // الخطوة الثانية (ملاذ أخير): fetch + Blob مع فحص سريع فقط (بدون SHA-256 كامل).
-  if (mirrorUrl && isHttpUrl(mirrorUrl)) {
-    try {
-      const response = await fetch(mirrorUrl, { cache: "no-store" });
-      if (response.ok) {
-        const blob = await response.blob();
-        if (blob.size >= 100_000) {
-          triggerBlobDownload(blob, safeName);
-          return;
-        }
-      }
-    } catch {
-      // تجاهل — ننتقل للتنقل المباشر
-    }
-    // تنقل مباشر كملاذ أخير مطلق
-    try {
-      const anchor = document.createElement("a");
-      anchor.href = mirrorUrl;
-      anchor.download = safeName;
-      anchor.rel = "noopener";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      return;
-    } catch {
-      // فشل
+      // جرّب المصدر التالي
     }
   }
 
