@@ -21,7 +21,7 @@
  *   التطبيق نفسها — وهو المسار الذي يخدمه أي مزوّد يعرض التطبيق أصلاً.
  *   (بدون `?url` يفشل البناء لأن Rollup يحاول قراءة الـ APK كوحدة JS.)
  */
-import apkAssetUrlRaw from "@/assets/al-abqari-v1.3.0.apk?url";
+import apkAssetUrlRaw from "@/assets/al-abqari-v1.4.0.apk?url";
 
 /** مسار الملف الفعلي — بدون استعلامات Vite (مثل ?import) التي تفشل في fetch. */
 const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
@@ -33,13 +33,13 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "1.3.0"; // client version — matches server WEB_VERSION 1.3.0
+export const APP_VERSION = "1.4.0"; // client version — matches server WEB_VERSION 1.4.0
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
-export const APK_VERSION = "1.3.0";
+export const APK_VERSION = "1.4.0";
 
 /** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
-export const APK_FALLBACK_FILE = "al-abqari-v1.3.0.apk";
+export const APK_FALLBACK_FILE = "al-abqari-v1.4.0.apk";
 
 /**
  * مرآة موثّقة احتياطية لملف APK (مصدرها `apkRelease.ts` على الخادم —
@@ -52,7 +52,7 @@ export const APK_FALLBACK_FILE = "al-abqari-v1.3.0.apk";
  * يُحدّث تلقائياً عند كل إصدار جديد.
  */
 export const APK_PRIMARY_DOWNLOAD_URL =
-  "https://tmpfiles.org/dl/wdwNCsk6cKpC/al-abqari-v1.3.0.apk";
+  "https://tmpfiles.org/dl/wtwLC9k8aBqs/al-abqari-v1.4.0.apk";
 
 /** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
 export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;
