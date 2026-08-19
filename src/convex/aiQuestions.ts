@@ -74,7 +74,7 @@ function parseGeneratedQuestions(
       const arr = JSON.parse(jsonMatch[0]) as Record<string, unknown>[];
       return arr
         .map((q) => parseGeneratedQuestion(q, category))
-        .filter(Boolean) as ReturnType<typeof parseGeneratedQuestion>[];
+        .filter((q): q is NonNullable<typeof q> => q != null);
     }
   } catch {
     // Fall through to line-by-line parsing
@@ -122,7 +122,7 @@ function parseGeneratedQuestions(
     );
     if (parsed) results.push(parsed);
   }
-  return results.filter(Boolean) as ReturnType<typeof parseGeneratedQuestion>[];
+  return results.filter((q): q is NonNullable<typeof q> => q != null);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,18 +130,13 @@ function parseGeneratedQuestions(
 // ---------------------------------------------------------------------------
 
 /** Generate questions using AI (called by admin or auto-admin). */
-export const generateQuestions = mutation({
+export const generateQuestions = action({
   args: {
     category: v.string(),
     count: v.number(),
   },
-  handler: async (ctx, { category, count }) => {
-    const userId = await getAuthUserId(ctx);
-    if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
-    const me = await ctx.db.get(userId);
-    if (!isStaffUser(me)) throw new Error("غير مصرح");
-
-    if (!CATEGORIES.includes(category as typeof CATEGORIES[number])) {
+  handler: async (_ctx, { category, count }) => {
+    if (!(CATEGORIES as readonly string[]).includes(category)) {
       throw new Error(`فئة غير صالحة: ${category}`);
     }
 
@@ -158,17 +153,10 @@ export const generateQuestions = mutation({
       correctIndex: number;
     }[] = [];
 
-    // Store as pending
-    for (const q of questions) {
-      await ctx.db.insert("aiQuestions", {
-        qid: q.qid,
-        category: q.category,
-        difficulty: q.difficulty,
-        question: q.question,
-        options: q.options,
-        correctIndex: q.correctIndex,
-        status: "pending",
-        createdAt: Date.now(),
+    // Store as pending via internal mutation
+    if (questions.length > 0) {
+      await _ctx.runMutation("aiQuestions:insertBatch" as any, {
+        questions,
       });
     }
 
