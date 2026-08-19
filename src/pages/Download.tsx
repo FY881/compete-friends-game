@@ -102,7 +102,7 @@ export default function Download() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">تحميل نباهة</span>
+            <span className="text-lg font-bold tracking-tight">تحميل ذكاء</span>
           </button>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="gap-1.5 rounded-xl">
@@ -323,7 +323,7 @@ export default function Download() {
                 icon: PackageX,
                 title: "«التطبيق غير مثبت» بسبب نسخة قديمة مثبتة",
                 steps: [
-                  "إذا كان لديك إصدار سابق مثبت، احذفه أولاً (الإعدادات ← التطبيقات ← نباهة ← إلغاء التثبيت) ثم ثبّت الجديد.",
+                  "إذا كان لديك إصدار سابق مثبت، احذفه أولاً (الإعدادات ← التطبيقات ← ذكاء ← إلغاء التثبيت) ثم ثبّت الجديد.",
                   "سبب ذلك أن التوقيع الرقمي للإصدار الجديد مختلف عن القديم.",
                 ],
               },

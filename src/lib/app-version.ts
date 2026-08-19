@@ -52,12 +52,12 @@ export const APK_FALLBACK_FILE = "al-abqari-v1.3.0.apk";
  * يُحدّث تلقائياً عند كل إصدار جديد.
  */
 export const APK_PRIMARY_DOWNLOAD_URL =
-  "https://tmpfiles.org/dl/wVwwC6htjZHR/al-abqari-v1.3.0.apk";
+  "https://tmpfiles.org/dl/w5wECLhJingK/al-abqari-v1.3.0.apk";
 
 /** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
 export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;
 
-export const APP_VERSION_LABEL = `نُباهة ${APP_VERSION}`;
+export const APP_VERSION_LABEL = `ذكاء ${APP_VERSION}`;
 
 /** هل هذه نسخة تطبيق أندرويد الأصلية (WebView على https://localhost)؟ */
 function isNativeApp(): boolean {

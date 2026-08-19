@@ -162,7 +162,7 @@ export default function MiniGames() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">نباهة</span>
+            <span className="text-lg font-bold tracking-tight">ذكاء</span>
           </Link>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="gap-1.5 rounded-full">
@@ -189,7 +189,7 @@ export default function MiniGames() {
               <Gamepad2 className="size-8" />
             </motion.div>
             <h1 className="mt-4 text-3xl font-bold tracking-tight">
-              مركز الألعاب المصغرة
+              مركز الألعاب المصغرة — 80 لعبة ذكية
             </h1>
             <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
               أكثر من {GAME_CATEGORIES.reduce((sum, c) => sum + c.games.length, 0)} لعبة مصغرة متنوعة

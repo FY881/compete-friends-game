@@ -40,7 +40,7 @@ async function callOpenRouter(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "https://nabaah.app",
-      "X-Title": "نباهة - لعبة المسابقات",
+      "X-Title": "ذكاء - لعبة المسابقات",
     },
     body: JSON.stringify({
       model,
@@ -156,7 +156,7 @@ export const runSelfHealing = action({
     systemState: v.string(),
   },
   handler: async (_ctx, { apiKey, errorLogs, systemState }) => {
-    const prompt = `أنت نظام حل مشاكل ذاتي للعبة "نباهة". حلّل السجلات والأخطاء التالية واقترح حلولاً عملية.
+    const prompt = `أنت نظام حل مشاكل ذاتي للعبة "ذكاء". حلّل السجلات والأخطاء التالية واقترح حلولاً عملية.
 
 == حالة النظام ==
 ${systemState}
@@ -208,7 +208,7 @@ export const aiControlCommand = action({
     gameState: v.string(),
   },
   handler: async (_ctx, { apiKey, command, gameState }) => {
-    const prompt = `أنت نظام ذكاء اصطناعي يتحكم في لعبة "نباهة". المالك أعطاك الأمر التالي:
+    const prompt = `أنت نظام ذكاء اصطناعي يتحكم في لعبة "ذكاء". المالك أعطاك الأمر التالي:
 
 الأمر: ${command}
 
@@ -266,7 +266,7 @@ export const aiTransparencyChat = action({
     conversationHistory: v.array(v.object({ role: v.string(), content: v.string() })),
   },
   handler: async (_ctx, { apiKey, message, conversationHistory }) => {
-    const systemPrompt = `أنت "نباهة AI" — المساعد الشخصي للمالك في تطوير لعبة "نباهة".
+    const systemPrompt = `أنت "ذكاء AI" — المساعد الشخصي للمالك في تطوير لعبة "ذكاء".
 
 مهمتك:
 - تحليل حالة اللعبة واقتراح تحسينات
@@ -328,7 +328,7 @@ ${playerStats}
         strengths: ["المشاركة النشطة"],
         weaknesses: [],
         suggestions: ["استمر في اللعب لتحسين مهاراتك!"],
-        funFact: "أنت جزء مهم من مجتمع نباهة! 🌟",
+        funFact: "أنت جزء مهم من مجتمع ذكاء! 🌟",
       };
     }
 

@@ -288,7 +288,7 @@ function ReactionSpeed({ onComplete, onExit }: MiniGameProps) {
 
 // 4-10: Word Scramble
 function WordScramble({ onComplete, onExit }: MiniGameProps) {
-  const words = ["نباهة", "تحدي", "ذكاء", "معركة", "فوز", "سؤال", "سرعة", "منافسة", "بطل", "نجم"];
+  const words = ["ذكاء", "تحدي", "ذكاء", "معركة", "فوز", "سؤال", "سرعة", "منافسة", "بطل", "نجم"];
   const [currentWord, setCurrentWord] = useState("");
   const [scrambled, setScrambled] = useState("");
   const [userInput, setUserInput] = useState("");
@@ -577,9 +577,9 @@ function PatternMatch({ onComplete, onExit }: MiniGameProps) {
 
 // 8-10: Word Chain
 function WordChain({ onComplete, onExit }: MiniGameProps) {
-  const words = ["نباهة", "ة", " gioc", "gt", "top", "puzzle", "ل", "لغز", "ز"];
+  const words = ["ذكاء", "ة", " gioc", "gt", "top", "puzzle", "ل", "لغز", "ز"];
   const pairs = [
-    ["نباهة", "ة"], ["ذكاء", "اء"], ["胜负", "胜"],
+    ["ذكاء", "ة"], ["ذكاء", "اء"], ["胜负", "胜"],
   ];
   const [current, setCurrent] = useState(0);
   const [score, setScore] = useState(0);

@@ -21,6 +21,9 @@ import {
   Trophy,
   Users,
   Zap,
+  Shield,
+  MessageSquare,
+  Globe,
 } from "lucide-react";
 import { Link } from "react-router";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
@@ -217,9 +220,19 @@ const FEATURES = [
   },
 ];
 
+
+const AI_FEATURES = [
+  { icon: BrainCircuit, title: "AI Question Generator", desc: "أسئلة مولّدة بالذكاء الاصطناعي تتجدد باستمرار" },
+  { icon: Sparkles, title: "AI Hints", desc: "تلميحات ذكية أثناء اللعب تساعدك تритор الإجابة" },
+  { icon: Zap, title: "Self-Healing", desc: "نظام حل المشاكل الذاتي يكتشف ويصلح الأخطاء" },
+  { icon: Shield, title: "AI Control", desc: "تحكم كامل باللعبة بأوامر ذكية من المالك" },
+  { icon: MessageSquare, title: "Transparency", desc: "صراحة مطلقة — AI يساعدك تطوّر اللعبة" },
+  { icon: Globe, title: "Daily Challenges", desc: "تحديات يومية ذكية تتجدد بالذكاء الاصطناعي" },
+];
+
 const STATS = [
-  { value: "500+", label: "سؤالاً في البنك" },
-  { value: "20+", label: "فئة معرفية" },
+  { value: "500+", label: "سؤال في البنك" },
+  { value: "80", label: "لعبة مصغرة" },
   { value: "12", label: "لاعباً في الغرفة" },
   { value: "380", label: "أقصى نقطة للسؤال" },
 ];
@@ -246,7 +259,7 @@ export default function Landing() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">نباهة</span>
+            <span className="text-lg font-bold tracking-tight">ذكاء</span>
           </Link>
 
           <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
@@ -254,7 +267,7 @@ export default function Landing() {
               كيف تلعب
             </a>
             <a href="#features" className="transition-colors hover:text-foreground">
-              لماذا نباهة
+              لماذا ذكاء مميز
             </a>
             <a href="#cta" className="transition-colors hover:text-foreground">
               ابدأ الآن
@@ -449,7 +462,7 @@ export default function Landing() {
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.6 }}
             >
-              <p className="text-sm font-semibold text-primary">لماذا نباهة؟</p>
+              <p className="text-sm font-semibold text-primary">لماذا ذكاء مميز؟</p>
               <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
                 ليست مسابقة معلومات…
                 <br />
@@ -703,7 +716,7 @@ export default function Landing() {
             <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <BrainCircuit className="size-4" />
             </span>
-            <span className="font-semibold text-foreground">نباهة</span> — بالذكاء الاصطناعي
+            <span className="font-semibold text-foreground">ذكاء</span> — بالذكاء الاصطناعي
           </div>
           <p>معركة الأصدقاء الفكرية — العب، تحدَّ، وافز.</p>
           <div className="flex items-center gap-2">

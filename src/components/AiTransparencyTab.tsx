@@ -50,7 +50,7 @@ export function AiTransparencyTab() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "ai",
-      content: "مرحباً! أنا نباهة AI — مساعدك الشخصي لتطوير اللعبة.\n\nهذا وضع الصراحة المطلقة: أخبرني عن أي شيء تحتاجه لتطوير اللعبة. لا أخفي شيئاً عنك! 🌟",
+      content: "مرحباً! أنا ذكاء AI — مساعدك الشخصي لتطوير اللعبة.\n\nهذا وضع الصراحة المطلقة: أخبرني عن أي شيء تحتاجه لتطوير اللعبة. لا أخفي شيئاً عنك! 🌟",
       timestamp: new Date().toLocaleTimeString("ar"),
     },
   ]);
@@ -172,7 +172,7 @@ export function AiTransparencyTab() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <MessageCircle className="size-4 text-primary" />
-            محادثة مع نباهة AI
+            محادثة مع ذكاء AI
             <Badge variant="outline" className="mr-auto text-[10px]">
               <Bot className="size-3" /> الصراحة المطلقة
             </Badge>

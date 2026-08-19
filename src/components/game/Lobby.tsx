@@ -515,8 +515,8 @@ export function Lobby({
               onClick={() => {
                 navigator
                   .share({
-                    title: "نباهة",
-                    text: `انضم إليّ في نباهة! رمز الغرفة: ${code}`,
+                    title: "ذكاء",
+                    text: `انضم إليّ في ذكاء! رمز الغرفة: ${code}`,
                     url: inviteLink,
                   })
                   .catch(() => undefined);

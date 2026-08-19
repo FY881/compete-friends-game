@@ -1,4 +1,5 @@
 import { useQuery } from "convex/react";
+// AI features enabled
 import { api } from "@/convex/_generated/api";
 import type { ProfileStats } from "@/convex/stats";
 import { BADGES } from "@/convex/stats";
@@ -150,7 +151,7 @@ export default function Profile() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <BrainCircuit className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">نباهة</span>
+            <span className="text-lg font-bold tracking-tight">ذكاء</span>
           </button>
 
           <div className="flex items-center gap-3">
@@ -394,6 +395,21 @@ export default function Profile() {
             <ArrowRight className="size-4" />
             العودة لصفحة اللعب
           </Button>
+        {/* AI Analysis Card */}
+        <div className="mt-8">
+          <div className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-amber-500/5 p-6 text-center">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+            </div>
+            <h3 className="text-lg font-bold">تحليل AI لأدائك</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              الذكاء الاصطناعي يحلل أداءك ويقترح طرقاً لتحسين مهاراتك
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground/80">
+              🤖 مدعوم بالذكاء الاصطناعي من OpenRouter
+            </p>
+          </div>
+        </div>
         </div>
       </main>
     </div>

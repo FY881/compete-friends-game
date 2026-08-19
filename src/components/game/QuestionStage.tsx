@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   DIFFICULTY_BASE_POINTS,
@@ -21,6 +21,7 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
+  Lightbulb,
   Trophy,
   Users,
   X,
@@ -323,6 +324,36 @@ export function QuestionStage({
     }
   };
 
+  // AI Hint
+  const getAiHint = useAction(api.openRouter.getAiHint);
+  const [aiHint, setAiHint] = useState<string | null>(null);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [hintUsed, setHintUsed] = useState(false);
+
+  const handleAiHint = async () => {
+    if (hintLoading || hintUsed || myAnswer || isRevealing) return;
+    let apiKey = "";
+    try { apiKey = localStorage.getItem("openrouter_api_key") ?? ""; } catch { /* */ }
+    if (!apiKey) { toast.error("مفتاح AI غير مُعد — اضافته من غرفة المالك"); return; }
+    setHintLoading(true);
+    try {
+      const res = await getAiHint({
+        apiKey,
+        question: question.question,
+        options: question.options,
+        difficulty: question.difficulty,
+      });
+      setAiHint(res.hint);
+      setHintUsed(true);
+      sounds.lifeline();
+    } catch (e) {
+      console.error(e);
+      toast.error("تعذر الحصول على تلميح AI");
+    } finally {
+      setHintLoading(false);
+    }
+  };
+
   const difficultyStyle =
     DIFFICULTY_STYLES[question.difficulty] ?? DIFFICULTY_STYLES.medium;
   const nextStreakBonus = Math.min(
@@ -422,6 +453,17 @@ export function QuestionStage({
               <p className="mt-0.5 text-xs font-medium leading-relaxed text-rose-700/80">
                 {cheatNotice}
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* AI Hint display */}
+        {aiHint && (
+          <div className="relative mt-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+            <Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-500" />
+            <div>
+              <p className="text-sm font-bold text-amber-700">تلميح AI 🤖</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-700/80">{aiHint}</p>
             </div>
           </div>
         )}
@@ -577,6 +619,28 @@ export function QuestionStage({
             منقّي 50/50
             <span className="rounded-full bg-muted px-1.5 text-[10px]">
               {fiftyUsed ? 0 : 1} / {LIFELINES_PER_GAME}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAiHint}
+            disabled={hintLoading || hintUsed || !!myAnswer || isRevealing}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all",
+              hintUsed
+                ? "border-border/60 bg-muted/40 text-muted-foreground/50"
+                : "border-amber-500/30 bg-amber-500/5 text-amber-600 hover:border-amber-500/60 hover:bg-amber-500/10",
+            )}
+          >
+            {hintLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            تلميح AI
+            <span className="rounded-full bg-muted px-1.5 text-[10px]">
+              {hintUsed ? 0 : 1} / 1
             </span>
           </button>
 

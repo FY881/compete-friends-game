@@ -233,7 +233,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
       return;
     }
     const payload = {
-      app: "نباهة",
+      app: "ذكاء",
       version: APP_VERSION,
       exportedAt: new Date().toISOString(),
       settings: {
