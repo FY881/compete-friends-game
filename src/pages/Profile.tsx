@@ -410,6 +410,45 @@ export default function Profile() {
             </p>
           </div>
         </div>
+        {/* AI Insights */}
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="size-4 text-emerald-500" />
+              <span className="text-sm font-bold">نقاط القوة</span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              استمر في الإجابات الصحيحة المتتالية — سلسلة 5+ تضاعف مكافأتك!
+            </p>
+          </div>
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="size-4 text-amber-500" />
+              <span className="text-sm font-bold">نصيحة AI</span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              جرّب التحدي اليومي كل يوم — أفضل طريقة لتحسين مهاراتك بسرعة!
+            </p>
+          </div>
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="size-4 text-primary" />
+              <span className="text-sm font-bold">هدف قريب</span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              أكمل 5 جولات إضافية وافتح شارة جديدة!
+            </p>
+          </div>
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Flame className="size-4 text-rose-500" />
+              <span className="text-sm font-bold">سلسلة يومية</span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              سجّل دخولك يومياً واحصل على مكافآت XP إضافية!
+            </p>
+          </div>
+        </div>
         </div>
       </main>
     </div>

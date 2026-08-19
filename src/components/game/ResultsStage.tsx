@@ -198,6 +198,22 @@ export function ResultsStage({ game }: { game: GameData }) {
           جولة جديدة (Rematch)
         </Button>
       </div>
+      {/* AI Post-Game Analysis */}
+      <div className="mt-6 rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-amber-500/5 p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <span className="text-lg">🤖</span>
+          </div>
+          <div>
+            <p className="text-sm font-bold">تحليل AI للجولة</p>
+            <p className="text-xs text-muted-foreground">الذكاء الاصطناعي يحلل أداءك ويقترح تحسينات</p>
+          </div>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          استمر في اللعب لتحسين مهاراتك! كل جولة تُحسّن أداءك وتقرّبك من الشارة التالية.
+          تحقق من صفحة البروفايل لرؤية إحصائياتك المفصلة.
+        </p>
+      </div>
     </div>
   );
 }

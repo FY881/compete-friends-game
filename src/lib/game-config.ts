@@ -14,6 +14,10 @@ export const COUNTDOWN_MS = 3_000;
 export const TIME_OPTIONS = [5_000, 10_000, 15_000, 20_000, 30_000] as const;
 
 /** Number of lifelines (50/50 + second chance) available per game. */
+// AI Hint configuration
+export const AI_HINTS_PER_GAME = 1; // each player gets 1 AI hint per game
+export const AI_HINT_TIMEOUT_MS = 10000; // 10 seconds to read the hint
+
 export const LIFELINES_PER_GAME = 1;
 
 /** Format a millisecond duration into an Arabic-friendly label. */

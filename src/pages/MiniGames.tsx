@@ -101,7 +101,7 @@ export default function MiniGames() {
           <div className="mb-8">
             <h1 className="text-2xl font-bold tracking-tight">{category.name}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              اختر لعبة واثبت مهاراتك!
+              اختر لعبة واثبت مهاراتك — 80 لعبة في انتظارك!
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -167,7 +167,7 @@ export default function MiniGames() {
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="gap-1.5 rounded-full">
               <Gamepad2 className="size-3.5" />
-              {GAME_CATEGORIES.reduce((sum, c) => sum + c.games.length, 0)} لعبة
+              80 لعبة ذكية
             </Badge>
           </div>
         </div>
