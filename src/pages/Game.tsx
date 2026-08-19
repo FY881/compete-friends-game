@@ -1,3 +1,4 @@
+import { ZakaLogo } from "@/components/ZakaLogo";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -224,7 +225,7 @@ export default function Game() {
             className="flex items-center gap-2.5"
           >
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <BrainCircuit className="size-5" />
+              <ZakaLogo className="size-5 text-primary-foreground" size={20} />
             </span>
             <span className="hidden text-lg font-bold tracking-tight sm:block">
               ذكاء

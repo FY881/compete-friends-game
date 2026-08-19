@@ -1,3 +1,4 @@
+import { ZakaLogo } from "@/components/ZakaLogo";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
@@ -189,7 +190,7 @@ export default function Play() {
             className="flex items-center gap-2.5"
           >
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <BrainCircuit className="size-5" />
+              <ZakaLogo className="size-5 text-primary-foreground" size={20} />
             </span>
             <span className="text-lg font-bold tracking-tight">ذكاء</span>
           </button>
@@ -405,6 +406,44 @@ export default function Play() {
                   </div>
                 </div>
               )}
+
+              {/* Daily Challenge Card */}
+              <div className="mt-4 rounded-xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎯</span>
+                  <p className="text-sm font-bold">تحدي اليوم</p>
+                  <Badge className="ml-auto gap-1 rounded-full bg-amber-500/10 text-amber-600 text-[10px]">
+                    <Flame className="size-2.5" />
+                    +50 XP
+                  </Badge>
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  سؤال واحد فقط — أسرع إجابة صحيحة تكسب مكافأة إضافية!
+                </p>
+                <Button asChild size="sm" variant="outline" className="mt-2.5 gap-1.5 rounded-xl">
+                  <Link to="/games">
+                    <Zap className="size-3" />
+                    العب التحدي
+                  </Link>
+                </Button>
+              </div>
+
+              {/* Mini-Games Quick Access */}
+              <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎮</span>
+                  <p className="text-sm font-bold">80 لعبة مصغرة</p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ذكاء + سرعة + استراتيجية — اختر لعبتك المفضلة
+                </p>
+                <Button asChild size="sm" variant="ghost" className="mt-2 gap-1.5 rounded-xl text-primary">
+                  <Link to="/games">
+                    <Gamepad2 className="size-3" />
+                    افتح مركز الألعاب
+                  </Link>
+                </Button>
+              </div>
 
               <div className="mt-5 grid grid-cols-3 gap-2 border-t border-border/70 pt-4">
                 <button

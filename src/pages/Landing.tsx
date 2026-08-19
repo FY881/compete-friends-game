@@ -1,3 +1,4 @@
+import { ZakaLogo } from "@/components/ZakaLogo";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -257,7 +258,7 @@ export default function Landing() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <Link to="/" className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <BrainCircuit className="size-5" />
+              <ZakaLogo className="size-5 text-primary-foreground" size={20} />
             </span>
             <span className="text-lg font-bold tracking-tight">ذكاء</span>
           </Link>
@@ -291,7 +292,7 @@ export default function Landing() {
             <Button asChild className="gap-1.5">
               <Link to="/play">
                 <Play className="size-4" />
-                العب الآن
+                ادخل عالم ذكاء
               </Link>
             </Button>
           </div>
@@ -299,7 +300,7 @@ export default function Landing() {
       </header>
 
       {/* ── Hero ───────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden bg-gradient-to-br from-background via-primary/5 to-amber-500/5">
         {/* Decorative background */}
         <div
           aria-hidden

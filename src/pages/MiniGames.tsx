@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,6 +104,11 @@ export default function MiniGames() {
             <h1 className="text-2xl font-bold tracking-tight">{category.name}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               اختر لعبة واثبت مهاراتك — 80 لعبة في انتظارك!
+        
+        {/* AI Difficulty Info */}
+        <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-center">
+          <p className="text-xs font-bold text-primary">🤖 الذكاء الاصطناعي يضبط مستوى الصعوبة تلقائياً بناءً على أدائك</p>
+        </div>
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
