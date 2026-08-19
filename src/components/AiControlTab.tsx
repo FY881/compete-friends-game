@@ -3,7 +3,7 @@
  * المالك يتحكم في كل شيء بالأوامر
  */
 import { useState } from "react";
-import { useAction } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,9 +46,10 @@ interface AiAction {
 }
 
 export function AiControlTab() {
-  const [apiKey, setApiKey] = useState(() => {
-    try { return localStorage.getItem("openrouter_api_key") ?? ""; } catch { return ""; }
-  });
+  const settings = useQuery(api.owner.getSettings);
+  const updateSettings = useMutation(api.owner.updateSettings);
+  const apiKey = settings?.openrouterApiKey ?? "";
+  const [localKey, setLocalKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [command, setCommand] = useState("");
   const [loading, setLoading] = useState(false);
@@ -57,8 +58,8 @@ export function AiControlTab() {
 
   const aiControl = useAction(api.openRouter.aiControlCommand);
 
-  const saveKey = () => {
-    try { localStorage.setItem("openrouter_api_key", apiKey); } catch { /* ok */ }
+  const saveKey = async () => {
+    await updateSettings({ openrouterApiKey: localKey || apiKey });
     toast.success("تم حفظ مفتاح API");
   };
 
@@ -97,12 +98,11 @@ export function AiControlTab() {
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Input
-                type={showKey ? "text" : "password"}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-or-v1-..."
+            <div className="relative flex-1">                <Input
+                  type={showKey ? "text" : "password"}
+                  value={localKey || apiKey}
+                  onChange={(e) => setLocalKey(e.target.value)}
+                  placeholder="sk-or-v1-..."
                 className="font-mono text-xs"
               />
               <button

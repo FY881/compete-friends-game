@@ -189,6 +189,7 @@ export type ModSettings = {
   antiCheatEnabled: boolean;
   disabledQuestions: string[];
   siteUrl: string; // official web app URL — needed by the Android APK for downloads
+  openrouterApiKey: string; // OpenRouter API key for AI features
 };
 
 export const DEFAULT_SETTINGS: ModSettings = {
@@ -201,6 +202,7 @@ export const DEFAULT_SETTINGS: ModSettings = {
   antiCheatEnabled: true,
   disabledQuestions: [],
   siteUrl: "",
+  openrouterApiKey: "",
 };
 
 export async function getSettingsData(
@@ -227,6 +229,7 @@ export async function getSettingsData(
     antiCheatEnabled: read("antiCheatEnabled", DEFAULT_SETTINGS.antiCheatEnabled),
     disabledQuestions: read("disabledQuestions", DEFAULT_SETTINGS.disabledQuestions),
     siteUrl: read("siteUrl", DEFAULT_SETTINGS.siteUrl),
+    openrouterApiKey: read("openrouterApiKey", ""),
   };
 }
 
@@ -1121,6 +1124,7 @@ export const updateSettings = mutation({
     antiCheatEnabled: v.optional(v.boolean()),
     disabledQuestions: v.optional(v.array(v.string())),
     siteUrl: v.optional(v.string()),
+    openrouterApiKey: v.optional(v.string()),
   },
   handler: async (ctx, patch) => {
     await requireOwner(ctx);
