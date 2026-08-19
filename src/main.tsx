@@ -21,6 +21,7 @@ const Owner = lazy(() => import("./pages/Owner.tsx"));
 const Rules = lazy(() => import("./pages/Rules.tsx"));
 const Download = lazy(() => import("./pages/Download.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const MiniGames = lazy(() => import("./pages/MiniGames.tsx"));
 
 // Simple loading fallback for route transitions
 function RouteLoading() {
@@ -244,6 +245,7 @@ createRoot(document.getElementById("root")!).render(
               />
               <Route path="/rules" element={<Rules />} />
               <Route path="/download" element={<Download />} />
+              <Route path="/games" element={<MiniGames />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
