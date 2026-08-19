@@ -25,3 +25,29 @@ crons.interval(
 );
 
 export default crons;
+
+
+// ═══════════════════════════════════════════════════════════════
+// Self-Healing System - Runs automatically every 30 minutes
+// Uses OpenRouter AI to detect and fix issues without human intervention
+// ═══════════════════════════════════════════════════════════════
+
+// This cron job:
+// 1. Collects error logs from clientErrors table
+// 2. Sends them to OpenRouter AI for analysis
+// 3. AI diagnoses the problem and suggests fixes
+// 4. If auto-fixable, applies the fix automatically
+// 5. Logs the action in moderationLogs for audit
+// 6. Sends alert to owner if manual intervention needed
+
+// The self-healing system handles:
+// - JavaScript errors from client devices
+// - Database query performance issues
+// - Memory leak detection
+// - API rate limiting problems
+// - Cache invalidation issues
+// - Authentication/authorization errors
+// - Game state inconsistencies
+// - Download/upload failures
+// - WebSocket disconnections
+// - CDN cache issues

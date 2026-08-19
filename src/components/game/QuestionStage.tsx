@@ -61,6 +61,7 @@ function CountdownRing({
   const radius = 30;
   const circumference = 2 * Math.PI * radius;
   const urgent = fraction < 0.25;
+  const veryUrgent = fraction < 0.1;
 
   return (
     <div className="relative size-20 shrink-0">

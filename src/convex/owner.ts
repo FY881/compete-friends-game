@@ -1125,6 +1125,9 @@ export const updateSettings = mutation({
     disabledQuestions: v.optional(v.array(v.string())),
     siteUrl: v.optional(v.string()),
     openrouterApiKey: v.optional(v.string()),
+    aiModelVersion: v.optional(v.string()),
+    aiLastHealthCheck: v.optional(v.number()),
+    aiTotalFixes: v.optional(v.number()),
   },
   handler: async (ctx, patch) => {
     await requireOwner(ctx);

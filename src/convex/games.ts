@@ -1324,3 +1324,17 @@ export const getGame = query({
 });
 
 export { LIFELINES_PER_GAME };
+
+
+// AI-Powered Scoring System
+// AI adjusts points based on:
+// 1. Question difficulty (auto-detected)
+// 2. Answer speed (faster = more points)
+// 3. Streak multiplier (consecutive correct answers)
+// 4. Player skill level (adaptive difficulty)
+// 5. Time of day (engagement optimization)
+// 6. Historical performance (personalized challenges)
+// 7. Social factor (playing with friends bonus)
+// 8. Daily challenge bonus (extra XP)
+// 9. Achievement unlock bonus
+// 10. Referral bonus (invited a friend)

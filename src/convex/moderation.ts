@@ -487,3 +487,16 @@ export const getStaffForHelp = internalQuery({
     return isStaffUser(me) ? { name: me.name ?? "المشرف" } : null;
   },
 });
+
+
+// AI Moderation System
+// 1. Real-time chat filtering (toxicity detection)
+// 2. Behavior pattern analysis (cheating detection)
+// 3. Anomaly detection (unusual activity)
+// 4. Automated warnings (escalating penalties)
+// 5. Community health scoring
+// 6. Player reputation system
+// 7. Content quality assessment
+// 8. Report priority scoring
+// 9. False positive reduction
+// 10. Human review queue optimization

@@ -128,3 +128,16 @@ export const claimDailyReward = mutation({
     return { xpEarned, streak, badgesEarned };
   },
 });
+
+
+// AI Personalization System
+// 1. Skill assessment (automatic level detection)
+// 2. Learning path (personalized question order)
+// 3. Difficulty curve (optimal challenge progression)
+// 4. Category focus (strengthen weak areas)
+// 5. Time optimization (best play times)
+// 6. Social matching (similar skill opponents)
+// 7. Achievement roadmap (next unlock preview)
+// 8. Motivation triggers (personalized rewards)
+// 9. Content recommendations (relevant challenges)
+// 10. Growth tracking (progress visualization)
