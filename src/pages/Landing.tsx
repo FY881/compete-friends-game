@@ -218,8 +218,8 @@ const FEATURES = [
 ];
 
 const STATS = [
-  { value: "230+", label: "سؤالاً في البنك" },
-  { value: "18", label: "فئة معرفية" },
+  { value: "500+", label: "سؤالاً في البنك" },
+  { value: "20+", label: "فئة معرفية" },
   { value: "12", label: "لاعباً في الغرفة" },
   { value: "380", label: "أقصى نقطة للسؤال" },
 ];
@@ -703,7 +703,7 @@ export default function Landing() {
             <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <BrainCircuit className="size-4" />
             </span>
-            <span className="font-semibold text-foreground">نباهة</span>
+            <span className="font-semibold text-foreground">نباهة</span> — بالذكاء الاصطناعي
           </div>
           <p>معركة الأصدقاء الفكرية — العب، تحدَّ، وافز.</p>
           <div className="flex items-center gap-2">

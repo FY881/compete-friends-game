@@ -83,6 +83,8 @@ import { CATEGORIES } from "@/convex/questions";
 import { APP_VERSION } from "@/lib/app-version";
 import { AdminAiTab } from "@/components/AdminAiTab";
 import { DownloadsTab } from "@/components/DownloadsTab";
+import { AiControlTab } from "@/components/AiControlTab";
+import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -2036,6 +2038,12 @@ export default function Owner() {
               </TabsTrigger>
               {access.isOwner && (
                 <>
+                  <TabsTrigger value="aicontrol" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <Sparkles className="size-4" /> تحكم AI
+                  </TabsTrigger>
+                  <TabsTrigger value="transparency" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <Bot className="size-4" /> الصراحة المطلقة
+                  </TabsTrigger>
                   <TabsTrigger value="downloads" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Smartphone className="size-4" /> التحميل
                   </TabsTrigger>
@@ -2078,6 +2086,12 @@ export default function Owner() {
               </TabsContent>
               {access.isOwner && (
                 <>
+                  <TabsContent value="aicontrol">
+                    <AiControlTab />
+                  </TabsContent>
+                  <TabsContent value="transparency">
+                    <AiTransparencyTab />
+                  </TabsContent>
                   <TabsContent value="downloads">
                     <DownloadsTab />
                   </TabsContent>
