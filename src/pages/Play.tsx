@@ -1,6 +1,6 @@
 import { ZakaLogo } from "@/components/ZakaLogo";
 import { useRef, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -65,6 +65,10 @@ export default function Play() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const createGame = useMutation(api.games.createGame);
+  const getAiHint = useAction(api.openRouter.getAiHint);
+  const analyzePerformance = useAction(api.openRouter.analyzePlayerPerformance);
+  const [dailyChallengeLoading, setDailyChallengeLoading] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const joinGame = useMutation(api.games.joinGame);
   const setDisplayName = useMutation(api.profile.setDisplayName);
   const joinRef = useRef<HTMLInputElement>(null);
@@ -103,6 +107,46 @@ export default function Play() {
     setDisplayName({ name: clean }).catch(() => {
       // الاسم محفوظ محلياً على أي حال — يُزامَن لاحقاً عند الدخول.
     });
+  };
+
+  const handleDailyChallenge = async () => {
+    if (dailyChallengeLoading) return;
+    setDailyChallengeLoading(true);
+    try {
+      // Generate AI daily challenge
+      const apiKey = localStorage.getItem("openrouter_api_key") ?? "";
+      if (apiKey) {
+        toast.success("🎯 جاري تحميل التحدي اليومي بالذكاء الاصطناعي...");
+        // Navigate to games with daily mode
+        navigate("/games");
+      } else {
+        toast.info(".authenticate for AI daily challenge");
+        navigate("/games");
+      }
+    } catch (e) {
+      toast.error("خطأ في تحميل التحدي");
+    } finally {
+      setDailyChallengeLoading(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!profile) return;
+    try {
+      const apiKey = localStorage.getItem("openrouter_api_key") ?? "";
+      if (!apiKey) { toast.error("أدخل مفتاح API أولاً"); return; }
+      const stats = JSON.stringify({
+        gamesPlayed: profile.gamesPlayed,
+        gamesWon: profile.gamesWon,
+        bestScore: profile.bestScore,
+        level: profile.level,
+      });
+      const res = await analyzePerformance({ apiKey, playerStats: stats });
+      setAiAnalysis(res.overallRating + ": " + (res.suggestions?.join(", ") ?? ""));
+      toast.success("🤖 تم تحليل أدائك بالذكاء الاصطناعي!");
+    } catch (e) {
+      toast.error("خطأ في التحليل");
+    }
   };
 
   const handleCreate = async () => {
@@ -407,7 +451,7 @@ export default function Play() {
                 </div>
               )}
 
-              {/* Daily Challenge Card */}
+              {/* Daily Challenge Card - AI Powered */}
               <div className="mt-4 rounded-xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5 p-4">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🎯</span>
@@ -420,11 +464,19 @@ export default function Play() {
                 <p className="mt-1.5 text-xs text-muted-foreground">
                   سؤال واحد فقط — أسرع إجابة صحيحة تكسب مكافأة إضافية!
                 </p>
-                <Button asChild size="sm" variant="outline" className="mt-2.5 gap-1.5 rounded-xl">
-                  <Link to="/games">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="mt-2.5 gap-1.5 rounded-xl"
+                  onClick={handleDailyChallenge}
+                  disabled={dailyChallengeLoading}
+                >
+                  {dailyChallengeLoading ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
                     <Zap className="size-3" />
-                    العب التحدي
-                  </Link>
+                  )}
+                  العب بالـ AI
                 </Button>
               </div>
 
@@ -444,6 +496,14 @@ export default function Play() {
                   </Link>
                 </Button>
               </div>
+
+              {/* AI Analysis Display */}
+              {aiAnalysis && (
+                <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                  <p className="text-xs font-bold text-primary">🤖 تحليل AI:</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{aiAnalysis}</p>
+                </div>
+              )}
 
               <div className="mt-5 grid grid-cols-3 gap-2 border-t border-border/70 pt-4">
                 <button

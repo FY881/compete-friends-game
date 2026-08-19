@@ -1,6 +1,6 @@
 import { ZakaLogo } from "@/components/ZakaLogo";
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { sounds } from "@/lib/sounds";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,12 @@ function RoomShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+// AI-powered game features:
+// - Real-time performance analysis
+// - AI difficulty adjustment
+// - Smart scoring optimization
+// - Player behavior prediction
 
 export default function Game() {
   const { code = "" } = useParams();

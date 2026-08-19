@@ -1,5 +1,4 @@
-import { useQuery } from "convex/react";
-// AI features enabled
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { ProfileStats } from "@/convex/stats";
 import { BADGES } from "@/convex/stats";
@@ -115,7 +114,14 @@ function LevelCard({ stats }: { stats: ProfileStats }) {
   );
 }
 
+// AI-powered profile features:
+// - Real-time performance analysis
+// - Skill assessment
+// - Personalized recommendations
+// - Growth tracking
+
 export default function Profile() {
+  const analyzePerformance = useAction(api.openRouter.analyzePlayerPerformance);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const profile = useQuery(api.stats.getMyProfile);

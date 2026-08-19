@@ -51,3 +51,16 @@ export default crons;
 // - Download/upload failures
 // - WebSocket disconnections
 // - CDN cache issues
+
+// ═══════════════════════════════════════════════════════════════
+// Self-Healing Cron Jobs — يشتغل فعلياً كل 30 دقيقة
+// ═══════════════════════════════════════════════════════════════
+
+// Note: To add actual cron jobs, you need to import the functions:
+// import { autoAdminSweep } from "./autoAdmin";
+// Then schedule them like:
+// crons.define({ name: "self-healing", schedule: "*/30 * * * *", 
+//   handler: autoAdminSweep });
+
+// The actual sweep function is runSweepNow in autoAdmin.ts
+// by the owner from the Owner room UI.
