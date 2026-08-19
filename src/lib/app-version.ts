@@ -52,7 +52,7 @@ export const APK_FALLBACK_FILE = "al-abqari-v1.3.0.apk";
  * يُحدّث تلقائياً عند كل إصدار جديد.
  */
 export const APK_PRIMARY_DOWNLOAD_URL =
-  "https://tmpfiles.org/dl/wiwnCOR5iihU/al-abqari-v1.3.0.apk";
+  "https://tmpfiles.org/dl/wGwuCIBLjSkp/al-abqari-v1.3.0.apk";
 
 /** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
 export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;
