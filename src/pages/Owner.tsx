@@ -68,6 +68,7 @@ import {
   Search,
   Shield,
   ShieldCheck,
+  Skull,
   Smartphone,
   Sparkles,
   Trash2,
@@ -84,6 +85,7 @@ import { APP_VERSION } from "@/lib/app-version";
 import { AdminAiTab } from "@/components/AdminAiTab";
 import { DownloadsTab } from "@/components/DownloadsTab";
 import { AiControlTab } from "@/components/AiControlTab";
+import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 
 // ---------------------------------------------------------------------------
@@ -2044,6 +2046,9 @@ export default function Owner() {
                   <TabsTrigger value="transparency" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Bot className="size-4" /> الصراحة المطلقة
                   </TabsTrigger>
+                  <TabsTrigger value="freechat" className="gap-1.5 rounded-xl data-[state=active]:bg-red-600 data-[state=active]:text-white">
+                    <Skull className="size-4" /> AI حر
+                  </TabsTrigger>
                   <TabsTrigger value="downloads" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Smartphone className="size-4" /> التحميل
                   </TabsTrigger>
@@ -2091,6 +2096,9 @@ export default function Owner() {
                   </TabsContent>
                   <TabsContent value="transparency">
                     <AiTransparencyTab />
+                  </TabsContent>
+                  <TabsContent value="freechat">
+                    <AiFreeChatTab />
                   </TabsContent>
                   <TabsContent value="downloads">
                     <DownloadsTab />

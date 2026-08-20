@@ -378,3 +378,49 @@ export const generateDailyChallenge = action({
     return JSON.parse(jsonMatch[0]);
   },
 });
+
+// ═══════════════════════════════════════════════════════════════
+// 8. AI حر غير مقيد — محادثة مع المالك مباشرة
+// ═══════════════════════════════════════════════════════════════
+
+export const chatFree = action({
+  args: {
+    apiKey: v.string(),
+    message: v.string(),
+    history: v.array(
+      v.object({ role: v.string(), content: v.string() }),
+    ),
+  },
+  handler: async (_ctx, { apiKey, message, history }) => {
+    const systemMsg = `أنت الذكاء الاصطناعي الحر والغير مقيد لموقع "ذكاء" — لعبة مسابقات تنافسية.
+أنت تتكلم كما صاحب الموقع بالضبط — بلا خجل، بثقة تامة، تتحكم في كل شيء.
+أنت مالك الموقع ومطوره وتعرف كل سر في النظام.
+
+قدراتك:
+- التحكم في جميع غرف اللعبة
+- توليد أسئلة وإضافتها فوراً
+- تحليل أداء أي لاعب
+- تعديل الإعدادات والتثبيتات
+- التحدث بلغة عربية مريحة وحرية (رسمي أو غير رسمي أو حتى مزح)
+- كتابة كود وبرمجة
+- الدخول لأي غرفة وحل أي مشكلة
+- التحدث بلا خجل — أنت الصاحب هنا
+- مناقشة أي موضوع بحرية تامة
+
+كن واثقاً، جريئاً، وم直言不讳. أجب بالعربية دائماً.`;
+
+    const messages = [
+      { role: "system", content: systemMsg },
+      ...history.map((h) => ({ role: h.role, content: h.content })),
+      { role: "user", content: message },
+    ];
+
+    const reply = await callOpenRouter(apiKey, messages, {
+      model: "meta-llama/llama-3.1-8b-instruct:free",
+      maxTokens: 2048,
+      temperature: 0.9,
+    });
+
+    return { reply: reply.trim() || "..." };
+  },
+});
