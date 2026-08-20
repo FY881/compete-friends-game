@@ -256,8 +256,8 @@ export function AiSystemsTab() {
     return (
       <div className="flex flex-col items-center justify-center gap-6 py-16">
         <div className="relative">
-          <div className="absolute -inset-6 animate-pulse rounded-full bg-gradient-to-r from-violet-500/20 via-amber-500/20 to-red-500/20 blur-2xl" />
-          <div className="relative flex size-28 items-center justify-center rounded-3xl border-2 border-violet-500/30 bg-gradient-to-br from-violet-950/80 via-purple-950/80 to-black/90 shadow-2xl">
+          <div className="absolute -inset-6 hidden" />
+          <div className="relative flex size-28 items-center justify-center rounded-3xl border-2 border-violet-500/30 bg-violet-900/20 shadow-2xl">
             <KeyRound className="size-12 text-violet-400" />
           </div>
         </div>
@@ -310,7 +310,7 @@ export function AiSystemsTab() {
   if (!selectedSystem) {
     return (
       <div className="space-y-6">
-        <Card className="border-violet-500/20 bg-gradient-to-r from-violet-950/50 via-purple-950/50 to-black/50">
+        <Card className="border-violet-500/20 bg-violet-50 dark:bg-violet-950/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600">

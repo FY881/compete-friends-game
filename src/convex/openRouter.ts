@@ -39,8 +39,8 @@ async function callOpenRouter(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://nabaah.app",
-      "X-Title": "ذكاء - لعبة المسابقات",
+      "HTTP-Referer": "https://zaka.app",
+      "X-Title": "Zaka - Quiz Game",
     },
     body: JSON.stringify({
       model,

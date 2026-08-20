@@ -208,8 +208,8 @@ export function AiFreeChatTab() {
     return (
       <div className="flex flex-col items-center justify-center gap-6 py-16">
         <div className="relative">
-          <div className="absolute -inset-4 animate-pulse rounded-3xl bg-gradient-to-r from-red-500/20 via-purple-500/20 to-amber-500/20 blur-xl" />
-          <div className="relative flex size-24 items-center justify-center rounded-3xl border-2 border-red-500/30 bg-gradient-to-br from-red-950/80 via-purple-950/80 to-black/90 shadow-2xl">
+          <div className="absolute -inset-4 hidden" />
+          <div className="relative flex size-24 items-center justify-center rounded-3xl border-2 border-red-500/30 bg-red-900/20 shadow-2xl">
             <Lock className="size-10 text-red-400" />
           </div>
         </div>
@@ -257,7 +257,7 @@ export function AiFreeChatTab() {
   return (
     <div className="flex h-[70vh] flex-col gap-4">
       {/* Header */}
-      <Card className="border-red-500/20 bg-gradient-to-r from-red-950/50 via-purple-950/50 to-black/50">
+      <Card className="border-red-500/20 bg-red-50 dark:bg-red-950/30">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <div className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-purple-600">
@@ -314,7 +314,7 @@ export function AiFreeChatTab() {
               className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                 msg.role === "user"
                   ? "bg-primary text-primary-foreground"
-                  : "border border-red-500/20 bg-gradient-to-br from-red-950/60 to-purple-950/40"
+                  : "border border-red-500/20 bg-red-50 dark:bg-red-950/20"
               }`}
             >
               {msg.role === "assistant" && (
