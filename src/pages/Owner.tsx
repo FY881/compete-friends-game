@@ -57,6 +57,7 @@ import {
   Gamepad2,
   Gavel,
   Globe,
+  KeyRound,
   Link2,
   Loader2,
   Megaphone,
@@ -87,6 +88,7 @@ import { DownloadsTab } from "@/components/DownloadsTab";
 import { AiControlTab } from "@/components/AiControlTab";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
+import { AiSystemsTab } from "@/components/AiSystemsTab";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -2046,6 +2048,9 @@ export default function Owner() {
                   <TabsTrigger value="transparency" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Bot className="size-4" /> الصراحة المطلقة
                   </TabsTrigger>
+                  <TabsTrigger value="aisystems" className="gap-1.5 rounded-xl data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                    <KeyRound className="size-4" /> أنظمة AI السرية
+                  </TabsTrigger>
                   <TabsTrigger value="freechat" className="gap-1.5 rounded-xl data-[state=active]:bg-red-600 data-[state=active]:text-white">
                     <Skull className="size-4" /> AI حر
                   </TabsTrigger>
@@ -2096,6 +2101,9 @@ export default function Owner() {
                   </TabsContent>
                   <TabsContent value="transparency">
                     <AiTransparencyTab />
+                  </TabsContent>
+                  <TabsContent value="aisystems">
+                    <AiSystemsTab />
                   </TabsContent>
                   <TabsContent value="freechat">
                     <AiFreeChatTab />

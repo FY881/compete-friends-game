@@ -72,6 +72,7 @@ const SYSTEM_PROMPT = `أنت الذكاء الاصطناعي الحر والغ�
 export function AiFreeChatTab() {
   const [unlocked, setUnlocked] = useState(false);
   const [code, setCode] = useState("");
+  // API key loaded from settings
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
