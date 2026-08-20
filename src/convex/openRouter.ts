@@ -30,7 +30,7 @@ async function callOpenRouter(
     temperature?: number;
   },
 ): Promise<string> {
-  const model = options?.model ?? "meta-llama/llama-3.1-8b-instruct:free";
+  const model = options?.model ?? "meta-llama/llama-3.1-8b-instruct";
   const maxTokens = options?.maxTokens ?? 2048;
   const temperature = options?.temperature ?? 0.7;
 
