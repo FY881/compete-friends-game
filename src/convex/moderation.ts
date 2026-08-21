@@ -104,8 +104,8 @@ export async function callOpenRouter(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://nabaha.freebuff.app",
-      "X-Title": "ذكاء",
+      "HTTP-Referer": "https://zaka.freebuff.app",
+      "X-Title": "Zaka - Quiz Game",
     },
     body: JSON.stringify({
       model,
@@ -373,8 +373,8 @@ export const aiModerateContent = action({
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://nabaha.freebuff.app",
-        "X-Title": "ذكاء",
+        "HTTP-Referer": "https://zaka.freebuff.app",
+        "X-Title": "Zaka - Quiz Game",
       },
       body: JSON.stringify({
         model: settings.aiModel,
@@ -450,8 +450,8 @@ export const aiHelpDesk = action({
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://nabaha.freebuff.app",
-        "X-Title": "ذكاء",
+        "HTTP-Referer": "https://zaka.freebuff.app",
+        "X-Title": "Zaka - Quiz Game",
       },
       body: JSON.stringify({
         model: settings.aiModel,

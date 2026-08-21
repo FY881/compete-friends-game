@@ -1,21 +1,15 @@
-/* نباهة — service worker
+/* ذكاء — service worker
  * Network-first for navigations (the shell is always fresh), cache-first for
  * hashed static assets (safe: Vite fingerprints filenames), and the Convex
  * API (different origin) is never touched.
  *
- * IMPORTANT (fixed 2026-08-17): binary downloads (.apk) are NEVER intercepted.
+ * IMPORTANT: binary downloads (.apk) are NEVER intercepted.
  * The cache-first strategy would happily serve a stale or corrupted cached
- * copy of the APK, making the phone save a broken file — that is exactly what
- * causes "حدثت مشكلة عند تحليل الحزمة" (problem parsing the package). Every
+ * copy of the APK, making the phone save a broken file. Every
  * APK request now goes straight to the network, always, forever. */
 // Bump this cache name whenever you ship a new version — it forces every
 // installed PWA to discard the old app shell and fetch the fresh one.
-// (Part of the app update plan: web/PWA clients self-update on reload.)
-// v7: forces every installed PWA to drop the old app shell & fetch the
-// fresh one (part of the stale-shell fix that was breaking downloads).
-// v8: new build (renamed to نباهة + new features) — every installed PWA
-// drops the old shell and fetches the fresh one automatically.
-const CACHE = "nabaha-v8";
+const CACHE = "zaka-v9";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {

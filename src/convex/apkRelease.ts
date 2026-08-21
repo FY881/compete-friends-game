@@ -1,23 +1,18 @@
 /**
  * مصدر الحقيقة الوحيد لإصدار APK الرسمي.
- *
- * عند نشر نسخة APK جديدة (بعد إعادة البناء): حدّث البصمة والحجم هنا فقط —
- * وستنتشر تلقائياً لصفحة التحميل والفحص الآلي دون أي تعديل آخر.
- *
- * الإصدار 1.3.0: تنزيل فوري (بدون انتظار)، إصلاحات شاملة.
  */
 
 /** إصدار الويب/التطبيق المعروض للمستخدم. */
-export const CURRENT_VERSION = "1.3.0";
+export const CURRENT_VERSION = "1.4.0";
 
 /** إصدار الويب المستقل — يحرّك لافتة «تحديث متاح». */
-export const WEB_VERSION = "1.3.0";
+export const WEB_VERSION = "1.4.0";
 
 /** رقم البناء — يزداد مع كل تحديث ويب. */
-export const BUILD_ID = 8;
+export const BUILD_ID = 9;
 
 /** اسم ملف الـ APK الرسمي المنشور. */
-export const APK_FILE_NAME = "al-abqari-v1.3.0.apk";
+export const APK_FILE_NAME = "al-abqari-v1.4.0.apk";
 
 /** بصمة SHA-256 لملف APK الرسمي — أي ملف مختلف يُرفض قبل وصوله للهاتف. */
 export const APK_SHA256 =

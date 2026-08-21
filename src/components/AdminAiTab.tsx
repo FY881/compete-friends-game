@@ -150,6 +150,9 @@ function StatCard({
  * يراجع البلاغات ويطبّق العقوبات وينظّف الغرف ويرفع العقوبات على المتكررين،
  * ثم يكتب تقريراً جاهزاً بالإصلاحات يُرسل للمطوّر فيُطبَّق فوراً.
  */
+// Convex rejects non-ASCII field names, so perCategory keys are slugified on the server.
+const slugify = (s: string): string => s.replace(/[^\x20-\x7E]/g, "_");
+
 export function AdminAiTab({ settings }: { settings: SettingsData }) {
   const updateSettings = useMutation(api.owner.updateSettings);
   const reports = useQuery(api.owner.getAdminReports, {});
@@ -267,7 +270,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `nabaha-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.download = `zaka-backup-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -352,7 +355,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
               value={siteUrl}
               onChange={(e) => setSiteUrl(e.target.value)}
               dir="ltr"
-              placeholder="https://nabaha.example.com"
+              placeholder="https://zaka.example.com"
               className="rounded-xl ps-9 text-end font-mono text-sm"
               disabled={busy}
             />
@@ -360,7 +363,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <Link2 className="size-3.5 text-primary" />
-              مثال: https://nabaha.example.com — بدون شرطة مائلة في النهاية.
+              مثال: https://zaka.example.com — بدون شرطة مائلة في النهاية.
             </p>
             <Button onClick={saveSiteUrl} disabled={busy} variant="outline" className="gap-1.5 rounded-xl">
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
@@ -741,7 +744,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>
-                      {c} ({(aiQueue?.perCategory[c] ?? 0)} نشط)
+                      {c} ({(aiQueue?.perCategory[slugify(c)] ?? 0)} نشط)
                     </option>
                   ))}
                 </select>
