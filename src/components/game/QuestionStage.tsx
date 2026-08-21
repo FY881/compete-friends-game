@@ -114,6 +114,7 @@ export function QuestionStage({
   const [hiddenOptions, setHiddenOptions] = useState<number[]>([]);
   const [cheatNotice, setCheatNotice] = useState<string | null>(null);
   const reportedFor = useRef<number | null>(null);
+  const submitRef = useRef<(idx: number) => void>(() => {});
   const now = useNow(200);
   const prevPhase = useRef(game.game.phase);
 
@@ -150,6 +151,12 @@ export function QuestionStage({
   const firstCorrectName = firstCorrectId
     ? game.players.find((p) => p.id === firstCorrectId)?.name ?? null
     : null;
+
+  // AI Hint hooks — MUST be before any early returns (React Rules of Hooks)
+  const getAiHint = useAction(api.openRouter.getAiHint);
+  const [aiHint, setAiHint] = useState<string | null>(null);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [hintUsed, setHintUsed] = useState(false);
 
   // Fresh lifeline + cheat notice state for every question.
   useEffect(() => {
@@ -231,6 +238,21 @@ export function QuestionStage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // Keyboard shortcuts: 1–4 pick an option.
+  useEffect(() => {
+    if (isRevealing || timeUp) return;
+    if (myAnswer && !canRetry) return;
+    const handler = (event: KeyboardEvent) => {
+      const num = parseInt(event.key, 10);
+      if (num >= 1 && num <= 4 && !hiddenOptions.includes(num - 1)) {
+        void submitRef.current(num - 1);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRevealing, myAnswer, timeUp, hiddenOptions, submitting, question]);
+
   if (!question) {
     return null;
   }
@@ -288,21 +310,7 @@ export function QuestionStage({
       setSubmitting(false);
     }
   };
-
-  // Keyboard shortcuts: 1–4 pick an option.
-  useEffect(() => {
-    if (isRevealing || timeUp) return;
-    if (myAnswer && !canRetry) return;
-    const handler = (event: KeyboardEvent) => {
-      const num = parseInt(event.key, 10);
-      if (num >= 1 && num <= 4 && !hiddenOptions.includes(num - 1)) {
-        void submit(num - 1);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRevealing, myAnswer, timeUp, hiddenOptions, submitting, question]);
+  submitRef.current = submit;
 
   const fiftyUsed = me.fiftyFiftyUsed;
   const handleFifty = async () => {
@@ -324,12 +332,6 @@ export function QuestionStage({
       setFiftyLoading(false);
     }
   };
-
-  // AI Hint
-  const getAiHint = useAction(api.openRouter.getAiHint);
-  const [aiHint, setAiHint] = useState<string | null>(null);
-  const [hintLoading, setHintLoading] = useState(false);
-  const [hintUsed, setHintUsed] = useState(false);
 
   const handleAiHint = async () => {
     if (hintLoading || hintUsed || myAnswer || isRevealing) return;

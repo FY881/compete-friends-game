@@ -1,4 +1,5 @@
 import '@vly-ai/integrations';
+import './hooks/no-hooks-after-return';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
