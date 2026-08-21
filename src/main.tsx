@@ -1,5 +1,4 @@
 import '@vly-ai/integrations';
-import './hooks/no-hooks-after-return';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
@@ -24,11 +23,11 @@ const Download = lazy(() => import("./pages/Download.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const MiniGames = lazy(() => import("./pages/MiniGames.tsx"));
 
-// Simple loading fallback for route transitions
+// Simple loading fallback for route transitions — all Arabic
 function RouteLoading() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-pulse text-muted-foreground">Loading...</div>
+    <div dir="rtl" className="min-h-screen flex items-center justify-center">
+      <div className="animate-pulse text-muted-foreground">جارٍ التحميل…</div>
     </div>
   );
 }
