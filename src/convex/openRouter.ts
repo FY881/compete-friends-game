@@ -416,7 +416,7 @@ export const chatFree = action({
     ];
 
     const reply = await callOpenRouter(apiKey, messages, {
-      model: "meta-llama/llama-3.1-8b-instruct:free",
+      model: "meta-llama/llama-3.1-8b-instruct",
       maxTokens: 2048,
       temperature: 0.9,
     });
