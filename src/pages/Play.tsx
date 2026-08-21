@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   ArrowLeft,
-  BrainCircuit,
   Copy,
   Crown,
   Download,

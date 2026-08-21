@@ -579,7 +579,7 @@ function PatternMatch({ onComplete, onExit }: MiniGameProps) {
 function WordChain({ onComplete, onExit }: MiniGameProps) {
   const words = ["ذكاء", "ة", " gioc", "gt", "top", "puzzle", "ل", "لغز", "ز"];
   const pairs = [
-    ["ذكاء", "ة"], ["ذكاء", "اء"], ["胜负", "胜"],
+    ["ذكاء", "ة"], ["ذكاء", "اء"], ["الفوز", "وز"],
   ];
   const [current, setCurrent] = useState(0);
   const [score, setScore] = useState(0);
@@ -879,7 +879,7 @@ const GAME_CATEGORIES: GameCategory[] = [
     icon: Eye,
     color: "text-teal-600 bg-teal-500/10",
     games: [
-      { id: "vis1", name: "Pattern初级", description: "اكتشف النمط", difficulty: "easy", players: "1", xpReward: 50, timeLimit: 45, component: PatternMatch },
+      { id: "vis1", name: "نمط بصري", description: "اكتشف النمط", difficulty: "easy", players: "1", xpReward: 50, timeLimit: 45, component: PatternMatch },
       { id: "vis2", name: "ColorGenius", description: "عبقري الألوان", difficulty: "medium", players: "1", xpReward: 75, timeLimit: 40, component: ColorMatch },
       { id: "vis3", name: "VisMem", description: "ذاكرة بصرية", difficulty: "medium", players: "1", xpReward: 80, timeLimit: 50, component: PatternMatch },
       { id: "vis4", name: "PatternMaster", description: "سيد الأنماط", difficulty: "hard", players: "1", xpReward: 100, timeLimit: 35, component: PatternMatch },

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import type { GameData } from "@/convex/games";
 import { cn } from "@/lib/utils";
-import { Crown, Flame, Zap } from "lucide-react";
+import { Crown, Flame } from "lucide-react";
 
 type Player = GameData["players"][number];
 

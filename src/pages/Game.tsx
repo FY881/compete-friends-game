@@ -12,7 +12,6 @@ import { QuestionStage } from "@/components/game/QuestionStage";
 import { ResultsStage } from "@/components/game/ResultsStage";
 import { copyText } from "@/components/game/ui";
 import {
-  BrainCircuit,
   Copy,
   Home,
   Loader2,

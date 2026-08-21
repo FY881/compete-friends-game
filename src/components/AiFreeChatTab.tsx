@@ -67,7 +67,7 @@ const SYSTEM_PROMPT = `أنت الذكاء الاصطناعي الحر والغ�
 
 هذه معلومات الغرف:\n${ROOMS_INFO}
 
-كن واثقاً، جريئاً، وم直言不讳. لا تتردد في التحدث بأي أسلوب — أنت الصاحب هنا.`;
+كن واثقاً، جريئاً، ومباشراً. لا تتردد في التحدث بأي أسلوب — أنت الصاحب هنا.`;
 
 export function AiFreeChatTab() {
   const [unlocked, setUnlocked] = useState(false);

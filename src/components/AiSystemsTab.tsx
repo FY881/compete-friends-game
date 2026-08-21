@@ -437,7 +437,7 @@ export function AiSystemsTab() {
           <div className="flex justify-start">
             <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card px-4 py-3">
               <Loader2 className="size-4 animate-spin text-violet-500" />
-              <span className="text-sm text-muted-foreground">ي思索...</span>
+              <span className="text-sm text-muted-foreground">يفكر...</span>
             </div>
           </div>
         )}
@@ -464,7 +464,7 @@ export function AiSystemsTab() {
               variant="outline"
               size="sm"
               onClick={() => {
-                setInput("اعطيني 5 توصيات عملية و动手ية");
+                setInput("اعطيني 5 توصيات عملية وعملية");
               }}
               disabled={loading}
               className="gap-1.5 rounded-full text-xs"
