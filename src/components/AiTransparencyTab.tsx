@@ -86,7 +86,7 @@ export function AiTransparencyTab() {
       const res = await chat({
         apiKey,
         message: text,
-        conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
+        conversationHistory: messages.map(m => ({ role: m.role === "ai" ? "assistant" : m.role, content: m.content })),
       });
       setMessages(prev => [
         ...prev,

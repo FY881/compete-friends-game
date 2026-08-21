@@ -30,7 +30,7 @@ async function callOpenRouter(
     temperature?: number;
   },
 ): Promise<string> {
-  const model = options?.model ?? "meta-llama/llama-3.1-8b-instruct";
+  const model = options?.model ?? "deepseek/deepseek-chat-v3-0324:free";
   const maxTokens = options?.maxTokens ?? 2048;
   const temperature = options?.temperature ?? 0.7;
 
@@ -416,7 +416,7 @@ export const chatFree = action({
     ];
 
     const reply = await callOpenRouter(apiKey, messages, {
-      model: "meta-llama/llama-3.1-8b-instruct",
+      model: "deepseek/deepseek-chat-v3-0324:free",
       maxTokens: 2048,
       temperature: 0.9,
     });
