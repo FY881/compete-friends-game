@@ -201,7 +201,7 @@ export const DEFAULT_SETTINGS: ModSettings = {
   announcementActive: false,
   antiCheatEnabled: true,
   disabledQuestions: [],
-  siteUrl: "",    openrouterApiKey: "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",
+  siteUrl: "",    openrouterApiKey: "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",
 };
 
 export async function getSettingsData(

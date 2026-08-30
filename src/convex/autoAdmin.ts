@@ -15,6 +15,7 @@ import {
 } from "./owner";
 import { callOpenRouter, parseVerdict, type AiVerdict } from "./moderation";
 import { APK_BYTES, APK_FILE_NAME, APK_MIRROR_URL, APK_SHA256 } from "./apkRelease";
+import { getOpenRouterKey } from "./aiConfig";
 
 // ---------------------------------------------------------------------------
 // «المدير الآلي» — ذكاء اصطناعي يدير شؤون الموقع تلقائياً.
@@ -65,7 +66,7 @@ async function performSweep(ctx: {
   );
   if (!settings.aiAdminEnabled) return; // the owner turned the administrator off
 
-  const apiKey = process.env.OPENROUTER_API_KEY ?? "";
+  const apiKey = getOpenRouterKey();
   const issues: SweepIssue[] = [];
   let reportsReviewed = 0;
   let punishmentsApplied = 0;

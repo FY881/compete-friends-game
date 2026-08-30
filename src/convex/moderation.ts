@@ -8,6 +8,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getSettingsData, isStaffUser } from "./owner";
+import { getOpenRouterKey } from "./aiConfig";
 
 // ---------------------------------------------------------------------------
 // AI moderation agent — "رقيب العقول".
@@ -283,7 +284,7 @@ export const handleReport = internalAction({
       if (!report) return;
       if (!settings.aiEnabled) return;
 
-      const apiKey = process.env.OPENROUTER_API_KEY;
+      const apiKey = getOpenRouterKey();
       if (!apiKey) {
         await ctx.runMutation(internal.moderation.recordAiReview, {
           reportId,
@@ -356,7 +357,7 @@ export const aiModerateContent = action({
       {},
     );
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = getOpenRouterKey();
     if (!apiKey) {
       throw new Error(
         "مفتاح OpenRouter غير مضبوط — أضِفه في تبويب المفاتيح (OPENROUTER_API_KEY)",
@@ -438,7 +439,7 @@ export const aiHelpDesk = action({
       internal.moderation.getModSettingsForReview,
       {},
     );
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = getOpenRouterKey();
     if (!apiKey) {
       throw new Error(
         "مفتاح OpenRouter غير مضبوط — أضِفه في تبويب المفاتيح (OPENROUTER_API_KEY)",

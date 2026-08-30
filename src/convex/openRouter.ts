@@ -16,20 +16,11 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
+import { FREE_MODELS } from "./aiConfig";
 
 // ═══════════════════════════════════════════════════════════════
 // OpenRouter API Helper
 // ═══════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════
-// نماذج مجانية مجربة — نبدأ بالأول وننتقل للأدنى عند الفشل
-// ═══════════════════════════════════════════════════════════════════════════
-const FREE_MODELS = [
-  "google/gemma-2-9b-it:free",
-  "meta-llama/llama-3.1-8b-instruct:free",
-  "mistralai/mistral-small-3.1-24b-instruct:free",
-  "qwen/qwen3-8b:free",
-];
 
 async function callOpenRouter(
   apiKey: string,
