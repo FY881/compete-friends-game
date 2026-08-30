@@ -5,10 +5,12 @@ import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import React, { StrictMode, useEffect, lazy, Suspense } from "react";
+import React, { StrictMode, useEffect, lazy, Suspense, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import { ErrorHunter } from "@/components/ErrorHunter";
+import { SplashScreen } from "@/components/SplashScreen";
 import "./index.css";
 
 // Lazy load route components for better code splitting
@@ -79,7 +81,7 @@ class RootErrorBoundary extends React.Component<
     };
   }
   componentDidCatch(err: Error) {
-    console.error("[ذكاء] Root crash:", err);
+    console.error("[تحدي العقول] Root crash:", err);
     reportRuntimeError(err.message || "Unknown", err.stack);
   }
   render() {
@@ -195,14 +197,19 @@ function RouteSyncer() {
 }
 
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <RootErrorBoundary>
-      <ToolbarErrorBoundary>
-        <VlyToolbar />
-      </ToolbarErrorBoundary>
-      <ConvexAuthProvider client={convex}>
-        <BrowserRouter>
+function AppShell() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (showSplash) return <SplashScreen />;
+
+  return (
+    <ConvexAuthProvider client={convex}>
+      <BrowserRouter>
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>
             <Routes>
@@ -252,6 +259,18 @@ createRoot(document.getElementById("root")!).render(
         </BrowserRouter>
         <Toaster />
       </ConvexAuthProvider>
+    );
+}
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <RootErrorBoundary>
+      <ToolbarErrorBoundary>
+        <VlyToolbar />
+      </ToolbarErrorBoundary>
+      <ErrorHunter>
+        <AppShell />
+      </ErrorHunter>
     </RootErrorBoundary>
   </StrictMode>,
 );

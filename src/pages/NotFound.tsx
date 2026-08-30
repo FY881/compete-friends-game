@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { BrainCircuit, Compass, Home } from "lucide-react";
+import { Compass, Home, Sparkles } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 
@@ -47,7 +47,7 @@ export default function NotFound() {
             </Button>
             <Button asChild size="lg" variant="outline" className="gap-2 rounded-xl px-7">
               <Link to="/play">
-                <BrainCircuit className="size-4" />
+                <Sparkles className="size-4" />
                 ابدأ التحدي
               </Link>
             </Button>

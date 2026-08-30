@@ -1,4 +1,4 @@
-/* ذكاء — service worker
+/* تحدي العقول — service worker
  * Network-first for navigations (the shell is always fresh), cache-first for
  * hashed static assets (safe: Vite fingerprints filenames), and the Convex
  * API (different origin) is never touched.
@@ -9,7 +9,7 @@
  * APK request now goes straight to the network, always, forever. */
 // Bump this cache name whenever you ship a new version — it forces every
 // installed PWA to discard the old app shell and fetch the fresh one.
-const CACHE = "zaka-v12";
+const CACHE = "zaka-v13";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
