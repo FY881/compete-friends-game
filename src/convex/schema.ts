@@ -656,6 +656,27 @@ const schema = defineSchema(
       deadline: v.number(),
       createdAt: v.number(),
     }).index("by_active", ["active"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ ذاكرة AI حر الدائمة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    aiFreeMemory: defineTable({
+      sessionId: v.string(),
+      role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+      content: v.string(),
+      metadata: v.optional(v.string()), // JSON string for extra data
+      createdAt: v.number(),
+    }).index("by_session", ["sessionId"]).index("by_time", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ سجل أوامر AI حر التنفيذية ║
+    // ═══════════════════════════════════════════════════════════════════════
+    aiFreeCommands: defineTable({
+      command: v.string(),
+      result: v.string(),
+      success: v.boolean(),
+      executedAt: v.number(),
+    }).index("by_time", ["executedAt"]),
   },
   {
     schemaValidation: false,

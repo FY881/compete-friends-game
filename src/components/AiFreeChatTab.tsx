@@ -77,7 +77,7 @@ export function AiFreeChatTab() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatFreeAction = useAction(api.openRouter.chatFree);
+  const executeCommand = useAction(api.aiFree.executeCommand);
   const settings = useQuery(api.owner.getSettings);
 
   const scrollToBottom = useCallback(() => {
@@ -135,13 +135,9 @@ export function AiFreeChatTab() {
     setLoading(true);
 
     try {
-      const result = await chatFreeAction({
-        apiKey: settings.openrouterApiKey,
-        message: userMsg.content,
-        history: messages.slice(-10).map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
+      const result = await executeCommand({
+        command: userMsg.content,
+        sessionId: "owner-free-chat",
       });
 
       setMessages((prev) => [
@@ -179,13 +175,9 @@ export function AiFreeChatTab() {
     setLoading(true);
 
     try {
-      const result = await chatFreeAction({
-        apiKey: settings.openrouterApiKey,
-        message: cmd,
-        history: messages.slice(-10).map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
+      const result = await executeCommand({
+        command: cmd,
+        sessionId: "owner-free-chat",
       });
 
       setMessages((prev) => [

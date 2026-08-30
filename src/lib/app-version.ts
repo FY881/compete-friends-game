@@ -34,14 +34,14 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "1.5.3"; // client version — matches server WEB_VERSION 1.4.0
+export const APP_VERSION = "1.5.4"; // client version — matches server WEB_VERSION 1.4.0
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
-export const APK_VERSION = "1.5.3";
+export const APK_VERSION = "1.5.4";
 
 /** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
-export const APK_FALLBACK_FILE = "al-abqari-v1.5.3.apk";
-export const APK_TMPFILES_URL = "https://tmpfiles.org/dl/wKweBf8TULPr/al-abqari-v1.5.3.apk";
+export const APK_FALLBACK_FILE = "al-abqari-v1.5.4.apk";
+export const APK_TMPFILES_URL = "https://tmpfiles.org/dl/wbw4Bx89Dv0g/al-abqari-v1.5.4.apk";
 
 /**
  * مرآة موثّقة احتياطية لملف APK (مصدرها `apkRelease.ts` على الخادم —
@@ -54,7 +54,7 @@ export const APK_TMPFILES_URL = "https://tmpfiles.org/dl/wKweBf8TULPr/al-abqari-
  * يُحدّث تلقائياً عند كل إصدار جديد.
  */
 export const APK_PRIMARY_DOWNLOAD_URL =
-  "https://tmpfiles.org/dl/wKweBf8TULPr/al-abqari-v1.5.3.apk";
+  "https://tmpfiles.org/dl/wbw4Bx89Dv0g/al-abqari-v1.5.4.apk";
 
 /** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
 export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;
