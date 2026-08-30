@@ -85,7 +85,7 @@ function PlayersControl() {
   const resetProgress = useMutation(api.playerControl.resetPlayerProgress);
   const clearCache = useMutation(api.playerControl.clearPlayerCache);
   const sendNotif = useMutation(api.playerControl.sendNotification);
-  const monitorPlayer = useMutation(api.playerControl.monitorPlayer as any);
+  // monitorPlayer is a query, not mutation - handled below
 
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);

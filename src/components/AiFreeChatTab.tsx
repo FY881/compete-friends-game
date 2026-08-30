@@ -28,7 +28,7 @@ import {
   Users,
 } from "lucide-react";
 
-const SECRET_CODE = "ذكاء2025";
+const SECRET_CODE = "OMAR450op20@K#";
 
 interface ChatMessage {
   role: "user" | "assistant";

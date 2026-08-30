@@ -3,10 +3,10 @@
  */
 
 /** إصدار الويب/التطبيق المعروض للمستخدم. */
-export const CURRENT_VERSION = "1.5.2";
+export const CURRENT_VERSION = "1.5.3";
 
 /** إصدار الويب المستقل — يحرّك لافتة «تحديث متاح». */
-export const WEB_VERSION = "1.5.2";
+export const WEB_VERSION = "1.5.3";
 
 /** رقم البناء — يزداد مع كل تحديث ويب. */
 export const BUILD_ID = 9;
