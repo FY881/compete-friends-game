@@ -21,6 +21,16 @@ import { v } from "convex/values";
 // OpenRouter API Helper
 // ═══════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// نماذج مجانية مجربة — نبدأ بالأول وننتقل للأدنى عند الفشل
+// ═══════════════════════════════════════════════════════════════════════════
+const FREE_MODELS = [
+  "google/gemma-2-9b-it:free",
+  "meta-llama/llama-3.1-8b-instruct:free",
+  "mistralai/mistral-small-3.1-24b-instruct:free",
+  "qwen/qwen3-8b:free",
+];
+
 async function callOpenRouter(
   apiKey: string,
   messages: Array<{ role: string; content: string }>,
@@ -30,33 +40,58 @@ async function callOpenRouter(
     temperature?: number;
   },
 ): Promise<string> {
-  const model = options?.model ?? "deepseek/deepseek-chat-v3-0324:free";
+  const requestedModel = options?.model;
   const maxTokens = options?.maxTokens ?? 2048;
   const temperature = options?.temperature ?? 0.7;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://zaka.app",
-      "X-Title": "Zaka - Quiz Game",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-    }),
-  });
+  // If caller specified a non-free model, use it directly.
+  // Otherwise, try free models with automatic fallback.
+  const modelsToTry = requestedModel
+    ? [requestedModel]
+    : [...FREE_MODELS];
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenRouter API error (${response.status}): ${err}`);
+  let lastError = "";
+
+  for (const model of modelsToTry) {
+    try {
+      const response = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://zaka.app",
+            "X-Title": "Zaka - Quiz Game",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            max_tokens: maxTokens,
+            temperature,
+          }),
+        },
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) return content;
+      }
+
+      const err = await response.text();
+      lastError = `(${model}): ${response.status} ${err}`;
+
+      // 404 = model unavailable, try next. Other errors = stop.
+      if (response.status !== 404) break;
+    } catch (e) {
+      lastError = `(${model}): ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content ?? "";
+  throw new Error(
+    `OpenRouter API error: جميع النماذج المجانية غير متاحة حالياً. ${lastError}`,
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -416,7 +451,6 @@ export const chatFree = action({
     ];
 
     const reply = await callOpenRouter(apiKey, messages, {
-      model: "deepseek/deepseek-chat-v3-0324:free",
       maxTokens: 2048,
       temperature: 0.9,
     });

@@ -68,6 +68,7 @@ import {
   Scale,
   Search,
   Shield,
+  Bug,
   ShieldCheck,
   Skull,
   Smartphone,
@@ -90,6 +91,7 @@ import { OwnerControlPanel } from "@/components/OwnerControlPanel";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 import { AiSystemsTab } from "@/components/AiSystemsTab";
+import { ProblemsTab } from "@/components/ProblemsTab";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -2058,6 +2060,9 @@ export default function Owner() {
                   <TabsTrigger value="freechat" className="gap-1.5 rounded-xl data-[state=active]:bg-red-600 data-[state=active]:text-white">
                     <Skull className="size-4" /> AI حر
                   </TabsTrigger>
+                  <TabsTrigger value="problems" className="gap-1.5 rounded-xl data-[state=active]:bg-rose-600 data-[state=active]:text-white">
+                    <Bug className="size-4" /> المشاكل
+                  </TabsTrigger>
                   <TabsTrigger value="downloads" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Smartphone className="size-4" /> التحميل
                   </TabsTrigger>
@@ -2114,6 +2119,9 @@ export default function Owner() {
               </TabsContent>
               <TabsContent value="freechat">
                     <AiFreeChatTab />
+                  </TabsContent>
+              <TabsContent value="problems">
+                    <ProblemsTab />
                   </TabsContent>
                   <TabsContent value="downloads">
                     <DownloadsTab />
