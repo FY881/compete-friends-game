@@ -26,6 +26,7 @@ import {
   Trophy,
   Zap,
 } from "lucide-react";
+import { AchievementsPanel, GiftsPanel, ArchivePanel, InvitePanel, CollectiveGoalsPanel, PerformanceAnalysis, SeasonBadge } from "@/components/PlayerFeatures";
 import { useNavigate } from "react-router";
 
 function avatarColor(name: string) {
@@ -453,6 +454,27 @@ export default function Profile() {
             <p className="text-xs text-muted-foreground leading-relaxed">
               سجّل دخولك يومياً واحصل على مكافآت XP إضافية!
             </p>
+          </div>
+        </div>
+
+        {/* ════ 15 ميزة جديدة ════ */}
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="size-5 text-primary" />
+            <h2 className="text-lg font-bold">مميزات إضافية</h2>
+            <SeasonBadge />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <AchievementsPanel />
+            <GiftsPanel />
+            <InvitePanel />
+            <CollectiveGoalsPanel />
+          </div>
+          <div className="mt-4">
+            <PerformanceAnalysis profile={profile} />
+          </div>
+          <div className="mt-4">
+            <ArchivePanel />
           </div>
         </div>
         </div>
