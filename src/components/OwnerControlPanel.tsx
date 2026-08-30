@@ -304,7 +304,7 @@ function Power20Features() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs">�权 صلاحيات مؤقتة</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-xs">�صلاحيات مؤقتة</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             <Input placeholder="الصلاحيات (مفصولة بفاصلة)" value={tokenPerm} onChange={(e) => setTokenPerm(e.target.value)} className="text-xs" />
             <Button size="sm" onClick={() => { if (tokenPerm) { createToken({ userId: "temporary" as any, permissions: tokenPerm.split(","), permanent: false, durationHours: 24 }); toast("تم إنشاء التوكن"); } }}>إنشاء توكن</Button>
