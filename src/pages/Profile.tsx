@@ -402,6 +402,8 @@ export default function Profile() {
             <ArrowRight className="size-4" />
             العودة لصفحة اللعب
           </Button>
+        </div>
+
         {/* AI Analysis Card */}
         <div className="mt-8">
           <div className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-amber-500/5 p-6 text-center">
@@ -476,7 +478,6 @@ export default function Profile() {
           <div className="mt-4">
             <ArchivePanel />
           </div>
-        </div>
         </div>
       </main>
     </div>
