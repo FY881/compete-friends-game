@@ -9,7 +9,7 @@
  * APK request now goes straight to the network, always, forever. */
 // Bump this cache name whenever you ship a new version — it forces every
 // installed PWA to discard the old app shell and fetch the fresh one.
-const CACHE = "zaka-v14";
+const CACHE = "zaka-v15";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {

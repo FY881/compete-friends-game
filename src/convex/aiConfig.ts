@@ -29,14 +29,15 @@ export function getOpenRouterKey(providedKey?: string | null): string {
 }
 
 /**
- * النماذج المجانية المتاحة — يُجربها بالترتيب عند الفشل
+ * النموذج الافتراضي — openrouter/free هو موزّع ذكي يختار تلقائياً
+ * نموذجاً مجانياً متاحاً. جميع النماذج الفردية بـ :free انتهت.
  */
 export const FREE_MODELS = [
-  "google/gemma-2-9b-it:free",
-  "meta-llama/llama-3.1-8b-instruct:free",
-  "mistralai/mistral-small-3.1-24b-instruct:free",
-  "qwen/qwen3-8b:free",
+  "openrouter/free",
 ];
+
+/** النموذج الافتراضي لكل الاستدعاءات */
+export const DEFAULT_MODEL = "openrouter/free";
 
 /**
  * معلومات النظام للتشخيص

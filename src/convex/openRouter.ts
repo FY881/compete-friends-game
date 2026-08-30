@@ -16,7 +16,7 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { FREE_MODELS } from "./aiConfig";
+import { DEFAULT_MODEL } from "./aiConfig";
 
 // ═══════════════════════════════════════════════════════════════
 // OpenRouter API Helper
@@ -31,58 +31,38 @@ async function callOpenRouter(
     temperature?: number;
   },
 ): Promise<string> {
-  const requestedModel = options?.model;
+  const model = options?.model ?? DEFAULT_MODEL;
   const maxTokens = options?.maxTokens ?? 2048;
   const temperature = options?.temperature ?? 0.7;
 
-  // If caller specified a non-free model, use it directly.
-  // Otherwise, try free models with automatic fallback.
-  const modelsToTry = requestedModel
-    ? [requestedModel]
-    : [...FREE_MODELS];
+  const response = await fetch(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://zaka.app",
+        "X-Title": "Zaka - Quiz Game",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    },
+  );
 
-  let lastError = "";
-
-  for (const model of modelsToTry) {
-    try {
-      const response = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://zaka.app",
-            "X-Title": "Zaka - Quiz Game",
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            max_tokens: maxTokens,
-            temperature,
-          }),
-        },
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content) return content;
-      }
-
-      const err = await response.text();
-      lastError = `(${model}): ${response.status} ${err}`;
-
-      // 404 = model unavailable, try next. Other errors = stop.
-      if (response.status !== 404) break;
-    } catch (e) {
-      lastError = `(${model}): ${e instanceof Error ? e.message : String(e)}`;
-    }
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`OpenRouter API error (${response.status}): ${err}`);
   }
 
-  throw new Error(
-    `OpenRouter API error: جميع النماذج المجانية غير متاحة حالياً. ${lastError}`,
-  );
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("OpenRouter returned empty response");
+  return content;
 }
 
 // ═══════════════════════════════════════════════════════════════
