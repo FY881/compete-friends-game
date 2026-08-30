@@ -34,13 +34,14 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "1.5.0"; // client version — matches server WEB_VERSION 1.4.0
+export const APP_VERSION = "1.5.1"; // client version — matches server WEB_VERSION 1.4.0
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
-export const APK_VERSION = "1.5.0";
+export const APK_VERSION = "1.5.1";
 
 /** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
-export const APK_FALLBACK_FILE = "al-abqari-v1.5.0.apk";
+export const APK_FALLBACK_FILE = "al-abqari-v1.5.1.apk";
+export const APK_TMPFILES_URL = "https://tmpfiles.org/dl/wKw9Brx3Wxzj/al-abqari-v1.5.1.apk";
 
 /**
  * مرآة موثّقة احتياطية لملف APK (مصدرها `apkRelease.ts` على الخادم —
@@ -53,12 +54,12 @@ export const APK_FALLBACK_FILE = "al-abqari-v1.5.0.apk";
  * يُحدّث تلقائياً عند كل إصدار جديد.
  */
 export const APK_PRIMARY_DOWNLOAD_URL =
-  "https://tmpfiles.org/dl/wdwaBnqeYyX1/al-abqari-v1.5.0.apk";
+  "https://tmpfiles.org/dl/wKw9Brx3Wxzj/al-abqari-v1.5.1.apk";
 
 /** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
 export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;
 
-export const APP_VERSION_LABEL = `ذكاء ${APP_VERSION}`;
+export const APP_VERSION_LABEL = `تحدي العقول ${APP_VERSION}`;
 
 /** هل هذه نسخة تطبيق أندرويد الأصلية (WebView على https://localhost)؟ */
 function isNativeApp(): boolean {
