@@ -86,6 +86,7 @@ import { APP_VERSION } from "@/lib/app-version";
 import { AdminAiTab } from "@/components/AdminAiTab";
 import { DownloadsTab } from "@/components/DownloadsTab";
 import { AiControlTab } from "@/components/AiControlTab";
+import { OwnerControlPanel } from "@/components/OwnerControlPanel";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 import { AiSystemsTab } from "@/components/AiSystemsTab";
@@ -2051,6 +2052,9 @@ export default function Owner() {
                   <TabsTrigger value="aisystems" className="gap-1.5 rounded-xl data-[state=active]:bg-purple-600 data-[state=active]:text-white">
                     <KeyRound className="size-4" /> أنظمة AI السرية
                   </TabsTrigger>
+                  <TabsTrigger value="powercontrol" className="gap-1.5 rounded-xl data-[state=active]:bg-amber-600 data-[state=active]:text-white">
+                    <Crown className="size-4" /> السيطرة الكاملة
+                  </TabsTrigger>
                   <TabsTrigger value="freechat" className="gap-1.5 rounded-xl data-[state=active]:bg-red-600 data-[state=active]:text-white">
                     <Skull className="size-4" /> AI حر
                   </TabsTrigger>
@@ -2105,7 +2109,10 @@ export default function Owner() {
                   <TabsContent value="aisystems">
                     <AiSystemsTab />
                   </TabsContent>
-                  <TabsContent value="freechat">
+                  <TabsContent value="powercontrol">
+                <OwnerControlPanel />
+              </TabsContent>
+              <TabsContent value="freechat">
                     <AiFreeChatTab />
                   </TabsContent>
                   <TabsContent value="downloads">

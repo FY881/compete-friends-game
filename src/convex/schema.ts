@@ -331,6 +331,331 @@ const schema = defineSchema(
       lastSyncAt: v.optional(v.number()),
       lastError: v.optional(v.string()),
     }).index("by_key", ["key"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ نظام العضويات المتعددة (فضي/ذهبي/ماسي/خاصة) ║
+    // ═══════════════════════════════════════════════════════════════════════
+    memberships: defineTable({
+      userId: v.id("users"),
+      tier: v.union(
+        v.literal("bronze"),
+        v.literal("silver"),
+        v.literal("gold"),
+        v.literal("diamond"),
+        v.literal("exclusive"),
+      ),
+      activatedAt: v.number(),
+      expiresAt: v.optional(v.number()), // null = permanent
+      codeUsed: v.optional(v.string()),
+      features: v.array(v.string()),
+    }).index("by_user", ["userId"]).index("by_tier", ["tier"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ أكواد العضوية (تُصدر من غرفة المالك) ║
+    // ═══════════════════════════════════════════════════════════════════════
+    membershipCodes: defineTable({
+      code: v.string(),
+      tier: v.union(
+        v.literal("bronze"),
+        v.literal("silver"),
+        v.literal("gold"),
+        v.literal("diamond"),
+        v.literal("exclusive"),
+      ),
+      durationDays: v.optional(v.number()), // null = permanent
+      maxUses: v.number(),
+      usedCount: v.number(),
+      usedBy: v.array(v.id("users")),
+      active: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_code", ["code"]).index("by_active", ["active"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ غرف المناقشة المتطورة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    chatRooms: defineTable({
+      name: v.string(),
+      description: v.optional(v.string()),
+      type: v.union(
+        v.literal("public"),
+        v.literal("private"),
+        v.literal("password"),
+        v.literal("invite"),
+      ),
+      password: v.optional(v.string()),
+      inviteCode: v.optional(v.string()),
+      ownerId: v.id("users"),
+      members: v.array(v.id("users")),
+      admins: v.array(v.id("users")),
+      pinnedMessageId: v.optional(v.string()),
+      archived: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_owner", ["ownerId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ رسائل المناقشة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    chatMessages: defineTable({
+      roomId: v.id("chatRooms"),
+      senderId: v.id("users"),
+      senderName: v.string(),
+      content: v.string(),
+      type: v.union(
+        v.literal("text"),
+        v.literal("image"),
+        v.literal("poll"),
+        v.literal("system"),
+      ),
+      pinned: v.boolean(),
+      deleted: v.boolean(),
+      reactions: v.array(v.object({ emoji: v.string(), userId: v.id("users") })),
+      replyTo: v.optional(v.string()),
+      createdAt: v.number(),
+    }).index("by_room", ["roomId"]).index("by_sender", ["senderId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ الإشعارات الفورية ║
+    // ═══════════════════════════════════════════════════════════════════════
+    notifications: defineTable({
+      userId: v.union(v.literal("__all__"), v.id("users")),
+      title: v.string(),
+      body: v.string(),
+      type: v.union(
+        v.literal("info"),
+        v.literal("warning"),
+        v.literal("ban"),
+        v.literal("update"),
+        v.literal("system"),
+      ),
+      read: v.boolean(),
+      actionUrl: v.optional(v.string()),
+      createdAt: v.number(),
+    }).index("by_user", ["userId"]).index("by_read", ["read"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ التوكنات المؤقتة للصلاحيات ║
+    // ═══════════════════════════════════════════════════════════════════════
+    permissionTokens: defineTable({
+      token: v.string(),
+      userId: v.id("users"),
+      permissions: v.array(v.string()),
+      permanent: v.boolean(),
+      expiresAt: v.optional(v.number()),
+      usedCount: v.number(),
+      active: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_token", ["token"]).index("by_user", ["userId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ سجل أفعال المالك ║
+    // ═══════════════════════════════════════════════════════════════════════
+    ownerActions: defineTable({
+      action: v.string(),
+      targetUserId: v.optional(v.id("users")),
+      targetName: v.optional(v.string()),
+      details: v.string(),
+      reversible: v.boolean(),
+      undone: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ نسخ احتياطي لبيانات اللاعب ║
+    // ═══════════════════════════════════════════════════════════════════════
+    playerBackups: defineTable({
+      userId: v.id("users"),
+      backupData: v.string(), // JSON string of profile + history
+      createdAt: v.number(),
+    }).index("by_user", ["userId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ وضع الصيانة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    maintenanceMode: defineTable({
+      active: v.boolean(),
+      message: v.string(),
+      startedAt: v.number(),
+      endedAt: v.optional(v.number()),
+    }).index("by_active", ["active"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ أرشيف الأسئلة الشخصية ║
+    // ═══════════════════════════════════════════════════════════════════════
+    questionArchive: defineTable({
+      userId: v.id("users"),
+      questionId: v.string(),
+      category: v.string(),
+      question: v.string(),
+      options: v.array(v.string()),
+      correctIndex: v.number(),
+      wasCorrect: v.boolean(),
+      favorited: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_user", ["userId"]).index("by_fav", ["userId", "favorited"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ نظام الهدايا ║
+    // ═══════════════════════════════════════════════════════════════════════
+    gifts: defineTable({
+      senderId: v.id("users"),
+      senderName: v.string(),
+      receiverId: v.id("users"),
+      receiverName: v.string(),
+      giftType: v.string(), // xp, badge, emoji, etc
+      message: v.optional(v.string()),
+      xpAmount: v.optional(v.number()),
+      claimed: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_receiver", ["receiverId"]).index("by_sender", ["senderId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ نظام الدعوات ║
+    // ═══════════════════════════════════════════════════════════════════════
+    invites: defineTable({
+      inviterId: v.id("users"),
+      inviteeId: v.optional(v.id("users")),
+      code: v.string(),
+      used: v.boolean(),
+      rewardClaimed: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_code", ["code"]).index("by_inviter", ["inviterId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ نظام السمعة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    reputation: defineTable({
+      userId: v.id("users"),
+      score: v.number(), // -100 to +100
+      positiveVotes: v.number(),
+      negativeVotes: v.number(),
+      lastVoteAt: v.number(),
+    }).index("by_user", ["userId"]).index("by_score", ["score"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ تحدي الذكاء اليومي ║
+    // ═══════════════════════════════════════════════════════════════════════
+    dailyChallengeBoard: defineTable({
+      day: v.string(), // YYYY-MM-DD
+      topPlayers: v.array(v.object({
+        userId: v.id("users"),
+        name: v.string(),
+        score: v.number(),
+      })),
+      totalPlayers: v.number(),
+      avgScore: v.number(),
+    }).index("by_day", ["day"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ تحديات1v1 ║
+    // ═══════════════════════════════════════════════════════════════════════
+    duels: defineTable({
+      challengerId: v.id("users"),
+      challengerName: v.string(),
+      opponentId: v.optional(v.id("users")),
+      opponentName: v.optional(v.string()),
+      status: v.union(
+        v.literal("waiting"),
+        v.literal("active"),
+        v.literal("finished"),
+      ),
+      challengerScore: v.number(),
+      opponentScore: v.number(),
+      questionCount: v.number(),
+      currentQuestion: v.number(),
+      winnerId: v.optional(v.id("users")),
+      createdAt: v.number(),
+    }).index("by_status", ["status"]).index("by_challenger", ["challengerId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ الإنجازات المتقدمة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    achievements: defineTable({
+      userId: v.id("users"),
+      type: v.string(), // e.g. "first_win", "streak_10", "perfect_score"
+      name: v.string(),
+      description: v.string(),
+      icon: v.string(),
+      rarity: v.union(
+        v.literal("common"),
+        v.literal("uncommon"),
+        v.literal("rare"),
+        v.literal("epic"),
+        v.literal("legendary"),
+      ),
+      xpReward: v.number(),
+      earnedAt: v.number(),
+    }).index("by_user", ["userId"]).index("by_type", ["type"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ نظام المواسم ║
+    // ═══════════════════════════════════════════════════════════════════════
+    seasons: defineTable({
+      name: v.string(),
+      number: v.number(),
+      startAt: v.number(),
+      endAt: v.number(),
+      rewards: v.array(v.object({
+        rank: v.number(),
+        badge: v.string(),
+        xp: v.number(),
+      })),
+      active: v.boolean(),
+    }).index("by_active", ["active"]),
+
+    seasonScores: defineTable({
+      userId: v.id("users"),
+      seasonNumber: v.number(),
+      totalScore: v.number(),
+      gamesPlayed: v.number(),
+      wins: v.number(),
+    }).index("by_season", ["seasonNumber"]).index("by_user_season", ["userId", "seasonNumber"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ نظام مفاتيح API الخاصة بالمالك ║
+    // ═══════════════════════════════════════════════════════════════════════
+    apiKeys: defineTable({
+      name: v.string(),
+      provider: v.string(), // openrouter, openai, custom, etc
+      key: v.string(),
+      active: v.boolean(),
+      lastUsedAt: v.optional(v.number()),
+      useCount: v.number(),
+      createdAt: v.number(),
+    }).index("by_provider", ["provider"]).index("by_active", ["active"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ قوانين اللعب الأونلاين ║
+    // ═══════════════════════════════════════════════════════════════════════
+    onlineRules: defineTable({
+      title: v.string(),
+      description: v.string(),
+      severity: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+      autoAction: v.union(
+        v.literal("none"),
+        v.literal("warn"),
+        v.literal("mute"),
+        v.literal("kick"),
+        v.literal("ban"),
+      ),
+      active: v.boolean(),
+      order: v.number(),
+      createdAt: v.number(),
+    }).index("by_active", ["active"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ الأهداف الجماعية (العقل الجمعي) ║
+    // ═══════════════════════════════════════════════════════════════════════
+    collectiveGoals: defineTable({
+      title: v.string(),
+      description: v.string(),
+      targetScore: v.number(),
+      currentScore: v.number(),
+      participants: v.array(v.id("users")),
+      reward: v.string(),
+      active: v.boolean(),
+      deadline: v.number(),
+      createdAt: v.number(),
+    }).index("by_active", ["active"]),
   },
   {
     schemaValidation: false,
