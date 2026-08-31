@@ -149,6 +149,77 @@
   animation: war-float 4s ease-in-out infinite;
 }
 
+/* ═══ حرب العقول — Premium Utility Animations ═══ */
+@keyframes war-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes war-text-glow {
+  0%, 100% { text-shadow: 0 0 8px rgba(37,99,235,0.4); }
+  50% { text-shadow: 0 0 20px rgba(37,99,235,0.7), 0 0 40px rgba(245,158,11,0.3); }
+}
+@keyframes war-border-flow {
+  0% { border-color: rgba(37,99,235,0.3); }
+  50% { border-color: rgba(245,158,11,0.5); }
+  100% { border-color: rgba(37,99,235,0.3); }
+}
+@keyframes war-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes war-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-war-gradient {
+  background-size: 200% 200%;
+  animation: war-gradient-shift 4s ease infinite;
+}
+.animate-war-text-glow {
+  animation: war-text-glow 3s ease-in-out infinite;
+}
+.animate-war-border {
+  animation: war-border-flow 3s ease-in-out infinite;
+}
+.animate-war-spin-slow {
+  animation: war-rotate 20s linear infinite;
+}
+.animate-war-slide-up {
+  animation: war-slide-up 0.5s ease-out forwards;
+}
+
+/* Smooth scroll for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--primary) 30%, transparent);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--primary) 50%, transparent);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
