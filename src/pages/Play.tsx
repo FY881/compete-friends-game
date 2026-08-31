@@ -116,7 +116,7 @@ export default function Play() {
       // Generate AI daily challenge
       const apiKey = localStorage.getItem("openrouter_api_key") ?? "";
       if (apiKey) {
-        toast.success("🎯 جاري تحميل التحدي اليومي بالذكاء الاصطناعي...");
+        toast.success("🎯 جاري تحميل التحدي اليومي بالحرب العقول الاصطناعي...");
         // Navigate to games with daily mode
         navigate("/games");
       } else {
@@ -143,7 +143,7 @@ export default function Play() {
       });
       const res = await analyzePerformance({ apiKey, playerStats: stats });
       setAiAnalysis(res.overallRating + ": " + (res.suggestions?.join(", ") ?? ""));
-      toast.success("🤖 تم تحليل أدائك بالذكاء الاصطناعي!");
+      toast.success("🤖 تم تحليل أدائك بالحرب العقول الاصطناعي!");
     } catch (e) {
       toast.error("خطأ في التحليل");
     }
@@ -236,7 +236,7 @@ export default function Play() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <ZakaLogo className="size-5 text-primary-foreground" size={20} />
             </span>
-            <span className="text-lg font-bold tracking-tight">ذكاء</span>
+            <span className="text-lg font-bold tracking-tight">حرب العقول</span>
           </button>
 
           <div className="flex items-center gap-2.5">
@@ -352,7 +352,7 @@ export default function Play() {
             >
               أين يذهب لقب
               <br />
-              <span className="text-primary">الذكاء الليلة؟</span>
+              <span className="text-primary">الحرب العقول الليلة؟</span>
             </motion.h1>
             <motion.p variants={fadeUp} className="mt-5 max-w-lg text-lg leading-relaxed text-muted-foreground">
               أنشئ غرفة في ثانية، شارك الرمز مع أصدقائك، ودع الأسئلة السريعة
@@ -487,7 +487,7 @@ export default function Play() {
                   <p className="text-sm font-bold">80 لعبة مصغرة</p>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  ذكاء + سرعة + استراتيجية — اختر لعبتك المفضلة
+                  حرب العقول + سرعة + استراتيجية — اختر لعبتك المفضلة
                 </p>
                 <Button asChild size="sm" variant="ghost" className="mt-2 gap-1.5 rounded-xl text-primary">
                   <Link to="/games">
@@ -836,7 +836,7 @@ export default function Play() {
                   <Smartphone className="size-6" />
                 </span>
                 <div className="max-w-md">
-                  <p className="text-lg font-bold">نزّل ذكاء على هاتفك</p>
+                  <p className="text-lg font-bold">نزّل حرب العقول على هاتفك</p>
                   <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     نسخة أندرويد أصلية (APK) بنفس حسابك وأصدقائك، مع تحديثات
                     تلقائية تصلك داخل التطبيق. أو ثبّت نسخة الويب من المتصفح

@@ -223,12 +223,12 @@ const FEATURES = [
 
 
 const AI_FEATURES = [
-  { icon: BrainCircuit, title: "AI Question Generator", desc: "أسئلة مولّدة بالذكاء الاصطناعي تتجدد باستمرار" },
+  { icon: BrainCircuit, title: "AI Question Generator", desc: "أسئلة مولّدة              ساحة المعركة الذكية تتجدد باستمرار" },
   { icon: Sparkles, title: "AI Hints", desc: "تلميحات ذكية أثناء اللعب تساعدك تритор الإجابة" },
   { icon: Zap, title: "Self-Healing", desc: "نظام حل المشاكل الذاتي يكتشف ويصلح الأخطاء" },
   { icon: Shield, title: "AI Control", desc: "تحكم كامل باللعبة بأوامر ذكية من المالك" },
   { icon: MessageSquare, title: "Transparency", desc: "صراحة مطلقة — AI يساعدك تطوّر اللعبة" },
-  { icon: Globe, title: "Daily Challenges", desc: "تحديات يومية ذكية تتجدد بالذكاء الاصطناعي" },
+  { icon: Globe, title: "Daily Challenges", desc: "تحديات يومية ذكية تتجدد              ساحة المعركة الذكية" },
 ];
 
 const STATS = [
@@ -260,7 +260,7 @@ export default function Landing() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <ZakaLogo className="size-5 text-primary-foreground" size={20} />
             </span>
-            <span className="text-lg font-bold tracking-tight">ذكاء</span>
+            <span className="text-lg font-bold tracking-tight">حرب العقول</span>
           </Link>
 
           <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
@@ -268,7 +268,7 @@ export default function Landing() {
               كيف تلعب
             </a>
             <a href="#features" className="transition-colors hover:text-foreground">
-              لماذا ذكاء مميز
+              لماذا حرب العقول مختلفة
             </a>
             <a href="#cta" className="transition-colors hover:text-foreground">
               ابدأ الآن
@@ -292,7 +292,7 @@ export default function Landing() {
             <Button asChild className="gap-1.5">
               <Link to="/play">
                 <Play className="size-4" />
-                ادخل عالم ذكاء
+                ادخل ساحة المعركة
               </Link>
             </Button>
           </div>
@@ -330,7 +330,7 @@ export default function Landing() {
             <motion.div variants={fadeUp}>
               <Badge variant="outline" className="mb-6 gap-1.5 rounded-full px-3.5 py-1.5 text-primary">
                 <Sparkles className="size-3.5" />
-                لعبة تحديات تنافسية بين الأصدقاء
+                أقوى تحدي ذكاء بين الأصدقاء
               </Badge>
             </motion.div>
 
@@ -338,25 +338,25 @@ export default function Landing() {
               variants={fadeUp}
               className="text-4xl font-bold leading-[1.2] tracking-tight sm:text-5xl lg:text-[3.4rem]"
             >
-              نفس السؤال،
+              ساحة المعركة،
               <br />
-              <span className="text-primary">أسرع عقل يفوز.</span>
+              <span className="text-primary">أسرع عقل ينتصر.</span>
             </motion.h1>
 
             <motion.p
               variants={fadeUp}
               className="mt-6 max-w-lg text-lg leading-relaxed text-muted-foreground"
             >
-              تحدٍّ سريع تتنافسون فيه مع أصدقائك لحظة بلحظة: نفس الأسئلة، نفس
+              معركة ذكاء سريعة تتنافسون فيها مع أصدقائك لحظة بلحظة: نفس الأسئلة، نفس
               الوقت، وسلاسل ومكافآت ومنقّي 50/50 لمن يجرؤ. أنشئ غرفة مخصصة، شارك
-              الرمز، وأثبت أن بديهتك هي الأسرع.
+              الرمز، وأثبت أن عقلك هو الأقوى.
             </motion.p>
 
             <motion.div variants={fadeUp} className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="gap-2 rounded-xl px-7 text-base">
                 <Link to="/play">
                   <Play className="size-4.5" />
-                  ابدأ التحدي
+                  ابدأ المعركة
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="gap-2 rounded-xl px-7 text-base">
@@ -467,7 +467,7 @@ export default function Landing() {
               <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
                 ليست مسابقة معلومات…
                 <br />
-                إنها معركة بديهة.
+                إنها معركة عقول.
               </h2>
               <p className="mt-5 max-w-md leading-relaxed text-muted-foreground">
                 كل سؤال محسوب بالثواني، وكل قرار يرفعك أو يهبط بك في الترتيب.
@@ -475,7 +475,7 @@ export default function Landing() {
               </p>
               <Button asChild size="lg" className="mt-8 gap-2 rounded-xl px-7">
                 <Link to="/play">
-                  جرّب جولة الآن
+                  جرّب معركة الآن
                   <ArrowLeft className="size-4.5" />
                 </Link>
               </Button>
@@ -552,9 +552,9 @@ export default function Landing() {
             transition={{ duration: 0.6 }}
             className="text-center"
           >
-            <p className="text-sm font-semibold text-primary">آراء اللاعبين</p>
+            <p className="text-sm font-semibold text-primary">              آراء المحاربين</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              معارك الأصدقاء لا تُنسى
+              معارك العقول لا تُنسى
             </h2>
           </motion.div>
 
@@ -651,7 +651,7 @@ export default function Landing() {
               },
               {
                 q: "ما هي قوانين اللعب؟ وهل هناك عقوبات؟",
-                a: "اللعب النزيه إلزامي: ممنوع الإساءة والغش والمحتوى غير اللائق. يرصد النظام تلقائياً مغادرة نافذة اللعب أثناء الأسئلة، وتُطبَّق عقوبات تصاعدية (تحذير ← خصم نقاط ← حظر) تلقائياً، ويديرها رقيب آلي بالذكاء الاصطناعي. اطّلع على القوانين كاملة من صفحة «القوانين».",
+                a: "اللعب النزيه إلزامي: ممنوع الإساءة والغش والمحتوى غير اللائق. يرصد النظام تلقائياً مغادرة نافذة اللعب أثناء الأسئلة، وتُطبَّق عقوبات تصاعدية (تحذير ← خصم نقاط ← حظر) تلقائياً، ويديرها رقيب آلي              ساحة المعركة الذكية. اطّلع على القوانين كاملة من صفحة «القوانين».",
               },
             ].map((item) => (
               <AccordionItem
@@ -689,12 +689,10 @@ export default function Landing() {
             }}
           />
           <Trophy className="mx-auto size-12" />
-          <h2 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-            من سيتصدّر قائمة أصدقائك الليلة؟
+          <h2 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">              من سيتصدّر قائمة المعركة الليلة؟
           </h2>
-          <p className="mx-auto mt-4 max-w-xl leading-relaxed text-primary-foreground/85">
-            افتح غرفة، أرسل الرمز، وشاهد المنافسة تشتعل. الجولة الواحدة لا تأخذ
-            أكثر من دقيقتين.
+          <p className="mx-auto mt-4 max-w-xl leading-relaxed text-primary-foreground/85">              افتح غرفة، أرسل الرمز، وشاهد المعركة تشتعل. الجولة الواحدة لا تأخذ
+              أكثر من دقيقتين.
           </p>
           <Button
             asChild
@@ -704,7 +702,7 @@ export default function Landing() {
           >
             <Link to="/play">
               <Play className="size-4.5" />
-              ابدأ التحدي الآن
+              ابدأ المعركة الآن
             </Link>
           </Button>
         </motion.div>
@@ -717,12 +715,11 @@ export default function Landing() {
             <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <BrainCircuit className="size-4" />
             </span>
-            <span className="font-semibold text-foreground">ذكاء</span> — بالذكاء الاصطناعي
+            <span className="font-semibold text-foreground">ذكاء</span> —              ساحة المعركة الذكية
           </div>
-          <p>معركة الأصدقاء الفكرية — العب، تحدَّ، وافز.</p>
+          <p>              معركة العقول — العب، انتصر، واحكم.</p>
           <div className="flex items-center gap-2">
-            <Medal className="size-4 text-primary" />
-            صُنع بحب لمن يحبون التحديات
+            <Medal className="size-4 text-primary" />              صُنع بحب لمحبي المعركة والذكاء
           </div>
           <div className="flex items-center gap-4">
             <Link to="/download" className="flex items-center gap-1.5 transition-colors hover:text-foreground">

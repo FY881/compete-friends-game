@@ -42,7 +42,7 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* CHANGE VALUES FOR THEME */
+/* ═══ حرب العقول — Premium Electric Blue + Gold Theme ═══ */
 
 @theme inline {
   --font-sans: "IBM Plex Sans Arabic", ui-sans-serif, system-ui, -apple-system,
@@ -50,32 +50,32 @@
 }
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.982 0.004 90);
-  --foreground: oklch(0.25 0.012 90);
+  --background: oklch(0.985 0.002 250);
+  --foreground: oklch(0.18 0.015 260);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.012 90);
+  --card-foreground: oklch(0.18 0.015 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.012 90);
-  --primary: oklch(0.51 0.096 186);
-  --primary-foreground: oklch(0.985 0.002 187);
-  --secondary: oklch(0.955 0.008 187);
-  --secondary-foreground: oklch(0.33 0.05 187);
-  --muted: oklch(0.962 0.005 90);
-  --muted-foreground: oklch(0.5 0.012 90);
-  --accent: oklch(0.955 0.01 187);
-  --accent-foreground: oklch(0.33 0.05 187);
+  --popover-foreground: oklch(0.18 0.015 260);
+  --primary: oklch(0.545 0.185 262);
+  --primary-foreground: oklch(0.99 0.002 250);
+  --secondary: oklch(0.955 0.012 80);
+  --secondary-foreground: oklch(0.30 0.04 80);
+  --muted: oklch(0.965 0.003 250);
+  --muted-foreground: oklch(0.48 0.01 250);
+  --accent: oklch(0.78 0.15 75);
+  --accent-foreground: oklch(0.22 0.04 75);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.912 0.006 90);
-  --input: oklch(0.902 0.007 90);
-  --ring: oklch(0.56 0.105 187);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --border: oklch(0.915 0.004 250);
+  --input: oklch(0.91 0.004 250);
+  --ring: oklch(0.545 0.185 262);
+  --chart-1: oklch(0.545 0.185 262);
+  --chart-2: oklch(0.75 0.16 75);
+  --chart-3: oklch(0.6 0.18 165);
+  --chart-4: oklch(0.65 0.2 320);
+  --chart-5: oklch(0.7 0.15 30);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary: oklch(0.545 0.185 262);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
@@ -84,37 +84,87 @@
 }
 
 .dark {
-  --background: oklch(0.165 0.008 90);
-  --foreground: oklch(0.94 0.005 90);
-  --card: oklch(0.21 0.009 90);
-  --card-foreground: oklch(0.94 0.005 90);
-  --popover: oklch(0.21 0.009 90);
-  --popover-foreground: oklch(0.94 0.005 90);
-  --primary: oklch(0.72 0.095 187);
-  --primary-foreground: oklch(0.16 0.01 90);
-  --secondary: oklch(0.28 0.012 90);
-  --secondary-foreground: oklch(0.94 0.005 90);
-  --muted: oklch(0.28 0.012 90);
-  --muted-foreground: oklch(0.68 0.008 90);
-  --accent: oklch(0.31 0.035 187);
-  --accent-foreground: oklch(0.9 0.02 187);
+  --background: oklch(0.13 0.02 265);
+  --foreground: oklch(0.93 0.005 250);
+  --card: oklch(0.18 0.018 265);
+  --card-foreground: oklch(0.93 0.005 250);
+  --popover: oklch(0.18 0.018 265);
+  --popover-foreground: oklch(0.93 0.005 250);
+  --primary: oklch(0.65 0.18 262);
+  --primary-foreground: oklch(0.13 0.01 265);
+  --secondary: oklch(0.22 0.015 265);
+  --secondary-foreground: oklch(0.93 0.005 250);
+  --muted: oklch(0.22 0.015 265);
+  --muted-foreground: oklch(0.62 0.008 250);
+  --accent: oklch(0.82 0.16 80);
+  --accent-foreground: oklch(0.18 0.03 80);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.66 0.1 187);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --ring: oklch(0.65 0.18 262);
+  --chart-1: oklch(0.65 0.18 262);
+  --chart-2: oklch(0.82 0.16 80);
+  --chart-3: oklch(0.7 0.16 165);
+  --chart-4: oklch(0.65 0.2 320);
+  --chart-5: oklch(0.72 0.15 30);
+  --sidebar: oklch(0.16 0.015 265);
+  --sidebar-foreground: oklch(0.93 0 0);
+  --sidebar-primary: oklch(0.65 0.18 262);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.22 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* ═══ حرب العقول — Global Animations ═══ */
+@keyframes war-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes war-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(37, 99, 235, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(37, 99, 235, 0.6), 0 0 60px rgba(245, 158, 11, 0.2); }
+}
+@keyframes war-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+@keyframes war-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+.animate-war-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(37,99,235,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: war-shimmer 3s infinite;
+}
+.animate-war-glow {
+  animation: war-glow 3s ease-in-out infinite;
+}
+.animate-war-pulse {
+  animation: war-pulse 2s ease-in-out infinite;
+}
+.animate-war-float {
+  animation: war-float 4s ease-in-out infinite;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
 }
 
 @layer base {

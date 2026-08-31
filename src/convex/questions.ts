@@ -1,17 +1,71 @@
-/**
- * The shared question bank used by every challenge.
- * Each round picks a random subset, so friends never play the same questions twice.
- * Questions carry a difficulty level that scales the points on offer.
- */
+PLACEHOLDER_START = [
+  "عام",
+  "علوم",
+  "جغرافيا",
+  "رياضيات",
+  "لغة",
+  "منطق",
+  "تاريخ",
+  "رياضة",
+  "فنون",
+  "تكنولوجيا",
+  "أفلام ومسلسلات",
+  "طعام ومشروبات",
+  "حيوانات",
+  "فضاء",
+  "موسيقى",
+  "دين وثقافة",
+  "جسم الإنسان",
+  "منوعات",
+] as const;
 
-export type Difficulty = "easy" | "medium" | "hard";
-
-export type Question = {
-  id: string;
-  category: string;
-  difficulty: Difficulty;
-  question: string;
-  options: [string, string, string, string];
+export const QUESTION_BANK: Question[] = [
+  // ── عام ───────────────────────────────────────────────────────────────
+  { id: "q01", category: "عام", difficulty: "easy", question: "ما هو أكبر محيط على وجه الأرض؟", options: ["المحيط الهادئ", "المحيط الأطلسي", "المحيط الهندي", "المحيط المتجمد الشمالي"], correctIndex: 0 },
+  { id: "q02", category: "عام", difficulty: "easy", question: "كم عدد ألوان قوس قزح؟", options: ["ستة", "سبعة", "خمسة", "ثمانية"], correctIndex: 1 },
+  { id: "q03", category: "عام", difficulty: "easy", question: "ما هو الحيوان الملقب بـ"سفينة الصحراء"؟", options: ["الحصان", "الفيل", "الجمل", "الحمار"], correctIndex: 2 },
+  { id: "q04", category: "عام", difficulty: "easy", question: "ما هي العملة الرسمية في اليابان؟", options: ["اليوان", "الين", "الوون", "الدرهم"], correctIndex: 1 },
+  { id: "q05", category: "عام", difficulty: "easy", question: "ما هو اللون الناتج عن خلط الأزرق مع الأصفر؟", options: ["الأخضر", "البنفسجي", "البرتقالي", "البني"], correctIndex: 0 },
+  { id: "q06", category: "عام", difficulty: "easy", question: "كم عدد أيام السنة الكبيسة؟", options: ["365", "366", "364", "360"], correctIndex: 1 },
+  { id: "q07", category: "عام", difficulty: "medium", question: "ما هو أكبر عضو في جسم الإنسان؟", options: ["الجلد", "الكبد", "الدماغ", "الرئتان"], correctIndex: 0 },
+  { id: "q264", category: "عام", difficulty: "easy", question: "ما هو الكوكب الذي نعيش عليه؟", options: ["المريخ", "الزهرة", "الأرض", "عطارد"], correctIndex: 2 },
+  { id: "q265", category: "علوم", difficulty: "easy", question: "ما هو المرض الذي تسببه فيروسات الإنفلونزا؟", options: ["السل", "الإنفلونزا", "الملاريا", "الدرن"], correctIndex: 1 },
+  { id: "q266", category: "جغرافيا", difficulty: "easy", question: "ما هي عاصمة السعودية؟", options: ["جدة", "مكة", "الرياض", "المدينة"], correctIndex: 2 },
+  { id: "q267", category: "رياضيات", difficulty: "easy", question: "كم يساوي 100 تقسيم 4؟", options: ["20", "25", "30", "40"], correctIndex: 1 },
+  { id: "q268", category: "لغة", difficulty: "easy", question: "ما هو جمع كلمة «قلم»؟", options: ["قلمون", "أقلام", "قلمات", "قلايم"], correctIndex: 1 },
+  { id: "q269", category: "منطق", difficulty: "easy", question: "ما هو الشيء الذي يمشي بلا رجلين؟", options: ["الحقيبة", "الساعة", "النهر", "الحذاء"], correctIndex: 2 },
+  { id: "q270", category: "تاريخ", difficulty: "easy", question: "متى وُلد النبي محمد؟", options: ["570م", "610م", "632م", "500م"], correctIndex: 0 },
+  { id: "q271", category: "رياضة", difficulty: "easy", question: "كم عدد كرات التنس المستخدمة في مباراة واحدة؟", options: ["1", "2", "3", "4"], correctIndex: 1 },
+  { id: "q272", category: "تكنولوجيا", difficulty: "easy", question: "ما هو نظام التشغيل المستخدم في أجهزة سامسونج؟", options: ["iOS", "Windows", "Android", "Linux"], correctIndex: 2 },
+  { id: "q273", category: "أفلام ومسلسلات", difficulty: "easy", question: "في فيلم آيرون مان، ما اسم البطل الذي يرتدي درعاً حديدياً؟", options: ["كابتن أمريكا", "آيرون مان", "هالك", "سبايدرمان"], correctIndex: 1 },
+  { id: "q274", category: "طعام ومشروبات", difficulty: "easy", question: "ما هو المكون الرئيسي لصلصة الطماطم؟", options: ["البطاطس", "الطماطم", "الجزر", "البصل"], correctIndex: 1 },
+  { id: "q275", category: "حيوانات", difficulty: "easy", question: "ما هو صوت القطة الشهير؟", options: ["نباح", "مواء", "صراخ", "زأر"], correctIndex: 1 },
+  { id: "q276", category: "فضاء", difficulty: "easy", question: "كم عدد كواكب المجموعة الشمسية بعد استبعاد بلوتو؟", options: ["7", "8", "9", "10"], correctIndex: 1 },
+  { id: "q277", category: "موسيقى", difficulty: "easy", question: "كم أوتار العود؟", options: ["4", "5", "6", "8"], correctIndex: 2 },
+  { id: "q278", category: "دين وثقافة", difficulty: "easy", question: "كم عدد أركان الإسلام؟", options: ["3", "4", "5", "6"], correctIndex: 2 },
+  { id: "q279", category: "جسم الإنسان", difficulty: "easy", question: "ما هو أكبر عضو في جسم الإنسان من حيث الحجم؟", options: ["الدماغ", "الكبد", "الجلد", "الرئتان"], correctIndex: 2 },
+  { id: "q280", category: "منوعات", difficulty: "easy", question: "كم عدد أضلاع مكعب؟", options: ["6", "8", "10", "12"], correctIndex: 3 },
+  { id: "q281", category: "عام", difficulty: "medium", question: "ما هو أصغر دولة في العالم من حيث المساحة؟", options: ["موناكو", "الفاتيكان", "سان مارينو", "لوكسمبورغ"], correctIndex: 1 },
+  { id: "q282", category: "علوم", difficulty: "easy", question: "ما هو العنصر الذي يمنح الدم لونه الأحمر؟", options: ["الحديد", "الكالسيوم", "الهيموجلوبين", "البوتاسيوم"], correctIndex: 2 },
+  { id: "q283", category: "جغرافيا", difficulty: "easy", question: "ما هي أصغر دولة عربية من حيث المساحة؟", options: ["البحرين", "الكويت", "لبنان", "قطر"], correctIndex: 0 },
+  { id: "q284", category: "رياضيات", difficulty: "easy", question: "كم يساوي 3 اس 2؟", options: ["6", "9", "12", "27"], correctIndex: 1 },
+  { id: "q285", category: "لغة", difficulty: "easy", question: "ما هو عكس كلمة «الارتفاع»؟", options: ["الضيق", "الانخفاض", "التوسع", "الضغط"], correctIndex: 1 },
+  { id: "q286", category: "منطق", difficulty: "easy", question: "الشمس في الصباح تشرق من أي اتجاه؟", options: ["الغرب", "الشمال", "الشرق", "الجنوب"], correctIndex: 2 },
+  { id: "q287", category: "تاريخ", difficulty: "easy", question: "في أي بلد نشأت أول حضارة إسلامية؟", options: ["العراق", "المغرب", "اليمن", "مصر"], correctIndex: 0 },
+  { id: "q288", category: "رياضة", difficulty: "easy", question: "كم عدد المربعات في لوحة الشطرنج؟", options: ["32", "48", "64", "100"], correctIndex: 2 },
+  { id: "q289", category: "فنون", difficulty: "easy", question: "ما هو أكبر متحف في العالم من حيث المساحة؟", options: ["متحف اللوفر", "المتحف البريطاني", "متحف المتروبوليتان", "متحف هيرميتاج"], correctIndex: 0 },
+  { id: "q290", category: "تكنولوجيا", difficulty: "easy", question: "ما هو تعريف RAM في الحاسوب؟", options: ["ذاكرة القراءة فقط", "الذاكرة العشوائية", "قرص التخزين الثابت", "المعالج"], correctIndex: 1 },
+  { id: "q291", category: "طعام ومشروبات", difficulty: "easy", question: "ما هو نوع العصير المستخرج من قصب السكر؟", options: ["عصير البرتقال", "عصير قصب السكر", "عصير التفاح", "عصير العنب"], correctIndex: 1 },
+  { id: "q292", category: "حيوانات", difficulty: "easy", question: "ما هو الحيوان الذي يُعرف بحاجب البحر؟", options: ["الحوت", "الدلفين", "الخنزير البحري", "القرش"], correctIndex: 2 },
+  { id: "q293", category: "فضاء", difficulty: "easy", question: "ما هي المنطقة التي تفصل بين المجموعة الشمسية والعوالم الخارجية؟", options: ["حزام كايبر", "مذنب هالي", "سحابة أورت", "حلقات زحل"], correctIndex: 0 },
+  { id: "q294", category: "موسيقى", difficulty: "easy", question: "ما هي الآلة التي تُعرف بملك الآلات؟", options: ["البيانو", "القيثارة", "الكمان", "الناي"], correctIndex: 0 },
+  { id: "q295", category: "دين وثقافة", difficulty: "easy", question: "كم مرة تُصلي في اليوم؟", options: ["3", "4", "5", "6"], correctIndex: 2 },
+  { id: "q296", category: "جسم الإنسان", difficulty: "easy", question: "ما هو العضو الذي يُعرف بالمحرك الرئيسي للجسم؟", options: ["الدماغ", "القلب", "العضلات", "الرئتان"], correctIndex: 2 },
+  { id: "q297", category: "منوعات", difficulty: "easy", question: "كم عدد أرجل الحشرات؟", options: ["4", "6", "8", "10"], correctIndex: 1 },
+  { id: "q298", category: "عام", difficulty: "easy", question: "ما هو اللون الذي يرمز للسلام في ثقافة العالم؟", options: ["الأحمر", "الأزرق", "الأبيض", "الأخضر"], correctIndex: 2 },
+  { id: "q299", category: "علوم", difficulty: "easy", question: "ما هي درجة حرارة ماء الغليان بالفهرنهايت؟", options: ["100 ف", "212 ف", "180 ف", "200 ف"], correctIndex: 1 },
+  { id: "q300", category: "جغرافيا", difficulty: "easy", question: "ما هي اللغة الأكثر تحدثاً في العالم؟", options: ["الإنجليزية", "الصينية المندرين", "الإسبانية", "العربية"], correctIndex: 1 },
+];
   correctIndex: 0 | 1 | 2 | 3;
 };
 

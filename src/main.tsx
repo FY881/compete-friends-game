@@ -83,7 +83,7 @@ class RootErrorBoundary extends React.Component<
     };
   }
   componentDidCatch(err: Error) {
-    console.error("[تحدي العقول] Root crash:", err);
+    console.error("[حرب العقول] Root crash:", err);
     reportRuntimeError(err.message || "Unknown", err.stack);
   }
   render() {

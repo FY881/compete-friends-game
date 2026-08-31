@@ -34,7 +34,7 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "2.1.0"; // client version — matches server WEB_VERSION 1.4.0
+export const APP_VERSION = "3.0.0"; // حرب العقول v3
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
 export const APK_VERSION = "1.5.4";
@@ -59,7 +59,7 @@ export const APK_PRIMARY_DOWNLOAD_URL =
 /** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
 export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;
 
-export const APP_VERSION_LABEL = `تحدي العقول ${APP_VERSION}`;
+export const APP_VERSION_LABEL = `حرب العقول ${APP_VERSION}`;
 
 /** هل هذه نسخة تطبيق أندرويد الأصلية (WebView على https://localhost)؟ */
 function isNativeApp(): boolean {
