@@ -12,19 +12,20 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 import { ErrorHunter } from "@/components/ErrorHunter";
 import { SplashScreen } from "@/components/SplashScreen";
 import "./index.css";
+import { lazyRetry } from "@/lib/lazyRetry";
 
-// Lazy load route components for better code splitting
-const Landing = lazy(() => import("./pages/Landing.tsx"));
-const AuthPage = lazy(() => import("./pages/Auth.tsx"));
-const Play = lazy(() => import("./pages/Play.tsx"));
-const Game = lazy(() => import("./pages/Game.tsx"));
-const Profile = lazy(() => import("./pages/Profile.tsx"));
-const Owner = lazy(() => import("./pages/Owner.tsx"));
-const Rules = lazy(() => import("./pages/Rules.tsx"));
-const Download = lazy(() => import("./pages/Download.tsx"));
-const NotFound = lazy(() => import("./pages/NotFound.tsx"));
-const MiniGames = lazy(() => import("./pages/MiniGames.tsx"));
-const ChatRooms = lazy(() => import("./pages/ChatRooms.tsx"));
+// Lazy load route components with automatic retry on failure
+const Landing = lazyRetry(() => import("./pages/Landing.tsx"));
+const AuthPage = lazyRetry(() => import("./pages/Auth.tsx"));
+const Play = lazyRetry(() => import("./pages/Play.tsx"));
+const Game = lazyRetry(() => import("./pages/Game.tsx"));
+const Profile = lazyRetry(() => import("./pages/Profile.tsx"));
+const Owner = lazyRetry(() => import("./pages/Owner.tsx"));
+const Rules = lazyRetry(() => import("./pages/Rules.tsx"));
+const Download = lazyRetry(() => import("./pages/Download.tsx"));
+const NotFound = lazyRetry(() => import("./pages/NotFound.tsx"));
+const MiniGames = lazyRetry(() => import("./pages/MiniGames.tsx"));
+const ChatRooms = lazyRetry(() => import("./pages/ChatRooms.tsx"));
 
 // Simple loading fallback for route transitions — all Arabic
 function RouteLoading() {

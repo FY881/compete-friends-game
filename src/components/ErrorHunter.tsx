@@ -52,6 +52,16 @@ const HEALING_STRATEGIES: Record<string, () => void> = {
   },
   // Network errors — just show retry
   "NetworkError": () => {},
+  // Dynamic import failures — reload to retry
+  "Failed to fetch dynamically imported module": () => {
+    console.log("[صياد الأخطاء] dynamic import failed — reloading");
+    if ("caches" in window) {
+      caches.keys().then((names) =>
+        Promise.all(names.map((n) => caches.delete(n))),
+      );
+    }
+    setTimeout(() => window.location.reload(), 1000);
+  },
   "Failed to fetch": () => {},
   // Convex offline — reconnect
   "Could not connect": () => {},
