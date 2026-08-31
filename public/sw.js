@@ -9,7 +9,7 @@
  * APK request now goes straight to the network, always, forever. */
 // Bump this cache name whenever you ship a new version — it forces every
 // installed PWA to discard the old app shell and fetch the fresh one.
-const CACHE = "zaka-v20";
+const CACHE = "zaka-v21";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -39,6 +39,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // never cache the Convex backend
+
+  // Dev server: never cache anything — let Vite serve fresh files
+  if (url.hostname.includes("daytonaproxy") || url.port === "5173") return;
 
   // ── HARD RULE: never intercept APK/download requests ──────────────
   // A cached APK that is stale, truncated, or was an HTML error page in a
