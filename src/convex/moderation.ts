@@ -8,7 +8,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getSettingsData, isStaffUser } from "./owner";
-import { getOpenRouterKey } from "./aiConfig";
+import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
 
 // ---------------------------------------------------------------------------
 // AI moderation agent — "رقيب العقول".
@@ -305,7 +305,7 @@ export const handleReport = internalAction({
 
       const verdict = await callOpenRouter(
         apiKey,
-        settings.aiModel,
+        DEFAULT_MODEL,
         rulesText,
         content,
       );
@@ -378,7 +378,7 @@ export const aiModerateContent = action({
         "X-Title": "Zaka - Quiz Game",
       },
       body: JSON.stringify({
-        model: settings.aiModel,
+        model: DEFAULT_MODEL,
         temperature: 0.1,
         response_format: { type: "json_object" },
         messages: [
@@ -455,7 +455,7 @@ export const aiHelpDesk = action({
         "X-Title": "Zaka - Quiz Game",
       },
       body: JSON.stringify({
-        model: settings.aiModel,
+        model: DEFAULT_MODEL,
         temperature: 0.3,
         messages: [
           { role: "system", content: HELP_DESK_SYSTEM_PROMPT },

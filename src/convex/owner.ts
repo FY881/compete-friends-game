@@ -196,13 +196,21 @@ export const DEFAULT_SETTINGS: ModSettings = {
   aiEnabled: true,
   aiAutoApply: true, // the AI guardian applies punishments automatically
   aiAdminEnabled: true, // autonomous sweep every 15 minutes
-  aiModel: "openrouter/auto",
+  aiModel: "openrouter/free",
   announcement: "",
   announcementActive: false,
   antiCheatEnabled: true,
   disabledQuestions: [],
   siteUrl: "",    openrouterApiKey: "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",
 };
+
+/** Force any stale/broken model name to the working default */
+function forceGoodModel(model: string): string {
+  if (!model || model === "openrouter/auto" || model.includes(":free") || model.includes("qwen") || model.includes("deepseek") || model.includes("meta-llama") || model.includes("mistralai") || model.includes("google/gemma")) {
+    return "openrouter/free";
+  }
+  return model;
+}
 
 export async function getSettingsData(
   ctx: DbCtx,
@@ -222,7 +230,7 @@ export async function getSettingsData(
     aiEnabled: read("aiEnabled", DEFAULT_SETTINGS.aiEnabled),
     aiAutoApply: read("aiAutoApply", DEFAULT_SETTINGS.aiAutoApply),
     aiAdminEnabled: read("aiAdminEnabled", DEFAULT_SETTINGS.aiAdminEnabled),
-    aiModel: read("aiModel", DEFAULT_SETTINGS.aiModel),
+    aiModel: forceGoodModel(read("aiModel", DEFAULT_SETTINGS.aiModel)),
     announcement: read("announcement", DEFAULT_SETTINGS.announcement),
     announcementActive: read("announcementActive", DEFAULT_SETTINGS.announcementActive),
     antiCheatEnabled: read("antiCheatEnabled", DEFAULT_SETTINGS.antiCheatEnabled),
@@ -237,6 +245,10 @@ export async function setSetting(
   key: string,
   value: unknown,
 ): Promise<void> {
+  // Guard: never save a broken model name
+  if (key === "aiModel" && typeof value === "string") {
+    value = forceGoodModel(value);
+  }
   const existing = await ctx.db
     .query("settings")
     .withIndex("by_key", (q) => q.eq("key", key))

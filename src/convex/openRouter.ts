@@ -31,7 +31,8 @@ async function callOpenRouter(
     temperature?: number;
   },
 ): Promise<string> {
-  const model = options?.model ?? DEFAULT_MODEL;
+  // Always force openrouter/free — ignore any stored/old model values
+  const model = DEFAULT_MODEL;
   const maxTokens = options?.maxTokens ?? 2048;
   const temperature = options?.temperature ?? 0.7;
 

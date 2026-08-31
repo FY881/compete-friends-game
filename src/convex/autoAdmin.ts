@@ -13,6 +13,7 @@ import {
   type ModSettings,
   setSetting,
 } from "./owner";
+import { DEFAULT_MODEL } from "./aiConfig";
 import { callOpenRouter, parseVerdict, type AiVerdict } from "./moderation";
 import { APK_BYTES, APK_FILE_NAME, APK_MIRROR_URL, APK_SHA256 } from "./apkRelease";
 import { getOpenRouterKey } from "./aiConfig";
@@ -103,7 +104,7 @@ async function performSweep(ctx: {
           .join("\n");
         const verdict: AiVerdict = await callOpenRouter(
           apiKey,
-          settings.aiModel,
+          DEFAULT_MODEL,
           rulesText,
           content,
         );

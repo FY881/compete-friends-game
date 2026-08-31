@@ -29,15 +29,28 @@ export function getOpenRouterKey(providedKey?: string | null): string {
 }
 
 /**
- * النموذج الافتراضي — openrouter/free هو موزّع ذكي يختار تلقائياً
+ * النموذج الوحيدworking — openrouter/free هو موزّع ذكي يختار تلقائياً
  * نموذجاً مجانياً متاحاً. جميع النماذج الفردية بـ :free انتهت.
  */
 export const FREE_MODELS = [
   "openrouter/free",
 ];
 
-/** النموذج الافتراضي لكل الاستدعاءات */
+/**
+ * النموذج الافتراضي لكل الاستدعاءات — مُثبّت على openrouter/free.
+ * لا تغيّر هذا إلا إذا أثبت OpenRouter نموذجاً مجانياً جديداً.
+ */
 export const DEFAULT_MODEL = "openrouter/free";
+
+/**
+ * يتحقق من أن النموذج صالح ويُعيد الافتراضي إذا كان معطلاً
+ */
+export function ensureWorkingModel(model?: string | null): string {
+  if (!model || model.includes(":free") || model === "openrouter/auto") {
+    return DEFAULT_MODEL;
+  }
+  return model;
+}
 
 /**
  * معلومات النظام للتشخيص
