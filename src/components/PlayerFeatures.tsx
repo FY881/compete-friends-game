@@ -282,7 +282,7 @@ export function DuelPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="text-xs text-muted-foreground">تحدَ صديقاً في معركة ذكاء مباشرة!</p>
+        <p className="text-xs text-muted-foreground">تحدَ صديقاً في معركة حرب العقول مباشرة!</p>
         <div className="space-y-1 max-h-[200px] overflow-y-auto">
           {duels && duels.length > 0 ? duels.map((d) => (
             <div key={d._id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs">

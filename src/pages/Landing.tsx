@@ -223,16 +223,16 @@ const FEATURES = [
 
 
 const AI_FEATURES = [
-  { icon: BrainCircuit, title: "AI Question Generator", desc: "أسئلة مولّدة              ساحة المعركة الذكية تتجدد باستمرار" },
-  { icon: Sparkles, title: "AI Hints", desc: "تلميحات ذكية أثناء اللعب تساعدك تритор الإجابة" },
-  { icon: Zap, title: "Self-Healing", desc: "نظام حل المشاكل الذاتي يكتشف ويصلح الأخطاء" },
-  { icon: Shield, title: "AI Control", desc: "تحكم كامل باللعبة بأوامر ذكية من المالك" },
-  { icon: MessageSquare, title: "Transparency", desc: "صراحة مطلقة — AI يساعدك تطوّر اللعبة" },
-  { icon: Globe, title: "Daily Challenges", desc: "تحديات يومية ذكية تتجدد              ساحة المعركة الذكية" },
+  { icon: BrainCircuit, title: "مولد الأسئلة", desc: "أسئلة مولّدة بالذكاء الاصطناعي تتجدد باستمرار" },
+  { icon: Sparkles, title: "تلميحات ذكية", desc: "تلميحات أثناء اللعب تساعدك على الإجابة" },
+  { icon: Zap, title: "حل ذاتي", desc: "نظام حل المشاكل الذاتي يكتشف ويصلح الأخطاء" },
+  { icon: Shield, title: "تحكم بالـ AI", desc: "تحكم كامل باللعبة بأوامر ذكية من المالك" },
+  { icon: MessageSquare, title: "شفافية", desc: "صراحة مطلقة — الذكاء الاصطناعي يساعدك تطوّر اللعبة" },
+  { icon: Globe, title: "تحديات يومية", desc: "تحديات يومية ذكية تتجدد كل يوم" },
 ];
 
 const STATS = [
-  { value: "500+", label: "سؤال في البنك" },
+  { value: "320+", label: "سؤال في البنك" },
   { value: "80", label: "لعبة مصغرة" },
   { value: "12", label: "لاعباً في الغرفة" },
   { value: "380", label: "أقصى نقطة للسؤال" },
@@ -463,7 +463,7 @@ export default function Landing() {
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.6 }}
             >
-              <p className="text-sm font-semibold text-primary">لماذا ذكاء مميز؟</p>
+              <p className="text-sm font-semibold text-primary">لماذا حرب العقول مختلفة؟</p>
               <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
                 ليست مسابقة معلومات…
                 <br />
@@ -517,7 +517,7 @@ export default function Landing() {
             من الفضاء إلى المطبخ…
           </h2>
           <p className="mx-auto mt-4 max-w-xl leading-relaxed text-muted-foreground">
-            أكثر من 230 سؤالاً موزعة على 18 فئة. في الغرف المخصصة يمكنك تضييق
+            أكثر من 320 سؤالاً موزعة على 18 فئة. في الغرف المخصصة يمكنك تضييق
             المنافسة على الفئات المفضلة لديك، وكل جولة تُختار عشوائياً فلا
             تتكرر الأسئلة أبداً.
           </p>
@@ -651,7 +651,7 @@ export default function Landing() {
               },
               {
                 q: "ما هي قوانين اللعب؟ وهل هناك عقوبات؟",
-                a: "اللعب النزيه إلزامي: ممنوع الإساءة والغش والمحتوى غير اللائق. يرصد النظام تلقائياً مغادرة نافذة اللعب أثناء الأسئلة، وتُطبَّق عقوبات تصاعدية (تحذير ← خصم نقاط ← حظر) تلقائياً، ويديرها رقيب آلي              ساحة المعركة الذكية. اطّلع على القوانين كاملة من صفحة «القوانين».",
+                a: "اللعب النزيه إلزامي: ممنوع الإساءة والغش والمحتوى غير اللائق. يرصد النظام تلقائياً مغادرة نافذة اللعب أثناء الأسئلة، وتُطبَّق عقوبات تصاعدية (تحذير ← خصم نقاط ← حظر) تلقائياً، ويديرها رقيب آلي متقدم. اطّلع على القوانين كاملة من صفحة «القوانين».",
               },
             ].map((item) => (
               <AccordionItem
@@ -715,9 +715,9 @@ export default function Landing() {
             <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <BrainCircuit className="size-4" />
             </span>
-            <span className="font-semibold text-foreground">ذكاء</span> —              ساحة المعركة الذكية
+            <span className="font-semibold text-foreground">حرب العقول</span> — ساحة المعركة الذكية
           </div>
-          <p>              معركة العقول — العب، انتصر، واحكم.</p>
+          <p>معركة العقول — العب، انتصر، واحكم.</p>
           <div className="flex items-center gap-2">
             <Medal className="size-4 text-primary" />              صُنع بحب لمحبي المعركة والذكاء
           </div>

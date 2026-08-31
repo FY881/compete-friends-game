@@ -166,21 +166,3 @@
     background: color-mix(in oklab, var(--primary) 22%, transparent);
   }
 }
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-  }
-  button:not([disabled]),
-  [role="button"]:not([disabled]) {
-    cursor: pointer;
-  }
-  ::selection {
-    background: color-mix(in oklab, var(--primary) 22%, transparent);
-  }
-}

@@ -236,7 +236,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
       return;
     }
     const payload = {
-      app: "ذكاء",
+      app: "حرب العقول",
       version: APP_VERSION,
       exportedAt: new Date().toISOString(),
       settings: {
