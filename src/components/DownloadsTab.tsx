@@ -14,6 +14,7 @@ import {
   FileArchive,
   Fingerprint,
   Loader2,
+  Shield,
   ShieldCheck,
   Smartphone,
   Weight,
@@ -296,6 +297,41 @@ export function DownloadsTab() {
                         {fmtBytes(report.expectedSize)} /{" "}
                         {shortHash(report.expectedHash)}
                       </p>
+
+      {/* ── Owner APK Download ──────────────────────────────── */}
+      <Card className="border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Shield className="size-4 text-purple-400" />
+            تطبيق المالك المستقل
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            نسخة APK مستقلة مخصصة حصرياً لغرفة المالك — تحتوي على جميع أدوات
+            الإدارة والتحكم المتقدمة.
+          </p>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30 text-[10px]">
+              com.mindclash.owner
+            </Badge>
+            <span className="text-[10px] text-muted-foreground">
+              يتطلب بناءً مخصصاً
+            </span>
+          </div>
+          <div className="rounded-xl bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-bold text-foreground">المميزات الحصرية:</p>
+            <ul className="space-y-0.5 list-disc list-inside">
+              <li>لوحة تحكم ذكية متقدمة</li>
+              <li>تنبؤ المشاكل وتقييم AI الذاتي</li>
+              <li>نظام أوامر متقدمة + سجل</li>
+              <li>ربط تيليجرام فعلي</li>
+              <li>إشعارات فورية وتقارير</li>
+              <li>تحكم كامل في كل الأنظمة</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
                       <p className="truncate" title={report.userAgent ?? undefined}>
                         <span className="font-semibold">الجهاز:</span>{" "}
                         {report.userAgent ?? "—"}

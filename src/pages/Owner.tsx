@@ -88,6 +88,8 @@ import { APP_VERSION } from "@/lib/app-version";
 import { AdminAiTab } from "@/components/AdminAiTab";
 import { DownloadsTab } from "@/components/DownloadsTab";
 import { AiIntelligenceDashboard } from "@/components/AiIntelligenceDashboard";
+import { TelegramSettings } from "@/components/TelegramSettings";
+// This line is intentionally left to avoid duplicate import
 import { AiControlTab } from "@/components/AiControlTab";
 import { OwnerControlPanel } from "@/components/OwnerControlPanel";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
@@ -1864,6 +1866,18 @@ function SettingsTab({ settings }: { settings: SettingsData }) {
             </div>
           </div>
         </CardContent>
+
+        {/* ── Telegram Settings ───────────────────────────────── */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Radio className="size-4" /> إعدادات تيليجرام
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <TelegramSettings />
+          </CardContent>
+        </Card>
       </Card>
     </div>
   );
