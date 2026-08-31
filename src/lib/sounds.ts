@@ -46,6 +46,13 @@ export const Sound = {
   timerTick: () => muted(() => playTone(1000, 0.05, "square", 0.05)),
   gameStart: () => muted(() => { playTone(440, 0.1, "sine", 0.1); setTimeout(() => playTone(554, 0.1, "sine", 0.1), 100); setTimeout(() => playTone(659, 0.15, "sine", 0.12), 200); }),
   error: () => muted(() => { playTone(200, 0.2, "sawtooth", 0.08); setTimeout(() => playTone(150, 0.3, "sawtooth", 0.08), 200); }),
+  countdown: () => muted(() => playTone(660, 0.08, "square", 0.1)),
+  tick: () => muted(() => playTone(1000, 0.04, "square", 0.06)),
+  reveal: () => muted(() => { playTone(440, 0.15, "triangle", 0.12); setTimeout(() => playTone(660, 0.2, "triangle", 0.14), 150); }),
+  select: () => muted(() => playTone(600, 0.08, "sine", 0.1)),
+  lifeline: () => muted(() => { playTone(523, 0.1, "sine", 0.1); setTimeout(() => playTone(784, 0.15, "sine", 0.12), 100); }),
+  isMuted: () => _muted,
+  toggleMuted: () => { _muted = !_muted; },
 };
 
 /** Backward-compatible alias so existing `import { sounds }` still works */
