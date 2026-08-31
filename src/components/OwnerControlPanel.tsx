@@ -13,6 +13,7 @@ import {
   Trash2, Undo2, Star, Gift, Swords, Target, Trophy, Zap,
   Search, Plus, Copy, Check, ChevronDown, ChevronUp, Radio,
   ShieldCheck, Skull, UserMinus, UserPlus, RefreshCw, Activity,
+  Loader2,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════
@@ -94,10 +95,12 @@ function PlayersControl() {
   const [notifBody, setNotifBody] = useState("");
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
 
-  if (!players) return <div className="p-4 text-muted-foreground">جارٍ التحميل...</div>;
+  if (!players) return <div className="flex items-center justify-center py-12"><Loader2 className="size-6 animate-spin text-muted-foreground" /><span className="mr-3 text-muted-foreground">جارٍ تحميل البيانات...</span></div>;
+
+  if (players.length === 0) return <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">لا يوجد لاعبون مسجلون بعد.</div>;
 
   const filtered = players.filter(
-    (p) => p.name.includes(search) || p.email?.includes(search),
+    (p) => (p.name || '').includes(search) || (p.email || '').includes(search),
   );
 
   const toggle = (id: string) =>
@@ -164,13 +167,13 @@ function PlayersControl() {
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm truncate">{p.name}</span>
+                  <span className="font-medium text-sm truncate">{p.name || 'لاعب مجهول'}</span>
                   {p.banned && <Badge variant="destructive" className="text-[10px]">محظور</Badge>}
                   {p.role === "admin" && <Badge className="text-[10px]">مدير</Badge>}
                   {p.warnings > 0 && <Badge variant="secondary" className="text-[10px]">{p.warnings} تحذير</Badge>}
                   {p.cheatStrikes > 0 && <Badge variant="destructive" className="text-[10px]">{p.cheatStrikes} غش</Badge>}
                 </div>
-                <span className="text-xs text-muted-foreground truncate block">{p.email}</span>
+                <span className="text-xs text-muted-foreground truncate block">{p.email || 'بدون بريد'}</span>
               </div>
               <Button
                 size="sm"
