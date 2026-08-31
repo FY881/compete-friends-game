@@ -55,6 +55,7 @@ import {
   FileDown,
   Brain,
   Flag,
+  Key,
   Gamepad2,
   Gavel,
   Globe,
@@ -92,6 +93,7 @@ import { TelegramSettings } from "@/components/TelegramSettings";
 // This line is intentionally left to avoid duplicate import
 import { AiControlTab } from "@/components/AiControlTab";
 import { OwnerControlPanel } from "@/components/OwnerControlPanel";
+import { OwnerPasswordManager } from "@/components/OwnerLoginDialog";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 import { AiSystemsTab } from "@/components/AiSystemsTab";
@@ -1867,6 +1869,18 @@ function SettingsTab({ settings }: { settings: SettingsData }) {
           </div>
         </CardContent>
 
+
+        {/* ── Owner Password ──────────────────────────────────── */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Key className="size-4" /> كلمة مرور المالك
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <OwnerPasswordManager />
+          </CardContent>
+        </Card>
         {/* ── Telegram Settings ───────────────────────────────── */}
         <Card className="mt-6">
           <CardHeader>

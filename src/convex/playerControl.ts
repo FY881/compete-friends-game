@@ -1125,3 +1125,138 @@ export const undoOwnerAction = mutation({
     return { ok: true };
   },
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ║ نظام دخول المالك بكلمة المرور ║
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Simple hash for password comparison (not cryptographic — obfuscation only) */
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash + char) | 0;
+  }
+  return `h${Math.abs(hash).toString(36)}`;
+}
+
+/** Verify owner password and set role to admin temporarily */
+export const verifyOwnerPassword = mutation({
+  args: { password: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
+    
+    const row = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "ownerPasswordHash"))
+      .unique();
+    
+    if (!row) throw new Error("لم يتم تفعيل كلمة مرور المالك بعد");
+    
+    const stored = JSON.parse(row.value) as { hash: string; active: boolean };
+    if (!stored.active) throw new Error("كلمة مرور المالك معطّلة حالياً");
+    
+    const inputHash = simpleHash(args.password);
+    if (inputHash !== stored.hash) throw new Error("كلمة المرور خاطئة");
+    
+    // Grant admin role temporarily
+    await ctx.db.patch(userId, { role: "admin" });
+    
+    // Log the action
+    await ctx.db.insert("ownerActions", {
+      action: "owner_password_login",
+      targetUserId: userId,
+      details: "دخول المالك عبر كلمة المرور",
+      reversible: false,
+      undone: false,
+      createdAt: Date.now(),
+    });
+    
+    return { ok: true, role: "admin" };
+  },
+});
+
+/** Set or update owner password (owner only) */
+export const setOwnerPassword = mutation({
+  args: { password: v.string(), active: v.boolean() },
+  handler: async (ctx, args) => {
+    await requireOwner(ctx);
+    
+    if (args.password.length < 4) throw new Error("كلمة المرور قصيرة جداً")
+    
+    const hash = simpleHash(args.password);
+    const existing = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "ownerPasswordHash"))
+      .unique();
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        value: JSON.stringify({ hash, active: args.active }),
+      });
+    } else {
+      await ctx.db.insert("settings", {
+        key: "ownerPasswordHash",
+        value: JSON.stringify({ hash, active: args.active }),
+      });
+    }
+    
+    await ctx.db.insert("ownerActions", {
+      action: args.active ? "set_owner_password" : "disable_owner_password",
+      details: args.active ? "تم تفعيل كلمة مرور المالك" : "تم تعطيل كلمة مرور المالك",
+      reversible: true,
+      undone: false,
+      createdAt: Date.now(),
+    });
+    
+    return { ok: true };
+  },
+});
+
+/** Delete owner password completely (owner only) */
+export const deleteOwnerPassword = mutation({
+  handler: async (ctx) => {
+    await requireOwner(ctx);
+    
+    const existing = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "ownerPasswordHash"))
+      .unique();
+    
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+    
+    await ctx.db.insert("ownerActions", {
+      action: "delete_owner_password",
+      details: "تم حذف كلمة مرور المالك نهائياً",
+      reversible: false,
+      undone: false,
+      createdAt: Date.now(),
+    });
+    
+    return { ok: true };
+  },
+});
+
+/** Get owner password status */
+export const getOwnerPasswordStatus = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { exists: false, active: false };
+    
+    const user = await ctx.db.get(userId);
+    if (!user || !isOwnerEmail(user.email)) return { exists: false, active: false };
+    
+    const row = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "ownerPasswordHash"))
+      .unique();
+    
+    if (!row) return { exists: false, active: false };
+    
+    const stored = JSON.parse(row.value) as { hash: string; active: boolean };
+    return { exists: true, active: stored.active };
+  },
+});

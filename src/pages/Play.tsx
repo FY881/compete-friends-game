@@ -18,6 +18,7 @@ import { Sound } from "@/lib/sounds";
 import { FeaturesShowcase } from "@/components/FeaturesShowcase";
 import { GameModes } from "@/components/game/GameModes";
 import { Volume2, VolumeX } from "lucide-react";
+import { OwnerLoginDialog } from "@/components/OwnerLoginDialog";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -95,6 +96,7 @@ export default function Play() {
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [downloadingApk, setDownloadingApk] = useState(false);
+  const [showOwnerLogin, setShowOwnerLogin] = useState(false);
 
   const persistNickname = (value: string) => {
     setNickname(value);
@@ -251,7 +253,7 @@ export default function Play() {
                 <span className="hidden md:inline">تحميل التطبيق</span>
               </Link>
             </Button>
-            {discipline?.isOwner && (
+            {discipline?.isOwner ? (
               <Button
                 type="button"
                 variant="outline"
@@ -261,6 +263,17 @@ export default function Play() {
               >
                 <ShieldCheck className="size-3.5" />
                 <span className="hidden sm:inline">غرفة المالك</span>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs text-muted-foreground"
+                onClick={() => setShowOwnerLogin(true)}
+                title="دخول المالك بكلمة المرور"
+              >
+                <ShieldCheck className="size-3.5" />
               </Button>
             )}
             <div className="hidden items-center gap-2.5 sm:flex">
@@ -929,6 +942,9 @@ export default function Play() {
           كل جولة تمنح خبرة (XP) تُضاف إلى مستواك وشاراتك — جولة كاملة في دقيقتين.
         </div>
       </main>
+
+      {/* ── Owner Login Dialog ─────────────────────────────── */}
+      <OwnerLoginDialog open={showOwnerLogin} onOpenChange={setShowOwnerLogin} />
     </div>
   );
 }
