@@ -26,6 +26,7 @@ import {
   Loader2,
   LogOut,
   Medal,
+  MessageSquare,
   Scale,
   ShieldCheck,
   Smartphone,
@@ -492,6 +493,23 @@ export default function Play() {
                   <Link to="/games">
                     <Gamepad2 className="size-3" />
                     افتح مركز الألعاب
+                  </Link>
+                </Button>
+              </div>
+
+              {/* Chat Rooms Quick Access */}
+              <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">💬</span>
+                  <p className="text-sm font-bold">غرف الدردشة</p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  تفاعل مع المجتمع — دردشة مباشرة مع اللاعبين
+                </p>
+                <Button asChild size="sm" variant="ghost" className="mt-2 gap-1.5 rounded-xl text-emerald-600">
+                  <Link to="/rooms">
+                    <MessageSquare className="size-3" />
+                    افتح الغرف
                   </Link>
                 </Button>
               </div>

@@ -1256,10 +1256,7 @@ function AiTab({ settings }: { settings: SettingsData }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="openrouter/auto">openrouter/auto (موصى به)</SelectItem>
-                  <SelectItem value="deepseek/deepseek-chat-v3-0324:free">deepseek chat (مجاني)</SelectItem>
-                  <SelectItem value="meta-llama/llama-3.3-70b-instruct">llama 3.3 70b</SelectItem>
-                  <SelectItem value="google/gemini-2.0-flash-001">gemini 2.0 flash</SelectItem>
+                  <SelectItem value="openrouter/free">openrouter/free (الموصى به — يعمل دائماً)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -24,6 +24,7 @@ const Rules = lazy(() => import("./pages/Rules.tsx"));
 const Download = lazy(() => import("./pages/Download.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const MiniGames = lazy(() => import("./pages/MiniGames.tsx"));
+const ChatRooms = lazy(() => import("./pages/ChatRooms.tsx"));
 
 // Simple loading fallback for route transitions — all Arabic
 function RouteLoading() {
@@ -253,6 +254,14 @@ function AppShell() {
               <Route path="/rules" element={<Rules />} />
               <Route path="/download" element={<Download />} />
               <Route path="/games" element={<MiniGames />} />
+              <Route
+                path="/rooms"
+                element={
+                  <RequireAuth>
+                    <ChatRooms />
+                  </RequireAuth>
+                }
+              />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
