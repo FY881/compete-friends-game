@@ -1,5 +1,5 @@
 /**
- * بنك الأسئلة الأوفلاين — 300 سؤال على 30 مرحلة (10 أسئلة لكل مرحلة).
+ * بنك الأسئلة الأوفلاين — 360 سؤال على 50 مرحلة (10 أسئلة لكل مرحلة).
  * تتراوح من السهل إلى الأسطوري مع تنوع كامل في المواضيع.
  */
 
@@ -387,10 +387,80 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   { id: "o298", category: "علوم", difficulty: "hard", question: "ما هي نظرية أينشتاين الشهيرة E=mc²؟", options: ["النسبية العامة", "النسبية الخاصة", "نظرية الأوتار", "نظرية الكم"], correctIndex: 1, stage: 12, reward: 300 },
   { id: "o299", category: "ألغاز", difficulty: "hard", question: "شيء يسمعك بلا أذن ويكلّمك بلا لسان. ما هو؟", options: ["الهاتف", "الراديو", "الهاتف الأرضي", "الصدى"], correctIndex: 0, stage: 18, reward: 300 },
   { id: "o300", category: "ألغاز", difficulty: "hard", question: "شيء يمكنك كسره دون أن تلمسه. ما هو؟", options: ["الزجاج", "الصمت", "الحبل", "ال"], correctIndex: 1, stage: 18, reward: 300 },
+
+  // ═══════════════════════════════════════════════════════════════
+  // المرحلة 31-40: صعب جداً (400 XP لكل سؤال)
+  // ═══════════════════════════════════════════════════════════════
+  // Stage 31 — تاريخ إسلامي
+  { id: "o301", category: "تاريخ", difficulty: "hard", question: "في أي سنة هجرية وقعت غزوة بدر؟", options: ["2 هـ", "3 هـ", "5 هـ", "7 هـ"], correctIndex: 1, stage: 31, reward: 400 },
+  { id: "o302", category: "تاريخ", difficulty: "hard", question: "من هو أول خليفة أموي؟", options: ["معاوية بن أبي سفيان", "عبد الملك بن مروان", "يزيد بن معاوية", "الوليد بن عبد الملك"], correctIndex: 0, stage: 31, reward: 400 },
+  { id: "o303", category: "تاريخ", difficulty: "hard", question: "في أي سنة سقطت قرطبة؟", options: ["363 هـ", "380 هـ", "422 هـ", "450 هـ"], correctIndex: 2, stage: 31, reward: 400 },
+  { id: "o304", category: "علوم", difficulty: "hard", question: "ما هو العنصر الكيميائي الذي رمزه Fe؟", options: ["النحاس", "الحديد", "الفضة", "الرصاص"], correctIndex: 1, stage: 32, reward: 400 },
+  { id: "o305", category: "علوم", difficulty: "hard", question: "كم عدد العظام في جسم الإنسان البالغ؟", options: ["186", "206", "226", "256"], correctIndex: 1, stage: 32, reward: 400 },
+  { id: "o306", category: "علوم", difficulty: "hard", question: "ما هو الغاز الأكثر وفرة في الغلاف الجوي؟", options: ["الأكسجين", "النيتروجين", "ثاني أكسيد الكربون", "الهيدروجين"], correctIndex: 1, stage: 32, reward: 400 },
+  { id: "o307", category: "رياضيات", difficulty: "hard", question: "ما ناتج 17 × 13؟", options: ["211", "221", "231", "241"], correctIndex: 1, stage: 33, reward: 400 },
+  { id: "o308", category: "رياضيات", difficulty: "hard", question: "ما هو الجذر التربيعي لـ 144؟", options: ["10", "11", "12", "13"], correctIndex: 2, stage: 33, reward: 400 },
+  { id: "o309", category: "رياضيات", difficulty: "hard", question: "إذا كان س = 5، فما قيمة 3س² + 2س - 1؟", options: ["84", "89", "94", "99"], correctIndex: 0, stage: 33, reward: 400 },
+  { id: "o310", category: "جغرافيا", difficulty: "hard", question: "ما هي أصغر دولة في العالم من حيث المساحة؟", options: ["موناكو", "الفاتيكان", "سان مارينو", "ليختنشتاين"], correctIndex: 1, stage: 34, reward: 400 },
+  { id: "o311", category: "جغرافيا", difficulty: "hard", question: "ما هو أعمق محيط في العالم؟", options: ["الأطلسي", "الهندي", "الهادئ", "المتجمد الشمالي"], correctIndex: 2, stage: 34, reward: 400 },
+  { id: "o312", category: "جغرافيا", difficulty: "hard", question: "في أي بلد يقع نهر الأمازون؟", options: ["كولومبيا", "بيرو", "البرازيل", "الأرجنتين"], correctIndex: 2, stage: 34, reward: 400 },
+  { id: "o313", category: "منطق", difficulty: "hard", question: "إذا كان اليوم الاثنين، فما هو اليوم بعد 100 يوم؟", options: ["الثلاثاء", "الأربعاء", "الخميس", "الجمعة"], correctIndex: 2, stage: 35, reward: 400 },
+  { id: "o314", category: "منطق", difficulty: "hard", question: "أب له 4 بنات، كل بنت لها أخ. كم عدد أبناء الأب؟", options: ["4", "5", "8", "12"], correctIndex: 1, stage: 35, reward: 400 },
+  { id: "o315", category: "منطق", difficulty: "hard", question: "رجل يحمل صندوقاً ويقول: إذا ضاعفتهنقصت النصف. ما المطلوب؟", options: ["الصفر", "الواحد", "الاثنان", "لا شيء"], correctIndex: 0, stage: 35, reward: 400 },
+  { id: "o316", category: "أدب عربي", difficulty: "hard", question: "من صاحب ديوان 'الأغاني'؟", options: ["أبو العتاهية", "أبو الفرج الأصفهاني", "المتنبي", "أبو نواس"], correctIndex: 1, stage: 36, reward: 400 },
+  { id: "o317", category: "أدب عربي", difficulty: "hard", question: "من هو الشاعر الملقب بـ'شاعر النيل'؟", options: ["أحمد شوقي", "حافظ إبراهيم", "المازني", "علي محمود طه"], correctIndex: 1, stage: 36, reward: 400 },
+  { id: "o318", category: "أدب عربي", difficulty: "hard", question: "أين ولد الإمام الشافعي؟", options: ["بغداد", "غزة", "القاهرة", "المدينة"], correctIndex: 1, stage: 36, reward: 400 },
+  { id: "o319", category: "تقنية", difficulty: "hard", question: "في أي سنة أُنشئ أول هاتف محمول؟", options: ["1973", "1983", "1993", "2003"], correctIndex: 1, stage: 37, reward: 400 },
+  { id: "o320", category: "تقنية", difficulty: "hard", question: "ما هي لغة البرمجة الأكثر استخداماً في العالم؟", options: ["Java", "Python", "C++", "JavaScript"], correctIndex: 3, stage: 37, reward: 400 },
+  { id: "o321", category: "تقنية", difficulty: "hard", question: "ماذا تعني كلمة 'API'؟", options: ["Application Programming Interface", "Advanced Program Integration", "Auto Protocol Interaction", "Applied Process Integration"], correctIndex: 0, stage: 37, reward: 400 },
+  { id: "o322", category: "ترفيه", difficulty: "hard", question: "من مؤسسلعبة 'روبلوكس'؟", options: ["إيبك غيمز", "ديفيد بيسكوفيتش", "موتو يوكي", "مارك زوكربيرغ"], correctIndex: 1, stage: 38, reward: 400 },
+  { id: "o323", category: "ترفيه", difficulty: "hard", question: "في أي سنة صدر فيلم 'الفارس الأسود'؟", options: ["2005", "2008", "2012", "2016"], correctIndex: 1, stage: 38, reward: 400 },
+  { id: "o324", category: "رياضة", difficulty: "hard", question: "كم مرة فاز منتخب البرازيل بكأس العالم؟", options: ["4", "5", "6", "7"], correctIndex: 1, stage: 39, reward: 400 },
+  { id: "o325", category: "رياضة", difficulty: "hard", question: "ما هي عاصمة أستراليا؟", options: ["سيدني", "ملبورن", "كانبرا", "بريزبن"], correctIndex: 2, stage: 39, reward: 400 },
+  { id: "o326", category: "رياضة", difficulty: "hard", question: "في أي رياضة يُستخدم مصطلح 'Declaration'؟", options: ["التنس", "الغولف", "السباحة", "أُسSEE"], correctIndex: 1, stage: 39, reward: 400 },
+  { id: "o327", category: "علوم", difficulty: "hard", question: "ما هو أكبر كوكب في المجموعة الشمسية؟", options: ["زحل", "المشتري", "أورانوس", "نبتون"], correctIndex: 1, stage: 40, reward: 400 },
+  { id: "o328", category: "علوم", difficulty: "hard", question: "كم يستغرق ضوء الشمس للوصول إلى الأرض؟", options: ["8 دقائق", "10 دقائق", "12 دقيقة", "15 دقيقة"], correctIndex: 0, stage: 40, reward: 400 },
+  { id: "o329", category: "علوم", difficulty: "hard", question: "ما هو العنصر الذي يُسبب تآكل الأوزون؟", options: [" ثاني أكسيد الكربون", "الميثان", "الكربونات", "الكلوروفلوروكربون"], correctIndex: 3, stage: 40, reward: 400 },
+  { id: "o330", category: "ikipedia", difficulty: "hard", question: "من هو مخترع المصباح الكهربائي؟", options: ["نيكولا تسلا", "توماس إديسون", "غراهام بيل", "ألبرت أينشتاين"], correctIndex: 1, stage: 40, reward: 400 },
+
+  // ═══════════════════════════════════════════════════════════════
+  // المرحلة 41-50: أسطوري (500 XP لكل سؤال)
+  // ═══════════════════════════════════════════════════════════════
+  // Stage 41 — فيزياء متقدمة
+  { id: "o331", category: "فيزياء", difficulty: "hard", question: "ما هي سرعة الضوء بالكيلومترات في الثانية؟", options: ["150,000", "200,000", "300,000", "400,000"], correctIndex: 2, stage: 41, reward: 500 },
+  { id: "o332", category: "فيزياء", difficulty: "hard", question: "ماذا يحدث للزمن عندما تقترب من سرعة الضوء؟", options: ["يتسارع", "يتباطأ", "يتوقف", "لا يتغير"], correctIndex: 1, stage: 41, reward: 500 },
+  { id: "o333", category: "فيزياء", difficulty: "hard", question: "ما هو قانون نيوتون الثالث؟", options: ["القصور الذاتي", "الفعل وردود الفعل", "الجاذبية", "التسارع"], correctIndex: 1, stage: 41, reward: 500 },
+  { id: "o334", category: "كيمياء", difficulty: "hard", question: "ما هو العنصر الكيميائي الذي رمزه Hg؟", options: ["الهيدروجين", "الزئبق", "الهيليوم", "الهافنيوم"], correctIndex: 1, stage: 42, reward: 500 },
+  { id: "o335", category: "كيمياء", difficulty: "hard", question: "ما هو الرقم الهيدروجيني للماء النقي عند 25 درجة؟", options: ["6", "7", "8", "14"], correctIndex: 1, stage: 42, reward: 500 },
+  { id: "o336", category: "كيمياء", difficulty: "hard", question: "كم عددجدول الدورات الكيميائية؟", options: ["100", "118", "126", "136"], correctIndex: 1, stage: 42, reward: 500 },
+  { id: "o337", category: "رياضيات", difficulty: "hard", question: "ما هو عدد الأعداد الأولية التي لا تتجاوز 50؟", options: ["13", "15", "17", "19"], correctIndex: 1, stage: 43, reward: 500 },
+  { id: "o338", category: "رياضيات", difficulty: "hard", question: "ما هو ناتج 99 × 99؟", options: ["9801", "9701", "9601", "9901"], correctIndex: 0, stage: 43, reward: 500 },
+  { id: "o339", category: "رياضيات", difficulty: "hard", question: "إذا كان نصف العدد يساوي 25، فما هو العدد؟", options: ["40", "50", "60", "75"], correctIndex: 1, stage: 43, reward: 500 },
+  { id: "o340", category: "فلك", difficulty: "hard", question: "كم عدد أقمار كوكب زحل؟", options: ["50+", "80+", "140+", "200+"], correctIndex: 2, stage: 44, reward: 500 },
+  { id: "o341", category: "فلك", difficulty: "hard", question: "أقرب نجم إلى الأرض (باستثناء الشمس)؟", options: ["الشعرى اليمانية", "الشعرىedByMan", "ألفا سنتوري", "ب桕د"], correctIndex: 0, stage: 44, reward: 500 },
+  { id: "o342", category: "فلك", difficulty: "hard", question: "ما هي المجرة التي نعيش فيها؟", options: ["الandro", "الدجاجة", "الحلزوني", "المgénta"], correctIndex: 2, stage: 44, reward: 500 },
+  { id: "o343", category: "تاريخ عالمي", difficulty: "hard", question: "في أي سنة سقط جدار برلين؟", options: ["1987", "1989", "1991", "1993"], correctIndex: 1, stage: 45, reward: 500 },
+  { id: "o344", category: "تاريخ عالمي", difficulty: "hard", question: "من هو أول إنسان صعد إلى الفضاء؟", options: ["نيل أرمسترونغ", "يوري غاغارين", " alan shepard", "جون غلين"], correctIndex: 1, stage: 45, reward: 500 },
+  { id: "o345", category: "تاريخ عالمي", difficulty: "hard", question: "أين أُقيمت أول أولمبياد حديثة؟", options: ["روما", "أثينا", "باريس", "لندن"], correctIndex: 1, stage: 45, reward: 500 },
+  { id: "o346", category: "أدب عالمي", difficulty: "hard", question: "من كتب 'البؤس'؟", options: ["تولستوي", "فيكتور هوغو", "ديكنز", "شيكسبير"], correctIndex: 1, stage: 46, reward: 500 },
+  { id: "o347", category: "أدب عالمي", difficulty: "hard", question: "من كتب '1984'؟", options: ["ألدوس هكسلي", "جورج أورويل", "راي برادبري", " ISAAC أerson"], correctIndex: 1, stage: 46, reward: 500 },
+  { id: "o348", category: "أدب عالمي", difficulty: "hard", question: "ما هي رواية 'دون كيشوت' لمن؟", options: ["غوغول", "سرفانتس", "دانتي", "فولتير"], correctIndex: 1, stage: 46, reward: 500 },
+  { id: "o349", category: "فلسفة", difficulty: "hard", question: "من قال 'أنا أفكر إذن أنا موجود'؟", options: ["أرسطو", "سقراط", "ديكارت", "كانط"], correctIndex: 2, stage: 47, reward: 500 },
+  { id: "o350", category: "فلسفة", difficulty: "hard", question: "من مؤسس الفلسفة اليونانية؟", options: ["أفلاطون", "سقراط", "أرسطو", "بيثاغورس"], correctIndex: 1, stage: 47, reward: 500 },
+  { id: "o351", category: "فلسفة", difficulty: "hard", question: "ماذا تعني كلمة 'فقه' في اللغة العربية؟", options: ["العلم", "الفهم", "الحكم", "ال عمليات"], correctIndex: 1, stage: 47, reward: 500 },
+  { id: "o352", category: "اقتصاد", difficulty: "hard", question: "ما هو مؤشر الأساسي لقياس التضخم؟", options: ["نسبة الفائدة", "سعر الصرف", "سعر الاستهلاك", "نسبة البطالة"], correctIndex: 2, stage: 48, reward: 500 },
+  { id: "o353", category: "اقتصاد", difficulty: "hard", question: "ما هو 'الناتج المحلي الإجمالي'؟", options: ["إجمالي صادرات الدولة", "قيمة جميع السلع والخدمات", "عدد السكان", "مساحة الأرض"], correctIndex: 1, stage: 48, reward: 500 },
+  { id: "o354", category: "اقتصاد", difficulty: "hard", question: "ما هو العملة الرسمية لليابان؟", options: ["الوون", "الين", "اليوان", "الروبية"], correctIndex: 1, stage: 48, reward: 500 },
+  { id: "o355", category: "طب", difficulty: "hard", question: "كم عدد نبضات القلب الطبيعية في الدقيقة؟", options: ["50-60", "60-100", "100-120", "120-140"], correctIndex: 1, stage: 49, reward: 500 },
+  { id: "o356", category: "طب", difficulty: "hard", question: "ما هو أكبر عضو في جسم الإنسان؟", options: ["الكبد", "الدماغ", "الجلد", "الرئتان"], correctIndex: 2, stage: 49, reward: 500 },
+  { id: "o357", category: "طب", difficulty: "hard", question: "ما هي فصيلة الدم الأكثر شيوعاً في العالم؟", options: ["A+", "B+", "O+", "AB+"], correctIndex: 2, stage: 49, reward: 500 },
+  { id: "o358", category: "تحدي ذهني", difficulty: "hard", question: "شيء له رأس ولا عين. ما هو؟", options: ["القلم", "الدبوس", "الحذاء", "الساعة"], correctIndex: 1, stage: 50, reward: 500 },
+  { id: "o359", category: "تحدي ذهني", difficulty: "hard", question: "كلما زدت منه قلت. ما هو؟", options: ["المال", "الحفرة", "العمر", "الkerja"], correctIndex: 1, stage: 50, reward: 500 },
+  { id: "o360", category: "تحدي ذهني", difficulty: "hard", question: "يمكنك كسره بكلمة واحدة. ما هو؟", options: ["الزجاج", "الصمت", "الوعد", "الحبل"], correctIndex: 2, stage: 50, reward: 500 },
 ];
 
 /** عدد المراحل الكلي */
-export const TOTAL_STAGES = 30;
+export const TOTAL_STAGES = 50;
 
 /** عدد الأسئلة في كل مرحلة */
 export const QUESTIONS_PER_STAGE = 10;
