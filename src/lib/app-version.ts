@@ -34,7 +34,7 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "2.0.0"; // client version — matches server WEB_VERSION 1.4.0
+export const APP_VERSION = "1.5.5"; // client version — matches server WEB_VERSION 1.4.0
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
 export const APK_VERSION = "1.5.4";

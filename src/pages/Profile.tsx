@@ -18,6 +18,8 @@ import {
   Lock,
   LogOut,
   Medal,
+  Moon,
+  Sun,
   ShieldCheck,
   Sparkles,
   Star,
@@ -27,7 +29,34 @@ import {
   Zap,
 } from "lucide-react";
 import { AchievementsPanel, GiftsPanel, ArchivePanel, InvitePanel, CollectiveGoalsPanel, PerformanceAnalysis, SeasonBadge } from "@/components/PlayerFeatures";
+import { MembershipCard } from "@/components/MembershipCard";
 import { useNavigate } from "react-router";
+import { useDarkMode } from "@/hooks/use-dark-mode";
+
+function DarkModeToggle() {
+  const { isDark, toggle } = useDarkMode();
+  return (
+    <button
+      onClick={toggle}
+      className="flex w-full items-center justify-between rounded-2xl border border-border/80 bg-card p-4 shadow-sm transition-colors hover:bg-muted/50"
+    >
+      <div className="flex items-center gap-3">
+        {isDark ? (
+          <Moon className="size-5 text-indigo-400" />
+        ) : (
+          <Sun className="size-5 text-amber-500" />
+        )}
+        <div>
+          <p className="text-sm font-bold">الوضع الداكن</p>
+          <p className="text-xs text-muted-foreground">{isDark ? "مضبوط — للراحة أثناء الليل" : "مضبوط — للراحة أثناء النهار"}</p>
+        </div>
+      </div>
+      <div className={`size-11 rounded-xl flex items-center justify-center transition-colors ${isDark ? "bg-indigo-500 text-white" : "bg-amber-100 text-amber-600"}`}>
+        {isDark ? <Moon className="size-5" /> : <Sun className="size-5" />}
+      </div>
+    </button>
+  );
+}
 
 function avatarColor(name: string) {
   const colors = [
@@ -478,6 +507,17 @@ export default function Profile() {
           <div className="mt-4">
             <ArchivePanel />
           </div>
+        </div>
+
+        {/* ════ العضوية ════ */}
+        <div className="mt-10">
+          <MembershipCard />
+        </div>
+
+        {/* ════ الإعدادات ════ */}
+        <div className="mt-10">
+          <h2 className="text-lg font-bold mb-4">الإعدادات</h2>
+          <DarkModeToggle />
         </div>
       </main>
     </div>
