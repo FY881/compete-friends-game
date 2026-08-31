@@ -190,6 +190,8 @@ export type ModSettings = {
   disabledQuestions: string[];
   siteUrl: string; // official web app URL — needed by the Android APK for downloads
   openrouterApiKey: string; // OpenRouter API key for AI features
+  telegramBotToken: string; // Telegram bot token for remote control
+  telegramChatId: string; // Telegram chat ID for notifications
 };
 
 export const DEFAULT_SETTINGS: ModSettings = {
@@ -201,7 +203,10 @@ export const DEFAULT_SETTINGS: ModSettings = {
   announcementActive: false,
   antiCheatEnabled: true,
   disabledQuestions: [],
-  siteUrl: "",    openrouterApiKey: "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",
+  siteUrl: "",
+  openrouterApiKey: "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",
+  telegramBotToken: "",
+  telegramChatId: "",
 };
 
 /** Force any stale/broken model name to the working default */
@@ -237,6 +242,8 @@ export async function getSettingsData(
     disabledQuestions: read("disabledQuestions", DEFAULT_SETTINGS.disabledQuestions),
     siteUrl: read("siteUrl", DEFAULT_SETTINGS.siteUrl),
     openrouterApiKey: read("openrouterApiKey", ""),
+    telegramBotToken: read("telegramBotToken", ""),
+    telegramChatId: read("telegramChatId", ""),
   };
 }
 
@@ -1136,6 +1143,8 @@ export const updateSettings = mutation({
     disabledQuestions: v.optional(v.array(v.string())),
     siteUrl: v.optional(v.string()),
     openrouterApiKey: v.optional(v.string()),
+    telegramBotToken: v.optional(v.string()),
+    telegramChatId: v.optional(v.string()),
     aiModelVersion: v.optional(v.string()),
     aiLastHealthCheck: v.optional(v.number()),
     aiTotalFixes: v.optional(v.number()),

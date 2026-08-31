@@ -51,6 +51,8 @@ export type MiniGameDef = {
   xpReward: number;
   timeLimit: number; // seconds
   component: React.ComponentType<MiniGameProps>;
+  /** الحد الأدنى للعضوية المطلوبة: bronze=freetier, silver, gold, diamond, exclusive */
+  tier?: "bronze" | "silver" | "gold" | "diamond" | "exclusive";
 };
 
 export type MiniGameProps = {
@@ -798,7 +800,7 @@ const GAME_CATEGORIES: GameCategory[] = [
       { id: "mem7", name: "ذاكرة كلمات", description: "تذكر الكلمات بالترتيب", difficulty: "medium", players: "1", xpReward: 70, timeLimit: 60, component: WordScramble },
       { id: "mem8", name: "نظام الأرقام السريع", description: "أرقام سريعة جداً", difficulty: "hard", players: "1", xpReward: 110, timeLimit: 30, component: NumberSequence },
       { id: "mem9", name: "تسلسل الأشكال", description: "تذكر ترتيب الأشكال", difficulty: "easy", players: "1", xpReward: 45, timeLimit: 45, component: PatternMatch },
-      { id: "mem10", name: "تحدي الذاكرة الخارق", description: "سلسلة طويلة من التحديات", difficulty: "hard", players: "1", xpReward: 150, timeLimit: 90, component: NumberSequence },
+      { id: "mem10", name: "تحدي الذاكرة الخارق", description: "سلسلة طويلة من التحديات", difficulty: "hard", players: "1", xpReward: 150, timeLimit: 90, component: NumberSequence, tier: "diamond" },
     ],
   },
   {
@@ -816,7 +818,7 @@ const GAME_CATEGORIES: GameCategory[] = [
       { id: "spd7", name: "رد سريع", description: "اختبر سرعة رد فعلك", difficulty: "easy", players: "1", xpReward: 40, timeLimit: 20, component: ReactionSpeed },
       { id: "spd8", name: "akhbar", description: "ألوان سريعة ومتصاعدة", difficulty: "medium", players: "1", xpReward: 70, timeLimit: 40, component: ColorMatch },
       { id: "spd9", name: "mathKing", description: "مسائل رياضية متقدمة", difficulty: "hard", players: "1", xpReward: 120, timeLimit: 30, component: MathSprint },
-      { id: "spd10", name: "SUPER_SPEED", description: "تحدي السرعة الخارق", difficulty: "hard", players: "1", xpReward: 150, timeLimit: 25, component: ReactionSpeed },
+      { id: "spd10", name: "SUPER_SPEED", description: "تحدي السرعة الخارق", difficulty: "hard", players: "1", xpReward: 150, timeLimit: 25, component: ReactionSpeed, tier: "silver" },
     ],
   },
   {
@@ -852,7 +854,7 @@ const GAME_CATEGORIES: GameCategory[] = [
       { id: "stg7", name: "speedLogic", description: "منطق سريع", difficulty: "easy", players: "1", xpReward: 55, timeLimit: 60, component: NumberSequence },
       { id: "stg8", name: "grandStrat", description: "استراتيجية كبرى", difficulty: "hard", players: "1", xpReward: 130, timeLimit: 150, component: TicTacToe },
       { id: "stg9", name: "ultimateLogic", description: "منطق مطلق", difficulty: "hard", players: "1", xpReward: 140, timeLimit: 90, component: NumberSequence },
-      { id: "stg10", name: "GRAND_MASTER", description: "السيد الأعلى", difficulty: "hard", players: "1", xpReward: 160, timeLimit: 120, component: TicTacToe },
+      { id: "stg10", name: "GRAND_MASTER", description: "السيد الأعلى", difficulty: "hard", players: "1", xpReward: 160, timeLimit: 120, component: TicTacToe, tier: "gold" },
     ],
   },
   {
@@ -870,7 +872,7 @@ const GAME_CATEGORIES: GameCategory[] = [
       { id: "num7", name: "decimalDash", description: "أرقام عشرية سريعة", difficulty: "medium", players: "1", xpReward: 85, timeLimit: 35, component: MathSprint },
       { id: "num8", name: "fractionFury", description: "كسور وقصور", difficulty: "hard", players: "1", xpReward: 110, timeLimit: 40, component: MathSprint },
       { id: "num9", name: "algebraAce", description: "جبر مبسط", difficulty: "hard", players: "1", xpReward: 140, timeLimit: 30, component: MathSprint },
-      { id: "num10", name: "MATH_LEGEND", description: "أسطورة الرياضيات", difficulty: "hard", players: "1", xpReward: 160, timeLimit: 20, component: MathSprint },
+      { id: "num10", name: "MATH_LEGEND", description: "أسطورة الرياضيات", difficulty: "hard", players: "1", xpReward: 160, timeLimit: 20, component: MathSprint, tier: "gold" },
     ],
   },
   {
@@ -906,7 +908,7 @@ const GAME_CATEGORIES: GameCategory[] = [
       { id: "ch7", name: "hyperMode", description: "وضع Hyper", difficulty: "hard", players: "1", xpReward: 140, timeLimit: 45, component: WordScramble },
       { id: "ch8", name: "marathon", description: "ماراثون الألعاب", difficulty: "hard", players: "1", xpReward: 160, timeLimit: 180, component: QuickTrivia },
       { id: "ch9", name: "lightning", description: "برق المعارك", difficulty: "medium", players: "1", xpReward: 85, timeLimit: 40, component: ColorMatch },
-      { id: "ch10", name: "ULTIMATE_CHAOS", description: "الفوضى المطلقة", difficulty: "hard", players: "1", xpReward: 180, timeLimit: 120, component: NumberSequence },
+      { id: "ch10", name: "ULTIMATE_CHAOS", description: "الفوضى المطلقة", difficulty: "hard", players: "1", xpReward: 180, timeLimit: 120, component: NumberSequence, tier: "silver" },
     ],
   },
   {
@@ -924,7 +926,7 @@ const GAME_CATEGORIES: GameCategory[] = [
       { id: "exp7", name: "LogicGate", description: "بوابة المنطق", difficulty: "hard", players: "1", xpReward: 155, timeLimit: 80, component: NumberSequence },
       { id: "exp8", name: "ZenMaster", description: "سيّد الزن", difficulty: "hard", players: "1", xpReward: 135, timeLimit: 150, component: PatternMatch },
       { id: "exp9", name: "TimeWarp", description: "التشوه الزمني", difficulty: "hard", players: "1", xpReward: 165, timeLimit: 60, component: ReactionSpeed },
-      { id: "exp10", name: "INFINITE_GENIUS", description: "عبقرية لا نهائية", difficulty: "hard", players: "1", xpReward: 200, timeLimit: 120, component: TicTacToe },
+      { id: "exp10", name: "INFINITE_GENIUS", description: "عبقرية لا نهائية", difficulty: "hard", players: "1", xpReward: 200, timeLimit: 120, component: TicTacToe, tier: "diamond" },
     ],
   },
 ];

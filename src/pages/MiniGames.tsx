@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,11 @@ export default function MiniGames() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeGame, setActiveGame] = useState<MiniGameDef | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
+  const myMembership = useQuery(api.memberships.getMyMembership);
+
+  // ترتيب العضويات من الأقل إلى الأعلى
+  const TIER_ORDER = ["bronze", "silver", "gold", "diamond", "exclusive"] as const;
+  const myTierIndex = myMembership ? TIER_ORDER.indexOf(myMembership.tier as any) : -1;
 
   const category = GAME_CATEGORIES.find(c => c.id === selectedCategory);
 
@@ -112,7 +117,11 @@ export default function MiniGames() {
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {category.games.map((game) => (
+            {category.games.map((game) => {
+              const gameTierIndex = game.tier ? TIER_ORDER.indexOf(game.tier) : 0;
+              const isLocked = gameTierIndex > myTierIndex + 1;
+              const TIER_EMOJI: Record<string, string> = { bronze: "🥉", silver: "🥈", gold: "🥇", diamond: "💎", exclusive: "👑" };
+              return (
               <motion.div
                 key={game.id}
                 initial={{ opacity: 0, y: 16 }}
@@ -120,8 +129,8 @@ export default function MiniGames() {
                 transition={{ duration: 0.3 }}
               >
                 <Card
-                  className="cursor-pointer border-border/80 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5"
-                  onClick={() => setActiveGame(game)}
+                  className={cn("border-border/80 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5", isLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer")}
+                  onClick={() => !isLocked && setActiveGame(game)}
                 >
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between gap-2">
@@ -149,11 +158,17 @@ export default function MiniGames() {
                       <Badge variant="outline" className="rounded-full text-[10px]">
                         ⏱ {game.timeLimit}ث
                       </Badge>
+                      {game.tier && (
+                        <Badge variant="outline" className="rounded-full text-[10px] gap-1">
+                          {TIER_EMOJI[game.tier]} {isLocked ? "قفل" : ""}
+                        </Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               </motion.div>
-            ))}
+            );
+            })}
           </div>
         </main>
       </div>

@@ -210,6 +210,7 @@ export const getMyHistory = query({
 });
 
 export type TopPlayer = {
+  userId: string;
   name: string;
   xp: number;
   level: number;
@@ -234,6 +235,7 @@ export const getTopPlayers = query({
       if (!user) continue;
       const level = levelFromXp(profile.xp);
       rows.push({
+        userId: profile.userId,
         name: user.name ?? "لاعب مجهول",
         xp: profile.xp,
         level,

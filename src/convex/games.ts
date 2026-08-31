@@ -1338,3 +1338,108 @@ export { LIFELINES_PER_GAME };
 // 8. Daily challenge bonus (extra XP)
 // 9. Achievement unlock bonus
 // 10. Referral bonus (invited a friend)
+
+// ─── Smart Matchmaking ────────────────────────────────────────────
+/**
+ * المطابقة الذكي: يبحث عن غرفة مناسبة للمستوى أو ينشئ غرفة جديدة.
+ * يعتمد على مستوى اللاعب و.GeMIه وavailability.
+ */
+export const smartMatch = mutation({
+  args: {
+    name: v.string(),
+  },
+  handler: async (ctx, { name }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("المستخدم غير موجود");
+    if (isUserBanned(user).banned) throw new Error("حسابك محظور")
+
+    // Get user's profile for level-based matching
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    const playerLevel = profile ? levelFromXp(profile.xp) : 1;
+
+    // Find waiting games with space (up to 12 players)
+    const waitingGames = await ctx.db
+      .query("games")
+      .withIndex("by_code")
+      .collect();
+    
+    const suitableGames: typeof waitingGames = [];
+    for (const game of waitingGames) {
+      if (game.status !== "waiting") continue;
+      const playerCount = await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_game", (q) => q.eq("gameId", game._id))
+        .collect();
+      if (playerCount.length >= 12) continue;
+      if (playerCount.some(p => p.userId === userId)) continue; // already in
+      
+      // Get host's level for matching
+      const hostProfile = await ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", game.hostId))
+        .first();
+      const hostLevel = hostProfile ? levelFromXp(hostProfile.xp) : 1;
+      
+      // Level difference should be within 50%
+      const diff = Math.abs(playerLevel - hostLevel);
+      const maxDiff = Math.max(playerLevel, hostLevel) * 0.5;
+      if (diff <= maxDiff) {
+        suitableGames.push(game);
+      }
+    }
+
+    // If suitable game found, join it
+    if (suitableGames.length > 0) {
+      // Pick the game with fewest players (most open)
+      let bestGame = suitableGames[0];
+      let bestCount = 999;
+      for (const g of suitableGames) {
+        const count = (await ctx.db
+          .query("gamePlayers")
+          .withIndex("by_game", (q) => q.eq("gameId", g._id))
+          .collect()).length;
+        if (count < bestCount) {
+          bestCount = count;
+          bestGame = g;
+        }
+      }
+      
+      // Join the game
+      const existing = await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_user_game", (q) =>
+          q.eq("userId", userId).eq("gameId", bestGame._id),
+        )
+        .first();
+      if (!existing) {
+        const playerCount = (await ctx.db
+          .query("gamePlayers")
+          .withIndex("by_game", (q) => q.eq("gameId", bestGame._id))
+          .collect()).length;
+        
+        await ctx.db.insert("gamePlayers", {
+          gameId: bestGame._id,
+          userId,
+          name: name.trim(),
+          score: 0,
+          streak: 0,
+          bestStreak: 0,
+          answers: Array.from({ length: bestGame.questionIds.length }, () => null),
+          joinedAt: Date.now(),
+        });
+        return { code: bestGame.code, joined: true, matched: true };
+      }
+      return { code: bestGame.code, joined: true, matched: false };
+    }
+
+    // No suitable game found — create a new one
+    return { code: null, joined: false, matched: false, createNew: true };
+  },
+});
+
+

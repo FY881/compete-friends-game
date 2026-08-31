@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { ProfileStats } from "@/convex/stats";
@@ -446,6 +447,31 @@ export default function Profile() {
             <p className="mt-3 text-xs text-muted-foreground/80">
               🤖 مدعوم بالذكاء الاصطناعي من OpenRouter
             </p>
+            <Button
+              size="sm"
+              className="mt-4 gap-1.5 rounded-xl"
+              onClick={async () => {
+                try {
+                  const stats = JSON.stringify({
+                    gamesPlayed: profile.gamesPlayed,
+                    gamesWon: profile.gamesWon,
+                    bestScore: profile.bestScore,
+                    level: profile.level,
+                    accuracy: profile.accuracy,
+                  });
+                  const res = await analyzePerformance({
+                    apiKey: localStorage.getItem("openrouter_api_key") ?? "",
+                    playerStats: stats,
+                  });
+                  alert(res.overallRating + "\n" + (res.suggestions?.join("\n") ?? ""));
+                } catch (e) {
+                  alert("خطأ في التحليل: " + (e instanceof Error ? e.message : ""));
+                }
+              }}
+            >
+              <BrainCircuit className="size-3.5" />
+              حلّل أداءي بالـ AI
+            </Button>
           </div>
         </div>
         {/* AI Insights */}

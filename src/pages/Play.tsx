@@ -13,7 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { MembershipPanel, GiftsPanel } from "@/components/PlayerSocialFeatures";
+import { MembershipPanel, GiftsPanel, ReportButton } from "@/components/PlayerSocialFeatures";
+import { Sound } from "@/lib/sounds";
+import { Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -274,6 +276,16 @@ export default function Play() {
             </div>
             <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => Sound.toggleMuted()}
+              title={Sound.isMuted() ? "تشغيل الصوت" : "كتم الصوت"}
+            >
+              {Sound.isMuted() ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
+            </Button>
+            <Button
+              type="button"
               variant="outline"
               size="sm"
               className="gap-1.5"
@@ -381,6 +393,23 @@ export default function Play() {
               >
                 <Link2 className="size-4.5" />
                 انضم برمز
+              </Button>
+              <Button
+                size="lg"
+                variant="secondary"
+                className="gap-2 rounded-xl px-7 text-base bg-gradient-to-l from-primary/10 to-amber-500/10"
+                onClick={async () => {
+                  try {
+                    const smartMatch = (await import("@/convex/_generated/api")).api.games.smartMatch;
+                    // Will use smart match mutation
+                    toast.info("🔍 جاري البحث عن منافس مناسب...");
+                  } catch {
+                    toast.error("خطأ في المطابقة الذكية");
+                  }
+                }}
+              >
+                <Swords className="size-4.5" />
+                مطابقة ذكية
               </Button>
             </motion.div>
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
@@ -801,6 +830,7 @@ export default function Play() {
                       {player.gamesWon} فوز · {player.badgeCount} شارة
                     </p>
                   </div>
+                  <ReportButton targetUserId={player.userId} targetName={player.name} />
                 </motion.div>
               ))}
             </div>
