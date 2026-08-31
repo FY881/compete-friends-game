@@ -52,7 +52,7 @@ export const Sound = {
   select: () => muted(() => playTone(600, 0.08, "sine", 0.1)),
   lifeline: () => muted(() => { playTone(523, 0.1, "sine", 0.1); setTimeout(() => playTone(784, 0.15, "sine", 0.12), 100); }),
   isMuted: () => _muted,
-  toggleMuted: () => { _muted = !_muted; },
+  toggleMuted: () => { _muted = !_muted; return _muted; },
 };
 
 /** Backward-compatible alias so existing `import { sounds }` still works */
