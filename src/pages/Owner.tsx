@@ -53,6 +53,7 @@ import {
   Eraser,
   EyeOff,
   FileDown,
+  Brain,
   Flag,
   Gamepad2,
   Gavel,
@@ -86,6 +87,7 @@ import { CATEGORIES } from "@/convex/questions";
 import { APP_VERSION } from "@/lib/app-version";
 import { AdminAiTab } from "@/components/AdminAiTab";
 import { DownloadsTab } from "@/components/DownloadsTab";
+import { AiIntelligenceDashboard } from "@/components/AiIntelligenceDashboard";
 import { AiControlTab } from "@/components/AiControlTab";
 import { OwnerControlPanel } from "@/components/OwnerControlPanel";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
@@ -2129,6 +2131,9 @@ export default function Owner() {
                     ) : (
                       <Loader2 className="mx-auto my-12 size-6 animate-spin" />
                     )}
+                  </TabsContent>
+                  <TabsContent value="intelligence">
+                    <AiIntelligenceDashboard />
                   </TabsContent>
                 </>
               )}

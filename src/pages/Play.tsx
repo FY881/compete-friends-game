@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { MembershipPanel, GiftsPanel, ReportButton } from "@/components/PlayerSocialFeatures";
 import { Sound } from "@/lib/sounds";
+import { FeaturesShowcase } from "@/components/FeaturesShowcase";
 import { Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -858,6 +859,13 @@ export default function Play() {
               القوانين كاملة
             </a>
           </Button>
+        </section>
+
+        {/* ── 50 Features Showcase ────────────────────────────── */}
+        <section className="mt-12">
+          <div className="rounded-3xl border border-border/50 bg-card p-6">
+            <FeaturesShowcase />
+          </div>
         </section>
 
         {/* ── In-game app download ────────────────────────────── */}
