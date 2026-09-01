@@ -3,10 +3,12 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
 // ═══════════════════════════════════════════════════════════════════════
-// ║ 3 ألعاب رئيسية مقسمة بالعضويات
+// ║ 5 ألعاب رئيسية مقسمة بالعضويات
 // ║ اللعبة 1: سباق الذكاء (للجميع)
 // ║ اللعبة 2: عصر الألغاز (فضي+)
 // ║ اللعبة 3: تحدي الأبطال (ذهبي+)
+// ║ اللعبة 4: اندفاع الماس (ماسي+)
+// ║ اللعبة 5: ساحة الأساطير (أسطوري فقط)
 // ═══════════════════════════════════════════════════════════════════════
 
 export interface GameMode {
@@ -14,9 +16,9 @@ export interface GameMode {
   name: string;
   description: string;
   icon: string;
-  minTier: string; // bronze = free, silver, gold, diamond, exclusive
+  minTier: string;
   questionCount: number;
-  timePerQuestion: number; // seconds
+  timePerQuestion: number;
   features: string[];
   rewards: { xpPerCorrect: number; xpBonusWin: number; badgeOnWin: string };
 }
@@ -48,16 +50,47 @@ export const GAME_MODES: GameMode[] = [
     id: "champion_battle",
     name: "تحدي الأبطال",
     description: "للمحترفين فقط — أسئلة صعبة ومكافآت ضخمة",
-    icon: "👑",
+    icon: "⚔️",
     minTier: "gold",
     questionCount: 15,
     timePerQuestion: 15,
     features: ["15 سؤال صعب+", "السؤال الذهبي ×3", "مكافآت ضخمة", "حصري للنخبة"],
     rewards: { xpPerCorrect: 30, xpBonusWin: 200, badgeOnWin: "champion" },
   },
+  {
+    id: "diamond_rush",
+    name: "اندفاع الماس",
+    description: "تحدي خاص بأصحاب الماس — أسئلة نادرة ومكافآت هائلة",
+    icon: "💎",
+    minTier: "diamond",
+    questionCount: 18,
+    timePerQuestion: 18,
+    features: ["18 سؤال نادر", "مكافآت ×1.75", "تنبؤات AI", "تحديات متغيرة", "جوائز ماسية"],
+    rewards: { xpPerCorrect: 50, xpBonusWin: 350, badgeOnWin: "diamond_master" },
+  },
+  {
+    id: "legend_arena",
+    name: "ساحة الأساطير",
+    description: "التحدي الأقصى — اختبار شامل لكل مهاراتك الذهنية",
+    icon: "👑",
+    minTier: "exclusive",
+    questionCount: 25,
+    timePerQuestion: 20,
+    features: ["25 سؤال شامل", "كل الفئات", "مكافآت ×2", "تحدي أسطوري", "Rank خاص", "شارة حصرية"],
+    rewards: { xpPerCorrect: 100, xpBonusWin: 1000, badgeOnWin: "legend" },
+  },
 ];
 
 const TIER_ORDER = ["bronze", "silver", "gold", "diamond", "exclusive"];
+
+// Daily limits per game mode per tier
+const DAILY_LIMITS: Record<string, Record<string, number>> = {
+  quiz_rush: { bronze: 5, silver: 8, gold: 12, diamond: 20, exclusive: 30 },
+  puzzle_masters: { bronze: 0, silver: 5, gold: 8, diamond: 12, exclusive: 20 },
+  champion_battle: { bronze: 0, silver: 0, gold: 5, diamond: 10, exclusive: 15 },
+  diamond_rush: { bronze: 0, silver: 0, gold: 0, diamond: 5, exclusive: 10 },
+  legend_arena: { bronze: 0, silver: 0, gold: 0, diamond: 0, exclusive: 10 },
+};
 
 function canAccessTier(userTier: string, requiredTier: string): boolean {
   const userIndex = TIER_ORDER.indexOf(userTier);
@@ -65,26 +98,59 @@ function canAccessTier(userTier: string, requiredTier: string): boolean {
   return userIndex >= requiredIndex;
 }
 
+function getUserTierIndex(userTier: string): number {
+  return TIER_ORDER.indexOf(userTier);
+}
+
 // ─── جلب أوضاع اللعب المتاحة ────────────────────────────────────
 export const getAvailableGameModes = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return GAME_MODES.map((m) => ({ ...m, unlocked: m.minTier === "bronze" }));
+    let userTier = "bronze";
 
-    // Get user membership
-    const membership = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
+    if (userId) {
+      const membership = await ctx.db
+        .query("memberships")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      userTier = membership?.tier ?? "bronze";
+    }
 
-    const userTier = membership?.tier ?? "bronze";
+    // Get today's game count per mode
+    let todayCounts: Record<string, number> = {};
+    if (userId) {
+      const today = new Date().toISOString().slice(0, 10);
+      const todayGames = await ctx.db
+        .query("gameHistory")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      for (const g of todayGames) {
+        const d = new Date(g.playedAt).toISOString().slice(0, 10);
+        if (d === today) {
+          const mode = (g as Record<string, unknown>).gameModeId as string | undefined;
+          if (mode) {
+            todayCounts[mode] = (todayCounts[mode] ?? 0) + 1;
+          }
+        }
+      }
+    }
 
-    return GAME_MODES.map((mode) => ({
-      ...mode,
-      unlocked: canAccessTier(userTier, mode.minTier),
-      userTier,
-    }));
+    return GAME_MODES.map((mode) => {
+      const unlocked = canAccessTier(userTier, mode.minTier);
+      const tierLimit = DAILY_LIMITS[mode.id]?.[userTier] ?? 0;
+      const usedToday = todayCounts[mode.id] ?? 0;
+      const remaining = Math.max(0, tierLimit - usedToday);
+
+      return {
+        ...mode,
+        unlocked,
+        userTier,
+        dailyLimit: tierLimit,
+        usedToday,
+        remaining,
+      };
+    });
   },
 });
 
@@ -108,40 +174,48 @@ export const createGameModeRound = mutation({
       .first();
     const userTier = membership?.tier ?? "bronze";
     if (!canAccessTier(userTier, mode.minTier)) {
-      throw new Error(`يتطلب عضوية ${mode.minTier} أو أعلى`);
+      throw new Error(`يتطلب عضوية ${mode.minTier} أو أعلى — الألعاب الأعلى مكافآت وتحديات!`);
     }
 
     // Check daily limit
-    const today = new Date().toISOString().slice(0, 10);
-    const todayGames = await ctx.db
-      .query("gameHistory")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-    const todayCount = todayGames.filter((g) => {
-      const d = new Date(g.playedAt).toISOString().slice(0, 10);
-      return d === today;
-    }).length;
+    const tierLimit = DAILY_LIMITS[gameModeId]?.[userTier] ?? 0;
+    if (tierLimit > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const todayGames = await ctx.db
+        .query("gameHistory")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      const todayCount = todayGames.filter((g) => {
+        const d = new Date(g.playedAt).toISOString().slice(0, 10);
+        return d === today;
+      }).length;
 
-    const DAILY_LIMITS: Record<string, number> = {
-      quiz_rush: 5,
-      puzzle_masters: 3,
-      champion_battle: 2,
-    };
-    const limit = DAILY_LIMITS[gameModeId] ?? 5;
-    if (todayCount >= limit) {
-      throw new Error(`وصلت الحد اليومي (${limit} جولات) — حاول غداً!`);
+      if (todayCount >= tierLimit) {
+        throw new Error(`وصلت الحد اليومي (${tierLimit} جولات) — حاول غداً!`);
+      }
     }
 
-    // Create the game (reuse the existing games table)
-    const code = `GM-${mode.id.slice(0, 2).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+    // Create code
+    const code = `GM-${mode.id.slice(0, 3).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
 
-    // Pick questions based on mode
+    // Pick questions based on mode difficulty
     const allQuestions = (await import("./questions")).QUESTION_BANK;
-    const filtered = mode.questionCount <= 10
-      ? allQuestions.filter((q) => q.difficulty === "easy" || q.difficulty === "medium")
-      : mode.questionCount <= 12
-        ? allQuestions.filter((q) => q.difficulty === "medium" || q.difficulty === "hard")
-        : allQuestions.filter((q) => q.difficulty === "hard");
+    let filtered;
+    const idx = TIER_ORDER.indexOf(userTier);
+    if (idx <= 0) {
+      filtered = allQuestions.filter((q) => q.difficulty === "easy" || q.difficulty === "medium");
+    } else if (idx === 1) {
+      filtered = allQuestions.filter((q) => q.difficulty === "medium");
+    } else if (idx <= 3) {
+      filtered = allQuestions.filter((q) => q.difficulty === "medium" || q.difficulty === "hard");
+    } else {
+      filtered = allQuestions.filter((q) => q.difficulty === "hard");
+    }
+
+    // Fallback if not enough questions
+    if (filtered.length < mode.questionCount) {
+      filtered = allQuestions;
+    }
 
     const shuffled = [...filtered].sort(() => Math.random() - 0.5);
     const picked = shuffled.slice(0, mode.questionCount);
@@ -163,7 +237,7 @@ export const createGameModeRound = mutation({
       },
     });
 
-    // Auto-join
+    // Auto-join the host
     const user = await ctx.db.get(userId);
     await ctx.db.insert("gamePlayers", {
       gameId,
@@ -176,6 +250,30 @@ export const createGameModeRound = mutation({
       joinedAt: Date.now(),
     });
 
-    return { code, mode: mode.name };
+    return { code, mode: mode.name, dailyLimit: tierLimit };
+  },
+});
+
+// ─── Get reward multiplier for a user ──────────────────────────────
+export const getRewardMultiplier = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 1.0;
+
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (!membership) return 1.0;
+
+    const multipliers: Record<string, number> = {
+      bronze: 1.0,
+      silver: 1.25,
+      gold: 1.5,
+      diamond: 1.75,
+      exclusive: 2.0,
+    };
+    return multipliers[membership.tier] ?? 1.0;
   },
 });

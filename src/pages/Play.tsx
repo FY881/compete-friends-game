@@ -20,6 +20,7 @@ import { FeaturesShowcase } from "@/components/FeaturesShowcase";
 import { GameModes } from "@/components/game/GameModes";
 import { Volume2, VolumeX } from "lucide-react";
 import { OwnerLoginDialog } from "@/components/OwnerLoginDialog";
+import StorePage from "@/components/StorePage";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -560,11 +561,7 @@ export default function Play() {
                 </Button>
               </div>
 
-              {/* Membership Panel */}
-              <MembershipShowcase />
 
-              {/* Gifts Panel */}
-              <GiftsPanel />
 
               {/* AI Analysis Display */}
               {aiAnalysis && (
@@ -853,7 +850,17 @@ export default function Play() {
           )}
         </section>
 
-        {/* ── 3 Game Modes ────────────────────────────────────── */}
+        {/* ── Membership & Gifts ──────────────────────────────── */}
+        <section className="mt-12 space-y-8">
+          <div className="rounded-3xl border border-border/50 bg-card p-6">
+            <MembershipShowcase />
+          </div>
+          <div className="rounded-3xl border border-border/50 bg-card p-6">
+            <GiftsPanel />
+          </div>
+        </section>
+
+        {/* ── 5 Game Modes ────────────────────────────────────── */}
         <section className="mt-12">
           <GameModes />
         </section>
@@ -885,6 +892,13 @@ export default function Play() {
         <section className="mt-12">
           <div className="rounded-3xl border border-border/50 bg-card p-6">
             <FeaturesShowcase />
+          </div>
+        </section>
+
+        {/* ── Store ────────────────────────────────────────────── */}
+        <section className="mt-12">
+          <div className="rounded-3xl border border-border/50 bg-card p-6">
+            <StorePage />
           </div>
         </section>
 
