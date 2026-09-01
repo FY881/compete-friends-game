@@ -97,6 +97,7 @@ import { AiControlTab } from "@/components/AiControlTab";
 import { OwnerControlPanel } from "@/components/OwnerControlPanel";
 import { OwnerPasswordManager } from "@/components/OwnerLoginDialog";
 import { OwnerDashboard } from "@/components/owner/OwnerDashboard";
+import { AdvancedPlayersTab } from "@/components/owner/AdvancedPlayersTab";
 import { Menu, Focus } from "lucide-react";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
@@ -2286,7 +2287,7 @@ export default function Owner() {
       case "dashboard":
         return <OwnerDashboard onNavigate={setActiveTab} />;
       case "users":
-        return <UsersTab isOwner={access.isOwner} />;
+        return <AdvancedPlayersTab isOwner={access.isOwner} />;
       case "reports":
         return <ReportsTab />;
       case "rules":
