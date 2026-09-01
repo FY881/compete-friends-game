@@ -205,6 +205,7 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
   const deleteMessage = useMutation(api.chatRooms.deleteMessage);
   const muteMember = useMutation(api.chatRooms.muteMember);
   const kickMember = useMutation(api.chatRooms.kickMember);
+  const leaveRoom = useMutation(api.chatRooms.leaveRoom);
   const searchMessages = useQuery(
     api.chatRooms.searchMessages,
     { roomId: roomId as any, query: "" }
@@ -652,6 +653,22 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
                 <p className="text-xs font-bold text-muted-foreground mb-2">🛠️ أدوات الإدارة</p>
                 <p className="text-[10px] text-muted-foreground">اضغط على اسم عضو في الرسائل لإدارة صلاحياته</p>
               </div>
+              {/* Leave Room */}
+              <button
+                onClick={async () => {
+                  try {
+                    await leaveRoom({ roomId: roomId as any });
+                    toast.success("تم مغادرة الغرفة");
+                    onBack();
+                  } catch (err: any) {
+                    toast.error(err.message || "فشل المغادرة");
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+              >
+                <LogOut className="size-4" />
+                مغادرة الغرفة
+              </button>
             </div>
           </motion.div>
         )}

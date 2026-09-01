@@ -249,6 +249,7 @@ export default function Play() {
           </button>
 
           <div className="flex items-center gap-2.5">
+            <NotificationsBell />
             <Button asChild variant="ghost" size="sm" className="gap-1.5">
               <Link to="/download">
                 <Smartphone className="size-3.5" />
@@ -868,6 +869,9 @@ export default function Play() {
         {/* ── Time-based Challenges ── */}
         <TimeChallenges />
 
+        {/* ── AI Coach Analysis ── */}
+        <AiCoachSection />
+
         {/* ── Laws reminder ────────────────────────────────────── */}
         <section className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-border/80 bg-card p-6">
           <div className="flex items-start gap-3">
@@ -1020,5 +1024,137 @@ function TimeChallenges() {
         </div>
       </div>
     </section>
+  );
+}
+
+// ── AI Coach Section ──────────────────────────────────────────
+function AiCoachSection() {
+  const analysis = useQuery(api.aiCoach.analyzePerformance);
+  if (!analysis || analysis.totalGames === 0) return null;
+
+  const trendIcon = analysis.weeklyTrend === "improving" ? "📈" : analysis.weeklyTrend === "declining" ? "📉" : "➡️";
+  const trendText = analysis.weeklyTrend === "improving" ? "متحسن" : analysis.weeklyTrend === "declining" ? "متراجع" : "مستقر";
+  const trendColor = analysis.weeklyTrend === "improving" ? "text-green-600" : analysis.weeklyTrend === "declining" ? "text-red-500" : "text-muted-foreground";
+
+  return (
+    <section className="mt-12">
+      <div className="rounded-3xl border border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-indigo-500/5 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xl">🤖</span>
+          <h2 className="text-lg font-bold">تحليل AI الشخصي</h2>
+          <Badge variant="outline" className={`text-[10px] rounded-full ${trendColor} border-current/30`}>
+            {trendIcon} {trendText}
+          </Badge>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          {[
+            { label: "نسبة الفوز", value: `${analysis.winRate}%`, color: analysis.winRate >= 60 ? "text-green-600" : "text-amber-600" },
+            { label: "متوسط النقاط", value: analysis.avgScore, color: "text-primary" },
+            { label: "أفضل سلسلة", value: analysis.bestStreak, color: "text-orange-500" },
+            { label: "إجمالي الألعاب", value: analysis.totalGames, color: "text-muted-foreground" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl bg-card/80 p-3 text-center">
+              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Strengths & Weaknesses */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {analysis.strengths.length > 0 && (
+            <div className="rounded-xl bg-green-500/5 border border-green-500/20 p-3">
+              <p className="text-xs font-bold text-green-600 mb-1.5">💪 نقاط القوة</p>
+              <div className="space-y-1">
+                {analysis.strengths.map((s, i) => (
+                  <p key={i} className="text-[11px] text-green-700">• {s}</p>
+                ))}
+              </div>
+            </div>
+          )}
+          {analysis.weaknesses.length > 0 && (
+            <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-3">
+              <p className="text-xs font-bold text-amber-600 mb-1.5">🎯 نقاط التحسين</p>
+              <div className="space-y-1">
+                {analysis.weaknesses.map((w, i) => (
+                  <p key={i} className="text-[11px] text-amber-700">• {w}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Suggestions + Goal */}
+        <div className="mt-3 rounded-xl bg-card/80 p-3">
+          <p className="text-xs font-bold text-primary mb-1.5">💡 اقتراحات ذكية</p>
+          <div className="space-y-1">
+            {analysis.suggestions.map((s, i) => (
+              <p key={i} className="text-[11px] text-muted-foreground">• {s}</p>
+            ))}
+          </div>
+          {analysis.nextGoal && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-primary font-medium">
+              <span>🎯</span> {analysis.nextGoal}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Notifications Bell ──────────────────────────────────────
+function NotificationsBell() {
+  const notifications = useQuery(api.playerControl.getMyNotifications);
+  const markRead = useMutation(api.playerControl.markNotificationRead);
+  const [open, setOpen] = useState(false);
+
+  const unreadCount = notifications?.filter((n: any) => !n.read).length ?? 0;
+  const typeIcon: Record<string, string> = { info: "ℹ️", warning: "⚠️", ban: "🚫", update: "📢", system: "⚙️" };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="relative flex size-9 items-center justify-center rounded-xl hover:bg-muted transition-colors"
+      >
+        🔔
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -left-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-2 z-50 w-80 max-h-96 overflow-y-auto rounded-2xl border bg-card shadow-xl">
+          <div className="sticky top-0 border-b bg-card px-4 py-2.5 flex items-center justify-between">
+            <h3 className="text-sm font-bold">الإشعارات</h3>
+            <button onClick={() => setOpen(false)} className="text-xs text-muted-foreground">✕</button>
+          </div>
+          <div className="p-2">
+            {!notifications || notifications.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">لا توجد إشعارات</p>
+            ) : (
+              notifications.slice(0, 20).map((n: any) => (
+                <button
+                  key={n._id}
+                  onClick={() => { if (!n.read) markRead({ notificationId: n._id }); }}
+                  className={`w-full text-right flex items-start gap-2 rounded-xl p-2.5 transition-colors ${n.read ? "opacity-60" : "bg-primary/5 hover:bg-primary/10"}`}
+                >
+                  <span className="text-sm mt-0.5">{typeIcon[n.type] || "ℹ️"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold truncate">{n.title}</p>
+                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">{n.body}</p>
+                  </div>
+                  {!n.read && <div className="size-2 rounded-full bg-primary shrink-0 mt-1" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
