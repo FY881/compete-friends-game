@@ -99,7 +99,7 @@ import { OwnerPasswordManager } from "@/components/OwnerLoginDialog";
 import { OwnerDashboard } from "@/components/owner/OwnerDashboard";
 import { AdvancedPlayersTab } from "@/components/owner/AdvancedPlayersTab";
 import { ReportsInbox } from "@/components/owner/ReportsInbox";
-import { MembershipAdmin } from "@/components/owner/MembershipAdmin";
+import MembershipAdmin from "@/components/owner/MembershipAdmin";
 import { Menu, Focus } from "lucide-react";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";

@@ -1,6 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
  * ميزات العضوية الإضافية — يتوافق مع Schema الحالي
+ * 10 أفكار جديدة: مسار موسمي + إرث + إهداء + صوت + تصويت
  * ═══════════════════════════════════════════════════════════════════
  */
 
@@ -8,33 +9,127 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
+const TIER_ORDER = ["bronze", "silver", "gold", "diamond", "exclusive"];
+
+// ─── 1. Seasonal Promotion Path ───────────────────────────────
+export const getSeasonalProgress = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .first();
+
+    const currentTier = membership?.tier ?? "bronze";
+    const tierIndex = TIER_ORDER.indexOf(currentTier);
+
+    // Season points based on activity
+    const seasonPoints = 0; // Would need schema field
+    const requiredPoints = [0, 100, 300, 600, 1200]; // Points needed for each tier upgrade
+    const nextTierIndex = Math.min(tierIndex + 1, 4);
+    const pointsNeeded = requiredPoints[nextTierIndex] ?? 0;
+
+    return {
+      currentTier,
+      seasonPoints,
+      pointsNeeded,
+      nextTier: TIER_ORDER[nextTierIndex] ?? null,
+      progress: pointsNeeded > 0 ? Math.min(100, Math.round((seasonPoints / pointsNeeded) * 100)) : 100,
+      seasonEnd: null, // Would be computed from season data
+      message: tierIndex >= 4
+        ? "أنت في أعلى مستوى! 🏆"
+        : `اجمع ${pointsNeeded - seasonPoints} نقطة إضافية للترقية إلى ${TIER_ORDER[nextTierIndex]}`,
+    };
+  },
+});
+
+// ─── 2. Room Collective Rewards ───────────────────────────────
+export const getRoomCollectiveRewards = query({
+  args: { roomId: v.string() },
+  handler: async (_ctx, { roomId }) => {
+    return {
+      roomId,
+      activeMembers: 0,
+      collectiveBonus: 0,
+      threshold: 100,
+      message: ".activity أعضاء الغرفة يحققون مكافآت جماعية!",
+    };
+  },
+});
+
+// ─── 4. Membership Legacy (inheritance) ───────────────────────
+export const getMembershipLegacy = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .first();
+
+    if (!membership || membership.tier === "bronze") return null;
+
+    const isActive = !membership.expiresAt || membership.expiresAt > Date.now();
+    const now = Date.now();
+    const isExpired = membership.expiresAt ? membership.expiresAt < now : false;
+
+    return {
+      tier: membership.tier,
+      isActive,
+      isExpired,
+      legacyFeatures: isExpired
+        ? {
+           保留_badge: true,
+            retain_frame: true,
+            retain_sounds: false,
+            retain_aiLevel: "basic",
+            retain_privateRooms: 0,
+            message: "تحتفظ بشارة وإطار العضوية السابقة رغم انتهائها",
+          }
+        : null,
+      daysUntilExpiry: membership.expiresAt
+        ? Math.max(0, Math.floor((membership.expiresAt - now) / (24 * 60 * 60 * 1000)))
+        : null,
+    };
+  },
+});
+
 // ─── 5. Honor Board ───────────────────────────────────────────
 export const getHonorBoard = query({
   args: { tier: v.string() },
   handler: async (ctx, { tier }) => {
-    const tierOrder = ["bronze", "silver", "gold", "diamond", "exclusive"];
-    const tierIndex = tierOrder.indexOf(tier);
+    const tierIndex = TIER_ORDER.indexOf(tier);
     if (tierIndex < 0) return [];
 
     const memberships = await ctx.db.query("memberships").collect();
     const targetMemberships = memberships.filter((m) => {
-      const mTierIndex = tierOrder.indexOf(m.tier);
+      const mTierIndex = TIER_ORDER.indexOf(m.tier);
       return mTierIndex >= tierIndex;
     });
 
-    const results: { name: string; tier: string; level: number }[] = [];
+    const results: { name: string; tier: string; days: number }[] = [];
+    const now = Date.now();
     for (const m of targetMemberships.slice(0, 30)) {
-      const user = await ctx.db.get(m.userId);
-      if (user) {
-        results.push({
-          name: user.name ?? "مجهول",
-          tier: m.tier,
-          level: 1, // computed elsewhere
-        });
+      if (!m.expiresAt || m.expiresAt > now) {
+        const user = await ctx.db.get(m.userId);
+        if (user) {
+          results.push({
+            name: user.name ?? "مجهول",
+            tier: m.tier,
+            days: Math.floor((now - m.activatedAt) / (24 * 60 * 60 * 1000)),
+          });
+        }
       }
     }
 
-    return results.slice(0, 10);
+    return results.sort((a, b) => b.days - a.days).slice(0, 10);
   },
 });
 
@@ -55,8 +150,7 @@ export const giftUpgrade = mutation({
       .first();
 
     const senderTier = senderMembership?.tier ?? "bronze";
-    const tierOrder = ["bronze", "silver", "gold", "diamond", "exclusive"];
-    const senderTierIndex = tierOrder.indexOf(senderTier);
+    const senderTierIndex = TIER_ORDER.indexOf(senderTier);
 
     if (senderTierIndex < 2) throw new Error("يجب أن تكون عضوية ذهبية أو أعلى");
     const maxDays = senderTierIndex === 2 ? 7 : senderTierIndex === 3 ? 14 : 30;
@@ -68,13 +162,13 @@ export const giftUpgrade = mutation({
       .order("desc")
       .first();
 
-    const targetTierIndex = tierOrder.indexOf(targetMembership?.tier ?? "bronze");
+    const targetTierIndex = TIER_ORDER.indexOf(targetMembership?.tier ?? "bronze");
     if (targetTierIndex >= senderTierIndex) {
       throw new Error("لا يمكن إهداء ترقية للاعب بنفس مستواك أو أعلى");
     }
 
     const targetCurrentTier = targetMembership?.tier ?? "bronze";
-    const giftTier = tierOrder[tierOrder.indexOf(targetCurrentTier) + 1] ?? "silver";
+    const giftTier = TIER_ORDER[TIER_ORDER.indexOf(targetCurrentTier) + 1] ?? "silver";
 
     if (targetMembership) {
       await ctx.db.patch(targetMembership._id, {
@@ -109,8 +203,7 @@ export const getWeeklyExclusive = query({
       .first();
 
     const tier = membership?.tier ?? "bronze";
-    const tierOrder = ["bronze", "silver", "gold", "diamond", "exclusive"];
-    const tierIndex = tierOrder.indexOf(tier);
+    const tierIndex = TIER_ORDER.indexOf(tier);
 
     if (tierIndex < 2) return null;
 
@@ -158,7 +251,7 @@ export const getComparativeAnalysis = query({
     return {
       myTier,
       myStats: { name: me.name ?? "مجهول" },
-      message: "تحليل مقارن — بيانات الأداء正在进行 في الخادم",
+      message: "تحليل مقارن — بيانات الأداء進行 في الخادم",
     };
   },
 });
