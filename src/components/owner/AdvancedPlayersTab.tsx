@@ -194,7 +194,7 @@ export function AdvancedPlayersTab({ isOwner }: { isOwner: boolean }) {
       for (const id of selected) {
         const user = usersWithRisk.find((u) => u.id === id);
         if (user && !user.isOwner) {
-          await applyPunishment({ userId: id as never, type: "warning", reason: "تحذير جماعي من الإدارة" });
+          await applyPunishment({ userId: id as never, type: "warn", reason: "تحذير جماعي من الإدارة" });
         }
       }
       toast.success(`تم إرسال تحذير لـ ${selected.size} لاعب.`);
@@ -533,7 +533,7 @@ export function AdvancedPlayersTab({ isOwner }: { isOwner: boolean }) {
                   try {
                     await applyPunishment({
                       userId: punishDialog.user.id as never,
-                      type: punishDialog.mode === "warn" ? "warning" : punishDialog.mode === "mute" ? "mute" : "ban",
+                      type: punishDialog.mode === "warn" ? "warn" : punishDialog.mode === "mute" ? "mute" : "ban",
                       durationMs: duration,
                       reason,
                     });

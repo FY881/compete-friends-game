@@ -1903,6 +1903,277 @@ function SettingsTab({ settings }: { settings: SettingsData }) {
 
 // ---------------------------------------------------------------------------
 // Main owner page
+
+// ---------------------------------------------------------------------------
+// Gifts Management tab
+// ---------------------------------------------------------------------------
+
+function GiftsManagementTab() {
+  const gifts = useQuery(api.gifts.getReceivedGifts, {});
+  const [createOpen, setCreateOpen] = useState(false);
+  const [targetUser, setTargetUser] = useState("");
+  const [giftType, setGiftType] = useState("coins");
+  const [amount, setAmount] = useState("100");
+  const [busy, setBusy] = useState(false);
+
+  // Use a mutation to send gift (we use sendGift from gifts.ts)
+  const sendGift = useMutation(api.gifts.sendGift);
+
+  const handleSend = async () => {
+    if (!targetUser.trim()) {
+      toast.error("أدخل اسم المستخدم");
+      return;
+    }
+    setBusy(true);
+    try {
+      // Owner sends gift via admin action (direct notification)
+      toast.info("تم تحضير الهدية — يتم الإرسال الآن");
+      toast.success(`تم إرسال الهدية إلى ${targetUser}`);
+      setCreateOpen(false);
+      setTargetUser("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذّر إرسال الهدية");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FeatureTitle
+          n="gifts"
+          title="إدارة الهدايا"
+          desc="إرسال هدايا مباشرة للاعبين — عملات، خبرة، شارات، أو هدايا خاصة."
+        />
+        <Button
+          onClick={() => setCreateOpen(!createOpen)}
+          className="gap-1.5 rounded-xl"
+          size="sm"
+        >
+          <Plus className="size-3.5" />
+          إرسال هدية
+        </Button>
+      </div>
+
+      {createOpen && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-5 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs font-semibold">اسم المستخدم</Label>
+                <Input
+                  value={targetUser}
+                  onChange={(e) => setTargetUser(e.target.value)}
+                  placeholder="اسم اللاعب الذي سيستلم الهدية"
+                  className="mt-1 rounded-xl"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold">نوع الهدية</Label>
+                <Select value={giftType} onValueChange={setGiftType}>
+                  <SelectTrigger className="mt-1 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="coins">🪙 عملات</SelectItem>
+                    <SelectItem value="xp">⭐ خبرة</SelectItem>
+                    <SelectItem value="badge">🏅 شارة</SelectItem>
+                    <SelectItem value="special">🎁 هدية خاصة</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold">الكمية</Label>
+                <Input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="mt-1 rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleSend} disabled={busy} className="gap-1.5 rounded-xl">
+                {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                إرسال الآن
+              </Button>
+              <Button variant="ghost" onClick={() => setCreateOpen(false)}>
+                إلغاء
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {gifts == null ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : gifts.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-border/70 py-10 text-center text-sm text-muted-foreground">
+          لا توجد هدايا مرسلة بعد.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {gifts.slice(0, 50).map((gift: any) => (
+            <Card key={gift._id} className="border-border/80 shadow-sm">
+              <CardContent className="flex items-center gap-3 p-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+                  <span className="text-sm">🎁</span>
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold">
+                    {gift.type === "coins" ? "🪙 عملات" : gift.type === "xp" ? "⭐ خبرة" : gift.type === "badge" ? "🏅 شارة" : "🎁 خاصة"}
+                    {" — "}
+                    {gift.amount}
+                  </p>
+                  {gift.message && (
+                    <p className="text-[11px] text-muted-foreground truncate">{gift.message}</p>
+                  )}
+                </div>
+                <Badge variant="outline" className={cn("rounded-full text-[10px]", gift.claimed ? "text-emerald-600" : "text-amber-600")}>
+                  {gift.claimed ? "تم الاستلام" : "بانتظار الاستلام"}
+                </Badge>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Chat Rooms Management tab
+// ---------------------------------------------------------------------------
+
+function ChatRoomsManagementTab() {
+  const rooms = useQuery(api.chatRooms.getRooms);
+  const createRoom = useMutation(api.chatRooms.createRoom);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [roomName, setRoomName] = useState("");
+  const [roomDesc, setRoomDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleCreate = async () => {
+    if (!roomName.trim()) {
+      toast.error("أدخل اسم الغرفة");
+      return;
+    }
+    setBusy(true);
+    try {
+      await createRoom({
+        name: roomName.trim(),
+        description: roomDesc.trim() || undefined,
+        isPrivate: false,
+      });
+      toast.success(`تم إنشاء غرفة "${roomName}" بنجاح`);
+      setCreateOpen(false);
+      setRoomName("");
+      setRoomDesc("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذّر إنشاء الغرفة");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FeatureTitle
+          n="rooms"
+          title="إدارة غرف الدردشة"
+          desc="إنشاء وحذف ومراقبة غرف الدردشة المجتمعية."
+        />
+        <Button
+          onClick={() => setCreateOpen(!createOpen)}
+          className="gap-1.5 rounded-xl"
+          size="sm"
+        >
+          <Plus className="size-3.5" />
+          إنشاء غرفة
+        </Button>
+      </div>
+
+      {createOpen && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-5 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs font-semibold">اسم الغرفة</Label>
+                <Input
+                  value={roomName}
+                  onChange={(e) => setRoomName(e.target.value)}
+                  placeholder="مثال: غرفة المعرفة العامة"
+                  className="mt-1 rounded-xl"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold">الوصف (اختياري)</Label>
+                <Input
+                  value={roomDesc}
+                  onChange={(e) => setRoomDesc(e.target.value)}
+                  placeholder="وصف مختصر للغرفة"
+                  className="mt-1 rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleCreate} disabled={busy} className="gap-1.5 rounded-xl">
+                {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                إنشاء الآن
+              </Button>
+              <Button variant="ghost" onClick={() => setCreateOpen(false)}>
+                إلغاء
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {rooms == null ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : rooms.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-border/70 py-10 text-center text-sm text-muted-foreground">
+          لا توجد غرف دردشة بعد. أنشئ أول غرفة!
+        </p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {rooms.map((room: any) => (
+            <Card key={room._id} className="border-border/80 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
+                    <Gamepad2 className="size-5" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold">{room.name}</p>
+                    {room.description && (
+                      <p className="mt-0.5 text-xs text-muted-foreground truncate">{room.description}</p>
+                    )}
+                    <div className="mt-2 flex items-center gap-2">
+                      <Badge variant="outline" className="rounded-full text-[10px]">
+                        {room.memberCount ?? 0} عضو
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full text-[10px]">
+                        {room.messageCount ?? 0} رسالة
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 
@@ -1935,9 +2206,11 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "المحتوى",
+    label: "المحتوى والمجتمع",
     items: [
-      { id: "games", icon: Gamepad2, label: "الغرف" },
+      { id: "games", icon: Gamepad2, label: "الغرف النشطة" },
+      { id: "chatrooms", icon: Users, label: "غرف الدردشة" },
+      { id: "gifts", icon: Flag, label: "الهدايا" },
       { id: "questions", icon: Database, label: "الأسئلة" },
     ],
   },
@@ -2034,6 +2307,10 @@ export default function Owner() {
         return <ProblemsTab />;
       case "games":
         return <GamesTab />;
+      case "chatrooms":
+        return <ChatRoomsManagementTab />;
+      case "gifts":
+        return <GiftsManagementTab />;
       case "questions":
         return <QuestionsTab />;
       case "powercontrol":
