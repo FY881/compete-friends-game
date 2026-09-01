@@ -1,3 +1,8 @@
+// Polyfill `process` for packages like the Vercel AI SDK that reference
+// `process.env` in browser code without a `typeof` guard.
+if (typeof window !== "undefined" && typeof process === "undefined") {
+  (window as unknown as Record<string, unknown>).process = { env: {} };
+}
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
