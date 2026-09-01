@@ -127,6 +127,11 @@ export default function ChatRooms() {
             </AnimatePresence>
           )}
         </div>
+
+        {/* Create Room Button */}
+        <div className="mt-6 text-center">
+          <CreateRoomDialog />
+        </div>
       </div>
     </div>
   );
@@ -734,6 +739,82 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
 }
 
 // Report Dialog - triggered via custom event
+// Create Room Dialog
+function CreateRoomDialog() {
+  const createRoom = useMutation(api.chatRooms.createRoom);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+  const [type, setType] = useState<"public" | "private" | "password">("public");
+  const [busy, setBusy] = useState(false);
+
+  const handleCreate = async () => {
+    if (!name.trim()) { toast.error("أدخل اسم الغرفة"); return; }
+    setBusy(true);
+    try {
+      const result = await createRoom({ name: name.trim(), description: desc.trim() || undefined, type });
+      toast.success(`تم إنشاء غرفة "${name}" بنجاح!`);
+      setOpen(false);
+      setName("");
+      setDesc("");
+    } catch (err: any) {
+      toast.error(err.message || "فشل الإنشاء");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Button onClick={() => setOpen(true)} className="rounded-xl gap-2">
+        <span className="text-lg">+</span> إنشاء غرفة جديدة
+      </Button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" dir="rtl">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md mx-4 bg-card rounded-2xl border shadow-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold">إنشاء غرفة جديدة</h3>
+              <Button variant="ghost" size="icon" className="size-7" onClick={() => setOpen(false)}><X className="size-4" /></Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">اسم الغرفة *</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: غرفة المعرفة" className="mt-1 rounded-xl" maxLength={30} dir="rtl" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">الوصف (اختياري)</label>
+                <Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="وصف مختصر للغرفة" className="mt-1 rounded-xl" maxLength={100} dir="rtl" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">نوع الغرفة</label>
+                <div className="flex gap-2 mt-1">
+                  {[{ v: "public" as const, l: "🌍 عامة" }, { v: "private" as const, l: "🔒 خاصة" }, { v: "password" as const, l: "🔑 بكلمة مرور" }].map((opt) => (
+                    <button
+                      key={opt.v}
+                      onClick={() => setType(opt.v)}
+                      className={`flex-1 rounded-xl border p-2 text-xs font-medium transition-all ${type === opt.v ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}
+                    >{opt.l}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 rounded-xl">إلغاء</Button>
+                <Button onClick={handleCreate} disabled={!name.trim() || busy} className="flex-1 rounded-xl">
+                  {busy ? "جارٍ الإنشاء..." : "إنشاء"}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </>
+  );
+}
+
 const REPORT_CATEGORIES = [
   { id: "spam", name: "سبام", icon: "📢" },
   { id: "abuse", name: "إساءة", icon: "🤬" },

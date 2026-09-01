@@ -869,6 +869,9 @@ export default function Play() {
         {/* ── Time-based Challenges ── */}
         <TimeChallenges />
 
+        {/* ── 1v1 Duels ── */}
+        <DuelsSection />
+
         {/* ── AI Coach Analysis ── */}
         <AiCoachSection />
 
@@ -1156,5 +1159,58 @@ function NotificationsBell() {
         </div>
       )}
     </div>
+  );
+}
+
+// ── 1v1 Duels Section ──────────────────────────────────────
+function DuelsSection() {
+  const availableDuels = useQuery(api.playerControl.getAvailableDuels);
+  const navigate = useNavigate();
+
+  return (
+    <section className="mt-12">
+      <div className="rounded-3xl border border-rose-500/20 bg-gradient-to-br from-rose-500/5 to-pink-500/5 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Swords className="size-5 text-rose-500" />
+          <h2 className="text-lg font-bold">⚔️ تحديات 1v1</h2>
+          <Badge variant="outline" className="text-[10px] rounded-full bg-rose-500/10 text-rose-600 border-rose-500/30">
+            تحدي مباشر
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">تحدي لاعب آخر في معركة ذكاء مباشرة — 5 أسئلة، الأعلى نقاطاً يفوز!</p>
+        {!availableDuels ? (
+          <div className="text-center py-6 text-xs text-muted-foreground animate-pulse">جارٍ التحميل...</div>
+        ) : availableDuels.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-xs text-muted-foreground mb-3">لا توجد تحديات مفتوحة حالياً</p>
+            <Button asChild variant="outline" className="rounded-xl gap-1.5">
+              <Link to="/games">
+                <Swords className="size-3.5" />
+                ابدأ تحدياً جديداً
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {availableDuels.slice(0, 3).map((duel: any) => (
+              <div key={duel._id} className="flex items-center justify-between rounded-xl border border-rose-500/20 bg-card/80 p-3 hover:shadow-sm transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 items-center justify-center rounded-xl bg-rose-500/10 text-sm">
+                    🎮
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold">{duel.challengerName}</p>
+                    <p className="text-[10px] text-muted-foreground"> challenged you!</p>
+                  </div>
+                </div>
+                <Button size="sm" className="rounded-xl gap-1 bg-rose-500 hover:bg-rose-600 text-white">
+                  <Swords className="size-3" /> قبول
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
