@@ -105,6 +105,7 @@ import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 import { AiSystemsTab } from "@/components/AiSystemsTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
+import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -2207,6 +2208,7 @@ const NAV_GROUPS = [
       { id: "aisystems", icon: KeyRound, label: "أنظمة AI" },
       { id: "freechat", icon: Skull, label: "AI حر" },
       { id: "problems", icon: Bug, label: "المشاكل" },
+      { id: "errorhunter", icon: ShieldCheck, label: "صياد الأخطاء" },
     ],
   },
   {
@@ -2279,6 +2281,7 @@ export default function Owner() {
       if (item.id === "aisystems" && !access.isOwner) return false;
       if (item.id === "freechat" && !access.isOwner) return false;
       if (item.id === "problems" && !access.isOwner) return false;
+      if (item.id === "errorhunter" && !access.isOwner) return false;
       if (item.id === "downloads" && !access.isOwner) return false;
       if (item.id === "settings" && !access.isOwner) return false;
       return true;
@@ -2311,6 +2314,8 @@ export default function Owner() {
         return <AiFreeChatTab />;
       case "problems":
         return <ProblemsTab />;
+      case "errorhunter":
+        return <ErrorHunterTab />;
       case "games":
         return <GamesTab />;
       case "chatrooms":
