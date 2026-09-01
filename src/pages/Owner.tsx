@@ -99,6 +99,7 @@ import { OwnerPasswordManager } from "@/components/OwnerLoginDialog";
 import { OwnerDashboard } from "@/components/owner/OwnerDashboard";
 import { AdvancedPlayersTab } from "@/components/owner/AdvancedPlayersTab";
 import { ReportsInbox } from "@/components/owner/ReportsInbox";
+import { MembershipAdmin } from "@/components/owner/MembershipAdmin";
 import { Menu, Focus } from "lucide-react";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
@@ -2193,6 +2194,7 @@ const NAV_GROUPS = [
       { id: "users", icon: Users, label: "اللاعبون", badge: true },
       { id: "reports", icon: Flag, label: "البلاغات", badge: true },
       { id: "rules", icon: Scale, label: "القوانين" },
+      { id: "memberships", icon: Crown, label: "العضويات" },
     ],
   },
   {
@@ -2293,6 +2295,8 @@ export default function Owner() {
         return <ReportsInbox />;
       case "rules":
         return <RulesTab />;
+      case "memberships":
+        return <MembershipAdmin />;
       case "ai":
         return settings ? <AiTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
       case "aiadmin":

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { MembershipPanel, GiftsPanel, ReportButton } from "@/components/PlayerSocialFeatures";
+import { MembershipShowcase } from "@/components/MembershipShowcase";
 import { Sound } from "@/lib/sounds";
 import { FeaturesShowcase } from "@/components/FeaturesShowcase";
 import { GameModes } from "@/components/game/GameModes";
@@ -560,7 +561,7 @@ export default function Play() {
               </div>
 
               {/* Membership Panel */}
-              <MembershipPanel />
+              <MembershipShowcase />
 
               {/* Gifts Panel */}
               <GiftsPanel />
