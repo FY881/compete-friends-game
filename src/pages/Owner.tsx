@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Tabs removed - using sidebar navigation instead
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -82,7 +82,9 @@ import {
   Users,
   X,
   Zap,
+  ChevronLeft,
 } from "lucide-react";
+// Menu + Focus imported above via separate import
 import { useNavigate } from "react-router";
 import { CATEGORIES } from "@/convex/questions";
 import { APP_VERSION } from "@/lib/app-version";
@@ -94,6 +96,8 @@ import { TelegramSettings } from "@/components/TelegramSettings";
 import { AiControlTab } from "@/components/AiControlTab";
 import { OwnerControlPanel } from "@/components/OwnerControlPanel";
 import { OwnerPasswordManager } from "@/components/OwnerLoginDialog";
+import { OwnerDashboard } from "@/components/owner/OwnerDashboard";
+import { Menu, Focus } from "lucide-react";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 import { AiSystemsTab } from "@/components/AiSystemsTab";
@@ -1901,16 +1905,68 @@ function SettingsTab({ settings }: { settings: SettingsData }) {
 // Main owner page
 // ---------------------------------------------------------------------------
 
+
+// ─── Sidebar nav items ──────────────────────────────────────
+const NAV_GROUPS = [
+  {
+    label: "القيادة",
+    items: [
+      { id: "dashboard", icon: Activity, label: "لوحة القيادة" },
+    ],
+  },
+  {
+    label: "الإدارة",
+    items: [
+      { id: "users", icon: Users, label: "اللاعبون", badge: true },
+      { id: "reports", icon: Flag, label: "البلاغات", badge: true },
+      { id: "rules", icon: Scale, label: "القوانين" },
+    ],
+  },
+  {
+    label: "الذكاء الاصطناعي",
+    items: [
+      { id: "ai", icon: Bot, label: "الرقابة الذكية" },
+      { id: "aiadmin", icon: BrainCircuit, label: "المدير الآلي" },
+      { id: "aicontrol", icon: Sparkles, label: "تحكم AI" },
+      { id: "transparency", icon: EyeOff, label: "الشفافية" },
+      { id: "aisystems", icon: KeyRound, label: "أنظمة AI" },
+      { id: "freechat", icon: Skull, label: "AI حر" },
+      { id: "problems", icon: Bug, label: "المشاكل" },
+    ],
+  },
+  {
+    label: "المحتوى",
+    items: [
+      { id: "games", icon: Gamepad2, label: "الغرف" },
+      { id: "questions", icon: Database, label: "الأسئلة" },
+    ],
+  },
+  {
+    label: "النظام",
+    items: [
+      { id: "powercontrol", icon: Crown, label: "السيطرة الكاملة" },
+      { id: "downloads", icon: Smartphone, label: "التحميل" },
+      { id: "settings", icon: Megaphone, label: "الإعدادات" },
+    ],
+  },
+];
+
 export default function Owner() {
   const navigate = useNavigate();
   const access = useQuery(api.owner.getAccess);
   const dashboard = useQuery(api.owner.getDashboard);
   const settings = useQuery(api.owner.getSettings);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [focusMode, setFocusMode] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   if (access === undefined) {
     return (
       <div dir="rtl" className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-6 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">جارٍ التحقق من الصلاحيات…</p>
+        </div>
       </div>
     );
   }
@@ -1924,8 +1980,7 @@ export default function Owner() {
           </span>
           <h1 className="mt-6 text-2xl font-bold">منطقة محظورة</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            غرفة المالك مخصصة لصاحب الموقع فقط، ويُسمح للمشرفين بدخول جزئي.
-            إذا كنت المالك، سجّل الدخول بالبريد الدائم{" "}
+            غرفة المالك مخصصة لصاحب الموقع فقط. سجّل الدخول بالبريد الدائم{" "}
             <span className="font-mono font-bold text-foreground">omw70op@gmail.com</span>.
           </p>
           <Button className="mt-8 gap-2 rounded-xl" onClick={() => navigate("/play")}>
@@ -1937,238 +1992,186 @@ export default function Owner() {
     );
   }
 
+  // Owner-only items filter
+  const filteredGroups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((item) => {
+      if (item.id === "powercontrol" && !access.isOwner) return false;
+      if (item.id === "aicontrol" && !access.isOwner) return false;
+      if (item.id === "transparency" && !access.isOwner) return false;
+      if (item.id === "aisystems" && !access.isOwner) return false;
+      if (item.id === "freechat" && !access.isOwner) return false;
+      if (item.id === "problems" && !access.isOwner) return false;
+      if (item.id === "downloads" && !access.isOwner) return false;
+      if (item.id === "settings" && !access.isOwner) return false;
+      return true;
+    }),
+  }));
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return <OwnerDashboard onNavigate={setActiveTab} />;
+      case "users":
+        return <UsersTab isOwner={access.isOwner} />;
+      case "reports":
+        return <ReportsTab />;
+      case "rules":
+        return <RulesTab />;
+      case "ai":
+        return settings ? <AiTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
+      case "aiadmin":
+        return settings ? <AdminAiTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
+      case "aicontrol":
+        return <AiControlTab />;
+      case "transparency":
+        return <AiTransparencyTab />;
+      case "aisystems":
+        return <AiSystemsTab />;
+      case "freechat":
+        return <AiFreeChatTab />;
+      case "problems":
+        return <ProblemsTab />;
+      case "games":
+        return <GamesTab />;
+      case "questions":
+        return <QuestionsTab />;
+      case "powercontrol":
+        return <OwnerControlPanel />;
+      case "downloads":
+        return <DownloadsTab />;
+      case "settings":
+        return settings ? <SettingsTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
+      default:
+        return <OwnerDashboard onNavigate={setActiveTab} />;
+    }
+  };
+
   return (
-    <div dir="rtl" className="min-h-screen bg-background text-foreground">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
-          <button type="button" onClick={() => navigate("/")} className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <ShieldCheck className="size-5" />
-            </span>
-            <span className="text-lg font-bold tracking-tight">غرفة المالك</span>
+    <div dir="rtl" className="flex min-h-screen bg-background text-foreground">
+      {/* ── Sidebar ── */}
+      <aside
+        className={cn(
+          "sticky top-0 z-40 flex h-screen flex-col border-l border-border/60 bg-card/95 backdrop-blur-sm transition-all duration-300",
+          sidebarOpen ? "w-64" : "w-16",
+        )}
+      >
+        {/* Sidebar Header */}
+        <div className="flex h-16 items-center justify-between border-b border-border/40 px-4">
+          {sidebarOpen && (
+            <button type="button" onClick={() => navigate("/play")} className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <ShieldCheck className="size-4" />
+              </span>
+              <span className="text-sm font-bold">غرفة المالك</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted"
+          >
+            {sidebarOpen ? <ChevronLeft className="size-4" /> : <Menu className="size-4" />}
           </button>
-
-          <div className="flex items-center gap-2">
-            <Badge className="gap-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/10">
-              <Crown className="size-3" />
-              {access.isOwner ? "المالك" : "مشرف"}
-            </Badge>
-            <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => navigate("/play")}>
-              <ArrowLeft className="size-3.5" />
-              للعبة
-            </Button>
-          </div>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-6xl px-5 pb-24 pt-10">
-        {/* Hero strip */}
-        <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-card p-8 shadow-sm">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -top-24 start-1/2 h-48 w-[30rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
-          />
-          <div className="relative flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <Badge variant="outline" className="mb-3 gap-1.5 rounded-full text-primary">
-                <Sparkles className="size-3.5" />
-                {access.isOwner ? "صلاحيات كاملة — تحكم كامل" : "صلاحيات إشراف"}
-              </Badge>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                {access.isOwner ? "مرحباً بك، المالك 👑" : "لوحة الإشراف 🛡️"}
-              </h1>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                {access.isOwner
-                  ? "20 ميزة للتحكم الكامل: المستخدمون، العقوبات، القوانين، الرقيب الآلي بالذكاء الاصطناعي (OpenRouter)، الغرف المباشرة، بنك الأسئلة والمزيد. كل شيء مسجّل وتحت إشرافك."
-                  : "يمكنك إدارة المستخدمين والعقوبات والبلاغات. الإعدادات والقوانين في يد المالك فقط."}
-              </p>
-            </div>
-            {access.isOwner && (
-              <div className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-muted/30 p-4 text-xs">
-                <p className="flex items-center gap-2 font-semibold text-muted-foreground">
-                  <BrainCircuit className="size-4 text-primary" />
-                  الرقيب الآلي: {settings?.aiEnabled ? "مفعّل" : "متوقف"}
-                  {settings?.aiEnabled && settings?.aiAutoApply ? " + تطبيق تلقائي" : ""}
+        {/* Nav Items */}
+        <nav className="flex-1 overflow-y-auto p-2 space-y-4 scrollbar-thin">
+          {filteredGroups.map((group) => (
+            <div key={group.label}>
+              {sidebarOpen && (
+                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {group.label}
                 </p>
-                <p className="flex items-center gap-2 font-semibold text-muted-foreground">
-                  <Eraser className="size-4 text-primary" />
-                  مكافحة الغش: {settings?.antiCheatEnabled ? "مفعّلة" : "متوقفة"}
-                </p>
-                <p className="flex items-center gap-2 font-semibold text-muted-foreground">
-                  <Megaphone className="size-4 text-primary" />
-                  الإعلان: {settings?.announcementActive ? "ظاهر" : "مخفي"}
-                </p>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  const badgeCount = item.id === "reports" ? dashboard?.openReports : undefined;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActiveTab(item.id)}
+                      className={cn(
+                        "group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200",
+                        isActive
+                          ? "bg-primary/10 text-primary shadow-sm"
+                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                        !sidebarOpen && "justify-center px-0",
+                      )}
+                    >
+                      <Icon className={cn("size-4 shrink-0 transition-transform group-hover:scale-110", isActive && "text-primary")} />
+                      {sidebarOpen && (
+                        <>
+                          <span className="flex-1 text-start">{item.label}</span>
+                          {badgeCount != null && badgeCount > 0 && (
+                            <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                              {badgeCount}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="border-t border-border/40 p-3">
+          <div className="flex items-center gap-2">
+            <Badge className="gap-1 rounded-full bg-primary/10 text-[10px] text-primary">
+              <Crown className="size-2.5" />
+              {access.isOwner ? "مالك" : "مشرف"}
+            </Badge>
+            {sidebarOpen && (
+              <Button variant="ghost" size="sm" className="ms-auto gap-1 text-[11px]" onClick={() => navigate("/play")}>
+                <ArrowLeft className="size-3" />
+                للعبة
+              </Button>
             )}
           </div>
         </div>
+      </aside>
 
-        {/* Feature 01: dashboard */}
-        <section className="mt-8">
-          <FeatureTitle
-            n="01"
-            title="نظرة عامة"
-            desc="مؤشرات حية على صحة الموقع ونشاط اللاعبين والرقابة."
-          />
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatCard icon={Users} label="لاعب مسجّل" value={dashboard?.userCount ?? "—"} hint="إجمالي" />
-            <StatCard icon={Gamepad2} label="غرفة أُنشئت" value={dashboard?.gameCount ?? "—"} hint="كل الوقت" />
-            <StatCard icon={Flag} label="بلاغ مفتوح" value={dashboard?.openReports ?? "—"} hint="بانتظار المراجعة" />
-            <StatCard icon={Ban} label="حساب محظور" value={dashboard?.bannedUsers ?? "—"} hint="حالياً" />
-            <StatCard icon={Gavel} label="عقوبة نُفّذت" value={dashboard?.totalPunishments ?? "—"} hint="إجمالي" />
-            <StatCard icon={Bot} label="الرقيب الآلي" value={dashboard?.aiEnabled ? "مفعّل" : "متوقف"} hint={dashboard?.aiAutoApply ? "تلقائي" : "يدوي"} />
-            <StatCard icon={Eraser} label="مكافحة الغش" value={dashboard?.antiCheatEnabled ? "مفعّلة" : "متوقفة"} hint="تلقائية" />
-            <StatCard icon={ShieldCheck} label="الوضع" value="نشط" hint="الموقع يعمل" />
+      {/* ── Main Content ── */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/40 bg-background/80 px-6 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            {!sidebarOpen && (
+              <button type="button" onClick={() => setSidebarOpen(true)} className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted">
+                <Menu className="size-4" />
+              </button>
+            )}
+            <h2 className="text-sm font-bold">
+              {NAV_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeTab)?.label ?? "لوحة القيادة"}
+            </h2>
           </div>
-        </section>
-
-        {/* Feature 20: recent activity */}
-        <section className="mt-8">
-          <Card className="border-border/80 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Activity className="size-4" />
-                </span>
-                <span>أحدث النشاطات (ميزة 20)</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ModerationLogList logs={dashboard?.recentActivity} empty="لا توجد نشاطات بعد." />
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* Tabs */}
-        <div className="mt-8">
-          <Tabs defaultValue="users" className="w-full">
-            <TabsList className="h-auto flex-wrap gap-1 rounded-2xl p-1.5">
-              <TabsTrigger value="users" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Users className="size-4" /> المستخدمون
-              </TabsTrigger>
-              <TabsTrigger value="reports" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Flag className="size-4" /> البلاغات
-                {dashboard?.openReports ? (
-                  <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
-                    {dashboard.openReports}
-                  </span>
-                ) : null}
-              </TabsTrigger>
-              <TabsTrigger value="rules" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Scale className="size-4" /> القوانين
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Bot className="size-4" /> الرقابة الذكية
-              </TabsTrigger>
-              <TabsTrigger value="aiadmin" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <BrainCircuit className="size-4" /> المدير الآلي
-              </TabsTrigger>
-              <TabsTrigger value="games" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Gamepad2 className="size-4" /> الغرف
-              </TabsTrigger>
-              <TabsTrigger value="questions" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Database className="size-4" /> الأسئلة
-              </TabsTrigger>
-              {access.isOwner && (
-                <>
-                  <TabsTrigger value="aicontrol" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    <Sparkles className="size-4" /> تحكم AI
-                  </TabsTrigger>
-                  <TabsTrigger value="transparency" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    <Bot className="size-4" /> الصراحة المطلقة
-                  </TabsTrigger>
-                  <TabsTrigger value="aisystems" className="gap-1.5 rounded-xl data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-                    <KeyRound className="size-4" /> أنظمة AI السرية
-                  </TabsTrigger>
-                  <TabsTrigger value="powercontrol" className="gap-1.5 rounded-xl data-[state=active]:bg-amber-600 data-[state=active]:text-white">
-                    <Crown className="size-4" /> السيطرة الكاملة
-                  </TabsTrigger>
-                  <TabsTrigger value="freechat" className="gap-1.5 rounded-xl data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                    <Skull className="size-4" /> AI حر
-                  </TabsTrigger>
-                  <TabsTrigger value="problems" className="gap-1.5 rounded-xl data-[state=active]:bg-rose-600 data-[state=active]:text-white">
-                    <Bug className="size-4" /> المشاكل
-                  </TabsTrigger>
-                  <TabsTrigger value="downloads" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    <Smartphone className="size-4" /> التحميل
-                  </TabsTrigger>
-                  <TabsTrigger value="settings" className="gap-1.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    <Megaphone className="size-4" /> الإعدادات
-                  </TabsTrigger>
-                </>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFocusMode(!focusMode)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all",
+                focusMode ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted",
               )}
-            </TabsList>
+            >
+              <Focus className="size-3.5" />
+              {focusMode ? "وضع التركيز" : "تركيز"}
+            </button>
+          </div>
+        </header>
 
-            <div className="mt-6">
-              <TabsContent value="users">
-                <UsersTab isOwner={access.isOwner} />
-              </TabsContent>
-              <TabsContent value="reports">
-                <ReportsTab />
-              </TabsContent>
-              <TabsContent value="rules">
-                <RulesTab />
-              </TabsContent>
-              <TabsContent value="ai">
-                {settings ? (
-                  <AiTab settings={settings} />
-                ) : (
-                  <Loader2 className="mx-auto my-12 size-6 animate-spin" />
-                )}
-              </TabsContent>
-              <TabsContent value="aiadmin">
-                {settings ? (
-                  <AdminAiTab settings={settings} />
-                ) : (
-                  <Loader2 className="mx-auto my-12 size-6 animate-spin" />
-                )}
-              </TabsContent>
-              <TabsContent value="games">
-                <GamesTab />
-              </TabsContent>
-              <TabsContent value="questions">
-                <QuestionsTab />
-              </TabsContent>
-              {access.isOwner && (
-                <>
-                  <TabsContent value="aicontrol">
-                    <AiControlTab />
-                  </TabsContent>
-                  <TabsContent value="transparency">
-                    <AiTransparencyTab />
-                  </TabsContent>
-                  <TabsContent value="aisystems">
-                    <AiSystemsTab />
-                  </TabsContent>
-                  <TabsContent value="powercontrol">
-                <OwnerControlPanel />
-              </TabsContent>
-              <TabsContent value="freechat">
-                    <AiFreeChatTab />
-                  </TabsContent>
-              <TabsContent value="problems">
-                    <ProblemsTab />
-                  </TabsContent>
-                  <TabsContent value="downloads">
-                    <DownloadsTab />
-                  </TabsContent>
-                  <TabsContent value="settings">
-                    {settings ? (
-                      <SettingsTab settings={settings} />
-                    ) : (
-                      <Loader2 className="mx-auto my-12 size-6 animate-spin" />
-                    )}
-                  </TabsContent>
-                  <TabsContent value="intelligence">
-                    <AiIntelligenceDashboard />
-                  </TabsContent>
-                </>
-              )}
-            </div>
-          </Tabs>
-        </div>
-      </main>
+        {/* Page Content */}
+        <main className={cn("p-6 transition-all duration-300", focusMode && "max-w-4xl mx-auto")}>
+          {renderContent()}
+        </main>
+      </div>
     </div>
   );
 }
