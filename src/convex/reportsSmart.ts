@@ -36,6 +36,8 @@ export const submitReport = mutation({
     category: v.string(),
     reason: v.string(),
     details: v.optional(v.string()),
+    roomId: v.optional(v.string()),
+    messageId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -76,10 +78,14 @@ export const submitReport = mutation({
     // Build the reason string including category info
     const fullReason = `[${category?.name ?? args.category}] ${args.reason}`;
 
+    // Convert string to Id<"users">
+    const targetId = ctx.db.normalizeId("users", args.targetUserId);
+    if (!targetId) throw new Error("المستخدم المُبلَّغ عنه غير موجود");
+
     const reportId = await ctx.db.insert("reports", {
       reporterId: userId,
       reporterName: reporter?.name ?? "مجهول",
-      targetId: args.targetUserId as any,
+      targetId,
       targetName: args.targetName,
       reason: fullReason,
       details: args.details,

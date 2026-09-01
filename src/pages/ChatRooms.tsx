@@ -214,6 +214,7 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const [showMembers, setShowMembers] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [reportDialog, setReportDialog] = useState<{ targetId: string; targetName: string; messageContent?: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchResults = useQuery(
@@ -225,6 +226,16 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages?.length]);
+
+  // Report dialog listener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setReportDialog(detail);
+    };
+    window.addEventListener("open-report", handler);
+    return () => window.removeEventListener("open-report", handler);
+  }, []);
 
   // Filter messages
   const displayMessages = useMemo(() => {
@@ -631,6 +642,16 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
           </Button>
         </div>
       </div>
+
+      {/* Report Dialog */}
+      {reportDialog && (
+        <ReportDialog
+          targetId={reportDialog.targetId}
+          targetName={reportDialog.targetName}
+          messageContent={reportDialog.messageContent}
+          onClose={() => setReportDialog(null)}
+        />
+      )}
     </div>
   );
 }
