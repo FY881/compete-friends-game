@@ -62,6 +62,7 @@ import {
   KeyRound,
   Link2,
   Loader2,
+  Music,
   Megaphone,
   MicOff,
   Plus,
@@ -106,6 +107,7 @@ import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 import { AiSystemsTab } from "@/components/AiSystemsTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
+import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -2226,6 +2228,7 @@ const NAV_GROUPS = [
       { id: "powercontrol", icon: Crown, label: "السيطرة الكاملة" },
       { id: "downloads", icon: Smartphone, label: "التحميل" },
       { id: "settings", icon: Megaphone, label: "الإعدادات" },
+      { id: "sounds", icon: Music, label: "الصوتيات" },
     ],
   },
 ];
@@ -2328,6 +2331,8 @@ export default function Owner() {
         return <OwnerControlPanel />;
       case "downloads":
         return <DownloadsTab />;
+      case "sounds":
+        return <SoundControlPanel />;
       case "settings":
         return settings ? <SettingsTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
       default:
