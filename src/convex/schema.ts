@@ -677,6 +677,96 @@ const schema = defineSchema(
       success: v.boolean(),
       executedAt: v.number(),
     }).index("by_time", ["executedAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ صياد الأخطاء — سجل الأخطاء المُلتقطة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    errorLogs: defineTable({
+      fingerprint: v.string(), // hash من message + component — للتجميع
+      message: v.string(),
+      stack: v.optional(v.string()),
+      component: v.optional(v.string()), // المكون الذي أخطأ
+      route: v.optional(v.string()), // المسار الحالي
+      url: v.optional(v.string()),
+      severity: v.union(
+        v.literal("low"),
+        v.literal("medium"),
+        v.literal("high"),
+        v.literal("critical"),
+      ),
+      category: v.string(), // hooks_violation | chunk_load | network | api | render | unknown
+      autoHealed: v.boolean(),
+      healStrategy: v.optional(v.string()),
+      healResult: v.optional(v.string()), // success | failed | skipped
+      userId: v.optional(v.id("users")),
+      deviceInfo: v.optional(v.string()), // UA مختصر
+      count: v.number(), // عدد التكرارات المجمّعة
+      firstSeen: v.number(),
+      lastSeen: v.number(),
+      resolved: v.boolean(),
+      resolvedBy: v.optional(v.string()), // auto | owner | unknown
+      createdAt: v.number(),
+    })
+      .index("by_fingerprint", ["fingerprint"])
+      .index("by_severity", ["severity"])
+      .index("by_created", ["createdAt"])
+      .index("by_unresolved", ["resolved", "createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ صياد الأخطاء — أنماط الأخطاء المُتعلّمة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    errorPatterns: defineTable({
+      pattern: v.string(), // نمط الخطأ (regex-friendly)
+      category: v.string(),
+      description: v.string(),
+      autoFixAction: v.string(), // reload | clear_cache | reconnect | skip | notify_owner
+      occurrences: v.number(),
+      lastOccurrence: v.number(),
+      successRate: v.number(), // 0-1 — نسبة نجاح الإصلاح التلقائي
+      active: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_pattern", ["pattern"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ صياد الأخطاء — مقاييس الأداء ║
+    // ═══════════════════════════════════════════════════════════════════════
+    performanceMetrics: defineTable({
+      userId: v.optional(v.id("users")),
+      fps: v.optional(v.number()),
+      memoryUsedMB: v.optional(v.number()),
+      memoryTotalMB: v.optional(v.number()),
+      networkLatencyMs: v.optional(v.number()),
+      networkType: v.optional(v.string()), // wifi | 4g | 3g | unknown
+      route: v.optional(v.string()),
+      loadTimeMs: v.optional(v.number()), // وقت تحميل الصفحة
+      convSyncMs: v.optional(v.number()), // وقت مزامنة Convex
+      componentCount: v.optional(v.number()), // عدد المكونات المشحونة
+      domNodes: v.optional(v.number()), // عدد عقد DOM
+      recordedAt: v.number(),
+    }).index("by_time", ["recordedAt"]).index("by_user", ["userId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ صياد الأخطاء — صحة النظام اللحظية ║
+    // ═══════════════════════════════════════════════════════════════════════
+    systemHealth: defineTable({
+      key: v.string(), // "current" — سطر واحد فقط
+      status: v.union(
+        v.literal("healthy"),
+        v.literal("degraded"),
+        v.literal("critical"),
+      ),
+      errorRate: v.number(), // أخطاء/دقيقة
+      activeUsers: v.number(),
+      avgFps: v.number(),
+      avgLatency: v.number(),
+      unresolvedErrors: v.number(),
+      criticalErrors: v.number(),
+      lastAutoFix: v.optional(v.number()),
+      lastSweepAt: v.number(),
+      uptime: v.number(), // uptime بالثواني
+      diagnostics: v.optional(v.string()), // JSON — تشخيصات مفصلة
+      updatedAt: v.number(),
+    }).index("by_key", ["key"]),
   },
   {
     schemaValidation: false,

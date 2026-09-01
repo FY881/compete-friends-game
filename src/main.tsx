@@ -14,7 +14,7 @@ import React, { StrictMode, useEffect, lazy, Suspense, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { ErrorHunter } from "@/components/ErrorHunter";
+import { ErrorHunter, setErrorHunterClient, startPerformanceMonitor } from "@/components/ErrorHunter";
 import { SplashScreen } from "@/components/SplashScreen";
 import "./index.css";
 import { lazyRetry } from "@/lib/lazyRetry";
@@ -131,8 +131,12 @@ class RootErrorBoundary extends React.Component<
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 
+// ── Error Hunter: initialize client + start performance monitor ──
+setErrorHunterClient(convex);
+startPerformanceMonitor();
+
 // Global capture: any uncaught error or rejected promise anywhere in the app
-// lands in the owner room (deduped) so no failure stays invisible.
+// lands in the error hunter (deduped) so no failure stays invisible.
 window.addEventListener("error", (event) => {
   reportRuntimeError(
     event.message || "Uncaught error",
