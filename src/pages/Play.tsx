@@ -875,6 +875,12 @@ export default function Play() {
         {/* ── AI Coach Analysis ── */}
         <AiCoachSection />
 
+        {/* ── Daily Streak ── */}
+        <DailyStreakSection />
+
+        {/* ── Leaderboard ── */}
+        <LeaderboardSection />
+
         {/* ── Laws reminder ────────────────────────────────────── */}
         <section className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-border/80 bg-card p-6">
           <div className="flex items-start gap-3">
@@ -1210,6 +1216,129 @@ function DuelsSection() {
             ))}
           </div>
         )}
+      </div>
+    </section>
+  );
+}
+
+// ── Daily Streak & Rewards ─────────────────────────────────
+function DailyStreakSection() {
+  const profile = useQuery(api.stats.getMyProfile);
+  const claimDaily = useMutation(api.profile.claimDailyReward);
+  const [claiming, setClaiming] = useState(false);
+  const [claimed, setClaimed] = useState(false);
+
+  if (!profile) return null;
+
+  const streak = profile.dailyStreak ?? 0;
+  const alreadyClaimed = !profile.canClaimDaily;
+
+  const handleClaim = async () => {
+    if (alreadyClaimed || claiming) return;
+    setClaiming(true);
+    try {
+      await claimDaily();
+      setClaimed(true);
+      Sound.victory();
+      toast.success("تم استلام المكافأة اليومية!");
+    } catch (err: any) {
+      toast.error(err.message || "فشل الاستلام");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const streakDays = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const dayOfWeek = new Date().getDay();
+
+  return (
+    <section className="mt-12">
+      <div className="rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-yellow-500/5 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🔥</span>
+            <h2 className="text-lg font-bold">السلسلة اليومية</h2>
+            {streak > 0 && (
+              <Badge variant="outline" className="text-[10px] rounded-full bg-amber-500/10 text-amber-600 border-amber-500/30">
+                {streak} يوم متتالي
+              </Badge>
+            )}
+          </div>
+        </div>
+        {/* Week view */}
+        <div className="grid grid-cols-7 gap-2 mb-4">
+          {streakDays.map((day, i) => {
+            const isActive = i <= dayOfWeek;
+            const isToday = i === dayOfWeek;
+            return (
+              <div key={i} className={`text-center rounded-xl p-2 transition-all ${isToday ? "bg-primary text-primary-foreground shadow-md" : isActive ? "bg-primary/10 text-primary" : "bg-muted/30 text-muted-foreground"}`}>
+                <p className="text-[9px] font-medium">{day}</p>
+                <p className="text-lg mt-0.5">{isActive ? "✅" : "⬜"}</p>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {alreadyClaimed ? "✅ تم استلام مكافأة اليوم" : "ادة مكافأتك اليومية"}
+          </p>
+          <Button
+            onClick={handleClaim}
+            disabled={alreadyClaimed || claiming || claimed}
+            className={`rounded-xl gap-1.5 ${alreadyClaimed || claimed ? "bg-green-500/20 text-green-600" : "bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white"}`}
+          >
+            {alreadyClaimed || claimed ? "✅ تم" : claiming ? "جارٍ..." : "🎁 استلام المكافأة"}
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Leaderboard / Hall of Fame ──────────────────────────────
+function LeaderboardSection() {
+  const topPlayers = useQuery(api.stats.getTopPlayers, { limit: 10 });
+  const [showAll, setShowAll] = useState(false);
+
+  if (!topPlayers || topPlayers.length === 0) return null;
+
+  const medals = ["🥇", "🥈", "🥉"];
+  const displayPlayers = showAll ? topPlayers : topPlayers.slice(0, 5);
+
+  return (
+    <section className="mt-12">
+      <div className="rounded-3xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-amber-500/5 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🏆</span>
+            <h2 className="text-lg font-bold">لوحة الشرف</h2>
+          </div>
+          {topPlayers.length > 5 && (
+            <Button variant="ghost" size="sm" className="text-xs" onClick={() => setShowAll(!showAll)}>
+              {showAll ? "عرض أقل" : "عرض الكل"}
+            </Button>
+          )}
+        </div>
+        <div className="space-y-2">
+          {displayPlayers.map((player: any, i: number) => (
+            <div
+              key={player.userId}
+              className={`flex items-center gap-3 rounded-xl p-3 transition-all ${
+                i < 3 ? "bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/20" : "bg-muted/30"
+              }`}
+            >
+              <span className="text-xl w-8 text-center">{medals[i] || `#${i + 1}`}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold truncate">{player.name}</p>
+                <p className="text-[10px] text-muted-foreground">{player.gamesPlayed} لعبة • {player.gamesWon} فوز</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-primary tabular-nums">{player.xp.toLocaleString()}</p>
+                <p className="text-[9px] text-muted-foreground">XP</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
