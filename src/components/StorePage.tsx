@@ -164,13 +164,13 @@ export default function StorePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [purchasing, setPurchasing] = useState<string | null>(null);
 
-  const categories = useQuery(api.store.getStoreCategories);
+  const categories = useQuery(api.store.getStoreSections);
   const items = useQuery(api.store.getStoreItems, { category: selectedCategory ?? undefined });
-  const userCoins = useQuery(api.store.getUserCoins);
-  const purchases = useQuery(api.store.getUserPurchases);
+  const userCoins = useQuery(api.store.getBalances);
+  const purchases = useQuery(api.store.getOwnedItems);
   const purchaseItem = useMutation(api.store.purchaseItem);
 
-  const ownedIds = new Set(purchases?.map((p) => p.itemId) ?? []);
+  const ownedIds = new Set(purchases ?? []);
 
   const filteredItems =
     items?.filter(
@@ -210,7 +210,7 @@ export default function StorePage() {
         </div>
         <Badge variant="outline" className="gap-1.5">
           <Coins className="size-3 text-amber-500" />
-          <span className="font-bold">{userCoins ?? 0}</span>
+          <span className="font-bold">{(userCoins as any)?.coins ?? 0}</span>
           <span className="text-muted-foreground">عملة</span>
         </Badge>
       </div>
@@ -277,7 +277,7 @@ export default function StorePage() {
               key={item.id}
               item={item}
               owned={ownedIds.has(item.id)}
-              userCoins={userCoins ?? 0}
+              userCoins={(userCoins as any)?.coins ?? 0}
               onPurchase={handlePurchase}
               purchasing={purchasing}
             />
