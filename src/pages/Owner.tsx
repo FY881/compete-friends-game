@@ -2052,7 +2052,7 @@ function GiftsManagementTab() {
 // ---------------------------------------------------------------------------
 
 function ChatRoomsManagementTab() {
-  const rooms = useQuery(api.chatRooms.getRooms);
+  const rooms = useQuery(api.chatRooms.getUserRooms);
   const createRoom = useMutation(api.chatRooms.createRoom);
   const [createOpen, setCreateOpen] = useState(false);
   const [roomName, setRoomName] = useState("");
@@ -2069,7 +2069,7 @@ function ChatRoomsManagementTab() {
       await createRoom({
         name: roomName.trim(),
         description: roomDesc.trim() || undefined,
-        isPrivate: false,
+        type: "public",
       });
       toast.success(`تم إنشاء غرفة "${roomName}" بنجاح`);
       setCreateOpen(false);

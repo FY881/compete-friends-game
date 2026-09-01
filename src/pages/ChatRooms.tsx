@@ -17,7 +17,7 @@ const EMOJI_REACTIONS = ["👍", "❤️", "😂", "😮", "🔥", "💯"];
 
 export default function ChatRooms() {
   const { user } = useAuth();
-  const rooms = useQuery(api.chatRooms.getRooms);
+  const rooms = useQuery(api.chatRooms.getUserRooms);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
 
   if (!user) {
@@ -99,7 +99,7 @@ function RoomCard({
   const handleJoin = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await joinRoom({ roomKey: room.key });
+      await joinRoom({ roomId: room._id });
       toast("تم الانضمام للغرفة!");
       onClick();
     } catch (err: any) {
@@ -159,10 +159,10 @@ function RoomChat({
   onBack: () => void;
   currentUserId: string;
 }) {
-  const messages = useQuery(api.chatRooms.getRoomMessages, { roomKey });
+  const messages = useQuery(api.chatRooms.getMessages, { roomId: roomKey as any });
   const sendMessage = useMutation(api.chatRooms.sendMessage);
-  const addReaction = useMutation(api.chatRooms.addReaction);
-  const togglePin = useMutation(api.chatRooms.togglePinMessage);
+  const addReaction = useMutation(api.chatRooms.toggleReaction);
+  const togglePin = useMutation(api.chatRooms.togglePin);
   const deleteMessage = useMutation(api.chatRooms.deleteMessage);
 
   const [input, setInput] = useState("");
@@ -193,9 +193,8 @@ function RoomChat({
     if (!text) return;
     try {
       await sendMessage({
-        roomKey,
+        roomId: roomKey as any,
         content: text,
-        type: "text",
         replyTo: replyTo?.id,
       });
       setInput("");
@@ -221,7 +220,7 @@ function RoomChat({
 
   const handlePin = async (messageId: string, currentlyPinned: boolean) => {
     try {
-      await togglePin({ messageId: messageId as any, pinned: !currentlyPinned });
+      await togglePin({ roomId: roomKey as any, messageId: messageId as string });
       toast(currentlyPinned ? "تم إلغاء التثبيت" : "تم التثبيت");
     } catch {}
   };
