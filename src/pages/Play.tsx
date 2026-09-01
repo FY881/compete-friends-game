@@ -42,7 +42,7 @@ import {
   Swords,
   Trophy,
   Users,
-  Zap,
+  Zap, Timer, Coffee, Moon, Star,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 
@@ -865,6 +865,9 @@ export default function Play() {
           <GameModes />
         </section>
 
+        {/* ── Time-based Challenges ── */}
+        <TimeChallenges />
+
         {/* ── Laws reminder ────────────────────────────────────── */}
         <section className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-border/80 bg-card p-6">
           <div className="flex items-start gap-3">
@@ -961,5 +964,61 @@ export default function Play() {
       {/* ── Owner Login Dialog ─────────────────────────────── */}
       <OwnerLoginDialog open={showOwnerLogin} onOpenChange={setShowOwnerLogin} />
     </div>
+  );
+}
+
+// ── Time-based Challenges Component ───────────────────────────
+function TimeChallenges() {
+  const timeChallenges = useQuery(api.premiumFeatures.getTimeChallenges);
+
+  if (!timeChallenges || timeChallenges.length === 0) return null;
+
+  const activeChallenges = timeChallenges.filter((c: any) => c.active);
+  if (activeChallenges.length === 0) return null;
+
+  const TIME_ICONS: Record<string, React.ReactNode> = {
+    morning_rush: <Coffee className="size-5 text-amber-500" />,
+    afternoon_blitz: <Zap className="size-5 text-orange-500" />,
+    night_master: <Moon className="size-5 text-indigo-500" />,
+    weekend_warrior: <Star className="size-5 text-purple-500" />,
+  };
+
+  return (
+    <section className="mt-12">
+      <div className="rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Timer className="size-5 text-amber-500" />
+          <h2 className="text-lg font-bold">⚡ تحديات حسب الوقت</h2>
+          <Badge variant="outline" className="text-[10px] rounded-full bg-amber-500/10 text-amber-600 border-amber-500/30">
+            نشطة الآن
+          </Badge>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {activeChallenges.map((c: any) => (
+            <div
+              key={c.id}
+              className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-card/80 p-4 hover:shadow-md transition-all"
+            >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
+                {TIME_ICONS[c.id] || <Timer className="size-5 text-amber-500" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold">{c.name}</h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{c.description}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-[9px] rounded-full">
+                    {c.questionCount} أسئلة
+                  </Badge>
+                  <Badge variant="outline" className="text-[9px] rounded-full bg-green-500/10 text-green-600 border-green-500/30">
+                    ×{c.bonusMultiplier} مكافأة
+                  </Badge>
+                  <span className="text-[9px] text-muted-foreground">{c.timeWindow}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

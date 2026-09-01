@@ -198,10 +198,13 @@ function RoomCard({ room, currentUserId, onClick }: { room: any; currentUserId: 
 
 function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: () => void; currentUserId: string }) {
   const messages = useQuery(api.chatRooms.getMessages, { roomId: roomId as any });
+  const roomStats = useQuery(api.chatRooms.getRoomStats, { roomId: roomId as any });
   const sendMessage = useMutation(api.chatRooms.sendMessage);
   const toggleReaction = useMutation(api.chatRooms.toggleReaction);
   const togglePin = useMutation(api.chatRooms.togglePin);
   const deleteMessage = useMutation(api.chatRooms.deleteMessage);
+  const muteMember = useMutation(api.chatRooms.muteMember);
+  const kickMember = useMutation(api.chatRooms.kickMember);
   const searchMessages = useQuery(
     api.chatRooms.searchMessages,
     { roomId: roomId as any, query: "" }
@@ -420,7 +423,7 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
       </div>
 
       {/* ── Messages Area ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 relative">
         <div className="mx-auto max-w-4xl space-y-0.5">
           {groupedMessages.length === 0 ? (
             <div className="py-16 text-center">
@@ -596,6 +599,63 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* ── Room Settings Panel (slide from right) ── */}
+      <AnimatePresence>
+        {showMembers && (
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="absolute inset-y-0 left-0 z-20 w-80 max-w-full border-r bg-card shadow-xl overflow-y-auto"
+            dir="rtl"
+          >
+            <div className="sticky top-0 bg-card/95 backdrop-blur border-b px-4 py-3 flex items-center justify-between">
+              <h3 className="font-bold text-sm">⚙️ إعدادات الغرفة</h3>
+              <Button variant="ghost" size="icon" className="size-7" onClick={() => setShowMembers(false)}>
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Room Stats */}
+              {roomStats && (
+                <div className="rounded-xl bg-muted/30 p-3 space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground">📊 إحصائيات</p>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div><p className="text-lg font-bold text-primary">{roomStats.totalMessages}</p><p className="text-[10px] text-muted-foreground">رسالة</p></div>
+                    <div><p className="text-lg font-bold text-emerald-600">{roomStats.memberCount}</p><p className="text-[10px] text-muted-foreground">عضو</p></div>
+                    <div><p className="text-lg font-bold text-amber-600">{roomStats.todayMessages}</p><p className="text-[10px] text-muted-foreground">اليوم</p></div>
+                    <div><p className="text-lg font-bold text-purple-600">{roomStats.pinnedCount}</p><p className="text-[10px] text-muted-foreground">مثبتة</p></div>
+                  </div>
+                </div>
+              )}
+              {/* Top Senders */}
+              {roomStats && roomStats.topSenders.length > 0 && (
+                <div className="rounded-xl bg-muted/30 p-3">
+                  <p className="text-xs font-bold text-muted-foreground mb-2">🏆 الأكثر نشاطاً</p>
+                  <div className="space-y-1.5">
+                    {roomStats.topSenders.map((s: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground">{i + 1}.</span>
+                          <span className="font-medium">{s.name}</span>
+                        </div>
+                        <Badge variant="outline" className="text-[9px] rounded-full">{s.count}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Admin Tools */}
+              <div className="rounded-xl bg-muted/30 p-3">
+                <p className="text-xs font-bold text-muted-foreground mb-2">🛠️ أدوات الإدارة</p>
+                <p className="text-[10px] text-muted-foreground">اضغط على اسم عضو في الرسائل لإدارة صلاحياته</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Reply Preview ── */}
       <AnimatePresence>
