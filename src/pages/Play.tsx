@@ -1353,11 +1353,13 @@ function LeaderboardSection() {
 
 function AchievementsSection() {
   const achievements = useQuery(api.seasons.getPlayerAchievements);
-  if (!achievements) return null;
+  // Defensive: return null if loading, empty, or not an array
+  if (!achievements || !Array.isArray(achievements) || achievements.length === 0) return null;
 
-  const earnedCount = achievements.filter((a: any) => a.earned).length;
-  const totalCount = achievements.length;
-  const progress = totalCount > 0 ? (earnedCount / totalCount) * 100 : 0;
+  try {
+    const earnedCount = achievements.filter((a: any) => a?.earned).length;
+    const totalCount = achievements.length;
+    const progress = totalCount > 0 ? (earnedCount / totalCount) * 100 : 0;
 
   return (
     <section className="mt-8">
@@ -1404,4 +1406,7 @@ function AchievementsSection() {
       </div>
     </section>
   );
+  } catch {
+    return null;
+  }
 }
