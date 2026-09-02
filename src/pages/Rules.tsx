@@ -1,4 +1,5 @@
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { RuleRow } from "@/convex/owner";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,17 @@ function RuleItem({ rule }: { rule: RuleRow }) {
 export default function Rules() {
   const navigate = useNavigate();
   const rules = useQuery(api.owner.getRules);
+  const seedRules = useMutation(api.lawEnforcement.seedRules);
+  const [seeding, setSeeding] = useState(false);
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    try {
+      await seedRules();
+      window.location.reload();
+    } catch { /* ignore */ }
+    setSeeding(false);
+  };
 
   const grouped = (rules ?? []).reduce<Record<string, RuleRow[]>>((acc, r) => {
     (acc[r.category] ??= []).push(r);
@@ -188,8 +200,11 @@ export default function Rules() {
                 <CardContent className="p-8 text-center">
                   <AlertTriangle className="mx-auto size-8 text-amber-500" />
                   <p className="mt-3 text-sm text-muted-foreground">
-                    القوانين قيد التحديث — عد لاحقاً.
+                    القوانين لم تُدخل بعد.
                   </p>
+                  <Button onClick={handleSeed} disabled={seeding} className="mt-4 gap-1.5">
+                    {seeding ? "⏳" : "⚖️"} إدخال القوانين الآن
+                  </Button>
                 </CardContent>
               </Card>
             )}
