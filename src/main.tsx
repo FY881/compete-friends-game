@@ -26,6 +26,7 @@ const Play = lazyRetry(() => import("./pages/Play.tsx"));
 const Game = lazyRetry(() => import("./pages/Game.tsx"));
 const Profile = lazyRetry(() => import("./pages/Profile.tsx"));
 const Owner = lazyRetry(() => import("./pages/Owner.tsx"));
+const OwnerPremiumLogin = lazyRetry(() => import("./components/owner/OwnerPremiumLogin.tsx"));
 const Rules = lazyRetry(() => import("./pages/Rules.tsx"));
 const Download = lazyRetry(() => import("./pages/Download.tsx"));
 const NotFound = lazyRetry(() => import("./pages/NotFound.tsx"));
@@ -252,6 +253,10 @@ function AppShell() {
                     <Profile />
                   </RequireAuth>
                 }
+              />
+              <Route
+                path="/owner-login"
+                element={<OwnerPremiumLogin />}
               />
               <Route
                 path="/owner"

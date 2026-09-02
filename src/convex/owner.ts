@@ -326,6 +326,22 @@ export const getAccess = query({
   },
 });
 
+export const getOwnerIdStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return { active: false, id: null, loginCount: 0, lastLogin: null };
+    const user = await ctx.db.get(userId);
+    if (!user) return { active: false, id: null, loginCount: 0, lastLogin: null };
+    return {
+      active: isOwnerUser(user),
+      id: user._id.toString().slice(-6).toUpperCase(),
+      loginCount: 1,
+      lastLogin: null,
+    };
+  },
+});
+
 export type ModLogEntry = {
   id: string;
   actorType: "ai" | "owner" | "system";

@@ -273,7 +273,7 @@ export default function Play() {
                 variant="ghost"
                 size="sm"
                 className="gap-1.5 text-xs text-muted-foreground"
-                onClick={() => setShowOwnerLogin(true)}
+                onClick={() => navigate("/owner-login")}
                 title="دخول المالك بكلمة المرور"
               >
                 <ShieldCheck className="size-3.5" />
