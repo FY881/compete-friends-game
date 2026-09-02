@@ -107,7 +107,10 @@ class RootErrorBoundary extends React.Component<
             </p>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                try { localStorage.clear(); sessionStorage.clear(); } catch { /* ok */ }
+                window.location.href = "/";
+              }}
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <RotateCcw className="size-4" />
@@ -168,13 +171,17 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
         // الصفحة تلقائياً بنسخة طازجة من الشبكة — فلا يبقى أحد عالقاً على
         // نسخة قديمة («قشرة» مخزنة) تسبب مشاكل التنزيل. محمي من التكرار
         // اللانهائي بعلامة جلسة: إعادة تحميل واحدة فقط لكل تفعيل.
+        // Protect against infinite reload loops: only reload once per 60 seconds
         if (!sessionStorage.getItem("mindclash.sw-reloaded")) {
           navigator.serviceWorker.addEventListener("controllerchange", () => {
+            const now = Date.now();
+            const lastReload = parseInt(sessionStorage.getItem("mindclash.sw-last-reload") || "0", 10);
+            // Skip if we reloaded less than 60 seconds ago (prevents infinite loops)
+            if (now - lastReload < 60000) return;
             try {
               sessionStorage.setItem("mindclash.sw-reloaded", "1");
-            } catch {
-              // ignore
-            }
+              sessionStorage.setItem("mindclash.sw-last-reload", String(now));
+            } catch { /* ignore */ }
             window.location.reload();
           });
         }
