@@ -293,6 +293,7 @@ function PunishDialog({
     }
   };
 
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -2340,40 +2341,67 @@ export default function Owner() {
     }
   };
 
+  const openReports = dashboard?.openReports ?? 0;
+
   return (
-    <div dir="rtl" className="flex min-h-screen bg-background text-foreground">
+    <div dir="rtl" className="owner-premium flex min-h-screen overflow-hidden">
       {/* ── Sidebar ── */}
       <aside
         className={cn(
-          "sticky top-0 z-40 flex h-screen flex-col border-l border-border/60 bg-card/95 backdrop-blur-sm transition-all duration-300",
-          sidebarOpen ? "w-64" : "w-16",
+          "owner-sidebar-glass sticky top-0 z-40 flex h-screen flex-col transition-all duration-300 ease-out",
+          sidebarOpen ? "w-64" : "w-[68px]",
         )}
       >
-        {/* Sidebar Header */}
-        <div className="flex h-16 items-center justify-between border-b border-border/40 px-4">
-          {sidebarOpen && (
-            <button type="button" onClick={() => navigate("/play")} className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                <ShieldCheck className="size-4" />
+        {/* Sidebar Header — Premium Logo */}
+        <div className="relative flex h-[72px] items-center justify-between px-4">
+          <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-l from-primary via-accent to-primary opacity-60" />
+          {sidebarOpen ? (
+            <button type="button" onClick={() => navigate("/play")} className="flex items-center gap-2.5 transition-transform hover:scale-[1.02]">
+              <span className="relative flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20">
+                <ShieldCheck className="size-4.5" />
+                <span className="absolute -bottom-0.5 -left-0.5 size-2.5 rounded-full border-2 border-[oklch(0.14_0.025_265)] bg-emerald-500 owner-status-live" />
               </span>
-              <span className="text-sm font-bold">غرفة المالك</span>
+              <div className="flex flex-col">
+                <span className="text-[13px] font-bold tracking-tight text-foreground">غرفة المالك</span>
+                <span className="text-[10px] font-medium text-muted-foreground">لوحة التحكم المتقدمة</span>
+              </div>
+            </button>
+          ) : (
+            <button type="button" onClick={() => navigate("/play")} className="mx-auto flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20">
+              <ShieldCheck className="size-4.5" />
             </button>
           )}
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted"
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-white/5 hover:text-foreground"
           >
-            {sidebarOpen ? <ChevronLeft className="size-4" /> : <Menu className="size-4" />}
+            {sidebarOpen ? <ChevronLeft className="size-4 transition-transform" /> : <Menu className="size-4" />}
           </button>
         </div>
 
-        {/* Nav Items */}
-        <nav className="flex-1 overflow-y-auto p-2 space-y-4 scrollbar-thin">
+        {/* Quick Stats (collapsed) */}
+        {!sidebarOpen && (
+          <div className="flex flex-col items-center gap-3 border-b border-white/5 px-2 py-3">
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] font-bold text-primary">{dashboard?.userCount ?? 0}</span>
+              <span className="text-[8px] text-muted-foreground">لاعب</span>
+            </div>
+            {(dashboard?.openReports ?? 0) > 0 && (
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-rose-500">{dashboard?.openReports}</span>
+                <span className="text-[8px] text-muted-foreground">بلاغ</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Nav Items — Premium Dark */}
+        <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-5 scrollbar-thin">
           {filteredGroups.map((group) => (
             <div key={group.label}>
               {sidebarOpen && (
-                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <p className="mb-2 px-2.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/60">
                   {group.label}
                 </p>
               )}
@@ -2388,20 +2416,25 @@ export default function Owner() {
                       type="button"
                       onClick={() => setActiveTab(item.id)}
                       className={cn(
-                        "group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200",
+                        "owner-nav-active group relative flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[12px] font-medium transition-all duration-200",
                         isActive
-                          ? "bg-primary/10 text-primary shadow-sm"
-                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                          ? "bg-primary/12 text-primary shadow-sm shadow-primary/5"
+                          : "text-muted-foreground/70 hover:bg-white/[0.04] hover:text-foreground/90",
                         !sidebarOpen && "justify-center px-0",
                       )}
                     >
-                      <Icon className={cn("size-4 shrink-0 transition-transform group-hover:scale-110", isActive && "text-primary")} />
+                      <Icon
+                        className={cn(
+                          "size-[15px] shrink-0 transition-all duration-200",
+                          isActive ? "text-primary drop-shadow-[0_0_6px_oklch(0.65_0.18_262_/_0.4)]" : "group-hover:scale-110",
+                        )}
+                      />
                       {sidebarOpen && (
                         <>
-                          <span className="flex-1 text-start">{item.label}</span>
+                          <span className="flex-1 text-start leading-tight">{item.label}</span>
                           {badgeCount != null && badgeCount > 0 && (
-                            <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                              {badgeCount}
+                            <span className="flex size-5 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white shadow-sm shadow-rose-500/30">
+                              {badgeCount > 99 ? "99+" : badgeCount}
                             </span>
                           )}
                         </>
@@ -2414,15 +2447,26 @@ export default function Owner() {
           ))}
         </nav>
 
-        {/* Sidebar Footer */}
-        <div className="border-t border-border/40 p-3">
+        {/* Sidebar Footer — Premium Status */}
+        <div className="border-t border-white/5 p-3">
+          {sidebarOpen && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2">
+              <span className="owner-status-live size-2 rounded-full bg-emerald-500" />
+              <span className="text-[10px] font-medium text-muted-foreground">النظام يعمل بشكل طبيعي</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
-            <Badge className="gap-1 rounded-full bg-primary/10 text-[10px] text-primary">
+            <Badge className={cn(
+              "gap-1 rounded-full text-[10px] font-bold",
+              access.isOwner
+                ? "bg-gradient-to-r from-amber-500/15 to-amber-600/10 text-amber-500 border border-amber-500/20"
+                : "bg-primary/10 text-primary border border-primary/20",
+            )}>
               <Crown className="size-2.5" />
-              {access.isOwner ? "مالك" : "مشرف"}
+              {access.isOwner ? "مالك رئيسي" : "مشرف"}
             </Badge>
             {sidebarOpen && (
-              <Button variant="ghost" size="sm" className="ms-auto gap-1 text-[11px]" onClick={() => navigate("/play")}>
+              <Button variant="ghost" size="sm" className="ms-auto gap-1 text-[11px] text-muted-foreground hover:text-foreground" onClick={() => navigate("/play")}>
                 <ArrowLeft className="size-3" />
                 للعبة
               </Button>
@@ -2431,37 +2475,80 @@ export default function Owner() {
         </div>
       </aside>
 
-      {/* ── Main Content ── */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/40 bg-background/80 px-6 backdrop-blur-md">
-          <div className="flex items-center gap-3">
+      {/* ── Main Content Area ── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Premium Top Bar */}
+        <header className="owner-topbar-glass sticky top-0 z-30 flex h-[60px] items-center justify-between px-6">
+          <div className="flex items-center gap-4">
             {!sidebarOpen && (
-              <button type="button" onClick={() => setSidebarOpen(true)} className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted">
+              <button type="button" onClick={() => setSidebarOpen(true)} className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground">
                 <Menu className="size-4" />
               </button>
             )}
-            <h2 className="text-sm font-bold">
-              {NAV_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeTab)?.label ?? "لوحة القيادة"}
-            </h2>
+            <div className="flex flex-col">
+              <h2 className="text-[14px] font-bold tracking-tight">
+                {NAV_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeTab)?.label ?? "لوحة القيادة"}
+              </h2>
+            </div>
           </div>
           <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 rounded-full bg-white/[0.04] px-3 py-1.5">
+              <span className="owner-status-live size-1.5 rounded-full bg-emerald-500" />
+              <span className="text-[10px] font-medium text-muted-foreground">متصل</span>
+            </div>
             <button
               type="button"
               onClick={() => setFocusMode(!focusMode)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all",
-                focusMode ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted",
+                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all duration-200",
+                focusMode
+                  ? "bg-primary/15 text-primary shadow-sm shadow-primary/10"
+                  : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
               )}
             >
               <Focus className="size-3.5" />
-              {focusMode ? "وضع التركيز" : "تركيز"}
+              {focusMode ? "تركيز مفعّل" : "تركيز"}
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("errorhunter")}
+              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
+              title="صياد الأخطاء"
+            >
+              <ShieldCheck className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("sounds")}
+              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
+              title="الصوتيات"
+            >
+              <Music className="size-4" />
+            </button>
+            {openReports > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("reports")}
+                className="relative flex size-8 items-center justify-center rounded-lg text-rose-400 transition-all hover:bg-rose-500/10 hover:text-rose-400"
+                title="بلاغات مفتوحة"
+              >
+                <Flag className="size-4" />
+                <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white">
+                  {openReports > 9 ? "9+" : openReports}
+                </span>
+              </button>
+            )}
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className={cn("p-6 transition-all duration-300", focusMode && "max-w-4xl mx-auto")}>
+        {/* Page Content — Animated Entry */}
+        <main
+          key={activeTab}
+          className={cn(
+            "owner-content-enter flex-1 overflow-y-auto p-6",
+            focusMode && "max-w-5xl mx-auto",
+          )}
+        >
           {renderContent()}
         </main>
       </div>

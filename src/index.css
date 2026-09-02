@@ -189,6 +189,123 @@
   animation: war-slide-up 0.5s ease-out forwards;
 }
 
+/* ═══ حرب العقول — Premium Owner Dashboard Dark Theme ═══ */
+.owner-premium {
+  --owner-bg: oklch(0.11 0.025 265);
+  --owner-surface: oklch(0.15 0.02 265);
+  --owner-surface-hover: oklch(0.19 0.02 265);
+  --owner-border: oklch(1 0 0 / 8%);
+  --owner-border-accent: oklch(0.65 0.18 262 / 20%);
+  --owner-glow: oklch(0.65 0.18 262 / 15%);
+  --owner-gold: oklch(0.78 0.15 75);
+  --owner-gold-dim: oklch(0.78 0.15 75 / 15%);
+  background: var(--owner-bg);
+  color: oklch(0.93 0.005 250);
+}
+
+@keyframes owner-sidebar-glow {
+  0%, 100% { box-shadow: inset 0 0 30px rgba(37,99,235,0.05); }
+  50% { box-shadow: inset 0 0 50px rgba(37,99,235,0.1); }
+}
+@keyframes owner-card-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes owner-metric-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.65 0.18 262 / 0%); }
+  50% { box-shadow: 0 0 0 6px oklch(0.65 0.18 262 / 8%); }
+}
+@keyframes owner-gold-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes owner-nav-indicator {
+  from { transform: scaleX(0); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+@keyframes owner-status-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes owner-content-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.owner-card-animate {
+  animation: owner-card-in 0.4s ease-out both;
+}
+.owner-card-animate:nth-child(2) { animation-delay: 0.05s; }
+.owner-card-animate:nth-child(3) { animation-delay: 0.1s; }
+.owner-card-animate:nth-child(4) { animation-delay: 0.15s; }
+.owner-card-animate:nth-child(5) { animation-delay: 0.2s; }
+.owner-card-animate:nth-child(6) { animation-delay: 0.25s; }
+
+.owner-content-enter {
+  animation: owner-content-in 0.3s ease-out both;
+}
+
+.owner-metric-pulse {
+  animation: owner-metric-pulse 2.5s ease-in-out infinite;
+}
+
+.owner-status-live {
+  animation: owner-status-blink 2s ease-in-out infinite;
+}
+
+.owner-gold-shimmer {
+  background: linear-gradient(90deg, oklch(0.78 0.15 75) 0%, oklch(0.88 0.12 85) 50%, oklch(0.78 0.15 75) 100%);
+  background-size: 200% auto;
+  animation: owner-gold-shimmer 3s linear infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Sidebar premium glassmorphism */
+.owner-sidebar-glass {
+  background: linear-gradient(
+    180deg,
+    oklch(0.14 0.025 265 / 0.95) 0%,
+    oklch(0.12 0.02 265 / 0.98) 100%
+  );
+  backdrop-filter: blur(20px) saturate(1.2);
+  border-left: 1px solid oklch(1 0 0 / 6%);
+}
+
+/* Nav active indicator */
+.owner-nav-active {
+  position: relative;
+}
+.owner-nav-active::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 3px 0 0 3px;
+  background: linear-gradient(180deg, oklch(0.65 0.18 262) 0%, oklch(0.78 0.15 75) 100%);
+  animation: owner-nav-indicator 0.2s ease-out both;
+}
+
+/* Premium stat card hover glow */
+.owner-stat-glow:hover {
+  box-shadow: 0 4px 24px oklch(0.65 0.18 262 / 10%), 0 0 0 1px oklch(0.65 0.18 262 / 15%);
+}
+
+/* Premium top bar glass */
+.owner-topbar-glass {
+  background: linear-gradient(
+    90deg,
+    oklch(0.13 0.02 265 / 0.85) 0%,
+    oklch(0.14 0.022 265 / 0.88) 100%
+  );
+  backdrop-filter: blur(16px) saturate(1.1);
+  border-bottom: 1px solid oklch(1 0 0 / 5%);
+}
+
 /* Smooth scroll for anchor links */
 html {
   scroll-behavior: smooth;
