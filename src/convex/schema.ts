@@ -717,6 +717,27 @@ const schema = defineSchema(
       executedAt: v.number(),
     }).index("by_time", ["executedAt"]),
 
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ Master AI — AI Activity Log ║
+    // ═══════════════════════════════════════════════════════════════════════
+    aiLogs: defineTable({
+      action: v.string(),       // "moderation" | "matchmaking" | "economy" | "analytics" | "achievement" | "auto_fix" | "report"
+      subsystem: v.string(),    // "moderation" | "matchmaking" | "economy" | "analytics" | "reports" | "security" | "commands"
+      message: v.string(),      // Arabic description of what was done
+      severity: v.union(v.literal("info"), v.literal("warning"), v.literal("critical"), v.literal("action")),
+      targetUser: v.optional(v.string()),  // affected user name or ID
+      targetRoom: v.optional(v.string()),  // affected room
+      data: v.optional(v.string()),        // JSON — detailed context
+      auto: v.boolean(),                    // true = AI did it automatically, false = owner command
+      executedBy: v.string(),               // "ai_master" | "owner" | "system"
+      timestamp: v.number(),
+    })
+      .index("by_timestamp", ["timestamp"])
+      .index("by_action", ["action"])
+      .index("by_severity", ["severity"])
+      .index("by_subsystem", ["subsystem"]),
+
     // ═══════════════════════════════════════════════════════════════════════
     // ║ صياد الأخطاء — سجل الأخطاء المُلتقطة ║
     // ═══════════════════════════════════════════════════════════════════════
@@ -751,6 +772,7 @@ const schema = defineSchema(
       .index("by_created", ["createdAt"])
       .index("by_unresolved", ["resolved", "createdAt"]),
 
+
     // ═══════════════════════════════════════════════════════════════════════
     // ║ صياد الأخطاء — أنماط الأخطاء المُتعلّمة ║
     // ═══════════════════════════════════════════════════════════════════════
@@ -764,7 +786,8 @@ const schema = defineSchema(
       successRate: v.number(), // 0-1 — نسبة نجاح الإصلاح التلقائي
       active: v.boolean(),
       createdAt: v.number(),
-    }).index("by_pattern", ["pattern"]),
+    })      .index("by_pattern", ["pattern"]),
+
 
     // ═══════════════════════════════════════════════════════════════════════
     // ║ صياد الأخطاء — مقاييس الأداء ║

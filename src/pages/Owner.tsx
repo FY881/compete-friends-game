@@ -108,6 +108,7 @@ import { AiSystemsTab } from "@/components/AiSystemsTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
 import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
+import MasterAIDashboard from "@/components/owner/MasterAIDashboard";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -2230,6 +2231,7 @@ const NAV_GROUPS = [
       { id: "downloads", icon: Smartphone, label: "التحميل" },
       { id: "settings", icon: Megaphone, label: "الإعدادات" },
       { id: "sounds", icon: Music, label: "الصوتيات" },
+      { id: "masterai", icon: Brain, label: "الذكاء الاصطناعي" },
     ],
   },
 ];
@@ -2334,6 +2336,8 @@ export default function Owner() {
         return <DownloadsTab />;
       case "sounds":
         return <SoundControlPanel />;
+      case "masterai":
+        return <MasterAIDashboard />;
       case "settings":
         return settings ? <SettingsTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
       default:
