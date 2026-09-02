@@ -448,13 +448,27 @@ function diagnoseAdvanced(error: Error): ErrorDiagnosis {
 // ⚡ CASCADING RECOVERY ENGINE
 // ═══════════════════════════════════════════════════════════════════════
 
+/** Check if user is currently in an active game room */
+function isInGameRoom(): boolean {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/game/");
+}
+
+/** Safe reload — skips during active gameplay to prevent game closure */
+function safeReload(): void {
+  if (isInGameRoom()) {
+    console.warn("[ErrorHunter] Skipping reload — user is in active game");
+    return;
+  }
+  safeReload();
+}
+
 const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise<boolean>; priority: number }> = {
   wait_and_retry: {
     name: "انتظار وإعادة المحاولة",
     priority: 1,
     execute: async () => {
       await sleep(2000);
-      window.location.reload();
+      safeReload();
       return true;
     },
   },
@@ -462,7 +476,7 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
     name: "إعادة تحميل ناعمة",
     priority: 2,
     execute: async () => {
-      window.location.reload();
+      safeReload();
       return true;
     },
   },
@@ -476,7 +490,7 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
           await Promise.all(names.map((n) => caches.delete(n)));
         }
         await sleep(500);
-        window.location.reload();
+        safeReload();
         return true;
       } catch { return false; }
     },
@@ -497,7 +511,7 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
           await Promise.all(names.map((n) => caches.delete(n)));
         }
         await sleep(800);
-        window.location.reload();
+        safeReload();
         return true;
       } catch { return false; }
     },
@@ -533,7 +547,7 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
 
         sessionStorage.clear();
         await sleep(800);
-        window.location.reload();
+        safeReload();
         return true;
       } catch { return false; }
     },
@@ -551,7 +565,7 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
         localStorage.clear();
         Object.entries(preserved).forEach(([k, v]) => localStorage.setItem(k, v));
         await sleep(300);
-        window.location.reload();
+        safeReload();
         return true;
       } catch { return false; }
     },
@@ -595,7 +609,7 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
         (window as any).process = { env: {} };
       }
       await sleep(300);
-      window.location.reload();
+      safeReload();
       return true;
     },
   },
@@ -1114,7 +1128,7 @@ export class ErrorHunter extends Component<Props, State> {
     if ("caches" in window) {
       caches.keys().then((n) => Promise.all(n.map((k) => caches.delete(k))));
     }
-    window.location.reload();
+    safeReload();
   };
 
   private handleGoHome = () => { window.location.href = "/play"; };

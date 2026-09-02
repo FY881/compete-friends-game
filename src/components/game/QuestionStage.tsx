@@ -167,25 +167,36 @@ export function QuestionStage({
   // Anti-cheat: leaving the game window during a question is treated as using
   // the internet to look up the answer. The server applies an automatic,
   // escalating punishment (warn → score penalty → ban).
+  //
+  // FIX: Much more tolerant to prevent false positives:
+  // - 5 second delay (was 1.5s) — allows accidental tab switches
+  // - Max 3 detections per game — after that, the player is flagged once
+  // - Only fires during "answering" phase when player hasn't answered yet
+  // - Resets on focus (cancels pending detection)
+  const cheatDetections = useRef(0);
   useEffect(() => {
     if (phase !== "answering" || myAnswer) return;
     if (reportedFor.current === index) return;
+    // Max 3 cheat detections per game — after that, stop checking
+    if (cheatDetections.current >= 3) return;
 
     let timer: ReturnType<typeof setTimeout> | null = null;
     const detect = () => {
       const away = document.hidden || !document.hasFocus();
       if (!away || reportedFor.current === index) return;
-      // Only flag after the player stays away for a moment, to avoid
-      // punishing accidental focus loss (notifications, window drag, …).
+      // 5 second delay — only flag sustained absence (not momentary flickers)
       timer = setTimeout(() => {
         if (reportedFor.current === index) return;
+        // Double-check: if user came back during the 5s, cancel
+        if (!document.hidden && document.hasFocus()) return;
         reportedFor.current = index;
+        cheatDetections.current++;
         recordCheat({ code: g.code })
           .then((result) => {
             if (result) setCheatNotice(result.message);
           })
           .catch(() => undefined);
-      }, 1500);
+      }, 5000);
     };
     const cancel = () => {
       if (timer) {
