@@ -405,13 +405,52 @@ const schema = defineSchema(
         v.literal("image"),
         v.literal("poll"),
         v.literal("system"),
+        v.literal("voice"),
+        v.literal("forward"),
       ),
       pinned: v.boolean(),
       deleted: v.boolean(),
       reactions: v.array(v.object({ emoji: v.string(), userId: v.id("users") })),
       replyTo: v.optional(v.string()),
+      forwardFrom: v.optional(v.object({
+        senderName: v.string(),
+        roomName: v.string(),
+        originalContent: v.string(),
+      })),
+      edited: v.optional(v.boolean()),
+      editedAt: v.optional(v.number()),
+      bookmarked: v.optional(v.boolean()),
+      mentionIds: v.optional(v.array(v.id("users"))),
+      moderationStatus: v.optional(v.union(
+        v.literal("passed"),
+        v.literal("flagged"),
+        v.literal("blocked"),
+      )),
+      moderationReason: v.optional(v.string()),
       createdAt: v.number(),
     }).index("by_room", ["roomId"]).index("by_sender", ["senderId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ مؤشرات الكتابة (حية) ║
+    // ═══════════════════════════════════════════════════════════════════════
+    typingStatus: defineTable({
+      roomId: v.id("chatRooms"),
+      userId: v.id("users"),
+      userName: v.string(),
+      typingUntil: v.number(),
+    }).index("by_room", ["roomId"]).index("by_user_room", ["userId", "roomId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ الرسائل المحفوظة / المفضلة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    savedMessages: defineTable({
+      userId: v.id("users"),
+      messageId: v.id("chatMessages"),
+      roomId: v.id("chatRooms"),
+      content: v.string(),
+      senderName: v.string(),
+      savedAt: v.number(),
+    }).index("by_user", ["userId"]).index("by_user_message", ["userId", "messageId"]),
 
     // ═══════════════════════════════════════════════════════════════════════
     // ║ الإشعارات الفورية ║
