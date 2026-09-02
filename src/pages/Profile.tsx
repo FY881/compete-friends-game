@@ -540,12 +540,60 @@ export default function Profile() {
           <MembershipCard />
         </div>
 
+        {/* ════ الإنجازات ════ */}
+        <div className="mt-10">
+          <ProfileAchievements />
+        </div>
+
         {/* ════ الإعدادات ════ */}
         <div className="mt-10">
           <h2 className="text-lg font-bold mb-4">الإعدادات</h2>
           <DarkModeToggle />
         </div>
       </main>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROFILE ACHIEVEMENTS
+// ═══════════════════════════════════════════════════════════════
+
+function ProfileAchievements() {
+  const achievements = useQuery(api.seasons.getPlayerAchievements);
+  if (!achievements) return null;
+
+  const earnedCount = achievements.filter((a: any) => a.earned).length;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold">الإنجازات</h2>
+        <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+          {earnedCount}/{achievements.length}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {achievements.map((a: any) => (
+          <div
+            key={a.id}
+            className={`relative flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition-all ${
+              a.earned
+                ? "border-yellow-400/40 bg-yellow-500/5"
+                : "border-border/40 bg-card/30 opacity-40 grayscale"
+            }`}
+          >
+            <span className="text-2xl">{a.icon}</span>
+            <p className="text-[11px] font-bold leading-tight">{a.name}</p>
+            <p className="text-[9px] text-muted-foreground leading-snug">{a.desc}</p>
+            {a.earned && (
+              <span className="absolute -top-1 -left-1 flex size-4 items-center justify-center rounded-full bg-yellow-400 text-[8px] text-black font-bold">
+                ✓
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -881,6 +881,9 @@ export default function Play() {
         {/* ── Leaderboard ── */}
         <LeaderboardSection />
 
+        {/* ── Achievements ── */}
+        <AchievementsSection />
+
         {/* ── Laws reminder ────────────────────────────────────── */}
         <section className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-border/80 bg-card p-6">
           <div className="flex items-start gap-3">
@@ -1339,6 +1342,65 @@ function LeaderboardSection() {
             </div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ACHIEVEMENTS SECTION
+// ═══════════════════════════════════════════════════════════════
+
+function AchievementsSection() {
+  const achievements = useQuery(api.seasons.getPlayerAchievements);
+  if (!achievements) return null;
+
+  const earnedCount = achievements.filter((a: any) => a.earned).length;
+  const totalCount = achievements.length;
+  const progress = totalCount > 0 ? (earnedCount / totalCount) * 100 : 0;
+
+  return (
+    <section className="mt-8">
+      <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🏅</span>
+          <h3 className="text-lg font-bold">الإنجازات</h3>
+        </div>
+        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+          {earnedCount}/{totalCount}
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-5 h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-primary to-yellow-400 transition-all duration-700"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      {/* Achievement grid */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {achievements.map((a: any) => (
+          <div
+            key={a.id}
+            className={`relative flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition-all ${
+              a.earned
+                ? "border-yellow-400/40 bg-yellow-500/5 shadow-md shadow-yellow-500/10"
+                : "border-border/50 bg-card/50 opacity-50 grayscale"
+            }`}
+          >
+            <span className="text-3xl">{a.icon}</span>
+            <p className="text-xs font-bold leading-tight">{a.name}</p>
+            <p className="text-[10px] leading-snug text-muted-foreground">{a.desc}</p>
+            {a.earned && (
+              <span className="absolute -top-1.5 -left-1.5 flex size-5 items-center justify-center rounded-full bg-yellow-400 text-[10px] text-black">
+                ✓
+              </span>
+            )}
+            <span className="text-[10px] font-bold text-primary">+{a.xpReward} XP</span>
+          </div>
+        ))}
       </div>
     </section>
   );
