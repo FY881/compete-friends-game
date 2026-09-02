@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -70,10 +71,10 @@ export const createSeason = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("غير مصرح");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("غير مصرح");
 
-    const user = await ctx.db.get(identity.subject as any);
+    const user = await ctx.db.get(userId);
     if (!user || (user as Record<string, unknown>).role !== "admin") {
       throw new Error("غير مصرح");
     }
@@ -120,10 +121,10 @@ const ALL_ACHIEVEMENTS = [
 export const getPlayerAchievements = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
-    const user = await ctx.db.get(identity.subject as any);
+    const user = await ctx.db.get(userId);
     if (!user) return [];
 
     const earned = ((user as Record<string, unknown>).achievements as string[]) ?? [];
@@ -146,10 +147,8 @@ export const recordGameCompletion = mutation({
     isPerfect: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-
-    const userId = identity.subject as any;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
     const user = await ctx.db.get(userId);
     if (!user) return null;
 
