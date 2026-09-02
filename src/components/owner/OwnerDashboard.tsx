@@ -82,7 +82,7 @@ function StatCard({
   pulse?: boolean;
 }) {
   return (
-    <Card className="owner-card-animate owner-stat-glow group relative overflow-hidden border-white/[0.06] bg-white/[0.02] backdrop-blur-sm transition-all duration-300 hover:border-white/[0.12] hover:shadow-lg hover:shadow-primary/5">
+    <Card className="group relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm transition-all duration-300 hover:border-border hover:shadow-lg hover:shadow-primary/5">
       <div
         className={cn(
           "absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100",
@@ -282,7 +282,9 @@ function QuickAction({
     <button
       type="button"
       onClick={onClick}
-      className="owner-card-animate owner-stat-glow group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 transition-all duration-200 hover:border-white/[0.12] hover:shadow-md"
+      className={cn(
+        "group flex items-center gap-3 rounded-xl border border-border/50 bg-card/80 p-3 transition-all duration-200 hover:border-border hover:shadow-md",
+      )}
     >
       <div
         className={cn(
@@ -347,12 +349,9 @@ export function OwnerDashboard({
   return (
     <div className="space-y-6">
       {/* ── Welcome + AI Status ── */}
-      <div className="owner-card-animate flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight">مرحباً بك في لوحة التحكم 🎯</h2>
-          <p className="mt-1 text-xs text-muted-foreground">نظرة عامة على حالة النظام والنشاط الحالي</p>
-        </div>
-        <div className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <AiStatusBadge enabled={dashboard.aiEnabled} autoApply={dashboard.aiAutoApply} />
+        <div className="flex items-center gap-3">
         <AiStatusBadge enabled={dashboard.aiEnabled} autoApply={dashboard.aiAutoApply} />
         <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground" onClick={() => setRefreshKey((k) => k + 1)}>
           <RefreshCw className="size-3.5" />
@@ -442,7 +441,7 @@ export function OwnerDashboard({
       {/* ── Two Column: Activity + System Status ── */}
       <div className="grid gap-4 lg:grid-cols-5">
         {/* Recent Activity */}
-        <Card className="owner-card-animate lg:col-span-3 border-white/[0.06] bg-white/[0.02]">
+        <Card className="lg:col-span-3 border-border/50 bg-card/80">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="flex items-center gap-2 text-sm font-bold">
@@ -468,7 +467,7 @@ export function OwnerDashboard({
         </Card>
 
         {/* System Status */}
-        <Card className="owner-card-animate lg:col-span-2 border-white/[0.06] bg-white/[0.02]">
+        <Card className="lg:col-span-2 border-border/50 bg-card/80">
           <CardContent className="p-5">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-bold">
               <Sparkles className="size-4 text-primary" />
