@@ -793,6 +793,25 @@ export class ErrorHunter extends Component<Props, State> {
   }
 
   private async startRecovery(diagnosis: ErrorDiagnosis) {
+    // ════════════════════════════════════════════════════════════════════
+    // CRITICAL: On page routes (/play, /profile, /rooms, etc.),
+    // NEVER auto-recover. Auto-recovery causes infinite reload loops
+    // because the same error persists after reload. Only show the error
+    // screen and let the user manually decide.
+    // Auto-recovery is ONLY allowed in game rooms (/game/*).
+    // ════════════════════════════════════════════════════════════════════
+    const isPageRoute = !isInGameRoom();
+    if (isPageRoute) {
+      this.setState({
+        healing: false,
+        healingResult: null,
+        healingMessage: "",
+        healingSteps: [],
+      });
+      this.addTimeline("system_action", "تعطيل الإصلاح التلقائي — الصفحة الرئيسية لا تُعاد تحميل تلقائياً");
+      return;
+    }
+
     const strategies = diagnosis.recoveryStrategies
       .map((s) => ({ key: s, ...RECOVERY_STRATEGIES[s] }))
       .filter((s) => s.execute)
