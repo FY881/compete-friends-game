@@ -83,7 +83,7 @@ import {
   Users,
   X,
   Zap,
-  ChevronLeft,
+  Focus,
 } from "lucide-react";
 // Menu + Focus imported above via separate import
 import { useNavigate } from "react-router";
@@ -101,7 +101,6 @@ import { OwnerDashboard } from "@/components/owner/OwnerDashboard";
 import { AdvancedPlayersTab } from "@/components/owner/AdvancedPlayersTab";
 import { ReportsInbox } from "@/components/owner/ReportsInbox";
 import MembershipAdmin from "@/components/owner/MembershipAdmin";
-import { Menu, Focus } from "lucide-react";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 import { AiSystemsTab } from "@/components/AiSystemsTab";
@@ -2244,7 +2243,7 @@ export default function Owner() {
   const settings = useQuery(api.owner.getSettings);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [focusMode, setFocusMode] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
 
   if (access === undefined) {
     return (
@@ -2351,123 +2350,32 @@ export default function Owner() {
   const openReports = dashboard?.openReports ?? 0;
 
   return (
-    <div dir="rtl" className="flex min-h-screen bg-background text-foreground">
-      {/* ── Sidebar ── */}
-      <aside
-        className={cn(
-          "sticky top-0 z-40 flex h-screen flex-col border-l border-border/50 bg-card/95 backdrop-blur-sm transition-all duration-300",
-          sidebarOpen ? "w-64" : "w-16",
-        )}
-      >
-        {/* Sidebar Header — Premium Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-border/40 px-4">
-          {sidebarOpen && (
+    <div dir="rtl" className="min-h-screen bg-background text-foreground">
+      {/* ════════════════════════════════════════════════════════════════
+       * TOP BAR — Logo + Quick Actions
+       * ════════════════════════════════════════════════════════════════ */}
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-card/95 backdrop-blur-xl">
+        <div className="flex h-14 items-center justify-between px-5">
+          {/* Left: Logo */}
+          <div className="flex items-center gap-3">
             <button type="button" onClick={() => navigate("/play")} className="flex items-center gap-2.5 transition-transform hover:scale-[1.02]">
               <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/10">
                 <ShieldCheck className="size-[18px]" />
               </span>
-              <div className="flex flex-col">
+              <div className="hidden sm:flex flex-col">
                 <span className="text-[13px] font-bold tracking-tight text-foreground">غرفة المالك</span>
                 <span className="text-[10px] text-muted-foreground">لوحة التحكم</span>
               </div>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted"
-          >
-            {sidebarOpen ? <ChevronLeft className="size-4" /> : <Menu className="size-4" />}
-          </button>
-        </div>
-
-        {/* Quick Stats (collapsed) */}
-        {/* Nav Items */}
-        <nav className="flex-1 overflow-y-auto p-2 space-y-4 scrollbar-thin">
-          {filteredGroups.map((group) => (
-            <div key={group.label}>
-              {sidebarOpen && (
-                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  {group.label}
-                </p>
-              )}
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  const badgeCount = item.id === "reports" ? dashboard?.openReports : undefined;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setActiveTab(item.id)}
-                      className={cn(
-                        "group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200",
-                        isActive
-                          ? "bg-primary/10 text-primary shadow-sm"
-                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                        !sidebarOpen && "justify-center px-0",
-                      )}
-                    >
-                      <Icon className={cn("size-4 shrink-0 transition-transform group-hover:scale-110", isActive && "text-primary")} />
-                      {sidebarOpen && (
-                        <>
-                          <span className="flex-1 text-start">{item.label}</span>
-                          {badgeCount != null && badgeCount > 0 && (
-                            <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                              {badgeCount}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
-
-        {/* Sidebar Footer — Premium Status */}
-        <div className="border-t border-border/40 p-3">
-          <div className="flex items-center gap-2">
-            <Badge className="gap-1 rounded-full bg-primary/10 text-[10px] text-primary">
-              <Crown className="size-2.5" />
-              {access.isOwner ? "مالك" : "مشرف"}
-            </Badge>
-            {sidebarOpen && (
-              <Button variant="ghost" size="sm" className="ms-auto gap-1 text-[11px]" onClick={() => navigate("/play")}>
-                <ArrowLeft className="size-3" />
-                للعبة
-              </Button>
-            )}
           </div>
-        </div>
-      </aside>
 
-      {/* ── Main Content Area ── */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/40 bg-background/80 px-6 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            {!sidebarOpen && (
-              <button type="button" onClick={() => setSidebarOpen(true)} className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted">
-                <Menu className="size-4" />
-              </button>
-            )}
-            <h2 className="text-sm font-bold">
-              {NAV_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeTab)?.label ?? "لوحة القيادة"}
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab("sounds")}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted"
-              title="الصوتيات"
-            >
-              <Music className="size-4" />
-            </button>
+          {/* Center: Active Tab Title */}
+          <h2 className="absolute left-1/2 -translate-x-1/2 text-sm font-bold text-foreground">
+            {NAV_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeTab)?.label ?? "لوحة القيادة"}
+          </h2>
+
+          {/* Right: Quick Actions */}
+          <div className="flex items-center gap-1.5">
             {openReports > 0 && (
               <button
                 type="button"
@@ -2491,6 +2399,14 @@ export default function Owner() {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab("sounds")}
+              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted"
+              title="الصوتيات"
+            >
+              <Music className="size-4" />
+            </button>
+            <button
+              type="button"
               onClick={() => setFocusMode(!focusMode)}
               className={cn(
                 "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all",
@@ -2498,16 +2414,79 @@ export default function Owner() {
               )}
             >
               <Focus className="size-3.5" />
-              {focusMode ? "وضع التركيز" : "تركيز"}
+              <span className="hidden sm:inline">{focusMode ? "تركيز" : "تركيز"}</span>
             </button>
+            <Badge className="hidden sm:flex gap-1 rounded-full bg-primary/10 text-[10px] text-primary">
+              <Crown className="size-2.5" />
+              {access.isOwner ? "مالك" : "مشرف"}
+            </Badge>
+            <Button variant="ghost" size="sm" className="hidden sm:flex gap-1 text-[11px]" onClick={() => navigate("/play")}>
+              <ArrowLeft className="size-3" />
+              للعبة
+            </Button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Page Content */}
-        <main className={cn("p-6 transition-all duration-300", focusMode && "max-w-4xl mx-auto")}>
-          {renderContent()}
-        </main>
-      </div>
+      {/* ════════════════════════════════════════════════════════════════
+       * HORIZONTAL TABS — Chrome-style grouped tabs
+       * ════════════════════════════════════════════════════════════════ */}
+      <nav className="sticky top-14 z-40 border-b border-border/40 bg-card/80 backdrop-blur-md">
+        <div className="flex overflow-x-auto scrollbar-none px-4">
+          {filteredGroups.map((group, gi) => (
+            <div key={group.label} className="flex items-center shrink-0">
+              {/* Group separator */}
+              {gi > 0 && <div className="mx-2 h-6 w-px bg-border/40" />}
+
+              {/* Group label */}
+              <span className="ms-3 me-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 whitespace-nowrap">
+                {group.label}
+              </span>
+
+              {/* Group items */}
+              <div className="flex items-center gap-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  const badgeCount = item.id === "reports" ? dashboard?.openReports : undefined;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActiveTab(item.id)}
+                      className={cn(
+                        "group relative flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-[11px] font-medium transition-all duration-200",
+                        isActive
+                          ? "bg-primary/10 text-primary shadow-sm shadow-primary/5"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      )}
+                    >
+                      <Icon className={cn("size-3.5 shrink-0 transition-transform group-hover:scale-110", isActive && "text-primary")} />
+                      <span>{item.label}</span>
+                      {badgeCount != null && badgeCount > 0 && (
+                        <span className="flex size-4 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white">
+                          {badgeCount > 9 ? "9+" : badgeCount}
+                        </span>
+                      )}
+                      {/* Active indicator bar */}
+                      {isActive && (
+                        <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </nav>
+
+      {/* ════════════════════════════════════════════════════════════════
+       * MAIN CONTENT AREA
+       * ════════════════════════════════════════════════════════════════ */}
+      <main className={cn("p-4 sm:p-6 transition-all duration-300", focusMode && "max-w-4xl mx-auto")}>
+        {renderContent()}
+      </main>
     </div>
   );
 }
