@@ -1118,54 +1118,116 @@ function AiCoachSection() {
 }
 
 // ── Notifications Bell ──────────────────────────────────────
+/** Color-coded notification bell — colors indicate severity/type */
 function NotificationsBell() {
   const notifications = useQuery(api.playerControl.getMyNotifications);
   const markRead = useMutation(api.playerControl.markNotificationRead);
   const [open, setOpen] = useState(false);
 
   const unreadCount = notifications?.filter((n: any) => !n.read).length ?? 0;
-  const typeIcon: Record<string, string> = { info: "ℹ️", warning: "⚠️", ban: "🚫", update: "📢", system: "⚙️" };
+
+  // Color mapping: green=info, blue=system/update, orange=warning, red=ban, purple=needs review
+  const TYPE_CONFIG: Record<string, { icon: string; color: string; bgColor: string; border: string }> = {
+    info:    { icon: "ℹ️", color: "text-emerald-600", bgColor: "bg-emerald-500", border: "border-l-emerald-400" },
+    warning: { icon: "⚠️", color: "text-orange-600", bgColor: "bg-orange-500", border: "border-l-orange-400" },
+    ban:     { icon: "🚫", color: "text-red-600", bgColor: "bg-red-500", border: "border-l-red-500" },
+    update:  { icon: "📢", color: "text-blue-600", bgColor: "bg-blue-500", border: "border-l-blue-400" },
+    system:  { icon: "⚙️", color: "text-violet-600", bgColor: "bg-violet-500", border: "border-l-violet-400" },
+  };
+
+  // Determine dominant badge color based on highest-severity unread
+  const getBadgeColor = () => {
+    const unread = notifications?.filter((n: any) => !n.read) ?? [];
+    if (unread.some((n: any) => n.type === "ban")) return "bg-red-500";
+    if (unread.some((n: any) => n.type === "warning")) return "bg-orange-500";
+    if (unread.some((n: any) => n.type === "update")) return "bg-blue-500";
+    if (unread.some((n: any) => n.type === "system")) return "bg-violet-500";
+    return "bg-emerald-500";
+  };
+
+  const handleMarkAllRead = async () => {
+    const unread = notifications?.filter((n: any) => !n.read) ?? [];
+    for (const n of unread) {
+      await markRead({ notificationId: n._id });
+    }
+  };
 
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className="relative flex size-9 items-center justify-center rounded-xl hover:bg-muted transition-colors"
+        className="relative flex size-9 items-center justify-center rounded-xl hover:bg-muted transition-all active:scale-95"
       >
-        🔔
+        <span className={`text-sm ${unreadCount > 0 ? getBadgeColor().replace('bg-', 'text-') : ''}`}>🔔</span>
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -left-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          <span className={`absolute -top-0.5 -left-0.5 flex min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white shadow-lg ${getBadgeColor()}`}>
+            {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-2 z-50 w-80 max-h-96 overflow-y-auto rounded-2xl border bg-card shadow-xl">
-          <div className="sticky top-0 border-b bg-card px-4 py-2.5 flex items-center justify-between">
-            <h3 className="text-sm font-bold">الإشعارات</h3>
-            <button onClick={() => setOpen(false)} className="text-xs text-muted-foreground">✕</button>
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-50 mt-2 w-80 max-h-96 overflow-hidden rounded-2xl border bg-card shadow-2xl" dir="rtl">
+            {/* Header */}
+            <div className="sticky top-0 border-b bg-card px-4 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold">🔔 الإشعارات</span>
+                {unreadCount > 0 && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white ${getBadgeColor()}`}>{unreadCount}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                {unreadCount > 0 && (
+                  <button type="button" onClick={handleMarkAllRead} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                    ✅ قراءة الكل
+                  </button>
+                )}
+                <button type="button" onClick={() => setOpen(false)} className="rounded p-1 text-muted-foreground hover:text-foreground">✕</button>
+              </div>
+            </div>
+
+            {/* Color legend */}
+            <div className="flex items-center gap-3 border-b px-4 py-1.5">
+              {Object.entries(TYPE_CONFIG).map(([key, cfg]) => (
+                <div key={key} className="flex items-center gap-1">
+                  <span className={`size-1.5 rounded-full ${cfg.bgColor}`} />
+                  <span className="text-[9px] text-muted-foreground">{cfg.icon}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Notifications list */}
+            <div className="overflow-y-auto max-h-72">
+              {!notifications || notifications.length === 0 ? (
+                <p className="py-6 text-center text-xs text-muted-foreground">لا توجد إشعارات</p>
+              ) : (
+                notifications.slice(0, 20).map((n: any) => {
+                  const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
+                  return (
+                    <button
+                      key={n._id}
+                      type="button"
+                      onClick={() => { if (!n.read) markRead({ notificationId: n._id }); }}
+                      className={`w-full text-right flex items-start gap-2.5 border-b border-border/20 border-r-2 ${cfg.border} px-4 py-2.5 transition-colors ${n.read ? "opacity-50" : "bg-muted/10 hover:bg-muted/30"}`}
+                    >
+                      <span className="text-sm mt-0.5 shrink-0">{cfg.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-bold truncate">{n.title}</p>
+                          {!n.read && <span className={`size-1.5 rounded-full shrink-0 ${cfg.bgColor}`} />}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5 leading-relaxed">{n.body}</p>
+                        <p className="text-[9px] text-muted-foreground/50 mt-0.5">{new Date(n.createdAt).toLocaleDateString("ar", { hour: "2-digit", minute: "2-digit" })}</p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
-          <div className="p-2">
-            {!notifications || notifications.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">لا توجد إشعارات</p>
-            ) : (
-              notifications.slice(0, 20).map((n: any) => (
-                <button
-                  key={n._id}
-                  onClick={() => { if (!n.read) markRead({ notificationId: n._id }); }}
-                  className={`w-full text-right flex items-start gap-2 rounded-xl p-2.5 transition-colors ${n.read ? "opacity-60" : "bg-primary/5 hover:bg-primary/10"}`}
-                >
-                  <span className="text-sm mt-0.5">{typeIcon[n.type] || "ℹ️"}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold truncate">{n.title}</p>
-                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">{n.body}</p>
-                  </div>
-                  {!n.read && <div className="size-2 rounded-full bg-primary shrink-0 mt-1" />}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

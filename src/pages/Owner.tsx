@@ -109,6 +109,7 @@ import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
 import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
 import MasterAIDashboard from "@/components/owner/MasterAIDashboard";
+import { LawEnforcementTab } from "@/components/owner/LawEnforcementTab";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -2308,6 +2309,8 @@ export default function Owner() {
         return <MembershipAdmin />;
       case "ai":
         return settings ? <AiTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
+      case "lawenforcement":
+        return <LawEnforcementTab />;
       case "aiadmin":
         return settings ? <AdminAiTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
       case "aicontrol":
