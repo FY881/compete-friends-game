@@ -459,7 +459,7 @@ function safeReload(): void {
     console.warn("[ErrorHunter] Skipping reload — user is in active game");
     return;
   }
-  safeReload();
+  window.location.reload();
 }
 
 const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise<boolean>; priority: number }> = {
@@ -574,6 +574,7 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
     name: "إعادة تحميل قوية ( bypass cache)",
     priority: 4,
     execute: async () => {
+      if (isInGameRoom()) { console.warn("[ErrorHunter] Skipping hard_reload in game"); return false; }
       window.location.href = window.location.href + (window.location.href.includes("?") ? "&" : "?") + "_r=" + Date.now();
       return true;
     },
@@ -582,8 +583,8 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
     name: "♻️ إعادة تحميل نووية",
     priority: 6,
     execute: async () => {
+      if (isInGameRoom()) { console.warn("[ErrorHunter] Skipping nuclear_reload in game"); return false; }
       try {
-        // Clear everything
         if ("caches" in window) {
           const names = await caches.keys();
           await Promise.all(names.map((n) => caches.delete(n)));
@@ -593,7 +594,6 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
             Promise.all(regs.map((r) => r.unregister()))
           );
         }
-        // Force navigation with cache-bust
         window.location.replace(
           window.location.pathname + "?_nuclear=" + Date.now()
         );
@@ -617,6 +617,7 @@ const RECOVERY_STRATEGIES: Record<string, { name: string; execute: () => Promise
     name: "إعادة المصادقة",
     priority: 3,
     execute: async () => {
+      if (isInGameRoom()) { console.warn("[ErrorHunter] Skipping re_auth in game"); return false; }
       try {
         localStorage.removeItem("convex-auth:refreshToken");
         localStorage.removeItem("convex-auth:accessToken");
@@ -795,15 +796,19 @@ export async function reportErrorToHunter(
 // ═══════════════════════════════════════════════════════════════════════
 
 let perfInterval: ReturnType<typeof setInterval> | null = null;
+let fpsRafId: number | null = null;
+let perfStopped = false;
 let fpsSamples: number[] = [];
 
 export function startPerformanceMonitor() {
   if (perfInterval) return;
+  perfStopped = false;
 
   let lastFrameTime = performance.now();
   let frameCount = 0;
 
   function measureFps() {
+    if (perfStopped) return; // Stop the RAF chain
     frameCount++;
     const now = performance.now();
     if (now - lastFrameTime >= 1000) {
@@ -813,9 +818,9 @@ export function startPerformanceMonitor() {
       frameCount = 0;
       lastFrameTime = now;
     }
-    requestAnimationFrame(measureFps);
+    fpsRafId = requestAnimationFrame(measureFps);
   }
-  requestAnimationFrame(measureFps);
+  fpsRafId = requestAnimationFrame(measureFps);
 
   perfInterval = setInterval(() => {
     if (!convexClient) return;
@@ -862,6 +867,11 @@ export function startPerformanceMonitor() {
 }
 
 export function stopPerformanceMonitor() {
+  perfStopped = true;
+  if (fpsRafId !== null) {
+    cancelAnimationFrame(fpsRafId);
+    fpsRafId = null;
+  }
   if (perfInterval) {
     clearInterval(perfInterval);
     perfInterval = null;
