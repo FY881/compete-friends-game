@@ -46,6 +46,12 @@ import {
   Zap, Timer, Coffee, Moon, Star,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
+import {
+  ANSWER_MS,
+  DURATION_MODE_OFF,
+  DURATION_OPTIONS,
+  formatDurationLabel,
+} from "@/lib/game-config";
 
 const NICKNAME_KEY = "mindclash.nickname";
 
@@ -100,6 +106,9 @@ export default function Play() {
   const [joining, setJoining] = useState(false);
   const [downloadingApk, setDownloadingApk] = useState(false);
   const [showOwnerLogin, setShowOwnerLogin] = useState(false);
+  // «مدة الجولة» at room creation: classic (by question count) or a timed
+  // match (5/10/15 دقائق — the round runs on the clock until time runs out).
+  const [roundDuration, setRoundDuration] = useState<number>(DURATION_MODE_OFF);
 
   const persistNickname = (value: string) => {
     setNickname(value);
@@ -164,7 +173,19 @@ export default function Play() {
     setCreating(true);
     try {
       syncAccountName(nickname);
-      const { code: roomCode } = await createGame({ name: nickname.trim() });
+      const settings =
+        roundDuration > 0
+          ? {
+              questionCount: 5,
+              timePerQuestionMs: ANSWER_MS,
+              categories: [],
+              durationMinutes: roundDuration,
+            }
+          : undefined;
+      const { code: roomCode } = await createGame({
+        name: nickname.trim(),
+        settings,
+      });
       navigate(`/game/${roomCode}`);
     } catch (error) {
       console.error(error);
@@ -437,6 +458,58 @@ export default function Play() {
                 مطابقة ذكية
               </Button>
             </motion.div>
+
+            {/* مدة الجولة — حددها قبل إنشاء الغرفة */}
+            <motion.div
+              variants={fadeUp}
+              className="mt-6 rounded-2xl border border-primary/15 bg-card/70 p-4 shadow-sm backdrop-blur-sm"
+            >
+              <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                <Timer className="size-3.5 text-primary" />
+                مدة الجولة
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={creating || banned}
+                  onClick={() => setRoundDuration(DURATION_MODE_OFF)}
+                  className={cn(
+                    "rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all",
+                    roundDuration === DURATION_MODE_OFF
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-border/80 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  كلاسيك (عدد الأسئلة)
+                </button>
+                {DURATION_OPTIONS.map((minutes) => (
+                  <button
+                    key={minutes}
+                    type="button"
+                    disabled={creating || banned}
+                    onClick={() => setRoundDuration(minutes)}
+                    className={cn(
+                      "flex items-center gap-1 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all",
+                      roundDuration === minutes
+                        ? "border-amber-500 bg-amber-500 text-white shadow-sm"
+                        : "border-amber-500/40 bg-amber-500/5 text-amber-700 hover:border-amber-500/70 hover:text-amber-600",
+                    )}
+                    title="مباراة بالوقت — تنتهي بانتهاء المدة مهما كان عدد الأسئلة"
+                  >
+                    <span className="text-[11px] leading-none">⏱</span>
+                    {formatDurationLabel(minutes)}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                {roundDuration === DURATION_MODE_OFF
+                  ? "«كلاسيك»: تنتهي الجولة بعد عدد الأسئلة المحدد (5 افتراضياً)."
+                  : `مباراة بالوقت — ${formatDurationLabel(
+                      roundDuration,
+                    )}: تنساب الأسئلة تلقائياً وتنتهي المباراة بانتهاء المدة، وكلما كانت إجاباتك أسرع زاد عدد الأسئلة.`}
+              </p>
+            </motion.div>
+
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-2">
                 <Users className="size-4 text-primary" />

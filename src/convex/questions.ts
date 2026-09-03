@@ -1,11 +1,8 @@
 export type Difficulty = "easy" | "medium" | "hard";
 
-export type Question = {
-  id: string;
-  category: string;
-  difficulty: Difficulty;
-  question: string;
-  options: [string, string, string, string
+export type Question = { id: string; category: string; difficulty: Difficulty; question: string; options: [string, string, string, string]; correctIndex: 0 | 1 | 2 | 3 }
+
+export const EXTRA_QUESTIONS: Question[] = [
 
   // ── بنك الأسئلة الأساسي (q001 – q320) ────────────────────────────────
 
