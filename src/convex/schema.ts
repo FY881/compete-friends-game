@@ -829,6 +829,56 @@ const schema = defineSchema(
       diagnostics: v.optional(v.string()), // JSON — تشخيصات مفصلة
       updatedAt: v.number(),
     }).index("by_key", ["key"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ مركز التقدم — المهام والمعالم المستلمة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    questClaims: defineTable({
+      userId: v.id("users"),
+      kind: v.union(v.literal("daily"), v.literal("weekly"), v.literal("milestone")),
+      periodKey: v.string(), // يوم / أسبوع / معرف المعلم
+      questId: v.string(),
+      claimedAt: v.number(),
+    })
+      .index("by_user_kind_period", ["userId", "kind", "periodKey"])
+      .index("by_user", ["userId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ مركز التقدم — الأسئلة المفضلة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    favorites: defineTable({
+      userId: v.id("users"),
+      questionId: v.string(),
+      addedAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_question", ["userId", "questionId"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ مركز التقدم — الدعوات ║
+    // ═══════════════════════════════════════════════════════════════════════
+    referrals: defineTable({
+      userId: v.id("users"),
+      code: v.string(),
+      appliedBy: v.array(v.id("users")),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_code", ["code"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ مركز التقدم — إعدادات اللاعب ║
+    // ═══════════════════════════════════════════════════════════════════════
+    playerSettings: defineTable({
+      userId: v.id("users"),
+      soundEnabled: v.boolean(),
+      musicEnabled: v.boolean(),
+      motionLevel: v.union(v.literal("full"), v.literal("reduced"), v.literal("off")),
+      notificationsEnabled: v.boolean(),
+      theme: v.union(v.literal("system"), v.literal("light"), v.literal("dark")),
+      equippedTitle: v.optional(v.string()),
+      updatedAt: v.number(),
+    }).index("by_user", ["userId"]),
   },
   {
     schemaValidation: false,

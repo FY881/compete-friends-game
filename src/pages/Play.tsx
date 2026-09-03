@@ -42,6 +42,7 @@ import {
   Swords,
   Trophy,
   Users,
+  Award,
   Zap, Timer, Coffee, Moon, Star,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
@@ -249,6 +250,12 @@ export default function Play() {
           </button>
 
           <div className="flex items-center gap-2.5">
+            <Button asChild variant="ghost" size="sm" className="gap-1.5 text-primary">
+              <Link to="/hub">
+                <Award className="size-3.5" />
+                <span className="hidden lg:inline">مركز التقدم</span>
+              </Link>
+            </Button>
             <NotificationsBell />
             <Button asChild variant="ghost" size="sm" className="gap-1.5">
               <Link to="/download">

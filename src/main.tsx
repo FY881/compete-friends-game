@@ -32,6 +32,7 @@ const Download = lazyRetry(() => import("./pages/Download.tsx"));
 const NotFound = lazyRetry(() => import("./pages/NotFound.tsx"));
 const MiniGames = lazyRetry(() => import("./pages/MiniGames.tsx"));
 const ChatRooms = lazyRetry(() => import("./pages/ChatRooms.tsx"));
+const Hub = lazyRetry(() => import("./pages/Hub.tsx"));
 
 // Simple loading fallback for route transitions — all Arabic
 function RouteLoading() {
@@ -281,6 +282,14 @@ function AppShell() {
                 element={
                   <RequireAuth>
                     <ChatRooms />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/hub"
+                element={
+                  <RequireAuth>
+                    <Hub />
                   </RequireAuth>
                 }
               />
