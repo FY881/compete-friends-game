@@ -16,19 +16,21 @@ export const APK_FILE_NAME = "al-abqari-v1.6.0.apk";
 
 /** بصمة SHA-256 لملف APK الرسمي — أي ملف مختلف يُرفض قبل وصوله للهاتف. */
 export const APK_SHA256 =
-  "PENDING_UPLOAD";
+  "f7f34392d5b2816237f0ebe6085f0d0397a396571ec53ef9b7be2f3c3eacdcb1";
 
 /** حجم ملف APK الرسمي بالبايت. */
-export const APK_BYTES = 0;
+export const APK_BYTES = 30444584;
 
 /**
  * مرآة موثّقة لملف APK — عند انتهاء صلاحية المرآة أعد رفع الملف
  * على tmpfiles.org وحدّث الرابطين هنا فقط.
  */
-export const APK_MIRROR_URL = "";
+export const APK_MIRROR_URL =
+  "https://tmpfiles.org/dl/wywmhp1lbXVU/al-abqari-v1.6.0.apk";
 
 /** صفحة المرآة (تظهر في صفحة التحميل كرابط احتياطي قابل للنقر). */
-export const APK_MIRROR_PAGE_URL = "";
+export const APK_MIRROR_PAGE_URL =
+  "https://tmpfiles.org/wywmhp1lbXVU/al-abqari-v1.6.0.apk";
 
 /** ملاحظات الإصدار — تظهر في صفحة التحميل وداخل التطبيق عند توفر تحديث. */
 export const UPDATE_NOTES: string[] = [
@@ -40,3 +42,18 @@ export const UPDATE_NOTES: string[] = [
   "🎨 تطبيق المالك المستقل «لوحة التحكم» متوفر الآن كنسخة APK منفصلة بإدارة كاملة وذكاء أوسع.",
   "🔄 التحديث يصل تلقائياً على كل الأجهزة عبر النظام الموثّق (بصمة SHA-256).",
 ];
+
+// ═══════════════════════════════════════════════════════════════════════
+// تطبيق المالك المستقل — نسخة APK منفصلة (com.mindclash.owner)
+// هوية مختلفة عن اللعبة، تفتح مباشرة على تسجيل دخول المالك ثم لوحة
+// التحكم الكاملة. تُوزَّع برابطها الخاص (لا تدخل في تحديث اللاعبين).
+// ═══════════════════════════════════════════════════════════════════════
+export const OWNER_APK_FILE_NAME = "mindclash-owner-v1.0.0.apk";
+export const OWNER_APK_VERSION = "1.0.0";
+export const OWNER_APK_SHA256 =
+  "57edffc907058e19f5d81765502fceb8014d23597395472dc072cd95f6d0de22";
+export const OWNER_APK_BYTES = 30444584;
+export const OWNER_APK_MIRROR_URL =
+  "https://tmpfiles.org/dl/wSw2hw1QbmdY/mindclash-owner-v1.0.0.apk";
+export const OWNER_APK_MIRROR_PAGE_URL =
+  "https://tmpfiles.org/wSw2hw1QbmdY/mindclash-owner-v1.0.0.apk";

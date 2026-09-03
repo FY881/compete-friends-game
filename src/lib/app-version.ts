@@ -41,7 +41,7 @@ export const APK_VERSION = "1.6.0";
 
 /** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
 export const APK_FALLBACK_FILE = "al-abqari-v1.6.0.apk";
-export const APK_TMPFILES_URL = "";
+export const APK_TMPFILES_URL = "https://tmpfiles.org/dl/wywmhp1lbXVU/al-abqari-v1.6.0.apk";
 
 /**
  * مرآة موثّقة احتياطية لملف APK (مصدرها `apkRelease.ts` على الخادم —
@@ -53,7 +53,8 @@ export const APK_TMPFILES_URL = "";
  * الرابط الأساسي للتحميل — tmpfiles.org هو المصدر الأول والموثوق.
  * يُحدّث تلقائياً عند كل إصدار جديد.
  */
-export const APK_PRIMARY_DOWNLOAD_URL = "";
+export const APK_PRIMARY_DOWNLOAD_URL =
+  "https://tmpfiles.org/dl/wywmhp1lbXVU/al-abqari-v1.6.0.apk";
 
 /** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
 export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;
@@ -93,8 +94,8 @@ const APK_MIME_TYPE = "application/vnd.android.package-archive";
  * الحزمة». عند نشر نسخة جديدة: أعد بناء APK ثم ضع بصمته وحجمه هنا.
  */
 export const APK_SHA256 =
-  "95d49886e71cd8818a25cbb60b275b3ed560a2829a8867052e42f0399f246c0b";
-export const APK_BYTES = 27033668;
+  "f7f34392d5b2816237f0ebe6085f0d0397a396571ec53ef9b7be2f3c3eacdcb1";
+export const APK_BYTES = 30444584;
 
 /** حساب SHA-256 لمحتوى Blob (يُستخدم للتحقق من سلامة الملف قبل التنزيل). */
 async function sha256Hex(blob: Blob): Promise<string | null> {
