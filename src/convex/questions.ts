@@ -3,10 +3,7 @@ export type Difficulty = "easy" | "medium" | "hard";
 export type Question = { id: string; category: string; difficulty: Difficulty; question: string; options: [string, string, string, string]; correctIndex: 0 | 1 | 2 | 3 }
 
 export const EXTRA_QUESTIONS: Question[] = [
-
-  // ── بنك الأسئلة الأساسي (q001 – q320) ────────────────────────────────
-
-  // ── الدفعة الجديدة: 300 سؤال (q321 – q620) ───────────────────────────
+  // ── أسئلة إضافية جديدة (q321 – q542) ─────────────────────────────────
 
   // ── عام ──
   { id: "q321", category: "عام", difficulty: "easy", question: "ما هي أكبر دولة في العالم من حيث المساحة؟", options: ["روسيا", "كندا", "الصين", "أمريكا"], correctIndex: 0 },
