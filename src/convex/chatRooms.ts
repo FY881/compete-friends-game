@@ -7,6 +7,111 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import {
+  isDuplicateSpam,
+  maxMatchSeverity,
+  ruleTitle,
+  scanCommunityText,
+} from "../lib/communityRules";
+
+/**
+ * رقيب القوانين الآلي على الرسائل: يفحص كل رسالة فور إرسالها، يكتشف
+ * السبام بالنص المكرر، ويطبق سلم التنبيه التلقائي (تنبيه ← كتم) مع تسجيل
+ * كامل للإدارة في aiLogs وإشعار ملون للمرسل.
+ */
+async function enforceChatMessage(
+  ctx: any,
+  userId: string,
+  roomId: string,
+  content: string,
+) {
+  const now = Date.now();
+  const matches = scanCommunityText(content);
+
+  // كشف السبام: نص مكرر لنفس المرسل خلال دقيقتين
+  const recent = await ctx.db
+    .query("chatMessages")
+    .withIndex("by_room", (q: any) => q.eq("roomId", roomId))
+    .order("desc")
+    .take(40);
+  const mineRecent = recent
+    .filter((m: any) => m.senderId === userId && now - (m.createdAt ?? 0) < 120000)
+    .map((m: any) => m.content ?? "");
+  if (
+    isDuplicateSpam(content, mineRecent, 2) &&
+    !matches.some((m) => m.ruleId === 1 || m.ruleId === 19 || m.ruleId === 26)
+  ) {
+    matches.unshift({ ruleId: 1, evidence: "رسالة مكررة" });
+  }
+
+  if (matches.length === 0) {
+    return { flagged: false, matchedTitles: [] as string[], action: "none" };
+  }
+
+  const severity = maxMatchSeverity(matches);
+  const user = await ctx.db.get(userId);
+  const warnings = user?.warnings ?? 0;
+  const lastWarningAt = user?.lastWarningAt ?? 0;
+  const titles = [...new Set(matches.map((m) => ruleTitle(m.ruleId)))];
+
+  // مهلة بين التنبيهات تمنع إغراق نفس اللاعب بالإشعارات
+  if (lastWarningAt && now - lastWarningAt < 45000) {
+    await ctx.db.insert("aiLogs", {
+      action: "auto_moderation_log",
+      subsystem: "moderation",
+      message: `رسالة مخالفة مرصودة (بدون تنبيه — مهلة): ${titles.join("، ")}`,
+      severity: severity === "high" ? "warning" : "info",
+      targetUser: user?.name,
+      targetRoom: roomId,
+      data: JSON.stringify({ ruleIds: matches.map((m) => m.ruleId) }),
+      auto: true,
+      executedBy: "ai_master",
+      timestamp: now,
+    });
+    return { flagged: true, matchedTitles: titles, action: "log" };
+  }
+
+  const patch: any = { lastWarningAt: now, warnings: warnings + 1 };
+  let action: "warn" | "mute" = "warn";
+  // سلم تصاعدي: 3 تنبيهات أو مخالفة خطيرة ثانية ← كتم تلقائي لمدة ساعة
+  if ((severity === "high" && warnings >= 1) || warnings >= 3) {
+    patch.mutedUntil = now + 60 * 60 * 1000;
+    action = "mute";
+  }
+  await ctx.db.patch(userId, patch);
+
+  await ctx.db.insert("notifications", {
+    userId,
+    title: action === "mute" ? "🔇 كتم تلقائي" : "⚠️ تنبيه تلقائي",
+    body:
+      action === "mute"
+        ? `كُتمت لمدة ساعة بعد رصد مخالفة: ${titles.join("، ")}`
+        : `رصدنا رسالة تخالف القوانين (${titles.join("، ")}). تكررها يقود لكتم تلقائي.`,
+    type: action === "mute" ? ("ban" as const) : ("warning" as const),
+    read: false,
+    createdAt: now,
+  });
+
+  await ctx.db.insert("aiLogs", {
+    action: "auto_moderation",
+    subsystem: "moderation",
+    message: `تطبيق ${action === "mute" ? "كتم" : "تنبيه"} تلقائي بسبب: ${titles.join("، ")}`,
+    severity: action === "mute" ? "critical" : severity === "high" ? "warning" : "info",
+    targetUser: user?.name,
+    targetRoom: roomId,
+    data: JSON.stringify({
+      content: content.slice(0, 200),
+      ruleIds: matches.map((m) => m.ruleId),
+      warnings: warnings + 1,
+      action,
+    }),
+    auto: true,
+    executedBy: "ai_master",
+    timestamp: now,
+  });
+
+  return { flagged: true, matchedTitles: titles, action };
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // ① إنشاء غرفة
@@ -88,7 +193,15 @@ export const sendMessage = mutation({
       createdAt: Date.now(),
     });
 
-    return { messageId, content: content.slice(0, 2000) };
+    // مراقبة الالتزام بالقوانين — فحص تلقائي فوري لكل رسالة
+    const enforcement = await enforceChatMessage(ctx, userId, roomId, content.slice(0, 2000));
+
+    return {
+      messageId,
+      content: content.slice(0, 2000),
+      flagged: enforcement.flagged,
+      matchedTitles: enforcement.matchedTitles,
+    };
   },
 });
 
@@ -145,6 +258,9 @@ export const replyToMessage = mutation({
       replyTo: messageId,
       createdAt: Date.now(),
     });
+
+    // مراقبة الالتزام بالقوانين على الردود أيضاً
+    await enforceChatMessage(ctx, userId, roomId, content.slice(0, 2000));
 
     return { replyId };
   },

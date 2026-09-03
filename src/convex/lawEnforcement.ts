@@ -11,33 +11,17 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import {
+  COMMUNITY_RULES,
+  scanCommunityText,
+  ruleById,
+} from "../lib/communityRules";
 
 // ═══════════════════════════════════════════════════════════════════════
-// THE 20 RULES — القوانين العشرون
+// THE 30 RULES — القوانين الثلاثون (مصدر موحد نقي في src/lib)
 // ═══════════════════════════════════════════════════════════════════════
 
-export const RULES = [
-  { id: 1, title: "منع السبام", desc: "يُمنع إرسال رسائل متكررة أو مزعجة بشكل ممنهج.", category: "essential" as const, severity: "medium" as const },
-  { id: 2, title: "منع الإساءة", desc: "يُمنع التنمر أو الإساءة اللفظية أو التحرش بأي شكل.", category: "prohibited" as const, severity: "high" as const },
-  { id: 3, title: "منع الروابط المشبوهة", desc: "يُمنع مشاركة روابط احتيالية أو محتوى مشبوه.", category: "prohibited" as const, severity: "high" as const },
-  { id: 4, title: "منع انتحال الهوية", desc: "يُمنع انتحال هوية لاعب آخر أو الإدارة.", category: "prohibited" as const, severity: "high" as const },
-  { id: 5, title: "منع الغش", desc: "يُمنع الغش أو استغلال ثغرات اللعبة.", category: "prohibited" as const, severity: "high" as const },
-  { id: 6, title: "منع المحتوى المثير للجدل", desc: "يُمنع نشر محتوى سياسي أو ديني مثير للجدل.", category: "essential" as const, severity: "medium" as const },
-  { id: 7, title: "منع المحتوى غير اللائق", desc: "يُمنع نشر محتوى إباحي أو غير لائق.", category: "prohibited" as const, severity: "high" as const },
-  { id: 8, title: "منع التحريض", desc: "يُمنع التحريض على العنف أو الكراهية.", category: "prohibited" as const, severity: "high" as const },
-  { id: 9, title: "منع الإزعاج المتكرر", desc: "يُمنع إزعاج لاعب آخر بشكل متكرر بعد طلب التوقف.", category: "prohibited" as const, severity: "medium" as const },
-  { id: 10, title: "منع الحسابات المتعددة", desc: "يُمنع استخدام أكثر من حساب لتجاوز الأنظمة.", category: "prohibited" as const, severity: "high" as const },
-  { id: 11, title: "منع بيع/شراء الحسابات", desc: "يُمنع بيع أو شراء الحسابات أو العناصر بشكل غير قانوني.", category: "prohibited" as const, severity: "high" as const },
-  { id: 12, title: "حماية الخصوصية", desc: "يُمنع مشاركة معلومات شخصية للآخرين بدون إذنهم.", category: "essential" as const, severity: "high" as const },
-  { id: 13, title: "منع التلاعب بالنتائج", desc: "يُمنع التلاعب بنتائج التحديات أو الترتيب.", category: "prohibited" as const, severity: "high" as const },
-  { id: 14, title: "منع الغرف الخبيثة", desc: "يُمنع إنشاء غرف بهدف النشاط الخبيث أو الإزعاج المنظم.", category: "prohibited" as const, severity: "high" as const },
-  { id: 15, title: "احترام القرارات", desc: "يُمنع تجاهل قرارات المشرفين أو الإدارة بشكل متكرر.", category: "essential" as const, severity: "medium" as const },
-  { id: 16, title: "منع البرامج غير المصرح بها", desc: "يُمنع استخدام برامج أو أدوات غير مصرح بها تؤثر على اللعب.", category: "prohibited" as const, severity: "high" as const },
-  { id: 17, title: "منع كراهية المجموعات", desc: "يُمنع نشر محتوى يحرض على الكراهية ضد أي مجموعة.", category: "prohibited" as const, severity: "high" as const },
-  { id: 18, title: "منع إساءة البلاغات", desc: "يُمنع استغلال نظام البلاغات بشكل خبيث أو متكرر دون مبرر.", category: "essential" as const, severity: "medium" as const },
-  { id: 19, title: "منع الرسائل الجماعية", desc: "يُمنع إرسال رسائل مزعجة أو ترويجية بالجملة بدون إذن.", category: "essential" as const, severity: "medium" as const },
-  { id: 20, title: "حماية المجتمع", desc: "يُمنع أي سلوك يضر بتجربة اللاعبين أو استقرار المجتمع.", category: "essential" as const, severity: "high" as const },
-];
+export const RULES = COMMUNITY_RULES;
 
 // ═══════════════════════════════════════════════════════════════════════
 // SEED RULES — إدخال القوانين في قاعدة البيانات
@@ -50,7 +34,6 @@ export const seedRules = mutation({
     if (!userId) throw new Error("Unauthorized");
 
     const existing = await ctx.db.query("rules").collect();
-    if (existing.length >= 20) return { message: "Rules already seeded", count: existing.length };
 
     let added = 0;
     for (const rule of RULES) {
@@ -91,26 +74,26 @@ function analyzeReport(
   reporterHistory: { reportCount: number; falseReports: number },
   targetHistory: { warnings: number; cheatStrikes: number; priorReports: number; mutedUntil: number; bannedUntil: number },
 ): AnalysisResult {
-  const reason = `${reportReason} ${reportDetails}`.toLowerCase();
+  const reason = reportReason.toLowerCase();
   const matchedRules: number[] = [];
   let maxSeverity: "low" | "medium" | "high" = "low";
   const severityOrder = { low: 0, medium: 1, high: 2 };
 
-  // Pattern matching against rules
-  const patterns: { ruleId: number; keywords: string[] }[] = [
+  // تلميحات سبب البلاغ (تطابق سبباً مختاراً من القائمة) + فحص نص التفاصيل آلياً
+  const reasonHints: { ruleId: number; keywords: string[] }[] = [
     { ruleId: 1, keywords: ["سبام", "تكرار", "رسائل متكررة", "spam", "مزعج"] },
-    { ruleId: 2, keywords: ["إساءة", "شتائم", "تنمر", "abuse", "إهانة", "بذيء"] },
+    { ruleId: 2, keywords: ["إساءة", "شتائم", "تنمر", "abuse", "إهانة", "بذيء", "تهكم"] },
     { ruleId: 3, keywords: ["رابط", "رابط مشبوه", "احتيال", "link", "phishing"] },
     { ruleId: 4, keywords: ["انتحال", "هوية مزيفة", "impersonate", "تنكرة"] },
     { ruleId: 5, keywords: ["غش", "cheat", "ثغرة", "glitch", "تلاعب"] },
     { ruleId: 6, keywords: ["سياسي", "ديني", "جدل", "politic", "عقيدة"] },
-    { ruleId: 7, keywords: ["إباحي", "غير لائق", "عري", "porn", "sexual"] },
-    { ruleId: 8, keywords: ["عنف", "كراهية", "تحريض", "violence", "kill", "hate"] },
+    { ruleId: 7, keywords: ["إباحي", "غير لائق", "عري", "porn", "sexual", "جريء"] },
+    { ruleId: 8, keywords: ["عنف", "كراهية", "تحريض", "violence", "kill", "hate", "تهديد"] },
     { ruleId: 9, keywords: ["إزعاج", "مضايقة", "harass"] },
     { ruleId: 10, keywords: ["حسابات متعددة", "multi", "حساب ثانٍ"] },
     { ruleId: 11, keywords: ["بيع", "شراء", "sell", "buy", "account"] },
-    { ruleId: 12, keywords: ["شخصي", "هاتف", "اسم عائلة", "address", "personal"] },
-    { ruleId: 13, keywords: ["تلاعب بالنتيجة", "stream sniping"] },
+    { ruleId: 12, keywords: ["شخصي", "هاتف", "خصوصية", "private", "personal"] },
+    { ruleId: 13, keywords: ["تلاعب بالنتيجة", "تلاعب بالترتيب", "stream sniping"] },
     { ruleId: 14, keywords: ["غرفة خبيثة", "malicious", "تنظيم", "organized"] },
     { ruleId: 15, keywords: ["تجاهل المشرف", "ignores mod", "لا يمتثل"] },
     { ruleId: 16, keywords: ["برنامج", "أداة", "bot", "hack", "mod menu"] },
@@ -118,15 +101,31 @@ function analyzeReport(
     { ruleId: 18, keywords: ["بلاغ كيدي", "false report", "إساءة البلاغ"] },
     { ruleId: 19, keywords: ["رسائل جماعية", "broadcast", "ترويج", "promotional"] },
     { ruleId: 20, keywords: ["ضرر بالمجتمع", "community harm", "instability"] },
+    { ruleId: 21, keywords: ["تهكم على مبتدئ", "سخرية من جديد", "استهزاء بلاعب جديد"] },
+    { ruleId: 22, keywords: ["رسائل خاصة مزعجة", "رسائل خاصه مزعجه", "dm spam"] },
+    { ruleId: 23, keywords: ["قاصر", "صغير السن", "underage"] },
+    { ruleId: 24, keywords: ["شائعة", "خبر كاذب", "rumor"] },
+    { ruleId: 25, keywords: ["إعلان منافس", "موقع منافس", "ترويج منصة أخرى"] },
+    { ruleId: 26, keywords: ["نشر متقاطع", "cross-post", "نفس الرسالة بغرف كثيرة"] },
+    { ruleId: 27, keywords: ["محتوى مؤلم", "فيديو دموي", "مقطع عنيف"] },
+    { ruleId: 28, keywords: ["نصب", "احتيال تجاري", "بيع وهمي"] },
+    { ruleId: 29, keywords: ["اسم مسيء", "اسم مخالف", "شعار مسيء"] },
+    { ruleId: 30, keywords: ["تجاهل تحديث القوانين", "مخالفة قانون جديد"] },
   ];
 
-  for (const { ruleId, keywords } of patterns) {
-    if (keywords.some((kw) => reason.includes(kw))) {
-      matchedRules.push(ruleId);
-      const rule = RULES.find((r) => r.id === ruleId);
-      if (rule && severityOrder[rule.severity] > severityOrder[maxSeverity]) {
-        maxSeverity = rule.severity;
-      }
+  const hintRuleIds = new Set<number>();
+  for (const { ruleId, keywords } of reasonHints) {
+    if (keywords.some((kw) => reason.includes(kw))) hintRuleIds.add(ruleId);
+  }
+
+  // الفحص الآلي التفصيلي للمحتوى الفعلي في التفاصيل
+  for (const m of scanCommunityText(reportDetails ?? "")) hintRuleIds.add(m.ruleId);
+
+  for (const ruleId of hintRuleIds) {
+    matchedRules.push(ruleId);
+    const rule = RULES.find((r) => r.id === ruleId);
+    if (rule && severityOrder[rule.severity] > severityOrder[maxSeverity]) {
+      maxSeverity = rule.severity;
     }
   }
 
