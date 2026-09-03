@@ -244,8 +244,7 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q541", category: "حيوانات", difficulty: "medium", question: "مما تخرج الفراشة بعد اكتمال نموها؟", options: ["البيضة", "الشرنقة", "العش", "اليرقة"], correctIndex: 1 },
   { id: "q542", category: "حيوانات", difficulty: "medium", question: "أي نوع من الأشعة يستطيع النحل رؤيته؟", options: ["تحت الحمراء", "فوق البنفسجية", "السينية", "الجاما"], correctIndex: 1 },
 ];
-  correctIndex: 0 | 1 | 2 | 3;
-};
+
 
 /** All available categories */
 export const CATEGORIES = [
@@ -271,7 +270,7 @@ export const CATEGORIES = [
   "ملاحظة ودقة",
 ] as const;
 
-export const QUESTION_BANK: Question[] = [
+export const QUESTION_BANK: Question[] = [...EXTRA_QUESTIONS, // q321–q542 (إضافية موصولة بالبنك الرئيسي)
   // ── عام ───────────────────────────────────────────────────────────────
   { id: "q01", category: "عام", difficulty: "easy", question: "ما هو أكبر محيط على وجه الأرض؟", options: ["المحيط الهادئ", "المحيط الأطلسي", "المحيط الهندي", "المحيط المتجمد الشمالي"], correctIndex: 0 },
   { id: "q02", category: "عام", difficulty: "easy", question: "كم عدد ألوان قوس قزح؟", options: ["ستة", "سبعة", "خمسة", "ثمانية"], correctIndex: 1 },
@@ -664,7 +663,7 @@ export const QUESTION_BANK: Question[] = [
   { id: "q315", category: "حيوانات", difficulty: "medium", question: "ما هو الحيوان الذي ينام 22 ساعة في اليوم؟", options: ["الأسد", "الدب", "الكسلان", "القط"], correctIndex: 2 },
   { id: "q316", category: "فضاء", difficulty: "medium", question: "ما هو الاسم العلمي للشمس؟", options: ["ألفا سنتوري", "سول", "سيتوس", "تاو سيتي"], correctIndex: 1 },
   { id: "q317", category: "تاريخ", difficulty: "medium", question: "متى سقطت دولة الخلافة العثمانية؟", options: ["1918", "1920", "1922", "1924"], correctIndex: 2 },
-  { id: "q318", category: "حيوانات", difficulty: "medium", question: "ما هو الحيوان الذي يمكنه الطيران لأطول مسافة بدون توقف؟", options: ["الصقر", "النسر", "طائر الس depth", "طائر السنونو"], correctIndex: 3 },
+  { id: "q318", category: "حيوانات", difficulty: "medium", question: "ما هو الحيوان الذي يمكنه الطيران لأطول مسافة بدون توقف؟", options: ["الصقر", "النسر", "طائر السمامة", "طائر السنونو"], correctIndex: 2 },
   { id: "q319", category: "جغرافيا", difficulty: "easy", question: "ما هي عملة لبنان؟", options: ["الليرة", "الدينار", "الجنيه", "الدرهم"], correctIndex: 0 },
   { id: "q320", category: "جغرافيا", difficulty: "easy", question: "ما هي أطول سلسلة جبال في أوروبا؟", options: ["جبال الألب", "جبال الكاربات", "جبال الأنديز", "جبال روكي"], correctIndex: 0 },
 ];
