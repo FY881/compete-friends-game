@@ -29,7 +29,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q338", category: "عام", difficulty: "medium", question: "ما هو أكبر تجمع حضري في العالم من حيث السكان؟", options: ["نيودلهي", "شنغهاي", "طوكيو", "مكسيكو سيتي"], correctIndex: 2 },
   { id: "q339", category: "عام", difficulty: "easy", question: "ما هي عاصمة النمسا؟", options: ["زيورخ", "براغ", "فيينا", "ميونخ"], correctIndex: 2 },
   { id: "q340", category: "عام", difficulty: "hard", question: "كم عدد الدول الأعضاء في الاتحاد الأوروبي حالياً؟", options: ["25", "26", "27", "28"], correctIndex: 2 },
-
   // ── علوم ──
   { id: "q341", category: "علوم", difficulty: "easy", question: "ما هي أصلب مادة طبيعية معروفة؟", options: ["الحديد", "الألماس", "الكوارتز", "التنجستن"], correctIndex: 1 },
   { id: "q342", category: "علوم", difficulty: "medium", question: "ما هو العنصر الأكثر وفرة في القشرة الأرضية؟", options: ["السيليكون", "الألمنيوم", "الأكسجين", "الحديد"], correctIndex: 2 },
@@ -53,7 +52,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q360", category: "علوم", difficulty: "easy", question: "ما هي وحدة قياس الطاقة في النظام الدولي؟", options: ["الجول", "الباسكال", "الأمبير", "الهرتز"], correctIndex: 0 },
   { id: "q361", category: "علوم", difficulty: "medium", question: "ما العضو الذي يخزن العصارة الصفراوية؟", options: ["البنكرياس", "الطحال", "المرارة", "الكلية"], correctIndex: 2 },
   { id: "q362", category: "علوم", difficulty: "hard", question: "ما الظاهرة الطبيعية التي تسبب المد والجزر في المقام الأول؟", options: ["جاذبية القمر", "دوران الأرض", "الرياح", "حرارة الشمس"], correctIndex: 0 },
-
   // ── جغرافيا ──
   { id: "q363", category: "جغرافيا", difficulty: "medium", question: "مضيق جبل طارق يفصل بين: ماذا؟", options: ["تونس وإيطاليا", "المغرب وإسبانيا", "مصر والسعودية", "تركيا واليونان"], correctIndex: 1 },
   { id: "q364", category: "جغرافيا", difficulty: "hard", question: "ما هي عاصمة سويسرا؟", options: ["جنيف", "زيورخ", "برن", "بازل"], correctIndex: 2 },
@@ -73,7 +71,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q378", category: "جغرافيا", difficulty: "medium", question: "في أي دولة يقع جبل كليمنجارو؟", options: ["كينيا", "أوغندا", "تنزانيا", "إثيوبيا"], correctIndex: 2 },
   { id: "q379", category: "جغرافيا", difficulty: "easy", question: "قناة السويس تربط أي بحرين؟", options: ["الأحمر والهندي", "المتوسط والبحر الأحمر", "الأحمر والخليج", "المتوسط والأسود"], correctIndex: 1 },
   { id: "q380", category: "جغرافيا", difficulty: "medium", question: "في أي مدينة هندية يقع تاج محل؟", options: ["نيودلهي", "أغرا", "مومباي", "جايبور"], correctIndex: 1 },
-
   // ── رياضيات ──
   { id: "q381", category: "رياضيات", difficulty: "easy", question: "كم يساوي 11 × 11؟", options: ["101", "111", "121", "131"], correctIndex: 2 },
   { id: "q382", category: "رياضيات", difficulty: "medium", question: "ما هو العدد الأولي الزوجي الوحيد؟", options: ["1", "2", "4", "6"], correctIndex: 1 },
@@ -97,7 +94,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q400", category: "رياضيات", difficulty: "hard", question: "كم يساوي 7 عاملي (7!)؟", options: ["720", "5040", "50400", "40320"], correctIndex: 1 },
   { id: "q401", category: "رياضيات", difficulty: "hard", question: "كم يساوي 36 ÷ 0.75؟", options: ["27", "48", "44", "52"], correctIndex: 1 },
   { id: "q402", category: "رياضيات", difficulty: "hard", question: "كم عدد الأصفار في ناتج 10 عاملي (10!)؟", options: ["1", "2", "3", "4"], correctIndex: 1 },
-
   // ── لغة ──
   { id: "q403", category: "لغة", difficulty: "medium", question: "ما هو جمع كلمة مصيبة؟", options: ["مصايب", "مصائب", "مصائيب", "مصيبات"], correctIndex: 1 },
   { id: "q404", category: "لغة", difficulty: "medium", question: "ما هو مفرد كلمة أشياء؟", options: ["شائ", "شيء", "شيئ", "شياء"], correctIndex: 1 },
@@ -107,7 +103,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q408", category: "لغة", difficulty: "medium", question: "أي كلمة من التالية تبدأ بهمزة وصل؟", options: ["استخرج", "أمل", "إصلاح", "إنعام"], correctIndex: 0 },
   { id: "q409", category: "لغة", difficulty: "hard", question: "ما هو جمع كلمة حرباء؟", options: ["حرباوات", "حرابي", "حربات", "حرباءات"], correctIndex: 1 },
   { id: "q410", category: "لغة", difficulty: "medium", question: "ما هو مثنى كلمة ساعي؟", options: ["ساعيين", "ساعيان", "ساعون", "ساعي"], correctIndex: 1 },
-
   // ── لغة (تكملة) ──
   { id: "q411", category: "لغة", difficulty: "medium", question: "ما حرف العلة في الفعل يقول؟", options: ["الألف", "الواو", "الياء", "لا يوجد"], correctIndex: 1 },
   { id: "q412", category: "لغة", difficulty: "easy", question: "ما هو ضد كلمة شجاعة؟", options: ["قوة", "جبن", "إقدام", "جرأة"], correctIndex: 1 },
@@ -117,7 +112,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q416", category: "لغة", difficulty: "hard", question: "ما هو الجذر الثلاثي للفعل انطلق؟", options: ["طلق", "نطلق", "أطلق", "لقط"], correctIndex: 0 },
   { id: "q417", category: "لغة", difficulty: "medium", question: "همزة كلمة أمل همزة: ماذا؟", options: ["وصل", "قطع", "مد", "لام"], correctIndex: 1 },
   { id: "q418", category: "لغة", difficulty: "medium", question: "ما هي الكلمة الصحيحة إملائياً؟", options: ["مسؤول", "مسؤل", "مسئول", "مسوئل"], correctIndex: 0 },
-
   // ── منطق ──
   { id: "q419", category: "منطق", difficulty: "easy", question: "ما العدد التالي في المتتالية: 3، 6، 12، 24، ...؟", options: ["36", "40", "48", "60"], correctIndex: 2 },
   { id: "q420", category: "منطق", difficulty: "hard", question: "كم شهراً في السنة يحتوي على 28 يوماً؟", options: ["فبراير فقط", "فبراير ويونيو", "كل الشهور", "شهر واحد فقط"], correctIndex: 2 },
@@ -131,7 +125,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q428", category: "منطق", difficulty: "hard", question: "كم يساوي نصف اثنين زائد اثنين (بالترتيب الحسابي)؟", options: ["2", "3", "4", "5"], correctIndex: 1 },
   { id: "q429", category: "منطق", difficulty: "hard", question: "إذا اصطادت 5 قطط 5 فئران في 5 دقائق، فكم دقيقة تحتاج 100 قطة لاصطياد 100 فأر؟", options: ["5", "20", "100", "25"], correctIndex: 0 },
   { id: "q430", category: "منطق", difficulty: "easy", question: "ما العدد التالي في المتتالية: 2، 3، 5، 7، 11، ...؟", options: ["12", "13", "15", "17"], correctIndex: 1 },
-
   { id: "q431", category: "منطق", difficulty: "hard", question: "أم لديها 5 بنات ولكل بنت أخ واحد، فكم عدد الأبناء؟", options: ["5", "4", "1", "6"], correctIndex: 2 },
   { id: "q432", category: "منطق", difficulty: "medium", question: "ما العدد التالي في المتتالية: 100، 90، 81، 73، 66، ...؟", options: ["61", "60", "59", "58"], correctIndex: 1 },
   { id: "q433", category: "منطق", difficulty: "hard", question: "قارب راسٍ وعليه سلم يتدلى حتى الماء، إذا ارتفع المد 10 سم فكم ترتفع درجة السلم عن الماء؟", options: ["10 سم", "لا ترتفع شيئاً", "5 سم", "20 سم"], correctIndex: 1 },
@@ -154,14 +147,12 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q448", category: "تاريخ", difficulty: "medium", question: "في أي عام قامت الثورة الفرنسية؟", options: ["1776", "1789", "1799", "1815"], correctIndex: 1 },
   { id: "q449", category: "تاريخ", difficulty: "medium", question: "ما الحضارة التي عرفت صناعة الورق أولاً؟", options: ["الفرعونية", "الرومانية", "الصينية", "الفارسية"], correctIndex: 2 },
   { id: "q450", category: "تاريخ", difficulty: "easy", question: "من أي دولة انطلقت حركة النهضة الفنية عصر النهضة؟", options: ["فرنسا", "إيطاليا", "إسبانيا", "هولندا"], correctIndex: 1 },
-
   { id: "q451", category: "تاريخ", difficulty: "hard", question: "من هو الطبيب العربي الذي اكتشف الدورة الدموية الصغرى؟", options: ["ابن سينا", "الرازي", "ابن النفيس", "ابن رشد"], correctIndex: 2 },
   { id: "q452", category: "تاريخ", difficulty: "medium", question: "من قاد جيش المسلمين في معركة القادسية؟", options: ["خالد بن الوليد", "سعد بن أبي وقاص", "أبو عبيدة بن الجراح", "المثنى بن حارثة"], correctIndex: 1 },
   { id: "q453", category: "تاريخ", difficulty: "easy", question: "في أي عام هاجر النبي محمد ﷺ إلى المدينة المنورة؟", options: ["610", "618", "622", "632"], correctIndex: 2 },
   { id: "q454", category: "تاريخ", difficulty: "medium", question: "ما أقدم جامعة في العالم ما زالت تعمل حتى اليوم؟", options: ["الأزهر بالقاهرة", "القرويين بفاس", "الزيتونة بتونس", "جامعة بولونيا"], correctIndex: 1 },
   { id: "q455", category: "تاريخ", difficulty: "easy", question: "من أي دولة انطلقت الثورة الصناعية أولاً؟", options: ["فرنسا", "ألمانيا", "بريطانيا", "أمريكا"], correctIndex: 2 },
   { id: "q456", category: "تاريخ", difficulty: "hard", question: "ما أول دولة اعترفت باستقلال الولايات المتحدة الأمريكية؟", options: ["فرنسا", "إسبانيا", "المغرب", "هولندا"], correctIndex: 2 },
-
   // ── رياضة ──
   { id: "q457", category: "رياضة", difficulty: "hard", question: "كم عدد لاعبي فريق الرغبي داخل الملعب؟", options: ["11", "13", "15", "9"], correctIndex: 2 },
   { id: "q458", category: "رياضة", difficulty: "medium", question: "كم عدد لاعبي الفريق في الكرة الطائرة الشاطئية؟", options: ["2", "4", "6", "1"], correctIndex: 0 },
@@ -180,7 +171,6 @@ export const EXTRA_QUESTIONS: Question[] = [
 
   { id: "q471", category: "رياضة", difficulty: "medium", question: "كم عدد لاعبي فريق الكريكيت داخل الملعب؟", options: ["9", "10", "11", "13"], correctIndex: 2 },
   { id: "q472", category: "رياضة", difficulty: "easy", question: "رياضة البادل تشبه إلى حد كبير رياضة: ماذا؟", options: ["الاسكواش", "التنس", "كرة الطاولة", "الريشة الطائرة"], correctIndex: 1 },
-
   // ── فنون ──
   { id: "q473", category: "فنون", difficulty: "medium", question: "من رسم لوحة العشاء الأخير؟", options: ["مايكل أنجلو", "ليوناردو دافنشي", "رافاييل", "كارافاجيو"], correctIndex: 1 },
   { id: "q474", category: "فنون", difficulty: "medium", question: "من هو رائد المدرسة التكعيبية في الرسم؟", options: ["فان جوخ", "بيكاسو", "مونيه", "ماغريت"], correctIndex: 1 },
@@ -194,7 +184,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q482", category: "فنون", difficulty: "hard", question: "أهدت فرنسا تمثال الحرية لأمريكا بمناسبة: ماذا؟", options: ["نهاية الحرب العالمية الأولى", "مئوية استقلال أمريكا", "معاهدة فرساي", "اكتشاف أمريكا"], correctIndex: 1 },
   { id: "q483", category: "فنون", difficulty: "hard", question: "لوحة غيرنيكا لبيكاسو كانت احتجاجاً على: ماذا؟", options: ["الحرب العالمية الأولى", "الحرب الأهلية الإسبانية", "الحرب الباردة", "حرب فيتنام"], correctIndex: 1 },
   { id: "q484", category: "فنون", difficulty: "easy", question: "فن الأوريغامي الياباني يقوم على طي: ماذا؟", options: ["القماش", "الورق", "المعدن", "الخشب"], correctIndex: 1 },
-
   // ── تكنولوجيا ──
   { id: "q485", category: "تكنولوجيا", difficulty: "medium", question: "في أي عام تأسست شركة أبل؟", options: ["1971", "1976", "1980", "1984"], correctIndex: 1 },
   { id: "q486", category: "تكنولوجيا", difficulty: "medium", question: "من هو مخترع شبكة الويب العالمية؟", options: ["بيل غيتس", "تيم بيرنرز لي", "فينت سيرف", "ستيف وزنياك"], correctIndex: 1 },
@@ -202,7 +191,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q488", category: "تكنولوجيا", difficulty: "medium", question: "ما لغة البرمجة التي طورتها شركة صن ميكروسيستمز ورمزها فنجان قهوة؟", options: ["جافا", "باسكال", "روبي", "بيرل"], correctIndex: 0 },
   { id: "q489", category: "تكنولوجيا", difficulty: "medium", question: "ماذا يعني اختصار RAM في الحاسوب؟", options: ["ذاكرة القراءة فقط", "ذاكرة الوصول العشوائي", "ذاكرة التخزين الدائم", "ذاكرة التخزين المؤقت"], correctIndex: 1 },
   { id: "q490", category: "تكنولوجيا", difficulty: "easy", question: "البايت الواحد في الحاسوب يساوي: كم بت؟", options: ["4", "6", "8", "16"], correctIndex: 2 },
-
   { id: "q491", category: "تكنولوجيا", difficulty: "easy", question: "ما الشركة التي تطوّر نظام تشغيل أندرويد؟", options: ["أبل", "جوجل", "مايكروسوفت", "سامسونج"], correctIndex: 1 },
   { id: "q492", category: "تكنولوجيا", difficulty: "easy", question: "ما الشركة المالكة لمنصة يوتيوب؟", options: ["أبل", "جوجل", "أمازون", "فيسبوك"], correctIndex: 1 },
   { id: "q493", category: "تكنولوجيا", difficulty: "easy", question: "من هو مخترع الهاتف؟", options: ["توماس إديسون", "ألكسندر غراهام بيل", "نيكولا تسلا", "غولييلمو ماركوني"], correctIndex: 1 },
@@ -215,7 +203,6 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q500", category: "تكنولوجيا", difficulty: "easy", question: "ما المتصفح الذي طورته مايكروسوفت ويأتي مدمجاً مع ويندوز؟", options: ["كروم", "سفاري", "إيدج", "فايرفوكس"], correctIndex: 2 },
   { id: "q501", category: "تكنولوجيا", difficulty: "medium", question: "ما اسم خدمة الحوسبة السحابية التابعة لشركة أمازون؟", options: ["Azure", "AWS", "Google Cloud", "IBM Cloud"], correctIndex: 1 },
   { id: "q502", category: "تكنولوجيا", difficulty: "hard", question: "من هو المؤسس الشاب لعملة إيثيريوم الرقمية؟", options: ["سام بانكمان فريد", "فيتاليك بوتيرين", "تشانغبينغ تشاو", "ساتوشي ناكاموتو"], correctIndex: 1 },
-
   // ── أفلام ومسلسلات ──
   { id: "q503", category: "أفلام ومسلسلات", difficulty: "easy", question: "ما الشركة التي أنتجت فيلم الأسد الملك؟", options: ["ديزني", "وارنر بروس", "يونيفرسال", "باراماونت"], correctIndex: 0 },
   { id: "q504", category: "أفلام ومسلسلات", difficulty: "medium", question: "بأي شخصية اشتهر الممثل هيو جاكمان؟", options: ["سبايدرمان", "وولفرين", "باتمان", "سوبرمان"], correctIndex: 1 },
@@ -225,14 +212,12 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q508", category: "أفلام ومسلسلات", difficulty: "easy", question: "من هو النجم الرئيسي في سلسلة أفلام الماتريكس؟", options: ["براد بيت", "كيانو ريفز", "توم هانكس", "ويل سميث"], correctIndex: 1 },
   { id: "q509", category: "أفلام ومسلسلات", difficulty: "easy", question: "من يؤدي شخصية الكابتن جاك سبارو في قراصنة الكاريبي؟", options: ["براد بيت", "جوني ديب", "أورلاندو بلوم", "توم كروز"], correctIndex: 1 },
   { id: "q510", category: "أفلام ومسلسلات", difficulty: "medium", question: "فيلم الأنمي الشهير المخطوفة من إخراج: مَن؟", options: ["ساتوشي كون", "هاياو ميازاكي", "ماكوتو شينكاي", "إيساو تاكاهاتا"], correctIndex: 1 },
-
   { id: "q511", category: "أفلام ومسلسلات", difficulty: "medium", question: "في أي مدينة تدور أحداث مسلسل فريندز؟", options: ["لوس أنجلوس", "نيويورك", "شيكاغو", "بوسطن"], correctIndex: 1 },
   { id: "q512", category: "أفلام ومسلسلات", difficulty: "medium", question: "من بطل فيلم جوكر عام 2019؟", options: ["هيث ليدجر", "خواكين فينيكس", "جاريد ليتو", "روبرت باتينسون"], correctIndex: 1 },
   { id: "q513", category: "أفلام ومسلسلات", difficulty: "easy", question: "من هو نجم سلسلة أفلام السرعة والغضب؟", options: ["دواين جونسون", "فين ديزل", "جيسون ستاثام", "توم كروز"], correctIndex: 1 },
   { id: "q514", category: "أفلام ومسلسلات", difficulty: "medium", question: "من هي بطلة فيلم تايتانيك الشهير؟", options: ["كيت بلانشيت", "كيت وينسلت", "جوليا روبرتس", "نيكول كيدمان"], correctIndex: 1 },
   { id: "q515", category: "أفلام ومسلسلات", difficulty: "medium", question: "من بطل فيلم غاتسبي العظيم بنسخة 2013؟", options: ["توبي ماغواير", "ليوناردو دي كابريو", "روبرت ريدفورد", "هيو جاكمان"], correctIndex: 1 },
   { id: "q516", category: "أفلام ومسلسلات", difficulty: "easy", question: "في كرتون توم وجيري، ما اسم القط؟", options: ["جيري", "توم", "سبايك", "بوتش"], correctIndex: 1 },
-
   // ── طعام ومشروبات ──
   { id: "q517", category: "طعام ومشروبات", difficulty: "easy", question: "ما المكوّن الأساسي لطبق الفول المدمس؟", options: ["العدس", "الحمص", "الفول", "الفاصولياء"], correctIndex: 2 },
   { id: "q518", category: "طعام ومشروبات", difficulty: "medium", question: "ما المشروب الياباني التقليدي المصنوع من الأرز المخمر؟", options: ["الماتشا", "الساكي", "الصويا", "الزنجبيل"], correctIndex: 1 },
@@ -246,11 +231,9 @@ export const EXTRA_QUESTIONS: Question[] = [
   { id: "q526", category: "طعام ومشروبات", difficulty: "hard", question: "حلوى الماكارون الفرنسية تُصنع أساساً من: ماذا؟", options: ["دقيق القمح", "دقيق اللوز", "دقيق الأرز", "نشا الذرة"], correctIndex: 1 },
   { id: "q527", category: "طعام ومشروبات", difficulty: "medium", question: "حلوى التيراميسو الإيطالية تحتوي على: ماذا؟", options: ["الجيلاتو", "جبن الماسكاربوني والقهوة", "البانيتون", "الريزوتو"], correctIndex: 1 },
   { id: "q528", category: "طعام ومشروبات", difficulty: "hard", question: "جبن الغورغونزولا ذو العفن الأزرق أصله من: أي دولة؟", options: ["فرنسا", "إيطاليا", "سويسرا", "هولندا"], correctIndex: 1 },
-
   // ── حيوانات ──
   { id: "q529", category: "حيوانات", difficulty: "easy", question: "ما هي أكبر سمكة في العالم؟", options: ["القرش الأبيض", "قرش الحوت", "الحوت الأزرق", "التونة"], correctIndex: 1 },
   { id: "q530", category: "حيوانات", difficulty: "medium", question: "ما هو الطائر الوحيد القادر على الطيران إلى الخلف؟", options: ["العصفور", "الطنان", "الببغاء", "الخطاف"], correctIndex: 1 },
-
   { id: "q531", category: "حيوانات", difficulty: "hard", question: "ما هو الثديي الوحيد الذي يبيض؟", options: ["البطريق", "خلد الماء", "القنفذ", "الكنغر"], correctIndex: 1 },
   { id: "q532", category: "حيوانات", difficulty: "easy", question: "ما الحيوان الأسترالي الذي يحمل صغيره في جيب؟", options: ["الكوالا", "الكنغر", "الدب", "الغزال"], correctIndex: 1 },
   { id: "q533", category: "حيوانات", difficulty: "easy", question: "ماذا يسمى صوت الأسد؟", options: ["نهيق", "زئير", "نباح", "مواء"], correctIndex: 1 },
