@@ -28,6 +28,12 @@ import {
   startOfDayTs,
   weekKey,
 } from "../lib/progression";
+import {
+  buildActivityTrend,
+  buildInsights,
+  categoryBreakdown,
+  difficultyBreakdown,
+} from "../lib/analytics";
 import type { PlayerSettings, QuestInput, QuestKind } from "../lib/progression";
 
 // ─── أدوات مساعدة ─────────────────────────────────────────────────────────
@@ -454,6 +460,90 @@ export const equipTitle = mutation({
       });
     }
     return { equipped: titleId };
+  },
+});
+
+// ─── التحليلات الشخصية ────────────────────────────────────────────────────
+
+export const getAnalytics = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+
+    const profile = await getProfileOrNull(ctx, userId);
+    const xp = profile?.xp ?? 0;
+    const level = levelFromXp(xp);
+
+    // آخر سجلات اللعب (للمنحنى اليومي)
+    const history = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .collect();
+    const recentGames = [...history]
+      .sort((a: any, b: any) => b.playedAt - a.playedAt)
+      .slice(0, 300);
+    const trend = buildActivityTrend(
+      recentGames.map((g: any) => ({
+        playedAt: g.playedAt,
+        correctCount: g.correctCount ?? 0,
+        xpEarned: g.xpEarned ?? 0,
+      })),
+      7,
+    );
+
+    // عينات الإجابات من أرشيف الأسئلة (آخر 800)
+    const archive = await ctx.db
+      .query("questionArchive")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .collect();
+    const samples = [...archive]
+      .sort((a: any, b: any) => b.createdAt - a.createdAt)
+      .slice(0, 800)
+      .map((a: any) => ({
+        category: a.category ?? "عام",
+        difficulty: a.difficulty ?? "easy",
+        wasCorrect: Boolean(a.wasCorrect),
+      }));
+
+    const categories = categoryBreakdown(samples);
+    const difficulties = difficultyBreakdown(samples);
+    const overallAccuracy =
+      (profile?.totalAnswers ?? 0) > 0
+        ? Math.round(((profile?.correctAnswers ?? 0) / (profile?.totalAnswers ?? 1)) * 100)
+        : samples.length > 0
+          ? Math.round((samples.filter((s) => s.wasCorrect).length / samples.length) * 100)
+          : 0;
+
+    const totals = {
+      games: profile?.gamesPlayed ?? 0,
+      wins: profile?.gamesWon ?? 0,
+      answered: profile?.totalAnswers ?? samples.length,
+      accuracy: overallAccuracy,
+      bestStreak: profile?.bestStreak ?? 0,
+      trendGames: trend.reduce((s: number, t: any) => s + t.games, 0),
+      trendCorrect: trend.reduce((s: number, t: any) => s + t.correct, 0),
+      trendXp: trend.reduce((s: number, t: any) => s + t.xp, 0),
+    };
+
+    const insights = buildInsights({
+      answered: totals.answered,
+      accuracy: totals.accuracy,
+      totalGames: totals.games,
+      wins: totals.wins,
+      bestStreak: totals.bestStreak,
+      categories,
+    });
+
+    const user = await ctx.db.get(userId);
+    return {
+      player: { name: user?.name ?? "لاعب", level, xp },
+      trend,
+      categories,
+      difficulties,
+      totals,
+      insights,
+    };
   },
 });
 

@@ -34,9 +34,11 @@ import {
   Music,
   Rocket,
   Settings,
+  Share2,
   Sparkles,
   Sun,
   Target,
+  TrendingUp,
   Trophy,
   Users,
   Volume2,
@@ -45,6 +47,7 @@ import {
 import { TITLE_RARITY_LABEL } from "@/lib/progression";
 import type { PlayerSettings } from "@/lib/progression";
 import type { QuestKind } from "@/lib/progression";
+import { DIFFICULTY_LABELS } from "@/lib/analytics";
 
 /* ── حساب مستوى محلي (نفس منحنى الخادم: 100 ثم ×1.15) ─────────────── */
 
@@ -84,6 +87,7 @@ const LEVEL_ICONS: Record<number, string> = {
 
 const TABS: { id: TabId; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { id: "overview", label: "نظرة عامة", icon: LayoutDashboard },
+  { id: "analytics", label: "التحليلات", icon: TrendingUp },
   { id: "quests", label: "المهام", icon: ListChecks },
   { id: "milestones", label: "المعالم", icon: Flag },
   { id: "titles", label: "الألقاب", icon: Medal },
@@ -92,7 +96,7 @@ const TABS: { id: TabId; label: string; icon: ComponentType<{ className?: string
   { id: "settings", label: "الإعدادات", icon: Settings },
 ];
 
-type TabId = "overview" | "quests" | "milestones" | "titles" | "favorites" | "referral" | "settings";
+type TabId = "overview" | "analytics" | "quests" | "milestones" | "titles" | "favorites" | "referral" | "settings";
 
 /* ═══════════════════════════════════════════════════════════════════
    عناصر مشتركة
@@ -1002,6 +1006,240 @@ function SettingsRow({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   التحليلات الشخصية
+   ═══════════════════════════════════════════════════════════════════ */
+function AnalyticsTab() {
+  const data = useQuery(api.progression.getAnalytics);
+  const [copied, setCopied] = useState(false);
+
+  if (!data) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-20 rounded-2xl" />
+        ))}
+      </div>
+    );
+  }
+
+  const { trend, categories, difficulties, totals, insights, player } = data;
+  const maxXp = Math.max(1, ...trend.map((d) => d.xp));
+
+  const barTint = (acc: number) =>
+    acc >= 75
+      ? "[&>div]:bg-emerald-500"
+      : acc >= 50
+        ? "[&>div]:bg-amber-500"
+        : "[&>div]:bg-rose-500";
+  const accuracyText = (acc: number) =>
+    acc >= 75
+      ? "text-emerald-600 dark:text-emerald-300"
+      : acc >= 50
+        ? "text-amber-600 dark:text-amber-300"
+        : "text-rose-600 dark:text-rose-300";
+
+  const shareSummary = async () => {
+    const text = [
+      `🧠 بطاقة أدائي في حرب العقول — ${player.name}`,
+      `المستوى ${player.level} • ${player.xp.toLocaleString("en")} XP`,
+      `الجولات ${totals.games} • الانتصارات ${totals.wins} • الدقة ${totals.accuracy}%`,
+      `خلال آخر 7 أيام: ${totals.trendGames} جولة • ${totals.trendCorrect} إجابة صحيحة • ${totals.trendXp} XP`,
+      data.insights[0] ? `💡 ${data.insights[0]}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+      toast.success("نُسخت بطاقة أدائك — ألصقها في أي محادثة 🎉");
+    } catch {
+      toast.error("تعذّر النسخ — حاول مرة أخرى");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* مؤشرات سريعة */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <MiniStat label="جولات آخر 7 أيام" value={totals.trendGames} icon={Gamepad2} tint="bg-sky-500/10 text-sky-500" />
+        <MiniStat label="إجابات صحيحة" value={totals.trendCorrect} icon={Target} tint="bg-emerald-500/10 text-emerald-500" />
+        <MiniStat label="XP مكتسبة أسبوعياً" value={totals.trendXp} icon={Zap} tint="bg-amber-500/10 text-amber-500" />
+        <MiniStat label="الدقة الإجمالية" value={`${totals.accuracy}%`} icon={TrendingUp} tint="bg-violet-500/10 text-violet-500" />
+      </div>
+
+      {/* منحنى الأسبوع */}
+      <Card className="rounded-3xl border-border/60">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-300">
+              <TrendingUp className="size-4" />
+            </span>
+            نشاطك خلال آخر 7 أيام
+          </CardTitle>
+          <CardDescription>عدد الجولات و XP المكتسبة لكل يوم — الأعمدة تمتد حسب يومك الأقوى</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {totals.trendGames === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+              <Gamepad2 className="size-7 opacity-40" />
+              لا توجد جولات هذا الأسبوع بعد — العب الآن ليمتلئ مخططك 🎮
+            </div>
+          ) : (
+            <div className="grid grid-cols-7 items-end gap-2">
+              {trend.map((d) => (
+                <div key={d.day} className="flex flex-col items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-muted-foreground">
+                    {d.games > 0 ? `${d.xp.toLocaleString("en")}xp` : "—"}
+                  </span>
+                  <div className="flex h-24 w-full items-end justify-center rounded-lg bg-muted/50">
+                    <div
+                      className={cn(
+                        "w-3/5 rounded-t-md bg-gradient-to-t from-teal-500 to-cyan-400 transition-all",
+                        d.games === 0 && "h-1 rounded-full from-muted to-muted opacity-30",
+                      )}
+                      style={{ height: d.games === 0 ? undefined : `${Math.max(6, (d.xp / maxXp) * 88)}%` }}
+                      title={`${d.xp} XP`}
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold text-foreground">{Number(d.day.slice(8))}</span>
+                  <span className="text-[10px] text-muted-foreground">{d.games} جولة</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* إتقان التصنيفات */}
+        <Card className="rounded-3xl border-border/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500">
+                <Target className="size-4" />
+              </span>
+              إتقانك حسب التصنيف
+            </CardTitle>
+            <CardDescription>دقة إجاباتك في كل فئة — كلما أجبت أكثر أصبح التقييم أدق</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {categories.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                أجب عن أسئلة من فئات مختلفة لتظهر خريطة إتقانك هنا 🗺️
+              </p>
+            ) : (
+              categories.slice(0, 8).map((c) => (
+                <div key={c.key}>
+                  <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                    <span className="flex min-w-0 items-center gap-1.5 font-semibold">
+                      <span className="truncate">{c.key}</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">({c.correct}/{c.total})</span>
+                    </span>
+                    <span className={cn("shrink-0 font-black", accuracyText(c.accuracy))}>{c.accuracy}%</span>
+                  </div>
+                  <Progress value={c.accuracy} className={cn("h-2 rounded-full bg-muted", barTint(c.accuracy))} />
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* الصعوبة + الرؤى */}
+        <div className="space-y-5">
+          <Card className="rounded-3xl border-border/60">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex size-8 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500">
+                  <TrendingUp className="size-4" />
+                </span>
+                الأداء حسب الصعوبة
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              {difficulties.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">لا توجد بيانات بعد</p>
+              ) : (
+                difficulties.map((d) => (
+                  <div key={d.key} className="flex items-center gap-3">
+                    <span className="w-14 shrink-0 text-xs font-semibold">{DIFFICULTY_LABELS[d.key] ?? d.key}</span>
+                    <Progress value={d.accuracy} className={cn("h-2.5 flex-1 rounded-full bg-muted", barTint(d.accuracy))} />
+                    <span className={cn("w-12 shrink-0 text-left text-xs font-black", accuracyText(d.accuracy))}>
+                      {d.accuracy}%
+                    </span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl border-teal-500/20 bg-gradient-to-br from-teal-500/5 via-card to-cyan-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex size-8 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-300">
+                  <Sparkles className="size-4" />
+                </span>
+                رؤى ذكية لك
+              </CardTitle>
+              <CardDescription>ملاحظات مولّدة من أدائك الفعلي لمساعدتك على التطور</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              {insights.length === 0 ? (
+                <p className="py-3 text-center text-sm text-muted-foreground">
+                  العب بضع جولات أولاً ثم عد لرؤية توصياتك 🧠
+                </p>
+              ) : (
+                insights.map((ins, i) => (
+                  <div key={i} className="flex items-start gap-2.5 rounded-2xl bg-card p-3 text-[13px] leading-relaxed">
+                    <span className="mt-0.5 shrink-0">💡</span>
+                    {ins}
+                  </div>
+                ))
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1 w-full rounded-full"
+                onClick={shareSummary}
+              >
+                {copied ? <Check className="size-4 text-emerald-500" /> : <Share2 className="size-4" />}
+                {copied ? "تم النسخ ✓" : "نسخ بطاقة الأداء ومشاركتها"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  icon: Icon,
+  tint,
+}: {
+  label: string;
+  value: number | string;
+  icon: ComponentType<{ className?: string }>;
+  tint: string;
+}) {
+  return (
+    <Card className="rounded-2xl border-border/60">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2">
+          <span className={cn("flex size-8 items-center justify-center rounded-lg", tint)}>
+            <Icon className="size-4" />
+          </span>
+          <span className="text-lg font-black leading-none">{typeof value === "number" ? value.toLocaleString("en") : value}</span>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">{label}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    الصفحة
    ═══════════════════════════════════════════════════════════════════ */
 export default function Hub() {
@@ -1097,6 +1335,7 @@ export default function Hub() {
             transition={{ duration: 0.18 }}
           >
             {active === "overview" && <OverviewTab onGoTo={setActive} />}
+            {active === "analytics" && <AnalyticsTab />}
             {active === "quests" && <QuestsTab />}
             {active === "milestones" && <MilestonesTab />}
             {active === "titles" && <TitlesTab />}
