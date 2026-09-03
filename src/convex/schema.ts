@@ -18,9 +18,10 @@ export type Role = Infer<typeof roleValidator>;
 
 /** Room settings chosen by the host before the game starts. */
 export const gameSettingsValidator = v.object({
-  questionCount: v.number(), // 3 | 5 | 7 | 10
+  questionCount: v.number(), // 3 | 5 | 7 | 10 (classic mode) — ignored when durationMinutes > 0
   timePerQuestionMs: v.number(), // 10s | 15s | 20s | 30s
   categories: v.array(v.string()), // empty array = all categories
+  durationMinutes: v.optional(v.number()), // 0/absent = classic by question count; 5 | 10 | 15 = timed round
 });
 
 /** One recorded answer inside a player's answers array. */
@@ -146,6 +147,7 @@ const schema = defineSchema(
       firstCorrect: v.optional(v.array(v.union(v.string(), v.null()))), // per-question first correct userId
       createdAt: v.number(),
       settings: gameSettingsValidator, // room rules chosen by the host
+      roundEndsAt: v.optional(v.number()), // timed rounds: absolute ms timestamp when the match must stop
       rematchOf: v.optional(v.id("games")), // set when this game is a rematch of another
     })
       .index("by_code", ["code"])

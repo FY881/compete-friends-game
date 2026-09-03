@@ -15,6 +15,10 @@ import {
   CODE_ALPHABET,
   CODE_LENGTH,
   COUNTDOWN_MS,
+  DURATION_MODE_OFF,
+  DURATION_OPTIONS,
+  MINUTE_MS,
+  timedPoolSize,
   DIFFICULTY_BASE_POINTS,
   DIFFICULTY_SPEED_BONUS,
   FAST_ANSWER_MS,
@@ -70,6 +74,8 @@ export type GameSettings = {
   questionCount: number;
   timePerQuestionMs: number;
   categories: string[];
+  /** 0 (or absent on legacy rooms) = classic; 5 | 10 | 15 = timed round in minutes. */
+  durationMinutes?: number;
 };
 
 export type MyResult = {
@@ -105,6 +111,8 @@ export type GameData = {
     questionStartedAt: number;
     questionCount: number;
     settings: GameSettings;
+    /** Absolute timestamp when a timed round must stop (null in classic mode). */
+    roundEndsAt: number | null;
     firstCorrect: (string | null)[];
     rematchCode: string | null;
   };
@@ -298,10 +306,25 @@ const DEFAULT_SETTINGS: GameSettings = {
   questionCount: QUESTION_COUNT,
   timePerQuestionMs: ANSWER_MS,
   categories: [],
+  durationMinutes: DURATION_MODE_OFF,
 };
 
 function settingsOf(game: { settings?: GameSettings }): GameSettings {
   return game.settings ?? DEFAULT_SETTINGS;
+}
+
+/** Timed rounds: minutes chosen by the host (0 = classic by question count). */
+function durationOf(game: { settings?: GameSettings }): number {
+  return settingsOf(game).durationMinutes ?? DURATION_MODE_OFF;
+}
+
+/** How many questions to pre-pick for a round (classic count or timed pool). */
+function poolSizeFor(settings: GameSettings): number {
+  const duration = settings.durationMinutes ?? DURATION_MODE_OFF;
+  if (duration > 0) {
+    return timedPoolSize(duration, settings.timePerQuestionMs);
+  }
+  return settings.questionCount;
 }
 
 /** Structural db accessor so the helper works from both queries and mutations. */
@@ -325,6 +348,7 @@ function validateSettings(settings: {
   questionCount: number;
   timePerQuestionMs: number;
   categories: string[];
+  durationMinutes?: number;
 }) {
   if (
     !(QUESTION_COUNT_OPTIONS as readonly number[]).includes(
@@ -338,13 +362,20 @@ function validateSettings(settings: {
   ) {
     throw new Error("وقت الإجابة غير صالح");
   }
+  const durationMinutes = settings.durationMinutes ?? DURATION_MODE_OFF;
+  if (
+    durationMinutes !== DURATION_MODE_OFF &&
+    !(DURATION_OPTIONS as readonly number[]).includes(durationMinutes)
+  ) {
+    throw new Error("مدة الجولة غير صالحة — اختر 5 أو 10 أو 15 دقيقة");
+  }
   const unique = [...new Set(settings.categories)];
   if (
     unique.some((c) => !(CATEGORIES as readonly string[]).includes(c))
   ) {
     throw new Error("فئة أسئلة غير صالحة");
   }
-  return { ...settings, categories: unique };
+  return { ...settings, categories: unique, durationMinutes };
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +391,7 @@ export const createGame = mutation({
         questionCount: v.number(),
         timePerQuestionMs: v.number(),
         categories: v.array(v.string()),
+        durationMinutes: v.optional(v.number()),
       }),
     ),
   },
@@ -394,6 +426,7 @@ export const createGame = mutation({
         questionCount: QUESTION_COUNT,
         timePerQuestionMs: ANSWER_MS,
         categories: [],
+        durationMinutes: DURATION_MODE_OFF,
       },
     );
 
@@ -401,7 +434,7 @@ export const createGame = mutation({
     const questionIds = await pickQuestions(
       ctx,
       safeSettings.categories,
-      safeSettings.questionCount,
+      poolSizeFor(safeSettings),
     );
 
     const gameId = await ctx.db.insert("games", {
@@ -520,6 +553,7 @@ export const updateSettings = mutation({
       questionCount: v.number(),
       timePerQuestionMs: v.number(),
       categories: v.array(v.string()),
+      durationMinutes: v.optional(v.number()),
     }),
   },
   handler: async (ctx, { code, settings }) => {
@@ -540,7 +574,26 @@ export const updateSettings = mutation({
     }
 
     const safe = validateSettings(settings);
-    await ctx.db.patch(game._id, { settings: safe });
+    const current = settingsOf(game);
+    // Changing the rules changes which questions the room plays: re-pick the
+    // pool whenever the count, categories or round duration move. Swapping
+    // only the per-question timer keeps the current pool.
+    const shapeChanged =
+      current.questionCount !== safe.questionCount ||
+      (current.durationMinutes ?? DURATION_MODE_OFF) !== safe.durationMinutes ||
+      JSON.stringify(current.categories) !== JSON.stringify(safe.categories);
+
+    if (shapeChanged) {
+      const questionIds = await pickQuestions(ctx, safe.categories, poolSizeFor(safe));
+      await ctx.db.patch(game._id, {
+        settings: safe,
+        questionIds,
+        currentQuestionIndex: 0,
+        firstCorrect: [],
+      });
+    } else {
+      await ctx.db.patch(game._id, { settings: safe });
+    }
   },
 });
 
@@ -568,11 +621,16 @@ export const startGame = mutation({
     // A 3-2-1 countdown plays before the first question, then the answer
     // window opens (questionStartedAt already points at the moment the
     // window opens, so the timer is accurate for every player).
+    const duration = durationOf(game);
     await ctx.db.patch(game._id, {
       status: "playing",
       phase: "countdown",
       currentQuestionIndex: 0,
       questionStartedAt: now + COUNTDOWN_MS,
+      // Timed rounds: the answering window itself lasts the chosen minutes
+      // (the 3-2-1 countdown is extra, before the clock starts).
+      roundEndsAt:
+        duration > 0 ? now + COUNTDOWN_MS + duration * MINUTE_MS : undefined,
     });
 
     await ctx.scheduler.runAfter(COUNTDOWN_MS, internal.games.beginQuestion, {
@@ -926,7 +984,7 @@ export const rematch = mutation({
     const questionIds = await pickQuestions(
       ctx,
       settingsOf(game).categories,
-      settingsOf(game).questionCount,
+      poolSizeFor(settingsOf(game)),
     );
 
     const gameId = await ctx.db.insert("games", {
@@ -1003,14 +1061,26 @@ export const advanceQuestion = internalMutation({
       return; // stale job — the phase already moved on
     }
 
-    if (index >= game.questionIds.length - 1) {
+    // Timed rounds: the next question is only started when a full cycle
+    // (answer window + reveal) fits inside the remaining budget. Otherwise
+    // the clock won — finish right here, at the end of the current reveal.
+    const duration = durationOf(game);
+    const roundEndsAt = game.roundEndsAt ?? 0;
+    const now = Date.now();
+    const timeBudgetGone =
+      duration > 0 && roundEndsAt > 0 && now >= roundEndsAt;
+    const nextWouldNotFit =
+      duration > 0 &&
+      roundEndsAt > 0 &&
+      now + settingsOf(game).timePerQuestionMs + REVEAL_MS > roundEndsAt;
+
+    if (index >= game.questionIds.length - 1 || timeBudgetGone || nextWouldNotFit) {
       await ctx.db.patch(gameId, { status: "finished" });
       await ctx.scheduler.runAfter(0, internal.games.finishGame, { gameId });
       return;
     }
 
     const nextIndex = index + 1;
-    const now = Date.now();
     await ctx.db.patch(gameId, {
       currentQuestionIndex: nextIndex,
       phase: "answering",
@@ -1309,6 +1379,7 @@ export const getGame = query({
         questionStartedAt: game.questionStartedAt,
         questionCount: game.questionIds.length,
         settings: settingsOf(game),
+        roundEndsAt: game.roundEndsAt ?? null,
         firstCorrect: Array.from(
           { length: game.questionIds.length },
           (_, i) => game.firstCorrect?.[i] ?? null,

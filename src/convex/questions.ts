@@ -6,7 +6,76 @@ export type Question = {
   category: string;
   difficulty: Difficulty;
   question: string;
-  options: [string, string, string, string];
+  options: [string, string, string, string
+
+  // ── الدفعة الجديدة: 300 سؤال (q321 – q620) ───────────────────────────
+
+  // ── عام ──
+  { id: "q321", category: "عام", difficulty: "easy", question: "ما هي أكبر دولة في العالم من حيث المساحة؟", options: ["روسيا", "كندا", "الصين", "أمريكا"], correctIndex: 0 },
+  { id: "q322", category: "عام", difficulty: "easy", question: "ما هي عاصمة الأردن؟", options: ["عمّان", "بيروت", "بغداد", "صنعاء"], correctIndex: 0 },
+  { id: "q323", category: "عام", difficulty: "easy", question: "ما هي أصغر دولة في العالم من حيث المساحة؟", options: ["مالطا", "الفاتيكان", "موناكو", "لوكسمبورغ"], correctIndex: 1 },
+  { id: "q324", category: "عام", difficulty: "medium", question: "ما هو أطول سور دفاعي في العالم؟", options: ["سور هادريان", "سور الصين العظيم", "سور برلين", "سور الأطلسي"], correctIndex: 1 },
+  { id: "q325", category: "عام", difficulty: "easy", question: "ما هي أكبر جزيرة في العالم؟", options: ["مدغشقر", "بورنيو", "غرينلاند", "سومطرة"], correctIndex: 2 },
+  { id: "q326", category: "عام", difficulty: "easy", question: "ما هي العملة الرسمية في بريطانيا؟", options: ["اليورو", "الدولار", "الجنيه الإسترليني", "الفرنك"], correctIndex: 2 },
+  { id: "q327", category: "عام", difficulty: "medium", question: "ما هي اللغة الأكثر تحدثاً في العالم كلغة أم؟", options: ["الإنجليزية", "الإسبانية", "الماندرين الصينية", "الفرنسية"], correctIndex: 2 },
+  { id: "q328", category: "عام", difficulty: "medium", question: "ما هو أطول نهر في أوروبا؟", options: ["الراين", "الدانوب", "الفولغا", "التيبر"], correctIndex: 2 },
+  { id: "q329", category: "عام", difficulty: "easy", question: "ما هي العملة الرسمية في دولة الإمارات؟", options: ["الريال", "الدرهم", "الدينار", "الجنيه"], correctIndex: 1 },
+  { id: "q330", category: "عام", difficulty: "medium", question: "ما هي أكثر دولة في العالم من حيث عدد السكان؟", options: ["الصين", "الهند", "أمريكا", "إندونيسيا"], correctIndex: 1 },
+  { id: "q331", category: "عام", difficulty: "medium", question: "ما هي أكبر بحيرة مياه عذبة في العالم من حيث المساحة؟", options: ["بحيرة بايكال", "بحيرة فيكتوريا", "بحيرة سوبيريور", "بحيرة تنجانيقا"], correctIndex: 2 },
+  { id: "q332", category: "عام", difficulty: "easy", question: "ما هي عاصمة كندا؟", options: ["تورونتو", "مونتريال", "أوتاوا", "فانكوفر"], correctIndex: 2 },
+  { id: "q333", category: "عام", difficulty: "easy", question: "ما هي العملة الرسمية في تركيا؟", options: ["الجنيه", "الليرة التركية", "الدينار", "الدرهم"], correctIndex: 1 },
+  { id: "q334", category: "عام", difficulty: "hard", question: "كم عدد اللغات الرسمية في سويسرا؟", options: ["اثنتان", "ثلاث", "أربع", "خمس"], correctIndex: 2 },
+  { id: "q335", category: "عام", difficulty: "medium", question: "ما هو أعلى شلال في العالم؟", options: ["شلال نياجرا", "شلال أنجل", "شلال فيكتوريا", "شلال إجوازو"], correctIndex: 1 },
+  { id: "q336", category: "عام", difficulty: "easy", question: "في أي دولة يقع برج بيزا المائل؟", options: ["فرنسا", "إسبانيا", "إيطاليا", "اليونان"], correctIndex: 2 },
+  { id: "q337", category: "عام", difficulty: "easy", question: "ما الدولة الملقبة بأرض الشمس المشرقة؟", options: ["الصين", "كوريا", "اليابان", "تايلاند"], correctIndex: 2 },
+  { id: "q338", category: "عام", difficulty: "medium", question: "ما هو أكبر تجمع حضري في العالم من حيث السكان؟", options: ["نيودلهي", "شنغهاي", "طوكيو", "مكسيكو سيتي"], correctIndex: 2 },
+  { id: "q339", category: "عام", difficulty: "easy", question: "ما هي عاصمة النمسا؟", options: ["زيورخ", "براغ", "فيينا", "ميونخ"], correctIndex: 2 },
+  { id: "q340", category: "عام", difficulty: "hard", question: "كم عدد الدول الأعضاء في الاتحاد الأوروبي حالياً؟", options: ["25", "26", "27", "28"], correctIndex: 2 },
+
+  // ── علوم ──
+  { id: "q341", category: "علوم", difficulty: "easy", question: "ما هي أصلب مادة طبيعية معروفة؟", options: ["الحديد", "الألماس", "الكوارتز", "التنجستن"], correctIndex: 1 },
+  { id: "q342", category: "علوم", difficulty: "medium", question: "ما هو العنصر الأكثر وفرة في القشرة الأرضية؟", options: ["السيليكون", "الألمنيوم", "الأكسجين", "الحديد"], correctIndex: 2 },
+  { id: "q343", category: "علوم", difficulty: "medium", question: "ما الغاز الرئيسي الناتج عن النشاط البشري والمسبب للاحتباس الحراري؟", options: ["الأكسجين", "النيتروجين", "ثاني أكسيد الكربون", "الهيدروجين"], correctIndex: 2 },
+  { id: "q344", category: "علوم", difficulty: "easy", question: "ما هي وحدة قياس شدة التيار الكهربائي؟", options: ["الفولت", "الواط", "الأمبير", "الأوم"], correctIndex: 2 },
+  { id: "q345", category: "علوم", difficulty: "easy", question: "ماذا نسمي تحول الماء من سائل إلى بخار؟", options: ["التجمد", "التكاثف", "التبخر", "الترسيب"], correctIndex: 2 },
+  { id: "q346", category: "علوم", difficulty: "easy", question: "ما الكائن الذي ينتج لنا الحرير الطبيعي؟", options: ["النحلة", "العنكبوت", "دودة القز", "الخنفساء"], correctIndex: 2 },
+  { id: "q347", category: "علوم", difficulty: "medium", question: "كم عدد فقرات رقبة الزرافة؟", options: ["سبع", "خمس عشرة", "أربعون", "اثنتان وخمسون"], correctIndex: 0 },
+  { id: "q348", category: "علوم", difficulty: "hard", question: "ما هي أطول خلية في جسم الإنسان؟", options: ["خلية العضلة", "الخلية العصبية", "خلية العظم", "خلية الدم"], correctIndex: 1 },
+  { id: "q349", category: "علوم", difficulty: "medium", question: "ما الغاز الخامل المستخدم تقليدياً في ملء المصابيح المتوهجة؟", options: ["الهيدروجين", "الهيليوم", "الأرغون", "النيون"], correctIndex: 2 },
+  { id: "q350", category: "علوم", difficulty: "easy", question: "ماذا يقيس جهاز البارومتر؟", options: ["سرعة الرياح", "الضغط الجوي", "نسبة الرطوبة", "درجة الحرارة"], correctIndex: 1 },
+  { id: "q351", category: "علوم", difficulty: "medium", question: "ما هو العدد الذري لعنصر الكربون؟", options: ["4", "6", "8", "12"], correctIndex: 1 },
+  { id: "q352", category: "علوم", difficulty: "easy", question: "ما أصغر وحدة في العنصر الكيميائي تحتفظ بخصائصه؟", options: ["الذرة", "الإلكترون", "النواة", "الأيون"], correctIndex: 0 },
+  { id: "q353", category: "علوم", difficulty: "medium", question: "ماذا نسمي عملية خروج بخار الماء من أوراق النباتات؟", options: ["التنفس", "النتح", "الامتصاص", "التخمر"], correctIndex: 1 },
+  { id: "q354", category: "علوم", difficulty: "medium", question: "أي من الحيوانات التالية ليس من الثدييات؟", options: ["الحوت", "الخفاش", "التمساح", "الدلفين"], correctIndex: 2 },
+  { id: "q355", category: "علوم", difficulty: "easy", question: "ما العضو الذي يفرز هرمون الأنسولين؟", options: ["الكبد", "المعدة", "البنكرياس", "الطحال"], correctIndex: 2 },
+  { id: "q356", category: "علوم", difficulty: "easy", question: "مقياس ريختر يقيس قوة ماذا؟", options: ["الأعاصير", "الزلازل", "البراكين", "الفيضانات"], correctIndex: 1 },
+  { id: "q357", category: "علوم", difficulty: "easy", question: "ما المادة الشائعة التي توجد طبيعياً في حالاتها الثلاث؟", options: ["الزيت", "الماء", "الكحول", "الزئبق"], correctIndex: 1 },
+  { id: "q358", category: "علوم", difficulty: "medium", question: "ذوبان الجليد وتحوله إلى ماء تغير من نوع: ماذا؟", options: ["كيميائي", "فيزيائي", "نووي", "بيولوجي"], correctIndex: 1 },
+  { id: "q359", category: "علوم", difficulty: "medium", question: "ما وظيفة الخلايا المخروطية في شبكية العين؟", options: ["الرؤية الليلية", "الرؤية الملونة", "ضبط التوازن", "إفراز الدموع"], correctIndex: 1 },
+  { id: "q360", category: "علوم", difficulty: "easy", question: "ما هي وحدة قياس الطاقة في النظام الدولي؟", options: ["الجول", "الباسكال", "الأمبير", "الهرتز"], correctIndex: 0 },
+  { id: "q361", category: "علوم", difficulty: "medium", question: "ما العضو الذي يخزن العصارة الصفراوية؟", options: ["البنكرياس", "الطحال", "المرارة", "الكلية"], correctIndex: 2 },
+  { id: "q362", category: "علوم", difficulty: "hard", question: "ما الظاهرة الطبيعية التي تسبب المد والجزر في المقام الأول؟", options: ["جاذبية القمر", "دوران الأرض", "الرياح", "حرارة الشمس"], correctIndex: 0 },
+
+  // ── جغرافيا ──
+  { id: "q363", category: "جغرافيا", difficulty: "medium", question: "مضيق جبل طارق يفصل بين: ماذا؟", options: ["تونس وإيطاليا", "المغرب وإسبانيا", "مصر والسعودية", "تركيا واليونان"], correctIndex: 1 },
+  { id: "q364", category: "جغرافيا", difficulty: "hard", question: "ما هي عاصمة سويسرا؟", options: ["جنيف", "زيورخ", "برن", "بازل"], correctIndex: 2 },
+  { id: "q365", category: "جغرافيا", difficulty: "hard", question: "ما هو أكبر خليج في العالم من حيث المساحة؟", options: ["الخليج العربي", "خليج المكسيك", "خليج البنغال", "خليج ألاسكا"], correctIndex: 2 },
+  { id: "q366", category: "جغرافيا", difficulty: "medium", question: "ما الجبال التي تفصل قارة أوروبا عن آسيا؟", options: ["جبال الألب", "جبال القوقاز", "جبال الأورال", "جبال الكاربات"], correctIndex: 2 },
+  { id: "q367", category: "جغرافيا", difficulty: "medium", question: "أي دولة من التالية دولة غير ساحلية؟", options: ["البرتغال", "اليونان", "سويسرا", "النرويج"], correctIndex: 2 },
+  { id: "q368", category: "جغرافيا", difficulty: "easy", question: "كم عدد الدول العربية؟", options: ["18", "20", "22", "25"], correctIndex: 2 },
+  { id: "q369", category: "جغرافيا", difficulty: "medium", question: "ما هي عاصمة البرازيل؟", options: ["ريو دي جانيرو", "ساو باولو", "برازيليا", "سلفادور"], correctIndex: 2 },
+  { id: "q370", category: "جغرافيا", difficulty: "easy", question: "في أي قارة تقع جبال الأنديز؟", options: ["أمريكا الشمالية", "أمريكا الجنوبية", "آسيا", "أوروبا"], correctIndex: 1 },
+  { id: "q371", category: "جغرافيا", difficulty: "easy", question: "في أي منطقة تقع صحراء الربع الخالي؟", options: ["شمال أفريقيا", "شبه الجزيرة العربية", "آسيا الوسطى", "أستراليا"], correctIndex: 1 },
+  { id: "q372", category: "جغرافيا", difficulty: "medium", question: "في أي مدينة يقع مضيق البوسفور؟", options: ["القاهرة", "إسطنبول", "أثينا", "موسكو"], correctIndex: 1 },
+  { id: "q373", category: "جغرافيا", difficulty: "medium", question: "ما هي أصغر الدول العربية من حيث المساحة؟", options: ["قطر", "جيبوتي", "البحرين", "الكويت"], correctIndex: 2 },
+  { id: "q374", category: "جغرافيا", difficulty: "easy", question: "في أي قارة يقع نهر الأمازون؟", options: ["أفريقيا", "آسيا", "أمريكا الجنوبية", "أوقيانوسيا"], correctIndex: 2 },
+  { id: "q375", category: "جغرافيا", difficulty: "easy", question: "ما هي أكبر دولة من حيث المساحة في أمريكا الجنوبية؟", options: ["الأرجنتين", "البرازيل", "بيرو", "كولومبيا"], correctIndex: 1 },
+  { id: "q376", category: "جغرافيا", difficulty: "medium", question: "مضيق هرمز يربط الخليج العربي بأي مسطح مائي؟", options: ["البحر الأحمر", "بحر عمان", "البحر المتوسط", "البحر الأسود"], correctIndex: 1 },
+  { id: "q377", category: "جغرافيا", difficulty: "hard", question: "ما هي عاصمة نيوزيلندا؟", options: ["أوكلاند", "كرايستشيرش", "ويلينغتون", "هاميلتون"], correctIndex: 2 },
+  { id: "q378", category: "جغرافيا", difficulty: "medium", question: "في أي دولة يقع جبل كليمنجارو؟", options: ["كينيا", "أوغندا", "تنزانيا", "إثيوبيا"], correctIndex: 2 },
+  { id: "q379", category: "جغرافيا", difficulty: "easy", question: "قناة السويس تربط أي بحرين؟", options: ["الأحمر والهندي", "المتوسط والبحر الأحمر", "الأحمر والخليج", "المتوسط والأسود"], correctIndex: 1 },
+  { id: "q380", category: "جغرافيا", difficulty: "medium", question: "في أي مدينة هندية يقع تاج محل؟", options: ["نيودلهي", "أغرا", "مومباي", "جايبور"], correctIndex: 1 },
+];
   correctIndex: 0 | 1 | 2 | 3;
 };
 
@@ -30,6 +99,8 @@ export const CATEGORIES = [
   "دين وثقافة",
   "جسم الإنسان",
   "منوعات",
+  "ألغاز وأحاجي",
+  "ملاحظة ودقة",
 ] as const;
 
 export const QUESTION_BANK: Question[] = [

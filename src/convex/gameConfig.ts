@@ -18,6 +18,27 @@ export const COUNTDOWN_MS = 3_000; // 3-2-1 countdown before the first question
 export const QUESTION_COUNT_OPTIONS = [3, 5, 7, 10] as const;
 export const TIME_OPTIONS = [5_000, 10_000, 15_000, 20_000, 30_000] as const; // 5s = "blitz"
 
+// ── Timed rounds («مدة الجولة») ─────────────────────────────────────
+// When the host picks a duration instead of a question count, the round runs
+// on the clock: questions keep flowing until the time budget is used up.
+// `0` = classic mode (round ends after `questionCount` questions).
+export const DURATION_MODE_OFF = 0;
+export const DURATION_OPTIONS = [5, 10, 15] as const; // minutes
+export const MINUTE_MS = 60_000;
+
+/**
+ * How many questions a timed round should pre-pick so the game never runs
+ * dry before the clock does: every question cycle takes roughly
+ * `timePerQuestionMs` (answer) + `REVEAL_MS` (reveal), + a small buffer.
+ * Capped so the room row stays light.
+ */
+export function timedPoolSize(minutes: number, timePerQuestionMs: number): number {
+  if (!minutes || minutes <= 0) return 0;
+  const cycleMs = Math.max(1, timePerQuestionMs + REVEAL_MS);
+  const needed = Math.ceil((minutes * MINUTE_MS) / cycleMs) + 4; // buffer for countdown/joins
+  return Math.min(Math.max(needed, 3), 100);
+}
+
 export const LIFELINES_PER_GAME = 1; // 50/50 uses per player per game
 
 // ── Bonus systems ────────────────────────────────────────────────────────

@@ -28,6 +28,15 @@ export function formatTimeOption(ms: number): string {
   return `${min} ${min === 1 ? "دقيقة" : "دقائق"}`;
 }
 
+// ── Timed rounds («مدة الجولة») — mirrors convex/gameConfig.ts ──────────
+export const DURATION_MODE_OFF = 0;
+export const DURATION_OPTIONS = [5, 10, 15] as const; // minutes
+
+/** Arabic label for a round duration in minutes (0 = classic by questions). */
+export function formatDurationLabel(minutes: number): string {
+  if (!minutes || minutes <= 0) return "حتى آخر سؤال";
+  return `${minutes} ${minutes === 1 ? "دقيقة" : "دقائق"}`;
+}
 
 // Game Modes (15+)
 export const GAME_MODES = {

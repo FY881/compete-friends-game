@@ -26,6 +26,10 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
+import {
+  DURATION_MODE_OFF,
+  formatDurationLabel,
+} from "@/lib/game-config";
 
 const NICKNAME_KEY = "mindclash.nickname";
 
@@ -139,9 +143,15 @@ export default function Game() {
   }
 
   const me = data.players.find((p) => p.isMe);
+  const timedRound =
+    (data.game.settings?.durationMinutes ?? DURATION_MODE_OFF) > 0;
   const progress =
     data.game.status === "playing"
-      ? `سؤال ${data.game.currentQuestionIndex + 1} من ${data.game.questionCount}`
+      ? timedRound
+        ? `⏱ جولة ${formatDurationLabel(
+            data.game.settings?.durationMinutes ?? DURATION_MODE_OFF,
+          )}`
+        : `سؤال ${data.game.currentQuestionIndex + 1} من ${data.game.questionCount}`
       : null;
 
   // وصل اللاعب عبر رابط دعوة لكنه ليس ضمن اللاعبين بعد:

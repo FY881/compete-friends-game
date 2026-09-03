@@ -32,6 +32,14 @@ import { useNow } from "./ui";
 
 const OPTION_LETTERS = ["أ", "ب", "ج", "د"];
 
+/** mm:ss — used by the round clock in timed matches. */
+function formatClock(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 const DIFFICULTY_STYLES = {
   easy: {
     label: "سهل",
@@ -122,6 +130,12 @@ export function QuestionStage({
   const index = g.currentQuestionIndex;
   const question = game.questions[index];
   const phase = g.phase;
+  // Timed rounds («مدة الجولة»): the round clock counts down from the chosen
+  // minutes while questions keep flowing — the server stops the match at 0.
+  const durationMinutes = g.settings?.durationMinutes ?? 0;
+  const roundEndsAt = g.roundEndsAt ?? 0;
+  const isTimedRound = durationMinutes > 0 && roundEndsAt > 0;
+  const roundLeftMs = roundEndsAt - now;
   // Fallbacks for legacy rooms: settings/questionStartedAt may be missing on
   // very old game rows — never let that crash the game screen.
   const startedAt = g.questionStartedAt || now;
@@ -418,9 +432,25 @@ export function QuestionStage({
               <span className={cn("size-1.5 rounded-full", difficultyStyle.dot)} />
               {difficultyStyle.label}
             </Badge>
-            <Badge variant="secondary" className="gap-1.5">
-              السؤال {index + 1} من {g.questionCount}
-            </Badge>
+            {isTimedRound ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-700",
+                  roundLeftMs <= 60_000 && roundLeftMs > 0 &&
+                    "border-rose-500/40 bg-rose-500/10 text-rose-700",
+                )}
+              >
+                <Hourglass className="size-3" />
+                {roundLeftMs > 0
+                  ? `متبقي ${formatClock(roundLeftMs)}`
+                  : "انتهى الوقت — جارٍ الإنهاء"}
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="gap-1.5">
+                السؤال {index + 1} من {g.questionCount}
+              </Badge>
+            )}
             {isGolden && (
               <Badge className="gap-1.5 border-amber-500/40 bg-amber-400/15 text-amber-700 hover:bg-amber-400/15">
                 <Trophy className="size-3" />

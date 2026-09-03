@@ -5,6 +5,9 @@ import type { GameData, GameSettings } from "@/convex/games";
 import { CATEGORIES } from "@/convex/questions";
 import {
   ANSWER_MS,
+  DURATION_MODE_OFF,
+  DURATION_OPTIONS,
+  formatDurationLabel,
   formatTimeOption,
   QUESTION_COUNT,
   QUESTION_COUNT_OPTIONS,
@@ -45,6 +48,7 @@ import {
   Share2,
   ShieldCheck,
   SlidersHorizontal,
+  Timer,
   Users,
   UserRoundPlus,
   UserX,
@@ -150,12 +154,23 @@ const REPORT_REASONS = [
 ];
 
 function SettingsSummary({ settings }: { settings: GameSettings }) {
+  const timed = (settings.durationMinutes ?? DURATION_MODE_OFF) > 0;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Badge variant="outline" className="gap-1.5 rounded-full">
-        <ListChecks className="size-3.5 text-primary" />
-        {settings.questionCount} أسئلة
-      </Badge>
+      {timed ? (
+        <Badge
+          variant="outline"
+          className="gap-1.5 rounded-full border-amber-500/40 bg-amber-500/10 text-amber-700"
+        >
+          <Timer className="size-3.5" />
+          {formatDurationLabel(settings.durationMinutes ?? DURATION_MODE_OFF)}
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="gap-1.5 rounded-full">
+          <ListChecks className="size-3.5 text-primary" />
+          {settings.questionCount} أسئلة
+        </Badge>
+      )}
       <Badge variant="outline" className="gap-1.5 rounded-full">
         <Gauge className="size-3.5 text-primary" />
         {formatTimeOption(settings.timePerQuestionMs)} لكل سؤال
@@ -197,30 +212,89 @@ function HostSettings({
         إعدادات الجولة
       </p>
 
-      {/* Question count */}
+      {/* Round duration: classic (by questions) or timed 5/10/15 minutes */}
       <div className="mt-4">
-        <p className="text-xs font-semibold text-muted-foreground">عدد الأسئلة</p>
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+          <Timer className="size-3.5 text-primary" />
+          مدة الجولة
+        </p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {QUESTION_COUNT_OPTIONS.map((count) => (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() =>
+              onChange({ ...settings, durationMinutes: DURATION_MODE_OFF })
+            }
+            className={cn(
+              "rounded-xl border px-4 py-2 text-sm font-bold transition-all",
+              (settings.durationMinutes ?? DURATION_MODE_OFF) === DURATION_MODE_OFF
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : "border-border/80 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+            )}
+          >
+            كلاسيك
+          </button>
+          {DURATION_OPTIONS.map((minutes) => (
             <button
-              key={count}
+              key={minutes}
               type="button"
               disabled={disabled}
               onClick={() =>
-                onChange({ ...settings, questionCount: count })
+                onChange({ ...settings, durationMinutes: minutes })
               }
               className={cn(
                 "rounded-xl border px-4 py-2 text-sm font-bold transition-all",
-                settings.questionCount === count
-                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                  : "border-border/80 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                settings.durationMinutes === minutes
+                  ? "border-amber-500 bg-amber-500 text-white shadow-sm"
+                  : "border-border/80 bg-card text-muted-foreground hover:border-amber-500/50 hover:text-foreground",
               )}
             >
-              {count}
+              ⏱ {formatDurationLabel(minutes)}
             </button>
           ))}
         </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          «كلاسيك»: تنتهي الجولة بعد عدد الأسئلة المحدد. اختيار دقائق يحوّل الجولة
+          إلى سباق بالوقت — تنساب الأسئلة تلقائياً حتى انتهاء المدة.
+        </p>
       </div>
+
+      {/* Question count — classic mode only */}
+      {(settings.durationMinutes ?? DURATION_MODE_OFF) === DURATION_MODE_OFF ? (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-muted-foreground">عدد الأسئلة</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {QUESTION_COUNT_OPTIONS.map((count) => (
+              <button
+                key={count}
+                type="button"
+                disabled={disabled}
+                onClick={() =>
+                  onChange({ ...settings, questionCount: count })
+                }
+                className={cn(
+                  "rounded-xl border px-4 py-2 text-sm font-bold transition-all",
+                  settings.questionCount === count
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border/80 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                )}
+              >
+                {count}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
+          <p className="text-xs font-bold text-amber-700">
+            ⏱ وضع الوقت مفعّل ({formatDurationLabel(settings.durationMinutes ?? DURATION_MODE_OFF)})
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            الجولة تنتهي عند انتهاء المدة مهما كان عدد الأسئلة المتبقية. كلما كانت
+            الإجابات أسرع، زاد عدد الأسئلة التي تلعبها.
+          </p>
+        </div>
+      )}
 
       {/* Time per question */}
       <div className="mt-4">
@@ -415,6 +489,7 @@ export function Lobby({
     questionCount: QUESTION_COUNT,
     timePerQuestionMs: ANSWER_MS,
     categories: [],
+    durationMinutes: DURATION_MODE_OFF,
   };
   const inviteLink =
     typeof window !== "undefined"
