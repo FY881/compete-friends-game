@@ -1,4 +1,3 @@
-/*HEADER*/
 export type Difficulty = "easy" | "medium" | "hard";
 
 export type Question = {
@@ -7,6 +6,8 @@ export type Question = {
   difficulty: Difficulty;
   question: string;
   options: [string, string, string, string
+
+  // ── بنك الأسئلة الأساسي (q001 – q320) ────────────────────────────────
 
   // ── الدفعة الجديدة: 300 سؤال (q321 – q620) ───────────────────────────
 
