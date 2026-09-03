@@ -1,4 +1,5 @@
 import { ZakaLogo } from "@/components/ZakaLogo";
+import { OWNER_ROOM_ENABLED } from "@/lib/buildFlags";
 import { useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
@@ -284,7 +285,7 @@ export default function Play() {
                 <span className="hidden md:inline">تحميل التطبيق</span>
               </Link>
             </Button>
-            {discipline?.isOwner ? (
+            {OWNER_ROOM_ENABLED && (discipline?.isOwner ? (
               <Button
                 type="button"
                 variant="outline"
@@ -306,7 +307,7 @@ export default function Play() {
               >
                 <ShieldCheck className="size-3.5" />
               </Button>
-            )}
+            ))}
             <div className="hidden items-center gap-2.5 sm:flex">
               <Avatar className="size-8">
                 {user?.image && <AvatarImage src={user.image} alt={displayName} />}

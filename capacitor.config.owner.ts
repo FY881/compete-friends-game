@@ -14,7 +14,6 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: "https",
     cleartext: false,
-    url: "https://quaint-ptarmigan-843.convex.site", // redirect to the same web app
   },
   android: {
     backgroundColor: "#0a0e1a",

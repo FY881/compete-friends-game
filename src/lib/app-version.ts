@@ -34,14 +34,14 @@ const apkAssetUrl = apkAssetUrlRaw.split("?")[0];
  * إصدار ملف APK مستقل عنه (`APK_VERSION`) لأن الملف الموقّع المنشور يبقى
  * باسمه وبصمته حتى يُبنى ملف جديد فعلياً — لا ترفع إصدار الويب من أجل APK.
  */
-export const APP_VERSION = "3.0.0"; // حرب العقول v3
+export const APP_VERSION = "3.1.0"; // حرب العقول v3.1
 
 /** إصدار ملف APK الرسمي المنشور (مطابق لـ CURRENT_VERSION في apkRelease). */
-export const APK_VERSION = "1.5.4";
+export const APK_VERSION = "1.6.0";
 
 /** اسم ملف APK الرسمي — ثابت لأن اسم الملف الموقّع لا يتغير مع إصدار الويب. */
-export const APK_FALLBACK_FILE = "al-abqari-v1.5.4.apk";
-export const APK_TMPFILES_URL = "https://tmpfiles.org/dl/wswWswVylJG9/al-abqari-v2.0.0.apk";
+export const APK_FALLBACK_FILE = "al-abqari-v1.6.0.apk";
+export const APK_TMPFILES_URL = "";
 
 /**
  * مرآة موثّقة احتياطية لملف APK (مصدرها `apkRelease.ts` على الخادم —
@@ -53,8 +53,7 @@ export const APK_TMPFILES_URL = "https://tmpfiles.org/dl/wswWswVylJG9/al-abqari-
  * الرابط الأساسي للتحميل — tmpfiles.org هو المصدر الأول والموثوق.
  * يُحدّث تلقائياً عند كل إصدار جديد.
  */
-export const APK_PRIMARY_DOWNLOAD_URL =
-  "https://tmpfiles.org/dl/wswWswVylJG9/al-abqari-v2.0.0.apk";
+export const APK_PRIMARY_DOWNLOAD_URL = "";
 
 /** مرآة احتياطية (الرابط القديم — يبقى كملاذ أخير). */
 export const APK_MIRROR_FALLBACK_URL = APK_PRIMARY_DOWNLOAD_URL;

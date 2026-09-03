@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import type { ProfileStats } from "@/convex/stats";
 import { BADGES } from "@/convex/stats";
 import { useAuth } from "@/hooks/use-auth";
+import { OWNER_ROOM_ENABLED } from "@/lib/buildFlags";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -192,7 +193,7 @@ export default function Profile() {
           </button>
 
           <div className="flex items-center gap-3">
-            {discipline?.isOwner && (
+            {OWNER_ROOM_ENABLED && discipline?.isOwner && (
               <Button
                 type="button"
                 variant="outline"

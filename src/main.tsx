@@ -8,15 +8,22 @@ import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import React, { StrictMode, useEffect, lazy, Suspense, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router";
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { ErrorHunter, setErrorHunterClient, startPerformanceMonitor } from "@/components/ErrorHunter";
 import { SplashScreen } from "@/components/SplashScreen";
 import "./index.css";
+
+// ── أعلام نسخة البناء (محلية لتُمكّن Rollup من إسقاط كود المالك نهائياً) ──
+// Vite يستبدل import.meta.env.* وقت البناء بنص حرفي، فيُسقط البناء مسارات
+// غرفة المالك من نسخة اللاعبين (VITE_NO_OWNER=1) ويحوّل نسخة المالك إلى
+// بوابة مالك موجهة (VITE_OWNER_APP=1).
+const OWNER_APP_MODE = import.meta.env.VITE_OWNER_APP === "1";
+const OWNER_ROOM_ENABLED = import.meta.env.VITE_NO_OWNER !== "1";
 import { lazyRetry } from "@/lib/lazyRetry";
 
 // Lazy load route components with automatic retry on failure
@@ -193,6 +200,26 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 
 
 
+/**
+ * بوابة تطبيق المالك المستقل (نسخة APK المنفصلة):
+ * الصفحة الرئيسية فيه توجّه دائماً إلى تجربة المالك — حساب ←
+ * تسجيل دخول المالك (Premium) ← لوحة التحكم الكاملة.
+ */
+function OwnerAppHome() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isLoading) return;
+    navigate(
+      isAuthenticated ? "/owner-login" : "/auth?returnTo=/owner-login",
+      { replace: true },
+    );
+  }, [isAuthenticated, isLoading, navigate]);
+
+  return <RouteLoading />;
+}
+
 function RouteSyncer() {
   const location = useLocation();
   useEffect(() => {
@@ -233,7 +260,10 @@ function AppShell() {
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>
             <Routes>
-              <Route path="/" element={<Landing />} />
+              <Route
+                path="/"
+                element={OWNER_APP_MODE ? <OwnerAppHome /> : <Landing />}
+              />
               <Route
                 path="/auth"
                 element={<AuthPage redirectAfterAuth="/play" />}
@@ -262,18 +292,22 @@ function AppShell() {
                   </RequireAuth>
                 }
               />
-              <Route
-                path="/owner-login"
-                element={<OwnerPremiumLogin />}
-              />
-              <Route
-                path="/owner"
-                element={
-                  <RequireAuth>
-                    <Owner />
-                  </RequireAuth>
-                }
-              />
+              {OWNER_ROOM_ENABLED && (
+                <>
+                  <Route
+                    path="/owner-login"
+                    element={<OwnerPremiumLogin />}
+                  />
+                  <Route
+                    path="/owner"
+                    element={
+                      <RequireAuth>
+                        <Owner />
+                      </RequireAuth>
+                    }
+                  />
+                </>
+              )}
               <Route path="/rules" element={<Rules />} />
               <Route path="/download" element={<Download />} />
               <Route path="/games" element={<MiniGames />} />
