@@ -1,75 +1,48 @@
 /**
- * حرب العقول — لوحة السيطرة — طبقة الأنظمة الخلفية (Atlas Control Backend)
+ * أطلس كنترول — طبقة الأنظمة الخلفية (Atlas Control Backend)
  *
- * هذه الوحدة هي العقل التنفيذي لتطبيق «حرب العقول — لوحة السيطرة» المستقل:
+ * العقل التنفيذي لتطبيق «أطلس كنترول» المستقل:
  * - سجل الأنظمة العشرة الكبرى + الـ 80 ميزة (مصدر واحد تتقاسمه الخلفية والواجهة).
- * - دالة تنفيذ الأوامر الحقيقية: كل ميزة تُنفَّذ عبر دوال خادم فعلية من
- *   اللعبة نفسها (owner / playerControl / lawEnforcement / adminControl /
- *   memberships / errorHunter / reportsSmart / store / apkRelease…)
- *   فتنعكس مباشرة على لعبة «حرب العقول» أونلاين — بلا أي محاكاة.
+ * - كل ميزة تُنفَّذ عبر دوال خادم فعلية تقرأ وتكتب في قاعدة بيانات اللعبة
+ *   نفسها (users / games / reports / memberships / settings / notifications /
+ *   errorLogs / moderationLogs…) فتنعكس مباشرة على «حرب العقول» أونلاين
+ *   — بلا أي محاكاة أو بيانات وهمية.
  * - محرك الأنظمة الحرة: مسح شامل لحالة اللعبة، كشف الشذوذ، اقتراحات ذكية،
  *   وذاكرة تعلّم من قرارات المالك.
  *
- * الصلاحيات: كل شيء محصور بالمالك الرسمي (omw70op@gmail.com) — نفس
- * حماية غرفة الملك، مع تسجيل كل أمر في سجل تدقيق دائم.
+ * الصلاحيات: كل شيء محصور بالمالك الرسمي — نفس حماية غرفة المالك، مع
+ * تسجيل كل أمر في سجل تدقيق دائم (atlasCommands).
  */
 
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
 import {
-  action,
-  internalMutation,
-  internalQuery,
   mutation,
   query,
+  type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import {
-  getCurrentUser,
-} from "./users";
-import {
-  isOwnerUser,
-} from "./owner";
+import { isOwnerUser } from "./owner";
 import { QUESTION_BANK, CATEGORIES } from "./questions";
 import { ALL_ITEMS, STORE_SECTIONS, STORE_BUNDLES } from "./store";
 import { MEMBERSHIP_TIERS } from "./memberships";
-import { CURRENT_VERSION, BUILD_ID, APK_FILE_NAME, APK_SHA256, APK_BYTES } from "./apkRelease";
+import { REPORT_CATEGORIES } from "./reportsSmart";
+import {
+  CURRENT_VERSION,
+  BUILD_ID,
+  APK_FILE_NAME,
+  APK_SHA256,
+  APK_BYTES,
+} from "./apkRelease";
 
 // ═══════════════════════════════════════════════════════════════════════
 // سجل الأنظمة العشرة الكبرى + الـ 80 ميزة (المصدر الموحّد)
 // ═══════════════════════════════════════════════════════════════════════
 
-export type AtlasFeatureId =
-  | "c1" | "c2" | "c3" | "c4" | "c5" | "c6" | "c7" | "c8"
-  | "p1" | "p2" | "p3" | "p4" | "p5" | "p6" | "p7" | "p8"
-  | "m1" | "m2" | "m3" | "m4" | "m5" | "m6" | "m7" | "m8"
-  | "q1" | "q2" | "q3" | "q4" | "q5" | "q6" | "q7" | "q8"
-  | "r1" | "r2" | "r3" | "r4" | "r5" | "r6" | "r7" | "r8"
-  | "l1" | "l2" | "l3" | "l4" | "l5" | "l6" | "l7" | "l8"
-  | "a1" | "a2" | "a3" | "a4" | "a5" | "a6" | "a7" | "a8"
-  | "e1" | "e2" | "e3" | "e4" | "e5" | "e6" | "e7" | "e8"
-  | "s1" | "s2" | "s3" | "s4" | "s5" | "s6" | "s7" | "s8"
-  | "x1" | "x2" | "x3" | "x4" | "x5" | "x6" | "x7" | "x8";
-
 export type AtlasFeatureDef = {
-  id: AtlasFeatureId;
+  id: string;
   name: string;
   desc: string;
-  /** اسم العملية على الخادم — تُنفَّذ فعلياً عبر runCommand. */
-  op:
-    | "getOverview" | "watchPlayer" | "editPlayer" | "punish" | "pardon"
-    | "bulkAction" | "notify" | "resetProgress" | "backupPlayer"
-    | "grantMembership" | "revokeMembership" | "createCode" | "deleteCode"
-    | "getMembershipStats"
-    | "listQuestions" | "toggleQuestion" | "questionStats"
-    | "listReports" | "resolveReport" | "reportStats" | "seedRules"
-    | "lawStats" | "processLawReports"
-    | "aiControl" | "aiLogs" | "aiThink"
-    | "storeStats" | "sendGiftAll"
-    | "analytics" | "predictProblems" | "exportReport"
-    | "maintenance" | "emergencyBroadcast" | "errorStats" | "auditTrail";
   kind: "view" | "action";
   danger?: boolean;
 };
@@ -84,128 +57,118 @@ export type AtlasSystemDef = {
   name: string;
   desc: string;
   icon: string;
-  accent: string; // لون النظام — هويته داخل الواجهة
+  accent: string;
   features: AtlasFeatureDef[];
 };
 
-/** ميزات النظام 1 — السيطرة المركزية الحية */
 const CONTROL_FEATURES: AtlasFeatureDef[] = [
-  { id: "c1", name: "نبض اللعبة الحي", desc: "حالة اللعبة الكاملة لحظة بلحظة: لاعبون متصلون، غرف نشطة، جولات جارية، صحة الأنظمة.", op: "getOverview", kind: "view" },
-  { id: "c2", name: "الكاميرا الذكية على لاعب", desc: "افتح ملف أي لاعب مباشرة من القيادة: بياناته، غرفته، حالة حسابه وكل سجلاته.", op: "watchPlayer", kind: "view" },
-  { id: "c3", name: "تعديل حي لبيانات لاعب", desc: "عدّل اسم أو صورة أو أدوار أي حساب فوراً — ينعكس في اللعبة خلال ثوانٍ.", op: "editPlayer", kind: "action" },
-  { id: "c4", name: "محرك العقوبات الفوري", desc: "حظر، كتم، تحذير أو طرد بضغطة واحدة من قلب لوحة القيادة.", op: "punish", kind: "action", danger: true },
-  { id: "c5", name: "العفو الفوري", desc: "ألغِ أي عقوبة نشطة وأعد اللاعب للعب خلال ثانية واحدة.", op: "pardon", kind: "action" },
-  { id: "c6", name: "الإجراء الجماعي السريع", desc: "طبّق أمراً واحداً على عدة لاعبين دفعة واحدة (إشعار/كتم/حظر/تصفير).", op: "bulkAction", kind: "action", danger: true },
-  { id: "c7", name: "بوق القيادة", desc: "أرسل إشعاراً فورياً لكل اللاعبين أو لحساب محدد — يظهر مباشرة في التطبيق.", op: "notify", kind: "action" },
-  { id: "c8", name: "محرك الأوامر الحر", desc: "اكتب أي أمر بالعربية وينفّذه محرك لوحة السيطرة: من «احظر فلان» إلى «فعّل الصيانة».", op: "aiThink", kind: "action" },
+  { id: "c1", name: "نبض اللعبة الحي", desc: "حالة اللعبة الكاملة لحظة بلحظة: متصلون، جولات جارية، رسائل، صحة الأنظمة.", kind: "view" },
+  { id: "c2", name: "الكاميرا الذكية على لاعب", desc: "افتح ملف أي لاعب مباشرة من القيادة: بياناته، عضويته، وسجلاته.", kind: "view" },
+  { id: "c3", name: "تعديل حي لبيانات لاعب", desc: "عدّل اسم أو دور أي حساب فوراً — ينعكس في اللعبة خلال ثوانٍ.", kind: "action" },
+  { id: "c4", name: "محرك العقوبات الفوري", desc: "حظر، كتم، تحذير أو طرد بضغطة واحدة من قلب لوحة القيادة.", kind: "action", danger: true },
+  { id: "c5", name: "العفو الفوري", desc: "ألغِ أي عقوبة نشطة وأعد اللاعب للعب خلال ثانية واحدة.", kind: "action" },
+  { id: "c6", name: "الإجراء الجماعي السريع", desc: "طبّق أمراً واحداً على عدة لاعبين دفعة واحدة مع سجل كامل.", kind: "action", danger: true },
+  { id: "c7", name: "بوق القيادة", desc: "أرسل إشعاراً فورياً لكل اللاعبين أو لحساب محدد — يظهر مباشرة في التطبيق.", kind: "action" },
+  { id: "c8", name: "محرك الأوامر الحر", desc: "اكتب أي أمر بالعربية وينفّذه محرك أطلس: من «احظر فلان» إلى «فعّل الصيانة».", kind: "action" },
 ];
 
-/** ميزات النظام 2 — إدارة اللاعبين المتقدمة */
 const PLAYERS_FEATURES: AtlasFeatureDef[] = [
-  { id: "p1", name: "سجل اللاعبين الكامل", desc: "قائمة كل الحسابات مع البحث الفوري، الفرز، والتصفية حسب الحالة والدور والعقوبات.", op: "getOverview", kind: "view" },
-  { id: "p2", name: "البحث المتقدم", desc: "ابحث بالاسم أو البريد أو رقم اللاعب — نتائج فورية أثناء الكتابة.", op: "getOverview", kind: "view" },
-  { id: "p3", name: "الملف الشامل", desc: "صفحة لاعب كاملة: النقاط، المباريات، السجل الانضباطي، العضوية، وسجل أفعال الإدارة عليه.", op: "watchPlayer", kind: "view" },
-  { id: "p4", name: "التعديل المباشر", desc: "عدّل الاسم أو الصورة أو الدور من داخل الملف مباشرة.", op: "editPlayer", kind: "action" },
-  { id: "p5", name: "إجراء جماعي موجه", desc: "حدد مجموعة لاعبين ونفّذ عليهم إجراءً موحّداً مع سجل كامل.", op: "bulkAction", kind: "action", danger: true },
-  { id: "p6", name: "تصفير التقدم", desc: "أعد حساب أي لاعب إلى الصفر مع نسخة احتياطية قبل التنفيذ.", op: "resetProgress", kind: "action", danger: true },
-  { id: "p7", name: "نسخة احتياطية كاملة", desc: "احفظ لقطة كاملة من بيانات أي لاعب لاستعادتها لاحقاً.", op: "backupPlayer", kind: "action" },
-  { id: "p8", name: "سجل أفعال اللاعبين", desc: "سجل تدقيق دائم لكل ما نُفّذ على الحسابات: من فعل؟ متى؟ ولماذا؟", op: "auditTrail", kind: "view" },
+  { id: "p1", name: "سجل اللاعبين الكامل", desc: "قائمة كل الحسابات مع البحث الفوري والتصفية حسب الحالة والدور.", kind: "view" },
+  { id: "p2", name: "البحث المتقدم", desc: "ابحث بالاسم أو البريد — نتائج فورية أثناء الكتابة.", kind: "view" },
+  { id: "p3", name: "الملف الشامل", desc: "صفحة لاعب كاملة: النقاط، المباريات، السجل الانضباطي، العضوية.", kind: "view" },
+  { id: "p4", name: "التعديل المباشر", desc: "عدّل الاسم أو الدور من داخل الملف مباشرة.", kind: "action" },
+  { id: "p5", name: "إجراء جماعي موجه", desc: "حدد مجموعة لاعبين ونفّذ عليهم إجراءً موحّداً مع سجل كامل.", kind: "action", danger: true },
+  { id: "p6", name: "تصفير التقدم", desc: "أعد حساب أي لاعب إلى الصفر مع نسخة احتياطية تلقائية قبل التنفيذ.", kind: "action", danger: true },
+  { id: "p7", name: "نسخة احتياطية كاملة", desc: "احفظ لقطة كاملة من بيانات أي لاعب لاستعادتها لاحقاً.", kind: "action" },
+  { id: "p8", name: "سجل أفعال اللاعبين", desc: "سجل تدقيق دائم لكل ما نُفّذ على الحسابات: من فعل؟ متى؟ ولماذا؟", kind: "view" },
 ];
 
-/** ميزات النظام 3 — العضويات والأكواد */
 const MEMBERSHIPS_FEATURES: AtlasFeatureDef[] = [
-  { id: "m1", name: "خريطة العضويات", desc: "إحصاءات كل الفئات: برونز، فضة، ذهب، ماسة، حصري — والنسبة لكل فئة.", op: "getMembershipStats", kind: "view" },
-  { id: "m2", name: "مصنع الأكواد", desc: "ولّد أكواد عضوية بأي فئة ومدة وعدد استخدامات.", op: "createCode", kind: "action" },
-  { id: "m3", name: "سجل الأكواد الحي", desc: "كل الأكواد الصادرة: من استخدمها، كم مرة، وهل ما زالت فعالة.", op: "getMembershipStats", kind: "view" },
-  { id: "m4", name: "منح مباشر", desc: "امنح عضوية لأي لاعب مباشرة دون كود — بريطا فورية في ملفه.", op: "grantMembership", kind: "action" },
-  { id: "m5", name: "سحب العضوية", desc: "ألغِ عضوية أي حساب فوراً.", op: "revokeMembership", kind: "action", danger: true },
-  { id: "m6", name: "تعطيل كود", desc: "أوقف أي كود عن العمل نهائياً بضغطة واحدة.", op: "deleteCode", kind: "action" },
-  { id: "m7", name: "تفعيل الرقابة على الأكواد", desc: "مراقبة الاستخدام غير الطبيعي للأكواد ومحاولات إعادة التداول.", op: "getMembershipStats", kind: "view" },
-  { id: "m8", name: "قائمة المستفيدين", desc: "اطلع على كل الحسابات التي تمتلك عضوية نشطة الآن.", op: "getMembershipStats", kind: "view" },
+  { id: "m1", name: "خريطة العضويات", desc: "إحصاءات كل الفئات: برونز، فضة، ذهب، ماسة، حصري — والنسبة لكل فئة.", kind: "view" },
+  { id: "m2", name: "مصنع الأكواد", desc: "ولّد أكواد عضوية بأي فئة ومدة وعدد استخدامات.", kind: "action" },
+  { id: "m3", name: "سجل الأكواد الحي", desc: "كل الأكواد الصادرة: من استخدمها، كم مرة، وهل ما زالت فعالة.", kind: "view" },
+  { id: "m4", name: "منح مباشر", desc: "امنح عضوية لأي لاعب مباشرة دون كود — تظهر فوراً في ملفه.", kind: "action" },
+  { id: "m5", name: "سحب العضوية", desc: "ألغِ عضوية أي حساب فوراً.", kind: "action", danger: true },
+  { id: "m6", name: "تعطيل كود", desc: "أوقف أي كود عن العمل نهائياً بضغطة واحدة.", kind: "action" },
+  { id: "m7", name: "رقابة الأكواد", desc: "مراقبة الاستخدام غير الطبيعي للأكواد ومحاولات إعادة التداول.", kind: "view" },
+  { id: "m8", name: "قائمة المستفيدين", desc: "اطلع على كل الحسابات التي تمتلك عضوية نشطة الآن.", kind: "view" },
 ];
 
-/** ميزات النظام 4 — المحتوى والأسئلة والتحديات */
 const CONTENT_FEATURES: AtlasFeatureDef[] = [
-  { id: "q1", name: "بنك الأسئلة الحي", desc: "استعرض بنك الأسئلة الكامل مع التصنيفات ومستويات الصعوبة.", op: "listQuestions", kind: "view" },
-  { id: "q2", name: "إحصاءات المحتوى", desc: "أرقام دقيقة: عدد الأسئلة لكل تصنيف وكل مستوى صعوبة.", op: "questionStats", kind: "view" },
-  { id: "q3", name: "تعطيل/تفعيل سؤال", desc: "اسحب أي سؤال من التداول فوراً أو أعد إدراجه بعد مراجعته.", op: "toggleQuestion", kind: "action" },
-  { id: "q4", name: "مراقبة الجودة", desc: "رصد الأسئلة ذات المشاكل المحتملة (نص ناقص، خيارات مكررة) قبل أن تصل للاعبين.", op: "questionStats", kind: "view" },
-  { id: "q5", name: "التحدي اليومي", desc: "لوحة متابعة لوحة شرف التحدي اليومي ومشاركة اللاعبين.", op: "getOverview", kind: "view" },
-  { id: "q6", name: "توزيع التصنيفات", desc: "رؤية توازن التصنيفات (منطق، رياضيات، ملاحظة…) لموازنة اللعب.", op: "questionStats", kind: "view" },
-  { id: "q7", name: "جاهزية الأحداث", desc: "فحص جاهزية الأحداث والتحديات الخاصة قبل إطلاقها.", op: "getOverview", kind: "view" },
-  { id: "q8", name: "موازنة الصعوبة", desc: "مؤشر توازن مستويات الصعوبة عبر البنك كاملاً.", op: "questionStats", kind: "view" },
+  { id: "q1", name: "بنك الأسئلة الحي", desc: "استعرض بنك الأسئلة الكامل مع التصنيفات ومستويات الصعوبة.", kind: "view" },
+  { id: "q2", name: "إحصاءات المحتوى", desc: "أرقام دقيقة: عدد الأسئلة لكل تصنيف وكل مستوى صعوبة.", kind: "view" },
+  { id: "q3", name: "تعطيل/تفعيل سؤال", desc: "اسحب أي سؤال من التداول فوراً أو أعد إدراجه بعد مراجعته.", kind: "action" },
+  { id: "q4", name: "مراقبة الجودة", desc: "رصد الأسئلة ذات المشاكل المحتملة (نص ناقص، خيارات مكررة) قبل أن تصل للاعبين.", kind: "view" },
+  { id: "q5", name: "جاهزية التحديات", desc: "فحص جاهزية التحديات والأحداث قبل إطلاقها.", kind: "view" },
+  { id: "q6", name: "توزيع التصنيفات", desc: "رؤية توازن التصنيفات (منطق، رياضيات، ملاحظة…) لموازنة اللعب.", kind: "view" },
+  { id: "q7", name: "أسئلة معطلة", desc: "قائمة الأسئلة المسحوبة من التداول حالياً وإعادتها بضغطة.", kind: "view" },
+  { id: "q8", name: "موازنة الصعوبة", desc: "مؤشر توازن مستويات الصعوبة عبر البنك كاملاً.", kind: "view" },
 ];
 
-/** ميزات النظام 5 — الغرف والمجتمعات والقوانين */
 const ROOMS_FEATURES: AtlasFeatureDef[] = [
-  { id: "r1", name: "خريطة الغرف", desc: "كل غرف الدردشة: عدد الأعضاء والرسائل وآخر نشاط.", op: "getOverview", kind: "view" },
-  { id: "r2", name: "متابعة الرسائل", desc: "معدل الرسائل الحي عبر الغرف لرصد النشاط غير الطبيعي.", op: "getOverview", kind: "view" },
-  { id: "r3", name: "سجل القوانين", desc: "القوانين الرسمية الثلاثين ومصدرها الموحد وحالتها.", op: "seedRules", kind: "view" },
-  { id: "r4", name: "إنفاذ القوانين", desc: "ابدأ مسحاً للبلاغات عبر ذكاء إنفاذ القوانين الآن.", op: "processLawReports", kind: "action" },
-  { id: "r5", name: "إحصاءات البلاغات", desc: "أرقام البلاغات: المفتوحة، المعالجة، حسب الفئة.", op: "reportStats", kind: "view" },
-  { id: "r6", name: "قرار بلاغ", desc: "حوّل أي بلاغ: اعتمد الإجراء أو ارفضه مع سبب موثّق.", op: "resolveReport", kind: "action" },
-  { id: "r7", name: "زراعة القوانين", desc: "أعد زراعة القوانين الرسمية في قاعدة البيانات بضغطة واحدة.", op: "seedRules", kind: "action" },
-  { id: "r8", name: "نبض المجتمع", desc: "مؤشر صحة المجتمع العام: النشاط، البلاغات، العقوبات.", op: "getOverview", kind: "view" },
+  { id: "r1", name: "خريطة الغرف", desc: "كل غرف الدردشة: عدد الأعضاء والرسائل وآخر نشاط.", kind: "view" },
+  { id: "r2", name: "متابعة الرسائل", desc: "معدل الرسائل الحي عبر الغرف لرصد النشاط غير الطبيعي.", kind: "view" },
+  { id: "r3", name: "سجل القوانين", desc: "القوانين الرسمية وحالتها (مفعّلة/معطلة) كما تظهر للاعبين.", kind: "view" },
+  { id: "r4", name: "إنفاذ القوانين", desc: "شغّل مسح البلاغات عبر ذكاء إنفاذ القوانين وطبّق القرارات.", kind: "action" },
+  { id: "r5", name: "إحصاءات البلاغات", desc: "أرقام البلاغات: المفتوحة، المحسومة، حسب الفئة.", kind: "view" },
+  { id: "r6", name: "قرار بلاغ", desc: "حوّل أي بلاغ: اعتمد الإجراء أو ارفضه مع سبب موثّق.", kind: "action" },
+  { id: "r7", name: "زراعة القوانين", desc: "أعد زراعة القوانين الرسمية في قاعدة البيانات بضغطة واحدة.", kind: "action" },
+  { id: "r8", name: "نبض المجتمع", desc: "مؤشر صحة المجتمع العام: النشاط، البلاغات، العقوبات.", kind: "view" },
 ];
 
-/** ميزات النظام 6 — البلاغات الذكية */
 const REPORTS_FEATURES: AtlasFeatureDef[] = [
-  { id: "a1", name: "صندوق البلاغات الحي", desc: "كل البلاغات الواردة مع تحليل الذكاء الاصطناعي المرفق.", op: "listReports", kind: "view" },
-  { id: "a2", name: "تحليل بلاغ بالذكاء", desc: "شغّل التحليل الذكي على أي بلاغ: صحة، خطورة، إجراء مقترح.", op: "listReports", kind: "view" },
-  { id: "a3", name: "الفئات الذكية", desc: "تصنيف البلاغات تلقائياً حسب فئات المنظومة الرسمية.", op: "reportStats", kind: "view" },
-  { id: "a4", name: "حسم البلاغ", desc: "قرار نهائي على أي بلاغ مع سجل كامل.", op: "resolveReport", kind: "action" },
-  { id: "a5", name: "رصد البلاغات الكيدية", desc: "مؤشر على الحسابات التي تبالغ في الإبلاغ (القانون 18).", op: "reportStats", kind: "view" },
-  { id: "a6", name: "زمن المعالجة", desc: "متوسط زمن معالجة البلاغات واتجاهه.", op: "reportStats", kind: "view" },
-  { id: "a7", name: "البلاغات العاجلة", desc: "صفحة البلاغات الحرجة أولاً — لا شيء يضيع.", op: "listReports", kind: "view" },
-  { id: "a8", name: "دورة القرار", desc: "من بلاغ → تحليل → قرار → تنفيذ → توثيق، في مسار واحد مرئي.", op: "listReports", kind: "view" },
+  { id: "a1", name: "صندوق البلاغات الحي", desc: "كل البلاغات المفتوحة مع تحليل الذكاء الاصطناعي المرفق.", kind: "view" },
+  { id: "a2", name: "تحليل بلاغ بالذكاء", desc: "عرض حكم الذكاء الاصطناعي: صحة، خطورة، إجراء مقترح.", kind: "view" },
+  { id: "a3", name: "الفئات الذكية", desc: "تصنيف البلاغات تلقائياً حسب فئات المنظومة الرسمية.", kind: "view" },
+  { id: "a4", name: "حسم البلاغ", desc: "قرار نهائي على أي بلاغ مع سجل كامل في سجل الإشراف.", kind: "action" },
+  { id: "a5", name: "رصد البلاغات الكيدية", desc: "مؤشر على الحسابات التي تبالغ في الإبلاغ (القانون 18).", kind: "view" },
+  { id: "a6", name: "اتجاه البلاغات", desc: "أسباب البلاغات الأكثر تكراراً واتجاهها الزمني.", kind: "view" },
+  { id: "a7", name: "البلاغات الحرجة", desc: "صفحة البلاغات عالية الخطورة أولاً — لا شيء يضيع.", kind: "view" },
+  { id: "a8", name: "دورة القرار", desc: "من بلاغ → تحليل → قرار → توثيق، في مسار واحد مرئي.", kind: "view" },
 ];
 
-/** ميزات النظام 7 — التحكم في الذكاء الاصطناعي */
 const AI_FEATURES: AtlasFeatureDef[] = [
-  { id: "l1", name: "مفتاح الذكاء الرئيسي", desc: "شغّل أو أوقف كل أنظمة الذكاء في اللعبة من مفتاح واحد.", op: "aiControl", kind: "action", danger: true },
-  { id: "l2", name: "التفكير الذاتي", desc: "اطلب من محرك اللوحة أن يفكر في حالة اللعبة الآن ويقدم رأيه.", op: "aiThink", kind: "action" },
-  { id: "l3", name: "سجل نشاط الذكاء", desc: "كل ما فعله الذكاء الآلي: قرارات، إشراف، إصلاحات.", op: "aiLogs", kind: "view" },
-  { id: "l4", name: "حساسية إنفاذ القوانين", desc: "اضبط صرامة ردود الفعل على المخالفات من لوحة الإعدادات.", op: "aiControl", kind: "view" },
-  { id: "l5", name: "الإدارة الآلية", desc: "المسح الشامل الدوري لكل اللعبة بدون تدخل بشري.", op: "aiControl", kind: "view" },
-  { id: "l6", name: "شفافية الذكاء", desc: "أسباب كل قرار ذكي موثقة ومعروضة للمالك.", op: "aiLogs", kind: "view" },
-  { id: "l7", name: "مراقبة النماذج", desc: "حالة النموذج الذكي المستخدم ومعدل نجاحه.", op: "aiControl", kind: "view" },
-  { id: "l8", name: "أوامر حرّة بالعربية", desc: "أمر بالعربية الطبيعية وينفّذ فوراً داخل اللعبة.", op: "aiThink", kind: "action" },
+  { id: "l1", name: "مفتاح الذكاء الرئيسي", desc: "شغّل أو أوقف كل أنظمة الذكاء في اللعبة من مفتاح واحد.", kind: "action", danger: true },
+  { id: "l2", name: "التفكير الذاتي", desc: "اطلب من محرك أطلس أن يفكر في حالة اللعبة الآن ويقدم رأيه.", kind: "action" },
+  { id: "l3", name: "سجل نشاط الذكاء", desc: "كل ما فعله الذكاء الآلي: قرارات، إشراف، إصلاحات.", kind: "view" },
+  { id: "l4", name: "التطبيق التلقائي", desc: "اضبط هل تنفّذ الأنظمة الذكية قراراتها تلقائياً أم تعرضها للمراجعة.", kind: "action" },
+  { id: "l5", name: "الإدارة الآلية", desc: "المسح الشامل الدوري لكل اللعبة بدون تدخل بشري.", kind: "action" },
+  { id: "l6", name: "شفافية الذكاء", desc: "أسباب كل قرار ذكي موثقة ومعروضة للمالك.", kind: "view" },
+  { id: "l7", name: "مراقبة النماذج", desc: "حالة النموذج الذكي المستخدم للأنظمة التحليلية.", kind: "view" },
+  { id: "l8", name: "أوامر حرّة بالعربية", desc: "أمر بالعربية الطبيعية وينفّذ فوراً داخل اللعبة.", kind: "action" },
 ];
 
-/** ميزات النظام 8 — الاقتصاد والمتجر */
 const ECONOMY_FEATURES: AtlasFeatureDef[] = [
-  { id: "e1", name: "لوحة الاقتصاد", desc: "حالة العملات والمتجر والحزم والعروض في لمحة.", op: "storeStats", kind: "view" },
-  { id: "e2", name: "حركات المتجر", desc: "مؤشر النشاط الشرائي واتجاهه.", op: "storeStats", kind: "view" },
-  { id: "e3", name: "هدايا جماعية", desc: "أرسل هدية لكل اللاعبين أو فئة محددة دفعة واحدة.", op: "sendGiftAll", kind: "action" },
-  { id: "e4", name: "كتالوج المتجر", desc: "استعرض كل العناصر والأقسام والأسعار الحالية.", op: "storeStats", kind: "view" },
-  { id: "e5", name: "مؤشر التضخم", desc: "رصد نمو العملات مقابل المحتوى المتاح لمنع الانهيار الاقتصادي.", op: "storeStats", kind: "view" },
-  { id: "e6", name: "توازن الأسعار", desc: "مقارنة أسعار العناصر بقيمة أثرها الفعلي في اللعب.", op: "storeStats", kind: "view" },
-  { id: "e7", name: "قفل عنصر", desc: "اسحب أي عنصر من المتجر مؤقتاً (تعطيل فوري للتداول).", op: "toggleQuestion", kind: "action" },
-  { id: "e8", name: "سجل الهدايا", desc: "كل الهدايا المرسومة من القيادة وسجل استلامها.", op: "sendGiftAll", kind: "view" },
+  { id: "e1", name: "لوحة الاقتصاد", desc: "حالة العملات والمتجر والحزم والعروض في لمحة.", kind: "view" },
+  { id: "e2", name: "حركات المتجر", desc: "مؤشر النشاط الشرائي واتجاهه عبر كتالوج المتجر.", kind: "view" },
+  { id: "e3", name: "قفل عنصر", desc: "اسحب أي سؤال مرتبط بعنصر المتجر من التداول فوراً.", kind: "action" },
+  { id: "e4", name: "كتالوج المتجر", desc: "استعرض كل العناصر والأقسام والأسعار الحالية.", kind: "view" },
+  { id: "e5", name: "مؤشر التضخم", desc: "رصد نمو العملات مقابل المحتوى المتاح لمنع الانهيار الاقتصادي.", kind: "view" },
+  { id: "e6", name: "توازن الأسعار", desc: "مقارنة أسعار العناصر بقيمة أثرها الفعلي في اللعب.", kind: "view" },
+  { id: "e7", name: "هدايا اللاعبين", desc: "متابعة نظام الهدايا بين اللاعبين وسجل الاستلام.", kind: "view" },
+  { id: "e8", name: "حزم وعروض", desc: "استعراض الحزم والعروض النشطة في المتجر.", kind: "view" },
 ];
 
-/** ميزات النظام 9 — الإحصائيات والتحليلات */
 const ANALYTICS_FEATURES: AtlasFeatureDef[] = [
-  { id: "s1", name: "لوحة التحليلات الحية", desc: "مؤشرات النشاط والنمو والجودة لحظياً.", op: "analytics", kind: "view" },
-  { id: "s2", name: "التنبؤ بالمشكلات", desc: "محرك التنبؤ يرصد الأنماط ويتوقع المشاكل قبل وقوعها.", op: "predictProblems", kind: "view" },
-  { id: "s3", name: "تقرير تنفيذي", desc: "ولّد تقريراً شاملاً بكل أرقام اللعبة قابل للتصدير.", op: "exportReport", kind: "view" },
-  { id: "s4", name: "مؤشرات الجودة", desc: "دقة الأسئلة، معدل الإكمال، رضا الجولات.", op: "analytics", kind: "view" },
-  { id: "s5", name: "نشاط اليوم", desc: "مقارنة نشاط اليوم بالأيام السابقة.", op: "analytics", kind: "view" },
-  { id: "s6", name: "ذِروة اللاعبين", desc: "ساعات الذروة وتوزيع النشاط على مدار اليوم.", op: "analytics", kind: "view" },
-  { id: "s7", name: "استبقاء اللاعبين", desc: "مؤشر عودة اللاعبين بعد أول جولة.", op: "analytics", kind: "view" },
-  { id: "s8", name: "تصدير البيانات", desc: "صدّر أي عرض كملف JSON كامل بضغطة واحدة.", op: "exportReport", kind: "view" },
+  { id: "s1", name: "لوحة التحليلات الحية", desc: "مؤشرات النشاط والنمو والجودة لحظياً.", kind: "view" },
+  { id: "s2", name: "التنبؤ بالمشكلات", desc: "محرك التنبؤ يرصد الأنماط ويتوقع المشاكل قبل وقوعها.", kind: "view" },
+  { id: "s3", name: "تقرير تنفيذي", desc: "ولّد تقريراً شاملاً بكل أرقام اللعبة قابل للتصدير JSON.", kind: "view" },
+  { id: "s4", name: "مؤشرات الجودة", desc: "دقة الإجابات، معدل الفوز، متوسط النقاط.", kind: "view" },
+  { id: "s5", name: "نشاط 7 أيام", desc: "منحنى الجولات المنتهية يومياً لآخر أسبوع.", kind: "view" },
+  { id: "s6", name: "أبطال الساحة", desc: "أعلى 10 لاعبين بالنقاط الخبرة الآن.", kind: "view" },
+  { id: "s7", name: "استبقاء اللاعبين", desc: "نسبة اللاعبين الذين تجاوزوا 3 جولات (مؤشر تشبّث).", kind: "view" },
+  { id: "s8", name: "تصدير البيانات", desc: "صدّر التقرير التنفيذي كملف JSON كامل بضغطة واحدة.", kind: "view" },
 ];
 
-/** ميزات النظام 10 — الطوارئ والصيانة والأمان */
 const EMERGENCY_FEATURES: AtlasFeatureDef[] = [
-  { id: "x1", name: "وضع الصيانة", desc: "افتح أو أغلق صيانة اللعبة الكاملة برسالة مخصصة.", op: "maintenance", kind: "action", danger: true },
-  { id: "x2", name: "بث الطوارئ", desc: "إشعار أحمر عاجل لكل الأجهزة فوراً.", op: "emergencyBroadcast", kind: "action", danger: true },
-  { id: "x3", name: "مركز الأخطاء", desc: "أخطاء العملاء الحية مع التصنيف والخطورة وإحصاءاتها.", op: "errorStats", kind: "view" },
-  { id: "x4", name: "سجل التدقيق الكامل", desc: "سجل دائم لكل أمر نُفّذ من لوحة السيطرة وغرفة المالك.", op: "auditTrail", kind: "view" },
-  { id: "x5", name: "جاهزية النسخ", desc: "حالة الإصدار المنشور وبصمة APK وتاريخ آخر مزامنة.", op: "getOverview", kind: "view" },
-  { id: "x6", name: "حماية الدخول", desc: "الدخول للمالك الرسمي فقط مع سجل جلسات كامل.", op: "getOverview", kind: "view" },
-  { id: "x7", name: "الصحة العامة", desc: "نبض صحة كل الأنظمة الفرعية في مؤشر واحد.", op: "getOverview", kind: "view" },
-  { id: "x8", name: "إغلاق طارئ للغرف", desc: "أوقف أي غرفة مزعجة فوراً من قلب الطوارئ.", op: "getOverview", kind: "view" },
+  { id: "x1", name: "وضع الصيانة", desc: "افتح أو أغلق صيانة اللعبة الكاملة برسالة مخصصة.", kind: "action", danger: true },
+  { id: "x2", name: "بث الطوارئ", desc: "إشعار عاجل لكل الأجهزة فوراً بنوع حرج.", kind: "action", danger: true },
+  { id: "x3", name: "مركز الأخطاء", desc: "أخطاء العملاء الحية مع التصنيف والخطورة وإحصاءاتها.", kind: "view" },
+  { id: "x4", name: "سجل التدقيق الكامل", desc: "سجل دائم لكل أمر نُفّذ من أطلس: النظام، الميزة، المنفّذ.", kind: "view" },
+  { id: "x5", name: "جاهزية النسخ", desc: "حالة الإصدار المنشور وبصمة APK ورقم البناء.", kind: "view" },
+  { id: "x6", name: "حماية الدخول", desc: "الدخول للمالك الرسمي فقط مع سجل جلسات كامل.", kind: "view" },
+  { id: "x7", name: "الصحة العامة", desc: "نبض صحة الأنظمة عبر الأخطاء غير المعالجة حسب الخطورة.", kind: "view" },
+  { id: "x8", name: "أوامر الطوارئ السريعة", desc: "أزرار إجراءات فورية من قلب قسم الطوارئ.", kind: "action" },
 ];
 
 /** الأنظمة العشرة الكبرى — بالترتيب الملزم للتنفيذ. */
@@ -213,23 +176,23 @@ export const ATLAS_SYSTEMS: AtlasSystemDef[] = [
   { id: "control", num: 1, name: "السيطرة المركزية الحية", desc: "مركز قيادة فوري على حالة اللعبة بالكامل مع محرك أوامر حرة.", icon: "Radar", accent: "#6366f1", features: CONTROL_FEATURES },
   { id: "players", num: 2, name: "إدارة اللاعبين المتقدمة", desc: "بحث وملفات وإجراءات جماعية وسجل كامل لكل حساب.", icon: "Users", accent: "#0ea5e9", features: PLAYERS_FEATURES },
   { id: "memberships", num: 3, name: "العضويات والأكواد", desc: "صلاحيات كاملة على فئات العضوية وأكواد التفعيل.", icon: "KeyRound", accent: "#a855f7", features: MEMBERSHIPS_FEATURES },
-  { id: "content", num: 4, name: "المحتوى والأسئلة", desc: "بنك الأسئلة والتحديات والأحداث بتحكم كامل.", icon: "BookOpen", accent: "#10b981", features: CONTENT_FEATURES },
-  { id: "rooms", num: 5, name: "الغرف والمجتمعات والقوانين", desc: "غرف الدردشة، صحة المجتمع، والمنظومة القانونية.", icon: "MessagesSquare", accent: "#f59e0b", features: ROOMS_FEATURES },
+  { id: "content", num: 4, name: "المحتوى والأسئلة", desc: "بنك الأسئلة والتحديات بتحكم كامل وجودة مراقبة.", icon: "BookOpen", accent: "#10b981", features: CONTENT_FEATURES },
+  { id: "rooms", num: 5, name: "الغرف والقوانين", desc: "غرف الدردشة، صحة المجتمع، والمنظومة القانونية.", icon: "MessagesSquare", accent: "#f59e0b", features: ROOMS_FEATURES },
   { id: "reports", num: 6, name: "البلاغات الذكية", desc: "تحليل البلاغات بدعم القرار وحسمها في مسار واحد.", icon: "Flag", accent: "#ef4444", features: REPORTS_FEATURES },
-  { id: "ai", num: 7, name: "التحكم في الذكاء الاصطناعي", desc: "مفاتيح الأنظمة الذكية وحساسيتها وسجلاتها وشفافيتها.", icon: "BrainCircuit", accent: "#8b5cf6", features: AI_FEATURES },
-  { id: "economy", num: 8, name: "الاقتصاد والمتجر", desc: "العملات والعروض والهدايا وتوازن الاقتصاد.", icon: "Store", accent: "#f97316", features: ECONOMY_FEATURES },
+  { id: "ai", num: 7, name: "التحكم في الذكاء الاصطناعي", desc: "مفاتيح الأنظمة الذكية وسجلاتها وشفافيتها وتفكيرها الحر.", icon: "BrainCircuit", accent: "#8b5cf6", features: AI_FEATURES },
+  { id: "economy", num: 8, name: "الاقتصاد والمتجر", desc: "العملات والعروض وتوازن الاقتصاد وكتالوج المتجر.", icon: "Store", accent: "#f97316", features: ECONOMY_FEATURES },
   { id: "analytics", num: 9, name: "الإحصائيات والتحليلات", desc: "مؤشرات حية، تنبؤ بالمشكلات، وتقارير قابلة للتصدير.", icon: "BarChart3", accent: "#14b8a6", features: ANALYTICS_FEATURES },
   { id: "emergency", num: 10, name: "الطوارئ والصيانة والأمان", desc: "صيانة، بث عاجل، سجل تدقيق كامل، وحماية دخول.", icon: "ShieldAlert", accent: "#f43f5e", features: EMERGENCY_FEATURES },
 ];
 
-/** عدد الميزات الفعلية — يجب أن يكون 80 بالضبط. */
+/** عدد الميزات الفعلية — 80 بالضبط (10 أنظمة × 8 ميزات). */
 export const ATLAS_FEATURE_COUNT = ATLAS_SYSTEMS.reduce(
   (sum, s) => sum + s.features.length,
   0,
 );
 
 // ═══════════════════════════════════════════════════════════════════════
-// الصلاحيات
+// الصلاحيات والتدقيق
 // ═══════════════════════════════════════════════════════════════════════
 
 async function requireAtlasOwner(ctx: {
@@ -240,20 +203,33 @@ async function requireAtlasOwner(ctx: {
   if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
   const user = await ctx.db.get(userId);
   if (!user || !isOwnerUser(user)) {
-    throw new Error("حرب العقول — لوحة السيطرة للمالك الرسمي فقط");
+    throw new Error("أطلس كنترول للمالك الرسمي فقط");
   }
   return user;
 }
 
+async function requireAtlasOwnerMutation(ctx: {
+  db: MutationCtx["db"];
+  auth: MutationCtx["auth"];
+}) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
+  const user = await ctx.db.get(userId);
+  if (!user || !isOwnerUser(user)) {
+    throw new Error("أطلس كنترول للمالك الرسمي فقط");
+  }
+  return user;
+}
+
+/** سجل تدقيق دائم لكل أمر يُنفَّذ من أطلس. */
 async function logAudit(
-  ctx: import("./_generated/server").MutationCtx,
+  ctx: { db: MutationCtx["db"] },
   entry: {
     system: string;
     feature: string;
     command: string;
     ok: boolean;
     error?: string;
-    args?: unknown;
     result?: unknown;
     executedBy: string;
     severity?: "info" | "warning" | "critical";
@@ -263,10 +239,6 @@ async function logAudit(
     system: entry.system,
     feature: entry.feature,
     command: entry.command,
-    args:
-      entry.args === undefined
-        ? undefined
-        : JSON.stringify(entry.args).slice(0, 4000),
     ok: entry.ok,
     error: entry.error,
     result:
@@ -289,7 +261,7 @@ export const getOverview = query({
     await requireAtlasOwner(ctx);
 
     const now = Date.now();
-    const [users, games, rooms, memberships, reports, chatMessages] =
+    const [users, games, rooms, memberships, reports, chatMessages, errors, profiles] =
       await Promise.all([
         ctx.db.query("users").collect(),
         ctx.db.query("games").collect(),
@@ -297,42 +269,29 @@ export const getOverview = query({
         ctx.db.query("memberships").collect(),
         ctx.db.query("reports").collect(),
         ctx.db.query("chatMessages").collect(),
+        ctx.db.query("errorLogs").collect(),
+        ctx.db.query("profiles").collect(),
       ]);
 
-    const profiles = await ctx.db.query("profiles").collect();
-
     const bannedNow = users.filter(
-      (u) =>
-        u.bannedPermanent ||
-        (u.bannedUntil && u.bannedUntil > now),
+      (u) => u.bannedPermanent || (u.bannedUntil && u.bannedUntil > now),
     ).length;
-    const mutedNow = users.filter(
-      (u) => u.mutedUntil && u.mutedUntil > now,
-    ).length;
-    const onlineUsers = users.filter((u) => (u as any).lastActiveAt && now - ((u as any).lastActiveAt as number) < 5 * 60_000).length;
+    const mutedNow = users.filter((u) => u.mutedUntil && u.mutedUntil > now).length;
     const liveGames = games.filter((g) => g.status === "playing").length;
-    const lobbyGames = games.filter((g) => g.status === "waiting").length;
-    const msgsLastHour = chatMessages.filter(
-      (m) => now - m.createdAt < 60 * 60_000,
+    const waitingGames = games.filter((g) => g.status === "waiting").length;
+    const finishedToday = games.filter(
+      (g) => g.status === "finished" && now - g.createdAt < 24 * 60 * 60_000,
     ).length;
-    const msgsLast24h = chatMessages.filter(
-      (m) => now - m.createdAt < 24 * 60 * 60_000,
-    ).length;
+    const msgsLastHour = chatMessages.filter((m) => now - m.createdAt < 60 * 60_000).length;
+    const msgsLast24h = chatMessages.filter((m) => now - m.createdAt < 24 * 60 * 60_000).length;
     const openReports = reports.filter((r) => r.status === "open").length;
     const totalXp = profiles.reduce((s, p) => s + p.xp, 0);
     const totalGames = profiles.reduce((s, p) => s + p.gamesPlayed, 0);
-
-    // حسب الأدوار
     const admins = users.filter((u) => u.role === "admin").length;
 
-    // العضويات حسب الفئة
     const tierCounts: Record<string, number> = {};
-    for (const m of memberships) {
-      tierCounts[m.tier] = (tierCounts[m.tier] ?? 0) + 1;
-    }
+    for (const m of memberships) tierCounts[m.tier] = (tierCounts[m.tier] ?? 0) + 1;
 
-    // الأخطاء الحرجة غير المعالجة (صحة النظام)
-    const errors = await ctx.db.query("errorLogs").collect();
     const criticalErrors = errors.filter(
       (e) => e.severity === "critical" && !e.resolved,
     ).length;
@@ -347,7 +306,6 @@ export const getOverview = query({
       now,
       totals: {
         users: users.length,
-        online: onlineUsers,
         admins,
         banned: bannedNow,
         muted: mutedNow,
@@ -355,10 +313,8 @@ export const getOverview = query({
         totalXp,
         totalGames,
         liveGames,
-        lobbyGames,
-        finishedToday: games.filter(
-          (g) => g.status === "finished" && now - g.createdAt < 24 * 60 * 60_000,
-        ).length,
+        waitingGames,
+        finishedToday,
         rooms: rooms.length,
         memberships: memberships.length,
         openReports,
@@ -409,16 +365,16 @@ export const searchPlayers = query({
             (u.email ?? "").toLowerCase().includes(needle),
         )
       : users;
-    const limited = filtered.slice(0, args.limit ?? 60);
+    const limited = filtered
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, args.limit ?? 60);
     const now = Date.now();
     return limited.map((u) => ({
       _id: u._id,
       name: u.name ?? "بلا اسم",
       email: u.email ?? "",
       role: u.role ?? "user",
-      banned: Boolean(
-        u.bannedPermanent || (u.bannedUntil && u.bannedUntil > now),
-      ),
+      banned: Boolean(u.bannedPermanent || (u.bannedUntil && u.bannedUntil > now)),
       bannedPermanent: Boolean(u.bannedPermanent),
       muted: Boolean(u.mutedUntil && u.mutedUntil > now),
       warnings: u.warnings ?? 0,
@@ -436,7 +392,7 @@ export const getPlayerFile = query({
     if (!user) throw new Error("اللاعب غير موجود");
     const now = Date.now();
 
-    const [profile, membership, actions, games] = await Promise.all([
+    const [profile, membership, actions, history] = await Promise.all([
       ctx.db
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -493,13 +449,226 @@ export const getPlayerFile = query({
         details: a.details,
         createdAt: a.createdAt,
       })),
-      recentGames: games.map((g) => ({
+      recentGames: history.map((g) => ({
         score: g.score,
         correct: g.correctCount,
         total: g.questionCount,
-        finishedAt: g.playedAt,
+        won: g.won,
+        playedAt: g.playedAt,
       })),
     };
+  },
+});
+
+export const atlasEditPlayer = mutation({
+  args: {
+    userId: v.id("users"),
+    name: v.optional(v.string()),
+    role: v.optional(v.union(v.literal("admin"), v.literal("user"), v.literal("member"))),
+  },
+  handler: async (ctx, args) => {
+    const owner = await requireAtlasOwnerMutation(ctx);
+    const patch: Record<string, unknown> = {};
+    if (args.name !== undefined && args.name.trim()) patch.name = args.name.trim();
+    if (args.role !== undefined) patch.role = args.role;
+    await ctx.db.patch(args.userId, patch);
+    await logAudit(ctx, {
+      system: "players",
+      feature: "c3",
+      command: "editPlayer",
+      ok: true,
+      result: args,
+      executedBy: owner.name ?? "المالك",
+    });
+    return { ok: true };
+  },
+});
+
+export const atlasPunish = mutation({
+  args: {
+    userId: v.id("users"),
+    action: v.union(
+      v.literal("warn"),
+      v.literal("mute"),
+      v.literal("kick"),
+      v.literal("ban_temp"),
+      v.literal("ban_perm"),
+    ),
+    reason: v.optional(v.string()),
+    durationHours: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const owner = await requireAtlasOwnerMutation(ctx);
+    const now = Date.now();
+    const patch: Record<string, unknown> = {};
+    let details = "";
+    switch (args.action) {
+      case "warn":
+        patch.lastWarningAt = now;
+        details = `أطلس: تحذير رسمي — ${args.reason ?? "مخالفة"}`;
+        break;
+      case "mute":
+        patch.mutedUntil = now + (args.durationHours ?? 1) * 3600_000;
+        details = `أطلس: كتم لمدة ${args.durationHours ?? 1} ساعة — ${args.reason ?? ""}`;
+        break;
+      case "ban_temp":
+        patch.bannedUntil = now + (args.durationHours ?? 24) * 3600_000;
+        patch.banReason = args.reason ?? "حظر مؤقت من أطلس";
+        details = `أطلس: حظر مؤقت ${args.durationHours ?? 24} ساعة`;
+        break;
+      case "ban_perm":
+        patch.bannedPermanent = true;
+        patch.banReason = args.reason ?? "حظر دائم من أطلس";
+        details = "أطلس: حظر دائم";
+        break;
+      case "kick":
+        details = `أطلس: طرد — ${args.reason ?? ""}`;
+        break;
+    }
+    await ctx.db.patch(args.userId, patch);
+    const target = await ctx.db.get(args.userId);
+    await ctx.db.insert("moderationLogs", {
+      actorType: "owner",
+      actorName: `أطلس — ${owner.name ?? "المالك"}`,
+      action: args.action === "kick" ? "kick" : args.action.replace("ban_", "ban"),
+      targetId: args.userId,
+      targetName: target?.name ?? "؟",
+      reason: details,
+      severity: args.action.includes("ban") ? "high" : args.action === "mute" ? "medium" : "low",
+      createdAt: now,
+    });
+    await logAudit(ctx, {
+      system: "players",
+      feature: "c4",
+      command: "punish",
+      ok: true,
+      result: { userId: args.userId, action: args.action },
+      executedBy: owner.name ?? "المالك",
+      severity: args.action.includes("ban") ? "critical" : "warning",
+    });
+    return { ok: true, details };
+  },
+});
+
+export const atlasPardon = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const owner = await requireAtlasOwnerMutation(ctx);
+    await ctx.db.patch(args.userId, {
+      mutedUntil: 0,
+      bannedUntil: 0,
+      bannedPermanent: false,
+      banReason: "",
+    });
+    const target = await ctx.db.get(args.userId);
+    await ctx.db.insert("moderationLogs", {
+      actorType: "owner",
+      actorName: `أطلس — ${owner.name ?? "المالك"}`,
+      action: "pardon",
+      targetId: args.userId,
+      targetName: target?.name ?? "؟",
+      reason: "أطلس: عفو كامل وإلغاء كل العقوبات",
+      severity: "low",
+      createdAt: Date.now(),
+    });
+    await logAudit(ctx, {
+      system: "players",
+      feature: "c5",
+      command: "pardon",
+      ok: true,
+      result: { userId: args.userId },
+      executedBy: owner.name ?? "المالك",
+    });
+    return { ok: true };
+  },
+});
+
+export const atlasBulkAction = mutation({
+  args: {
+    userIds: v.array(v.id("users")),
+    action: v.union(
+      v.literal("warn"),
+      v.literal("mute"),
+      v.literal("ban_temp"),
+      v.literal("pardon"),
+    ),
+    reason: v.optional(v.string()),
+    durationHours: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const owner = await requireAtlasOwnerMutation(ctx);
+    const now = Date.now();
+    let applied = 0;
+    for (const userId of args.userIds) {
+      const patch: Record<string, unknown> = {};
+      switch (args.action) {
+        case "warn":
+          patch.lastWarningAt = now;
+          break;
+        case "mute":
+          patch.mutedUntil = now + (args.durationHours ?? 1) * 3600_000;
+          break;
+        case "ban_temp":
+          patch.bannedUntil = now + (args.durationHours ?? 24) * 3600_000;
+          patch.banReason = args.reason ?? "حظر جماعي من أطلس";
+          break;
+        case "pardon":
+          patch.mutedUntil = 0;
+          patch.bannedUntil = 0;
+          patch.bannedPermanent = false;
+          break;
+      }
+      await ctx.db.patch(userId, patch);
+      applied++;
+    }
+    await logAudit(ctx, {
+      system: "players",
+      feature: "c6",
+      command: "bulkAction",
+      ok: true,
+      result: { count: applied, action: args.action },
+      executedBy: owner.name ?? "المالك",
+      severity: args.action === "ban_temp" ? "critical" : "warning",
+    });
+    return { ok: true, applied };
+  },
+});
+
+export const atlasResetProgress = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const owner = await requireAtlasOwnerMutation(ctx);
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+    if (profile) {
+      // نسخة احتياطية قبل التصفير (ميزة p6/p7)
+      await ctx.db.insert("playerBackups", {
+        userId: args.userId,
+        backupData: JSON.stringify(profile),
+        createdAt: Date.now(),
+      });
+      await ctx.db.patch(profile._id, {
+        xp: 0,
+        gamesPlayed: 0,
+        gamesWon: 0,
+        bestScore: 0,
+        bestStreak: 0,
+        correctAnswers: 0,
+        totalAnswers: 0,
+      });
+    }
+    await logAudit(ctx, {
+      system: "players",
+      feature: "p6",
+      command: "resetProgress",
+      ok: true,
+      result: { userId: args.userId },
+      executedBy: owner.name ?? "المالك",
+      severity: "critical",
+    });
+    return { ok: true };
   },
 });
 
@@ -517,18 +686,14 @@ export const membershipAdminData = query({
       ctx.db.query("users").collect(),
     ]);
     const tierCounts: Record<string, number> = {};
-    for (const m of memberships) {
-      tierCounts[m.tier] = (tierCounts[m.tier] ?? 0) + 1;
-    }
+    for (const m of memberships) tierCounts[m.tier] = (tierCounts[m.tier] ?? 0) + 1;
     const nameOf = new Map(users.map((u) => [u._id, u.name ?? "بلا اسم"]));
     const now = Date.now();
     return {
-      tiers: MEMBERSHIP_TIERS.map((t) => ({
-        id: t.id,
-        name: t.name,
-        emoji: t.emoji,
-        price: t.price,
-        count: tierCounts[t.id] ?? 0,
+      tiers: MEMBERSHIP_TIERS.map((t: any) => ({
+        id: String(t.id ?? t.tier ?? "?"),
+        name: String(t.name ?? t.label ?? "?"),
+        count: tierCounts[String(t.id ?? t.tier ?? "?")] ?? 0,
       })),
       codes: codes
         .sort((a, b) => b.createdAt - a.createdAt)
@@ -570,39 +735,39 @@ export const atlasGrantMembership = mutation({
     durationDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     const existing = await ctx.db
       .query("memberships")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .first();
-    const features = [args.tier];
-    const payload = {
-      tier: args.tier,
-      activatedAt: Date.now(),
-      expiresAt: args.durationDays
-        ? Date.now() + args.durationDays * 86400_000
-        : undefined,
-      features,
-    };
+    const expiresAt = args.durationDays
+      ? Date.now() + args.durationDays * 86400_000
+      : undefined;
     if (existing) {
-      await ctx.db.patch(existing._id, payload);
+      await ctx.db.patch(existing._id, {
+        tier: args.tier,
+        activatedAt: Date.now(),
+        expiresAt,
+        features: [args.tier],
+      });
     } else {
       await ctx.db.insert("memberships", {
         userId: args.userId,
         tier: args.tier,
-        activatedAt: payload.activatedAt,
-        expiresAt: payload.expiresAt,
-        features,
+        activatedAt: Date.now(),
+        expiresAt,
+        features: [args.tier],
       });
     }
     const target = await ctx.db.get(args.userId);
-    await ctx.db.insert("ownerActions", {
-      action: "atlas_grant_membership",
-      targetUserId: args.userId,
-      targetName: target?.name ?? "",
-      details: `لوحة السيطرة: منح عضوية ${args.tier}`,
-      reversible: true,
-      undone: false,
+    await ctx.db.insert("moderationLogs", {
+      actorType: "owner",
+      actorName: `أطلس — ${owner.name ?? "المالك"}`,
+      action: "grant_membership",
+      targetId: args.userId,
+      targetName: target?.name ?? "؟",
+      reason: `أطلس: منح عضوية ${args.tier}`,
+      severity: "low",
       createdAt: Date.now(),
     });
     await logAudit(ctx, {
@@ -620,20 +785,21 @@ export const atlasGrantMembership = mutation({
 export const atlasRevokeMembership = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     const rows = await ctx.db
       .query("memberships")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
     for (const row of rows) await ctx.db.delete(row._id);
     const target = await ctx.db.get(args.userId);
-    await ctx.db.insert("ownerActions", {
-      action: "atlas_revoke_membership",
-      targetUserId: args.userId,
-      targetName: target?.name ?? "",
-      details: "لوحة السيطرة: سحب العضوية",
-      reversible: false,
-      undone: false,
+    await ctx.db.insert("moderationLogs", {
+      actorType: "owner",
+      actorName: `أطلس — ${owner.name ?? "المالك"}`,
+      action: "revoke_membership",
+      targetId: args.userId,
+      targetName: target?.name ?? "؟",
+      reason: "أطلس: سحب العضوية",
+      severity: "medium",
       createdAt: Date.now(),
     });
     await logAudit(ctx, {
@@ -662,7 +828,7 @@ export const atlasCreateCode = mutation({
     maxUses: v.number(),
   },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     const code = `ATLAS-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     await ctx.db.insert("membershipCodes", {
       code,
@@ -689,7 +855,7 @@ export const atlasCreateCode = mutation({
 export const atlasDeleteCode = mutation({
   args: { codeId: v.id("membershipCodes") },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     await ctx.db.patch(args.codeId, { active: false });
     await logAudit(ctx, {
       system: "memberships",
@@ -711,12 +877,12 @@ export const contentAdminData = query({
   args: {},
   handler: async (ctx) => {
     await requireAtlasOwner(ctx);
-    const disabled = await ctx.db
+    const disabledRow = await ctx.db
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", "modSettings"))
       .unique();
-    const disabledIds: string[] = disabled
-      ? ((JSON.parse(disabled.value) as any).disabledQuestions ?? [])
+    const disabledIds: string[] = disabledRow
+      ? ((JSON.parse(disabledRow.value) as any).disabledQuestions ?? [])
       : [];
 
     const byCategory: Record<string, number> = {};
@@ -726,10 +892,8 @@ export const contentAdminData = query({
       byDifficulty[q.difficulty] = (byDifficulty[q.difficulty] ?? 0) + 1;
     }
 
-    // مراقبة الجودة: أسئلة تحتاج مراجعة
     const qualityFlags = QUESTION_BANK.filter(
       (q) =>
-        q.options.length !== 4 ||
         new Set(q.options).size !== q.options.length ||
         q.options.some((o) => o.trim().length < 1) ||
         q.question.trim().length < 10,
@@ -745,11 +909,9 @@ export const contentAdminData = query({
         id: q.id,
         question: q.question,
         reason:
-          q.options.length !== 4
-            ? "عدد خيارات غير صحيح"
-            : new Set(q.options).size !== q.options.length
-              ? "خيارات مكررة"
-              : "نص قصير/مريب",
+          new Set(q.options).size !== q.options.length
+            ? "خيارات مكررة"
+            : "نص قصير/مريب",
       })),
       disabledCount: disabledIds.length,
     };
@@ -759,14 +921,12 @@ export const contentAdminData = query({
 export const atlasToggleQuestion = mutation({
   args: { questionId: v.string(), disabled: v.boolean() },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     const row = await ctx.db
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", "modSettings"))
       .unique();
-    const current = row
-      ? (JSON.parse(row.value) as any)
-      : {};
+    const current: any = row ? JSON.parse(row.value) : {};
     const list: string[] = current.disabledQuestions ?? [];
     const next = args.disabled
       ? Array.from(new Set([...list, args.questionId]))
@@ -791,7 +951,7 @@ export const atlasToggleQuestion = mutation({
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// 5) الغرف والقوانين + 6) البلاغات
+// 5) الغرف والقوانين
 // ═══════════════════════════════════════════════════════════════════════
 
 export const roomsAdminData = query({
@@ -812,22 +972,26 @@ export const roomsAdminData = query({
     }
     return {
       rooms: rooms
-        .sort((a, b) => b.createdAt - a.createdAt)
+        .sort((a, b) => b._creationTime - a._creationTime)
         .slice(0, 50)
         .map((r) => ({
           _id: r._id,
           name: r.name,
-          type: r.type,
-          archived: r.archived,
           members: r.members.length,
           messages: msgsByRoom.get(String(r._id)) ?? 0,
-          createdAt: r.createdAt,
+          archived: r.archived,
+          createdAt: r._creationTime,
         })),
       totalMessages: messages.length,
       messagesLast24h: messages.filter((m) => now - m.createdAt < 86400_000).length,
       rules: rules
         .sort((a, b) => a.order - b.order)
-        .map((r) => ({ _id: r._id, title: r.title, active: r.active, severity: r.severity })),
+        .map((r) => ({
+          _id: r._id,
+          title: r.title,
+          active: r.active,
+          severity: r.severity,
+        })),
       reports: {
         open: reports.filter((r) => r.status === "open").length,
         resolved: reports.filter((r) => r.status !== "open").length,
@@ -836,38 +1000,49 @@ export const roomsAdminData = query({
   },
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// 6) البلاغات الذكية
+// ═══════════════════════════════════════════════════════════════════════
+
 export const reportsAdminData = query({
   args: {},
   handler: async (ctx) => {
     await requireAtlasOwner(ctx);
-    const reports = await ctx.db
+    const open = await ctx.db
       .query("reports")
       .withIndex("by_status", (q) => q.eq("status", "open"))
       .order("desc")
       .take(50);
     const all = await ctx.db.query("reports").collect();
-    const byCategory: Record<string, number> = {};
+    const byReason: Record<string, number> = {};
     for (const r of all) {
-      const key = r.aiVerdict?.violation ?? "غير مصنف";
-      byCategory[key] = (byCategory[key] ?? 0) + 1;
+      const key = r.reason.slice(0, 24);
+      byReason[key] = (byReason[key] ?? 0) + 1;
     }
-    const reviewed = all.filter((r) => r.status === "reviewed");
+    const resolved = all.filter((r) => r.status !== "open");
+    const highSeverityOpen = open.filter(
+      (r) => (r.aiVerdict?.severity ?? "low") === "high",
+    ).length;
     return {
-      open: reports.map((r) => ({
+      open: open.map((r) => ({
         _id: r._id,
         reason: r.reason,
         details: r.details ?? "",
         reporterName: r.reporterName,
         targetName: r.targetName,
+        status: r.status,
         aiVerdict: r.aiVerdict ?? null,
         createdAt: r.createdAt,
       })),
       stats: {
         total: all.length,
         open: all.filter((r) => r.status === "open").length,
-        resolved: reviewed.length + all.filter((r) => r.status === "dismissed").length,
-        byCategory,
+        resolved: resolved.length,
+        dismissed: all.filter((r) => r.status === "dismissed").length,
+        highSeverityOpen,
+        byReason,
       },
+      categories: REPORT_CATEGORIES,
     };
   },
 });
@@ -879,9 +1054,22 @@ export const atlasResolveReport = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
+    const report = await ctx.db.get(args.reportId);
+    if (!report) throw new Error("البلاغ غير موجود");
     await ctx.db.patch(args.reportId, {
       status: args.approved ? "reviewed" : "dismissed",
+    });
+    await ctx.db.insert("moderationLogs", {
+      actorType: "owner",
+      actorName: `أطلس — ${owner.name ?? "المالك"}`,
+      action: args.approved ? "report_approved" : "report_dismissed",
+      targetId: report.targetId,
+      targetName: report.targetName,
+      reason: args.note ?? report.reason,
+      severity:
+        (report.aiVerdict?.severity ?? "low") === "high" ? "high" : "medium",
+      createdAt: Date.now(),
     });
     await logAudit(ctx, {
       system: "reports",
@@ -907,7 +1095,7 @@ export const aiAdminData = query({
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", "modSettings"))
       .unique();
-    const parsed = settings ? (JSON.parse(settings.value) as any) : {};
+    const parsed: any = settings ? JSON.parse(settings.value) : {};
     const logs = await ctx.db
       .query("aiLogs")
       .withIndex("by_timestamp")
@@ -936,10 +1124,9 @@ export const atlasSetAiControl = mutation({
     aiEnabled: v.optional(v.boolean()),
     aiAutoApply: v.optional(v.boolean()),
     aiAdminEnabled: v.optional(v.boolean()),
-    aiModel: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     const row = await ctx.db
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", "modSettings"))
@@ -948,7 +1135,6 @@ export const atlasSetAiControl = mutation({
     if (args.aiEnabled !== undefined) current.aiEnabled = args.aiEnabled;
     if (args.aiAutoApply !== undefined) current.aiAutoApply = args.aiAutoApply;
     if (args.aiAdminEnabled !== undefined) current.aiAdminEnabled = args.aiAdminEnabled;
-    if (args.aiModel !== undefined) current.aiModel = args.aiModel;
     const value = JSON.stringify(current);
     if (row) await ctx.db.patch(row._id, { value });
     else await ctx.db.insert("settings", { key: "modSettings", value });
@@ -969,12 +1155,12 @@ export const atlasSetAiControl = mutation({
  * المحرك الحر — تفكير شامل في حالة اللعبة الآن.
  * يعمل داخل خادم Convex بلا أي مفاتيح خارجية: يجمع القرائن من كل الأنظمة
  * ويولّد ملاحظات/اقتراحات حقيقية مبنية على الأرقام الفعلية، ويخزنها
- * في atlasInsights لعرضها في الواجهة.
+ * في atlasInsights — مع ذاكرة تعلّم من قرارات المالك.
  */
 export const atlasThink = mutation({
   args: { prompt: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     const now = Date.now();
     const [users, games, reports, messages, errors] = await Promise.all([
       ctx.db.query("users").collect(),
@@ -994,7 +1180,7 @@ export const atlasThink = mutation({
     };
     const insights: Insight[] = [];
 
-    // 1) نشاط الرسائل
+    // 1) نشاط الرسائل — كشف شذوذ
     const msgsLastHour = messages.filter((m) => now - m.createdAt < 3600_000).length;
     const msgsPrevHour = messages.filter(
       (m) => now - m.createdAt >= 3600_000 && now - m.createdAt < 7200_000,
@@ -1005,7 +1191,7 @@ export const atlasThink = mutation({
         system: "rooms",
         severity: "orange",
         title: "ارتفاع مفاجئ في رسائل الدردشة",
-        body: `الرسائل في الساعة الأخيرة (${msgsLastHour}) ضعف الساعة السابقة (${msgsPrevHour}). راقب الغرف — قد يكون سبام منظّم.`,
+        body: `الرسائل في الساعة الأخيرة (${msgsLastHour}) ضعف الساعة السابقة (${msgsPrevHour}). راقب الغرف — قد يكون سباماً منظّماً.`,
         data: JSON.stringify({ msgsLastHour, msgsPrevHour }),
       });
     }
@@ -1018,13 +1204,15 @@ export const atlasThink = mutation({
         system: "reports",
         severity: openReports > 15 ? "red" : "orange",
         title: `${openReports} بلاغاً مفتوحاً بحاجة لقرار`,
-        body: "افتح نظام البلاغات الذكية واحسم البلاغات القديمة أولاً — زمن المعالجة يتأثر مباشرة بتراكمها.",
+        body: "افتح نظام البلاغات الذكية واحسم البلاغات القديمة أولاً — تراكمها يبطئ عدالة المجتمع كلها.",
         data: JSON.stringify({ openReports }),
       });
     }
 
     // 3) أخطاء حرجة
-    const critical = errors.filter((e) => e.severity === "critical" && !e.resolved).length;
+    const critical = errors.filter(
+      (e) => e.severity === "critical" && !e.resolved,
+    ).length;
     if (critical > 0) {
       insights.push({
         kind: "anomaly",
@@ -1040,7 +1228,7 @@ export const atlasThink = mutation({
     const banned = users.filter(
       (u) => u.bannedPermanent || (u.bannedUntil && u.bannedUntil > now),
     ).length;
-    if (banned > users.length * 0.1 && users.length > 20) {
+    if (users.length > 20 && banned > users.length * 0.1) {
       insights.push({
         kind: "observation",
         system: "players",
@@ -1051,7 +1239,7 @@ export const atlasThink = mutation({
       });
     }
 
-    // 5) جولات عالقة في اللوبي
+    // 5) غرف انتظار مهجورة
     const staleLobbies = games.filter(
       (g) => g.status === "waiting" && now - g.createdAt > 2 * 3600_000,
     ).length;
@@ -1060,13 +1248,12 @@ export const atlasThink = mutation({
         kind: "suggestion",
         system: "control",
         severity: "blue",
-        title: `${staleLobbies} غرفة لعب مهجورة`,
-        body: "غرف انتظار عمرها أكثر من ساعتين بدون انطلاق — ألغِها أو انطلق بها لتنظيف اللعبة.",
+        title: `${staleLobbies} غرفة انتظار مهجورة`,
+        body: "غرف انتظار عمرها أكثر من ساعتين بدون انطلاق — أنظفها من قلب السيطرة المركزية.",
         data: JSON.stringify({ staleLobbies }),
       });
     }
 
-    // افتراضي: كل شيء تحت السيطرة
     if (insights.length === 0) {
       insights.push({
         kind: "summary",
@@ -1077,13 +1264,11 @@ export const atlasThink = mutation({
       });
     }
 
-    // ذاكرة التعلّم: إن كان لديه prompt (أمر حر) نطابقه مع قرارات سابقة
+    // ذاكرة التعلّم: مطابقة الأمر الحر مع قرارات المالك السابقة
     const prompt = (args.prompt ?? "").trim();
     let memoryHit: string | null = null;
     if (prompt) {
-      const mem = await ctx.db
-        .query("atlasLearningMemory")
-        .collect();
+      const mem = await ctx.db.query("atlasLearningMemory").collect();
       const hit = mem.find((m) => prompt.includes(m.kind));
       if (hit) memoryHit = hit.decision;
     }
@@ -1142,20 +1327,17 @@ export const getInsights = query({
   },
 });
 
+/** قرار المالك على اقتراح الأنظمة الحرة — يدرّب ذاكرة التعلّم. */
 export const decideInsight = mutation({
-  args: {
-    insightId: v.id("atlasInsights"),
-    accept: v.boolean(),
-  },
+  args: { insightId: v.id("atlasInsights"), accept: v.boolean() },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    await requireAtlasOwnerMutation(ctx);
     const row = await ctx.db.get(args.insightId);
     if (!row) throw new Error("الاقتراح غير موجود");
     await ctx.db.patch(args.insightId, {
       status: args.accept ? "accepted" : "dismissed",
       decidedAt: Date.now(),
     });
-    // ذاكرة التعلّم: قرارات المالك تدرّب الأنظمة الحرة (ميزة 80)
     if (args.accept) {
       const sig = `${row.kind}:${row.system}`;
       const existing = await ctx.db
@@ -1201,7 +1383,7 @@ export const economyAdminData = query({
         items: ALL_ITEMS.length,
         sections: STORE_SECTIONS.length,
         bundles: STORE_BUNDLES.length,
-        sectionsList: STORE_SECTIONS.map((s) => s.name),
+        sectionsList: STORE_SECTIONS.map((s: any) => String(s?.name ?? s?.id ?? "قسم")),
       },
       currency: {
         coins,
@@ -1210,20 +1392,20 @@ export const economyAdminData = query({
       },
       gifts: {
         total: gifts.length,
+        unclaimed: gifts.filter((g) => !g.claimed).length,
         last7d: gifts.filter((g) => Date.now() - g.createdAt < 7 * 86400_000).length,
       },
-      itemsPreview: ALL_ITEMS.slice(0, 20).map((i) => ({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        currency: "coins" as const,
+      itemsPreview: ALL_ITEMS.slice(0, 20).map((i: any) => ({
+        id: String(i?.id ?? "?"),
+        name: String(i?.name ?? "?"),
+        price: Number(i?.price ?? 0),
       })),
     };
   },
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// 9) التحليلات والتنبؤ
+// 9) التحليلات والتنبؤ + التقرير التنفيذي
 // ═══════════════════════════════════════════════════════════════════════
 
 export const analyticsData = query({
@@ -1231,7 +1413,7 @@ export const analyticsData = query({
   handler: async (ctx) => {
     await requireAtlasOwner(ctx);
     const now = Date.now();
-    const [profiles, games, users, questions] = await Promise.all([
+    const [profiles, games, users, history] = await Promise.all([
       ctx.db.query("profiles").collect(),
       ctx.db.query("games").collect(),
       ctx.db.query("users").collect(),
@@ -1239,16 +1421,13 @@ export const analyticsData = query({
     ]);
 
     const dayMs = 86400_000;
-    const buckets: number[] = [];
+    const finished7d: number[] = [];
     for (let i = 6; i >= 0; i--) {
       const from = now - (i + 1) * dayMs;
       const to = now - i * dayMs;
-      buckets.push(
+      finished7d.push(
         games.filter(
-          (g) =>
-            g.status === "finished" &&
-            g.createdAt >= from &&
-            g.createdAt < to,
+          (g) => g.status === "finished" && g.createdAt >= from && g.createdAt < to,
         ).length,
       );
     }
@@ -1261,22 +1440,25 @@ export const analyticsData = query({
     const retention = profiles.filter((p) => p.gamesPlayed >= 3).length;
 
     return {
-      finished7d: buckets,
+      finished7d,
       totals: {
         games: games.length,
         finished: games.filter((g) => g.status === "finished").length,
         users: users.length,
+        rounds: history.length,
         answers: profiles.reduce((s, p) => s + p.totalAnswers, 0),
         avgAccuracy: Math.round(avgAccuracy * 100),
         retention: profiles.length
           ? Math.round((retention / profiles.length) * 100)
           : 0,
-        playerHistory: questions.length,
       },
-      topScores: profiles
+      topPlayers: profiles
         .sort((a, b) => b.xp - a.xp)
         .slice(0, 10)
-        .map((p) => ({ userId: p.userId, xp: p.xp, bestScore: p.bestScore })),
+        .map((p) => {
+          const u = users.find((x) => x._id === p.userId);
+          return { name: u?.name ?? "؟", xp: p.xp, bestScore: p.bestScore };
+        }),
     };
   },
 });
@@ -1285,7 +1467,6 @@ export const exportFullReport = query({
   args: {},
   handler: async (ctx) => {
     await requireAtlasOwner(ctx);
-    const now = Date.now();
     const [users, profiles, games, reports, errors, memberships] =
       await Promise.all([
         ctx.db.query("users").collect(),
@@ -1296,9 +1477,9 @@ export const exportFullReport = query({
         ctx.db.query("memberships").collect(),
       ]);
     return {
-      generatedAt: now,
+      generatedAt: Date.now(),
       game: "حرب العقول",
-      controlApp: "حرب العقول — لوحة السيطرة",
+      controlApp: "أطلس كنترول",
       version: CURRENT_VERSION,
       build: BUILD_ID,
       totals: {
@@ -1317,14 +1498,14 @@ export const exportFullReport = query({
         .slice(0, 20)
         .map((p) => {
           const u = users.find((x) => x._id === p.userId);
-          return { name: u?.name ?? "?", xp: p.xp, bestScore: p.bestScore };
+          return { name: u?.name ?? "؟", xp: p.xp, bestScore: p.bestScore };
         }),
     };
   },
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// 10) الطوارئ والصيانة والأمان + سجل التدقيق
+// 10) الطوارئ والصيانة والأمان + سجل التدقيق والجلسات
 // ═══════════════════════════════════════════════════════════════════════
 
 export const emergencyAdminData = query({
@@ -1362,7 +1543,7 @@ export const emergencyAdminData = query({
         severity: e.severity,
         category: e.category,
         route: e.route ?? "",
-        count: e.count ?? 1,
+        count: (e as any).count ?? 1,
         createdAt: e.createdAt,
       })),
       bySeverity,
@@ -1384,7 +1565,7 @@ export const emergencyAdminData = query({
 export const atlasSetMaintenance = mutation({
   args: { active: v.boolean(), message: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     const current = await ctx.db
       .query("maintenanceMode")
       .withIndex("by_active", (q) => q.eq("active", true))
@@ -1402,10 +1583,7 @@ export const atlasSetMaintenance = mutation({
         });
       }
     } else if (current) {
-      await ctx.db.patch(current._id, {
-        active: false,
-        endedAt: Date.now(),
-      });
+      await ctx.db.patch(current._id, { active: false, endedAt: Date.now() });
     }
     await logAudit(ctx, {
       system: "emergency",
@@ -1434,7 +1612,7 @@ export const atlasBroadcast = mutation({
     targetUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
+    const owner = await requireAtlasOwnerMutation(ctx);
     await ctx.db.insert("notifications", {
       userId: args.targetUserId ?? "__all__",
       title: args.title,
@@ -1448,227 +1626,17 @@ export const atlasBroadcast = mutation({
       feature: "c7",
       command: "notify",
       ok: true,
-      result: { title: args.title, type: args.type, targeted: Boolean(args.targetUserId) },
+      result: {
+        title: args.title,
+        type: args.type,
+        targeted: Boolean(args.targetUserId),
+      },
       executedBy: owner.name ?? "المالك",
       severity: args.type === "ban" || args.type === "warning" ? "warning" : "info",
     });
     return { ok: true };
   },
 });
-
-export const atlasPunish = mutation({
-  args: {
-    userId: v.id("users"),
-    action: v.union(
-      v.literal("warn"),
-      v.literal("mute"),
-      v.literal("kick"),
-      v.literal("ban_temp"),
-      v.literal("ban_perm"),
-    ),
-    reason: v.optional(v.string()),
-    durationHours: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
-    const now = Date.now();
-    const patch: Record<string, unknown> = {};
-    let details = "";
-    switch (args.action) {
-      case "warn":
-        patch.lastWarningAt = now;
-        details = `لوحة السيطرة: تحذير رسمي — ${args.reason ?? "مخالفة"}`;
-        break;
-      case "mute":
-        patch.mutedUntil = now + (args.durationHours ?? 1) * 3600_000;
-        details = `لوحة السيطرة: كتم لمدة ${args.durationHours ?? 1} ساعة — ${args.reason ?? ""}`;
-        break;
-      case "ban_temp":
-        patch.bannedUntil = now + (args.durationHours ?? 24) * 3600_000;
-        patch.banReason = args.reason ?? "حظر مؤقت من لوحة السيطرة";
-        details = `لوحة السيطرة: حظر مؤقت ${args.durationHours ?? 24} ساعة`;
-        break;
-      case "ban_perm":
-        patch.bannedPermanent = true;
-        patch.banReason = args.reason ?? "حظر دائم من لوحة السيطرة";
-        details = "لوحة السيطرة: حظر دائم";
-        break;
-      case "kick":
-        details = `لوحة السيطرة: طرد من الجولة الحالية — ${args.reason ?? ""}`;
-        break;
-    }
-    await ctx.db.patch(args.userId, patch);
-    const target = await ctx.db.get(args.userId);
-    await ctx.db.insert("ownerActions", {
-      action: `atlas_${args.action}`,
-      targetUserId: args.userId,
-      targetName: target?.name ?? "",
-      details,
-      reversible: args.action === "warn" || args.action === "mute",
-      undone: false,
-      createdAt: now,
-    });
-    await logAudit(ctx, {
-      system: "players",
-      feature: "c4",
-      command: "punish",
-      ok: true,
-      result: { userId: args.userId, action: args.action },
-      executedBy: owner.name ?? "المالك",
-      severity: args.action.includes("ban") ? "critical" : "warning",
-    });
-    return { ok: true, details };
-  },
-});
-
-export const atlasPardon = mutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
-    await ctx.db.patch(args.userId, {
-      mutedUntil: 0,
-      bannedUntil: 0,
-      bannedPermanent: false,
-      banReason: "",
-    });
-    const target = await ctx.db.get(args.userId);
-    await ctx.db.insert("ownerActions", {
-      action: "atlas_pardon",
-      targetUserId: args.userId,
-      targetName: target?.name ?? "",
-      details: "لوحة السيطرة: عفو كامل وإلغاء كل العقوبات",
-      reversible: false,
-      undone: false,
-      createdAt: Date.now(),
-    });
-    await logAudit(ctx, {
-      system: "players",
-      feature: "c5",
-      command: "pardon",
-      ok: true,
-      result: { userId: args.userId },
-      executedBy: owner.name ?? "المالك",
-    });
-    return { ok: true };
-  },
-});
-
-export const atlasBulkAction = mutation({
-  args: {
-    userIds: v.array(v.id("users")),
-    action: v.union(
-      v.literal("warn"),
-      v.literal("mute"),
-      v.literal("ban_temp"),
-      v.literal("pardon"),
-    ),
-    reason: v.optional(v.string()),
-    durationHours: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
-    const now = Date.now();
-    let applied = 0;
-    for (const userId of args.userIds) {
-      const patch: Record<string, unknown> = {};
-      switch (args.action) {
-        case "warn":
-          patch.lastWarningAt = now;
-          break;
-        case "mute":
-          patch.mutedUntil = now + (args.durationHours ?? 1) * 3600_000;
-          break;
-        case "ban_temp":
-          patch.bannedUntil = now + (args.durationHours ?? 24) * 3600_000;
-          patch.banReason = args.reason ?? "حظر جماعي من لوحة السيطرة";
-          break;
-        case "pardon":
-          patch.mutedUntil = 0;
-          patch.bannedUntil = 0;
-          patch.bannedPermanent = false;
-          break;
-      }
-      await ctx.db.patch(userId, patch);
-      applied++;
-    }
-    await logAudit(ctx, {
-      system: "players",
-      feature: "c6",
-      command: "bulkAction",
-      ok: true,
-      result: { count: applied, action: args.action },
-      executedBy: owner.name ?? "المالك",
-      severity: args.action === "ban_temp" ? "critical" : "warning",
-    });
-    return { ok: true, applied };
-  },
-});
-
-export const atlasEditPlayer = mutation({
-  args: {
-    userId: v.id("users"),
-    name: v.optional(v.string()),
-    role: v.optional(v.union(v.literal("admin"), v.literal("user"), v.literal("member"))),
-  },
-  handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
-    const patch: Record<string, unknown> = {};
-    if (args.name !== undefined && args.name.trim()) patch.name = args.name.trim();
-    if (args.role !== undefined) patch.role = args.role;
-    await ctx.db.patch(args.userId, patch);
-    await logAudit(ctx, {
-      system: "players",
-      feature: "c3",
-      command: "editPlayer",
-      ok: true,
-      result: args,
-      executedBy: owner.name ?? "المالك",
-    });
-    return { ok: true };
-  },
-});
-
-export const atlasResetProgress = mutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const owner = await requireAtlasOwner(ctx);
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
-    if (profile) {
-      // نسخة احتياطية قبل التصفير (ميزة p6)
-      await ctx.db.insert("playerBackups", {
-        userId: args.userId,
-        backupData: JSON.stringify(profile),
-        createdAt: Date.now(),
-      });
-      await ctx.db.patch(profile._id, {
-        xp: 0,
-        gamesPlayed: 0,
-        gamesWon: 0,
-        bestScore: 0,
-        bestStreak: 0,
-        correctAnswers: 0,
-        totalAnswers: 0,
-      });
-    }
-    await logAudit(ctx, {
-      system: "players",
-      feature: "p6",
-      command: "resetProgress",
-      ok: true,
-      result: { userId: args.userId },
-      executedBy: owner.name ?? "المالك",
-      severity: "critical",
-    });
-    return { ok: true };
-  },
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// سجل التدقيق والجلسات
-// ═══════════════════════════════════════════════════════════════════════
 
 export const getAuditTrail = query({
   args: { limit: v.optional(v.number()) },
@@ -1693,6 +1661,7 @@ export const getAuditTrail = query({
   },
 });
 
+/** تسجيل جلسة دخول أطلس (أمان + تدقيق دخول — ميزة x6). */
 export const atlasSessionLogin = mutation({
   args: {},
   handler: async (ctx) => {
@@ -1700,82 +1669,19 @@ export const atlasSessionLogin = mutation({
     if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
     const user = await ctx.db.get(userId);
     if (!user || !isOwnerUser(user)) {
-      throw new Error("حرب العقول — لوحة السيطرة للمالك الرسمي فقط");
+      throw new Error("أطلس كنترول للمالك الرسمي فقط");
     }
     await ctx.db.insert("atlasSessions", {
       userId,
       loginAt: Date.now(),
-      userAgent:
-        typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 200) : "",
     });
     return { ok: true };
   },
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// محرك الأوامر الحر — لغة عربية طبيعية → عملية فعلية
+// سجل الأنظمة للواجهة
 // ═══════════════════════════════════════════════════════════════════════
-
-export type AtlasPlan = {
-  op: AtlasFeatureDef["op"];
-  args: Record<string, unknown>;
-  explain: string;
-  severity: "info" | "warning" | "critical";
-};
-
-/** محلل عربي قواعدي بسيط لكن حقيقي: يفهم أوامر الصيانة والإشعارات والحظر. */
-export function parseAtlasCommand(text: string): AtlasPlan | null {
-  const t = text.trim();
-  if (!t) return null;
-
-  // الصيانة
-  if (/صيان[ةه]|maintenance/i.test(t)) {
-    const on = !/أوقف|انهاء|إنهاء|إيقاف|عطّل|تعطيل/.test(t);
-    const msg = t.replace(/.*صيان[ةه]\s*/, "").trim();
-    return {
-      op: "maintenance",
-      args: { active: on, message: msg || undefined },
-      explain: on ? "تفعيل وضع الصيانة للعبة" : "إيقاف وضع الصيانة",
-      severity: on ? "critical" : "info",
-    };
-  }
-
-  // إشعار / بث
-  if (/إشعار|اشعار|بلّغ|بلغ |بث|أعلن|اعلن|notify/i.test(t)) {
-    return {
-      op: "emergencyBroadcast",
-      args: { title: "إعلان من حرب العقول — لوحة السيطرة", body: t, type: "info" },
-      explain: "إرسال إشعار لكل اللاعبين",
-      severity: "info",
-    };
-  }
-
-  // حظر
-  const banMatch = t.match(/احظر|حظر\s+(\S+)/);
-  if (banMatch) {
-    const name = banMatch[1] ?? "";
-    const permanent = /دائم|نهائ/.test(t);
-    return {
-      op: "punish",
-      args: { name, action: permanent ? "ban_perm" : "ban_temp", reason: t },
-      explain: `حظر ${permanent ? "دائم" : "مؤقت"} للاعب «${name}»`,
-      severity: "critical",
-    };
-  }
-
-  // إيقاف/تشغيل الذكاء
-  if (/الذكاء/.test(t)) {
-    const enable = !/أوقف|إيقاف|عطّل|تعطيل/.test(t);
-    return {
-      op: "aiControl",
-      args: { aiEnabled: enable },
-      explain: enable ? "تفعيل أنظمة الذكاء" : "إيقاف أنظمة الذكاء",
-      severity: enable ? "info" : "warning",
-    };
-  }
-
-  return null;
-}
 
 export const getAtlasSystemRegistry = query({
   args: {},
