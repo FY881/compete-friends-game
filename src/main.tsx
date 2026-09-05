@@ -23,6 +23,7 @@ import "./index.css";
 // غرفة المالك من نسخة اللاعبين (VITE_NO_OWNER=1) ويحوّل نسخة المالك إلى
 // بوابة مالك موجهة (VITE_OWNER_APP=1).
 const OWNER_APP_MODE = import.meta.env.VITE_OWNER_APP === "1";
+const ATLAS_APP_MODE = import.meta.env.VITE_ATLAS_APP === "1";
 const OWNER_ROOM_ENABLED = import.meta.env.VITE_NO_OWNER !== "1";
 import { lazyRetry } from "@/lib/lazyRetry";
 
@@ -40,6 +41,8 @@ const NotFound = lazyRetry(() => import("./pages/NotFound.tsx"));
 const MiniGames = lazyRetry(() => import("./pages/MiniGames.tsx"));
 const ChatRooms = lazyRetry(() => import("./pages/ChatRooms.tsx"));
 const Hub = lazyRetry(() => import("./pages/Hub.tsx"));
+const Atlas = lazyRetry(() => import("./pages/Atlas.tsx"));
+const AtlasLogin = lazyRetry(() => import("./components/atlas/AtlasLogin.tsx"));
 
 // Simple loading fallback for route transitions — all Arabic
 function RouteLoading() {
@@ -220,6 +223,26 @@ function OwnerAppHome() {
   return <RouteLoading />;
 }
 
+/**
+ * بوابة تطبيق أطلس كنترول المستقل (نسخة APK المنفصلة):
+ * الصفحة الرئيسية توجّه دائماً إلى تجربة أطلس — حساب ← بوابة أطلس ←
+ * لوحة السيطرة الكاملة على اللعبة.
+ */
+function AtlasAppHome() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isLoading) return;
+    navigate(
+      isAuthenticated ? "/atlas-login" : "/auth?returnTo=/atlas-login",
+      { replace: true },
+    );
+  }, [isAuthenticated, isLoading, navigate]);
+
+  return <RouteLoading />;
+}
+
 function RouteSyncer() {
   const location = useLocation();
   useEffect(() => {
@@ -262,7 +285,7 @@ function AppShell() {
             <Routes>
               <Route
                 path="/"
-                element={OWNER_APP_MODE ? <OwnerAppHome /> : <Landing />}
+                element={ATLAS_APP_MODE ? <AtlasAppHome /> : OWNER_APP_MODE ? <OwnerAppHome /> : <Landing />}
               />
               <Route
                 path="/auth"
@@ -308,6 +331,18 @@ function AppShell() {
                   />
                 </>
               )}
+              <Route
+                path="/atlas-login"
+                element={<AtlasLogin />}
+              />
+              <Route
+                path="/atlas"
+                element={
+                  <RequireAuth>
+                    <Atlas />
+                  </RequireAuth>
+                }
+              />
               <Route path="/rules" element={<Rules />} />
               <Route path="/download" element={<Download />} />
               <Route path="/games" element={<MiniGames />} />

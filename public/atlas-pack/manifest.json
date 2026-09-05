@@ -1,0 +1,218 @@
+{
+  "pack": "atlas-premium",
+  "version": "1.0.0",
+  "audio": [
+    {
+      "id": "atmosphere-control",
+      "file": "audio/atmosphere-control.wav",
+      "seconds": 65.0,
+      "mood": "قيادي مهيب",
+      "system": "control",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-players",
+      "file": "audio/atmosphere-players.wav",
+      "seconds": 65.0,
+      "mood": "يقظة إدارية",
+      "system": "players",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-memberships",
+      "file": "audio/atmosphere-memberships.wav",
+      "seconds": 65.0,
+      "mood": "فخامة ملكية",
+      "system": "memberships",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-content",
+      "file": "audio/atmosphere-content.wav",
+      "seconds": 65.0,
+      "mood": "صفاء معرفي",
+      "system": "content",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-rooms",
+      "file": "audio/atmosphere-rooms.wav",
+      "seconds": 65.0,
+      "mood": "دفء مجتمعي",
+      "system": "rooms",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-reports",
+      "file": "audio/atmosphere-reports.wav",
+      "seconds": 65.0,
+      "mood": "إنذار منضبط",
+      "system": "reports",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-ai",
+      "file": "audio/atmosphere-ai.wav",
+      "seconds": 65.0,
+      "mood": "تفكير عميق",
+      "system": "ai",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-economy",
+      "file": "audio/atmosphere-economy.wav",
+      "seconds": 65.0,
+      "mood": "ثقل اقتصادي",
+      "system": "economy",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-analytics",
+      "file": "audio/atmosphere-analytics.wav",
+      "seconds": 65.0,
+      "mood": "دقة تحليلية",
+      "system": "analytics",
+      "bytes": 5733044
+    },
+    {
+      "id": "atmosphere-emergency",
+      "file": "audio/atmosphere-emergency.wav",
+      "seconds": 65.0,
+      "mood": "طوارئ جدية",
+      "system": "emergency",
+      "bytes": 5733044
+    },
+    {
+      "id": "ui-click",
+      "file": "audio/ui-click.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 4454
+    },
+    {
+      "id": "ui-toggle",
+      "file": "audio/ui-toggle.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 10628
+    },
+    {
+      "id": "alert-info",
+      "file": "audio/alert-info.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 48554
+    },
+    {
+      "id": "alert-blue",
+      "file": "audio/alert-blue.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 48554
+    },
+    {
+      "id": "alert-orange",
+      "file": "audio/alert-orange.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 48554
+    },
+    {
+      "id": "alert-red",
+      "file": "audio/alert-red.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 48554
+    },
+    {
+      "id": "alert-purple",
+      "file": "audio/alert-purple.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 48554
+    },
+    {
+      "id": "success",
+      "file": "audio/success.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 70604
+    },
+    {
+      "id": "insight",
+      "file": "audio/insight.wav",
+      "mood": "واجهة",
+      "system": "ui",
+      "bytes": 79424
+    }
+  ],
+  "wallpapers": [
+    {
+      "id": "wallpaper-control",
+      "file": "wallpapers/wallpaper-control.png",
+      "mood": "قيادي مهيب",
+      "bytes": 106342
+    },
+    {
+      "id": "wallpaper-players",
+      "file": "wallpapers/wallpaper-players.png",
+      "mood": "يقظة إدارية",
+      "bytes": 106705
+    },
+    {
+      "id": "wallpaper-memberships",
+      "file": "wallpapers/wallpaper-memberships.png",
+      "mood": "فخامة ملكية",
+      "bytes": 105641
+    },
+    {
+      "id": "wallpaper-content",
+      "file": "wallpapers/wallpaper-content.png",
+      "mood": "صفاء معرفي",
+      "bytes": 105996
+    },
+    {
+      "id": "wallpaper-rooms",
+      "file": "wallpapers/wallpaper-rooms.png",
+      "mood": "دفء مجتمعي",
+      "bytes": 105876
+    },
+    {
+      "id": "wallpaper-reports",
+      "file": "wallpapers/wallpaper-reports.png",
+      "mood": "إنذار منضبط",
+      "bytes": 105830
+    },
+    {
+      "id": "wallpaper-ai",
+      "file": "wallpapers/wallpaper-ai.png",
+      "mood": "تفكير عميق",
+      "bytes": 106528
+    },
+    {
+      "id": "wallpaper-economy",
+      "file": "wallpapers/wallpaper-economy.png",
+      "mood": "ثقل اقتصادي",
+      "bytes": 105406
+    },
+    {
+      "id": "wallpaper-analytics",
+      "file": "wallpapers/wallpaper-analytics.png",
+      "mood": "دقة تحليلية",
+      "bytes": 106735
+    },
+    {
+      "id": "wallpaper-emergency",
+      "file": "wallpapers/wallpaper-emergency.png",
+      "mood": "طوارئ جدية",
+      "bytes": 105992
+    },
+    {
+      "id": "wallpaper-hero",
+      "file": "wallpapers/wallpaper-hero.png",
+      "mood": "اللوحة الرئيسية",
+      "bytes": 106533
+    }
+  ],
+  "totalBytes": 58905904
+}

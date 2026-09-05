@@ -289,3 +289,18 @@ html {
     background: color-mix(in oklab, var(--primary) 22%, transparent);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   أطلس كنترول — متغيرات الهوية البصرية (داكن فاخر / فاتح أنيق)
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --atlas-bg: #f4f5fb;
+  --atlas-panel: #ffffff;
+  --atlas-header: rgba(255, 255, 255, 0.88);
+}
+
+.dark {
+  --atlas-bg: #070b16;
+  --atlas-panel: #0e1428;
+  --atlas-header: rgba(7, 11, 22, 0.88);
+}
