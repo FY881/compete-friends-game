@@ -1,7 +1,7 @@
 /**
- * أطلس كنترول — طبقة الأنظمة الخلفية (Atlas Control Backend)
+ * حرب العقول — لوحة السيطرة — طبقة الأنظمة الخلفية (Atlas Control Backend)
  *
- * هذه الوحدة هي العقل التنفيذي لتطبيق «أطلس كنترول» المستقل:
+ * هذه الوحدة هي العقل التنفيذي لتطبيق «حرب العقول — لوحة السيطرة» المستقل:
  * - سجل الأنظمة العشرة الكبرى + الـ 80 ميزة (مصدر واحد تتقاسمه الخلفية والواجهة).
  * - دالة تنفيذ الأوامر الحقيقية: كل ميزة تُنفَّذ عبر دوال خادم فعلية من
  *   اللعبة نفسها (owner / playerControl / lawEnforcement / adminControl /
@@ -35,7 +35,6 @@ import {
 import { QUESTION_BANK, CATEGORIES } from "./questions";
 import { ALL_ITEMS, STORE_SECTIONS, STORE_BUNDLES } from "./store";
 import { MEMBERSHIP_TIERS } from "./memberships";
-import { REPORT_CATEGORIES } from "./reportsSmart";
 import { CURRENT_VERSION, BUILD_ID, APK_FILE_NAME, APK_SHA256, APK_BYTES } from "./apkRelease";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -98,7 +97,7 @@ const CONTROL_FEATURES: AtlasFeatureDef[] = [
   { id: "c5", name: "العفو الفوري", desc: "ألغِ أي عقوبة نشطة وأعد اللاعب للعب خلال ثانية واحدة.", op: "pardon", kind: "action" },
   { id: "c6", name: "الإجراء الجماعي السريع", desc: "طبّق أمراً واحداً على عدة لاعبين دفعة واحدة (إشعار/كتم/حظر/تصفير).", op: "bulkAction", kind: "action", danger: true },
   { id: "c7", name: "بوق القيادة", desc: "أرسل إشعاراً فورياً لكل اللاعبين أو لحساب محدد — يظهر مباشرة في التطبيق.", op: "notify", kind: "action" },
-  { id: "c8", name: "محرك الأوامر الحر", desc: "اكتب أي أمر بالعربية وينفّذه محرك أطلس: من «احظر فلان» إلى «فعّل الصيانة».", op: "aiThink", kind: "action" },
+  { id: "c8", name: "محرك الأوامر الحر", desc: "اكتب أي أمر بالعربية وينفّذه محرك لوحة السيطرة: من «احظر فلان» إلى «فعّل الصيانة».", op: "aiThink", kind: "action" },
 ];
 
 /** ميزات النظام 2 — إدارة اللاعبين المتقدمة */
@@ -164,7 +163,7 @@ const REPORTS_FEATURES: AtlasFeatureDef[] = [
 /** ميزات النظام 7 — التحكم في الذكاء الاصطناعي */
 const AI_FEATURES: AtlasFeatureDef[] = [
   { id: "l1", name: "مفتاح الذكاء الرئيسي", desc: "شغّل أو أوقف كل أنظمة الذكاء في اللعبة من مفتاح واحد.", op: "aiControl", kind: "action", danger: true },
-  { id: "l2", name: "التفكير الذاتي", desc: "اطلب من محرك أطلس أن يفكر في حالة اللعبة الآن ويقدم رأيه.", op: "aiThink", kind: "action" },
+  { id: "l2", name: "التفكير الذاتي", desc: "اطلب من محرك اللوحة أن يفكر في حالة اللعبة الآن ويقدم رأيه.", op: "aiThink", kind: "action" },
   { id: "l3", name: "سجل نشاط الذكاء", desc: "كل ما فعله الذكاء الآلي: قرارات، إشراف، إصلاحات.", op: "aiLogs", kind: "view" },
   { id: "l4", name: "حساسية إنفاذ القوانين", desc: "اضبط صرامة ردود الفعل على المخالفات من لوحة الإعدادات.", op: "aiControl", kind: "view" },
   { id: "l5", name: "الإدارة الآلية", desc: "المسح الشامل الدوري لكل اللعبة بدون تدخل بشري.", op: "aiControl", kind: "view" },
@@ -202,7 +201,7 @@ const EMERGENCY_FEATURES: AtlasFeatureDef[] = [
   { id: "x1", name: "وضع الصيانة", desc: "افتح أو أغلق صيانة اللعبة الكاملة برسالة مخصصة.", op: "maintenance", kind: "action", danger: true },
   { id: "x2", name: "بث الطوارئ", desc: "إشعار أحمر عاجل لكل الأجهزة فوراً.", op: "emergencyBroadcast", kind: "action", danger: true },
   { id: "x3", name: "مركز الأخطاء", desc: "أخطاء العملاء الحية مع التصنيف والخطورة وإحصاءاتها.", op: "errorStats", kind: "view" },
-  { id: "x4", name: "سجل التدقيق الكامل", desc: "سجل دائم لكل أمر نُفّذ من أطلس وغرفة المالك.", op: "auditTrail", kind: "view" },
+  { id: "x4", name: "سجل التدقيق الكامل", desc: "سجل دائم لكل أمر نُفّذ من لوحة السيطرة وغرفة المالك.", op: "auditTrail", kind: "view" },
   { id: "x5", name: "جاهزية النسخ", desc: "حالة الإصدار المنشور وبصمة APK وتاريخ آخر مزامنة.", op: "getOverview", kind: "view" },
   { id: "x6", name: "حماية الدخول", desc: "الدخول للمالك الرسمي فقط مع سجل جلسات كامل.", op: "getOverview", kind: "view" },
   { id: "x7", name: "الصحة العامة", desc: "نبض صحة كل الأنظمة الفرعية في مؤشر واحد.", op: "getOverview", kind: "view" },
@@ -241,19 +240,20 @@ async function requireAtlasOwner(ctx: {
   if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
   const user = await ctx.db.get(userId);
   if (!user || !isOwnerUser(user)) {
-    throw new Error("أطلس كنترول للمالك الرسمي فقط");
+    throw new Error("حرب العقول — لوحة السيطرة للمالك الرسمي فقط");
   }
   return user;
 }
 
 async function logAudit(
-  ctx: { db: QueryCtx["db"] | import("./_generated/server").MutationCtx["db"] },
+  ctx: import("./_generated/server").MutationCtx,
   entry: {
     system: string;
     feature: string;
     command: string;
     ok: boolean;
     error?: string;
+    args?: unknown;
     result?: unknown;
     executedBy: string;
     severity?: "info" | "warning" | "critical";
@@ -263,7 +263,10 @@ async function logAudit(
     system: entry.system,
     feature: entry.feature,
     command: entry.command,
-    args: entry.result === undefined ? undefined : undefined,
+    args:
+      entry.args === undefined
+        ? undefined
+        : JSON.stringify(entry.args).slice(0, 4000),
     ok: entry.ok,
     error: entry.error,
     result:
@@ -308,14 +311,14 @@ export const getOverview = query({
     ).length;
     const onlineUsers = users.filter((u) => (u as any).lastActiveAt && now - ((u as any).lastActiveAt as number) < 5 * 60_000).length;
     const liveGames = games.filter((g) => g.status === "playing").length;
-    const lobbyGames = games.filter((g) => g.status === "lobby").length;
+    const lobbyGames = games.filter((g) => g.status === "waiting").length;
     const msgsLastHour = chatMessages.filter(
       (m) => now - m.createdAt < 60 * 60_000,
     ).length;
     const msgsLast24h = chatMessages.filter(
       (m) => now - m.createdAt < 24 * 60 * 60_000,
     ).length;
-    const openReports = reports.filter((r) => !r.resolved).length;
+    const openReports = reports.filter((r) => r.status === "open").length;
     const totalXp = profiles.reduce((s, p) => s + p.xp, 0);
     const totalGames = profiles.reduce((s, p) => s + p.gamesPlayed, 0);
 
@@ -354,7 +357,7 @@ export const getOverview = query({
         liveGames,
         lobbyGames,
         finishedToday: games.filter(
-          (g) => g.status === "finished" && now - (g.finishedAt ?? g.createdAt) < 24 * 60 * 60_000,
+          (g) => g.status === "finished" && now - g.createdAt < 24 * 60 * 60_000,
         ).length,
         rooms: rooms.length,
         memberships: memberships.length,
@@ -491,10 +494,10 @@ export const getPlayerFile = query({
         createdAt: a.createdAt,
       })),
       recentGames: games.map((g) => ({
-        score: g.score ?? 0,
-        correct: g.correct ?? 0,
-        total: g.total ?? 0,
-        finishedAt: g.finishedAt ?? g.createdAt ?? 0,
+        score: g.score,
+        correct: g.correctCount,
+        total: g.questionCount,
+        finishedAt: g.playedAt,
       })),
     };
   },
@@ -520,10 +523,11 @@ export const membershipAdminData = query({
     const nameOf = new Map(users.map((u) => [u._id, u.name ?? "بلا اسم"]));
     const now = Date.now();
     return {
-      tiers: MEMBERSHIP_TIERS.map((t: any) => ({
+      tiers: MEMBERSHIP_TIERS.map((t) => ({
         id: t.id,
         name: t.name,
-        price: t.price ?? 0,
+        emoji: t.emoji,
+        price: t.price,
         count: tierCounts[t.id] ?? 0,
       })),
       codes: codes
@@ -596,7 +600,7 @@ export const atlasGrantMembership = mutation({
       action: "atlas_grant_membership",
       targetUserId: args.userId,
       targetName: target?.name ?? "",
-      details: `أطلس: منح عضوية ${args.tier}`,
+      details: `لوحة السيطرة: منح عضوية ${args.tier}`,
       reversible: true,
       undone: false,
       createdAt: Date.now(),
@@ -627,7 +631,7 @@ export const atlasRevokeMembership = mutation({
       action: "atlas_revoke_membership",
       targetUserId: args.userId,
       targetName: target?.name ?? "",
-      details: "أطلس: سحب العضوية",
+      details: "لوحة السيطرة: سحب العضوية",
       reversible: false,
       undone: false,
       createdAt: Date.now(),
@@ -808,14 +812,16 @@ export const roomsAdminData = query({
     }
     return {
       rooms: rooms
-        .sort((a, b) => (b.lastActivity ?? b.createdAt) - (a.lastActivity ?? a.createdAt))
+        .sort((a, b) => b.createdAt - a.createdAt)
         .slice(0, 50)
         .map((r) => ({
           _id: r._id,
           name: r.name,
-          members: r.members?.length ?? 0,
+          type: r.type,
+          archived: r.archived,
+          members: r.members.length,
           messages: msgsByRoom.get(String(r._id)) ?? 0,
-          lastActivity: r.lastActivity ?? r.createdAt,
+          createdAt: r.createdAt,
         })),
       totalMessages: messages.length,
       messagesLast24h: messages.filter((m) => now - m.createdAt < 86400_000).length,
@@ -823,8 +829,8 @@ export const roomsAdminData = query({
         .sort((a, b) => a.order - b.order)
         .map((r) => ({ _id: r._id, title: r.title, active: r.active, severity: r.severity })),
       reports: {
-        open: reports.filter((r) => !r.resolved).length,
-        resolved: reports.filter((r) => r.resolved).length,
+        open: reports.filter((r) => r.status === "open").length,
+        resolved: reports.filter((r) => r.status !== "open").length,
       },
     };
   },
@@ -836,39 +842,32 @@ export const reportsAdminData = query({
     await requireAtlasOwner(ctx);
     const reports = await ctx.db
       .query("reports")
-      .withIndex("by_resolved", (q) => q.eq("resolved", false))
+      .withIndex("by_status", (q) => q.eq("status", "open"))
+      .order("desc")
       .take(50);
     const all = await ctx.db.query("reports").collect();
     const byCategory: Record<string, number> = {};
     for (const r of all) {
-      byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
+      const key = r.aiVerdict?.violation ?? "غير مصنف";
+      byCategory[key] = (byCategory[key] ?? 0) + 1;
     }
-    const resolved = all.filter((r) => r.resolved);
-    const avgMs =
-      resolved.length > 0
-        ? resolved.reduce(
-            (s, r) => s + ((r.resolvedAt ?? r.createdAt) - r.createdAt),
-            0,
-          ) / resolved.length
-        : 0;
+    const reviewed = all.filter((r) => r.status === "reviewed");
     return {
       open: reports.map((r) => ({
         _id: r._id,
-        category: r.category,
-        description: r.description,
-        reporterName: r.reporterName ?? "",
-        targetName: r.targetName ?? "",
+        reason: r.reason,
+        details: r.details ?? "",
+        reporterName: r.reporterName,
+        targetName: r.targetName,
         aiVerdict: r.aiVerdict ?? null,
         createdAt: r.createdAt,
       })),
       stats: {
         total: all.length,
-        open: all.filter((r) => !r.resolved).length,
-        resolved: resolved.length,
+        open: all.filter((r) => r.status === "open").length,
+        resolved: reviewed.length + all.filter((r) => r.status === "dismissed").length,
         byCategory,
-        avgResolveMinutes: Math.round(avgMs / 60_000),
       },
-      categories: REPORT_CATEGORIES,
     };
   },
 });
@@ -882,10 +881,7 @@ export const atlasResolveReport = mutation({
   handler: async (ctx, args) => {
     const owner = await requireAtlasOwner(ctx);
     await ctx.db.patch(args.reportId, {
-      resolved: true,
-      resolvedAt: Date.now(),
-      resolution: args.approved ? "approved" : "rejected",
-      resolutionNote: args.note ?? "",
+      status: args.approved ? "reviewed" : "dismissed",
     });
     await logAudit(ctx, {
       system: "reports",
@@ -1015,7 +1011,7 @@ export const atlasThink = mutation({
     }
 
     // 2) بلاغات مفتوحة
-    const openReports = reports.filter((r) => !r.resolved).length;
+    const openReports = reports.filter((r) => r.status === "open").length;
     if (openReports > 5) {
       insights.push({
         kind: "suggestion",
@@ -1057,7 +1053,7 @@ export const atlasThink = mutation({
 
     // 5) جولات عالقة في اللوبي
     const staleLobbies = games.filter(
-      (g) => g.status === "lobby" && now - g.createdAt > 2 * 3600_000,
+      (g) => g.status === "waiting" && now - g.createdAt > 2 * 3600_000,
     ).length;
     if (staleLobbies > 0) {
       insights.push({
@@ -1205,7 +1201,7 @@ export const economyAdminData = query({
         items: ALL_ITEMS.length,
         sections: STORE_SECTIONS.length,
         bundles: STORE_BUNDLES.length,
-        sectionsList: STORE_SECTIONS.map((s: any) => s.name ?? s.id ?? "قسم"),
+        sectionsList: STORE_SECTIONS.map((s) => s.name),
       },
       currency: {
         coins,
@@ -1216,11 +1212,11 @@ export const economyAdminData = query({
         total: gifts.length,
         last7d: gifts.filter((g) => Date.now() - g.createdAt < 7 * 86400_000).length,
       },
-      itemsPreview: ALL_ITEMS.slice(0, 20).map((i: any) => ({
+      itemsPreview: ALL_ITEMS.slice(0, 20).map((i) => ({
         id: i.id,
         name: i.name,
         price: i.price,
-        currency: i.currency ?? "coins",
+        currency: "coins" as const,
       })),
     };
   },
@@ -1251,8 +1247,8 @@ export const analyticsData = query({
         games.filter(
           (g) =>
             g.status === "finished" &&
-            (g.finishedAt ?? g.createdAt) >= from &&
-            (g.finishedAt ?? g.createdAt) < to,
+            g.createdAt >= from &&
+            g.createdAt < to,
         ).length,
       );
     }
@@ -1302,7 +1298,7 @@ export const exportFullReport = query({
     return {
       generatedAt: now,
       game: "حرب العقول",
-      controlApp: "أطلس كنترول",
+      controlApp: "حرب العقول — لوحة السيطرة",
       version: CURRENT_VERSION,
       build: BUILD_ID,
       totals: {
@@ -1311,7 +1307,7 @@ export const exportFullReport = query({
         games: games.length,
         finishedGames: games.filter((g) => g.status === "finished").length,
         reports: reports.length,
-        openReports: reports.filter((r) => !r.resolved).length,
+        openReports: reports.filter((r) => r.status === "open").length,
         errors: errors.length,
         memberships: memberships.length,
         questions: QUESTION_BANK.length,
@@ -1342,7 +1338,7 @@ export const emergencyAdminData = query({
         .first(),
       ctx.db
         .query("errorLogs")
-        .withIndex("by_resolved", (q) => q.eq("resolved", false))
+        .withIndex("by_unresolved", (q) => q.eq("resolved", false))
         .order("desc")
         .take(30),
       ctx.db
@@ -1481,24 +1477,24 @@ export const atlasPunish = mutation({
     switch (args.action) {
       case "warn":
         patch.lastWarningAt = now;
-        details = `أطلس: تحذير رسمي — ${args.reason ?? "مخالفة"}`;
+        details = `لوحة السيطرة: تحذير رسمي — ${args.reason ?? "مخالفة"}`;
         break;
       case "mute":
         patch.mutedUntil = now + (args.durationHours ?? 1) * 3600_000;
-        details = `أطلس: كتم لمدة ${args.durationHours ?? 1} ساعة — ${args.reason ?? ""}`;
+        details = `لوحة السيطرة: كتم لمدة ${args.durationHours ?? 1} ساعة — ${args.reason ?? ""}`;
         break;
       case "ban_temp":
         patch.bannedUntil = now + (args.durationHours ?? 24) * 3600_000;
-        patch.banReason = args.reason ?? "حظر مؤقت من أطلس";
-        details = `أطلس: حظر مؤقت ${args.durationHours ?? 24} ساعة`;
+        patch.banReason = args.reason ?? "حظر مؤقت من لوحة السيطرة";
+        details = `لوحة السيطرة: حظر مؤقت ${args.durationHours ?? 24} ساعة`;
         break;
       case "ban_perm":
         patch.bannedPermanent = true;
-        patch.banReason = args.reason ?? "حظر دائم من أطلس";
-        details = "أطلس: حظر دائم";
+        patch.banReason = args.reason ?? "حظر دائم من لوحة السيطرة";
+        details = "لوحة السيطرة: حظر دائم";
         break;
       case "kick":
-        details = `أطلس: طرد من الجولة الحالية — ${args.reason ?? ""}`;
+        details = `لوحة السيطرة: طرد من الجولة الحالية — ${args.reason ?? ""}`;
         break;
     }
     await ctx.db.patch(args.userId, patch);
@@ -1540,7 +1536,7 @@ export const atlasPardon = mutation({
       action: "atlas_pardon",
       targetUserId: args.userId,
       targetName: target?.name ?? "",
-      details: "أطلس: عفو كامل وإلغاء كل العقوبات",
+      details: "لوحة السيطرة: عفو كامل وإلغاء كل العقوبات",
       reversible: false,
       undone: false,
       createdAt: Date.now(),
@@ -1584,7 +1580,7 @@ export const atlasBulkAction = mutation({
           break;
         case "ban_temp":
           patch.bannedUntil = now + (args.durationHours ?? 24) * 3600_000;
-          patch.banReason = args.reason ?? "حظر جماعي من أطلس";
+          patch.banReason = args.reason ?? "حظر جماعي من لوحة السيطرة";
           break;
         case "pardon":
           patch.mutedUntil = 0;
@@ -1704,7 +1700,7 @@ export const atlasSessionLogin = mutation({
     if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
     const user = await ctx.db.get(userId);
     if (!user || !isOwnerUser(user)) {
-      throw new Error("أطلس كنترول للمالك الرسمي فقط");
+      throw new Error("حرب العقول — لوحة السيطرة للمالك الرسمي فقط");
     }
     await ctx.db.insert("atlasSessions", {
       userId,
@@ -1748,7 +1744,7 @@ export function parseAtlasCommand(text: string): AtlasPlan | null {
   if (/إشعار|اشعار|بلّغ|بلغ |بث|أعلن|اعلن|notify/i.test(t)) {
     return {
       op: "emergencyBroadcast",
-      args: { title: "إعلان من أطلس كنترول", body: t, type: "info" },
+      args: { title: "إعلان من حرب العقول — لوحة السيطرة", body: t, type: "info" },
       explain: "إرسال إشعار لكل اللاعبين",
       severity: "info",
     };
