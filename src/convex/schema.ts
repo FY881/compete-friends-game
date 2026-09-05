@@ -871,6 +871,74 @@ const schema = defineSchema(
     // ═══════════════════════════════════════════════════════════════════════
     // ║ مركز التقدم — إعدادات اللاعب ║
     // ═══════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ أطلس كنترول — أنظمة السيطرة الكاملة (Atlas Control) ║
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // أوامر السيطرة الصادرة من أطلس: تُنفَّذ فوراً على الخادم وتنعكس على اللعبة.
+    atlasCommands: defineTable({
+      system: v.string(), // أحد أنظمة أطلس العشرة
+      feature: v.string(), // معرّف الميزة من سجل الـ 80 ميزة
+      command: v.string(), // اسم العملية الفعلية (identify: api function)
+      args: v.optional(v.string()), // JSON — مدخلات العملية
+      result: v.optional(v.string()), // JSON — نتيجة التنفيذ الفعلية
+      ok: v.boolean(),
+      error: v.optional(v.string()),
+      executedBy: v.string(), // اسم المشرف المنفّذ
+      severity: v.union(
+        v.literal("info"),
+        v.literal("warning"),
+        v.literal("critical"),
+      ),
+      createdAt: v.number(),
+    })
+      .index("by_created", ["createdAt"])
+      .index("by_system", ["system"])
+      .index("by_feature", ["feature"]),
+
+    // أفكار الأنظمة الحرة: ملاحظات واقتراحات مولّدة دورياً بتفكير شامل.
+    atlasInsights: defineTable({
+      kind: v.string(), // "observation" | "anomaly" | "suggestion" | "summary"
+      system: v.string(), // النظام المصدر
+      severity: v.union(
+        v.literal("info"),
+        v.literal("blue"),
+        v.literal("orange"),
+        v.literal("red"),
+        v.literal("purple"),
+      ),
+      title: v.string(),
+      body: v.string(),
+      data: v.optional(v.string()), // JSON — الأرقام الداعمة
+      status: v.union(
+        v.literal("open"),
+        v.literal("accepted"),
+        v.literal("dismissed"),
+      ),
+      createdAt: v.number(),
+      decidedAt: v.optional(v.number()),
+    })
+      .index("by_created", ["createdAt"])
+      .index("by_status", ["status"]),
+
+    // ذاكرة التعلّم: قرارات المالك → تُدرِّب الأنظمة الحرة (ميزة 80).
+    atlasLearningMemory: defineTable({
+      kind: v.string(),
+      signature: v.string(), // بصمة الحالة (تُستخدم لمطابقة الحالات المشابهة)
+      decision: v.string(), // ما قرره المالك فعلياً
+      timesSeen: v.number(),
+      lastSeenAt: v.number(),
+      createdAt: v.number(),
+    }).index("by_signature", ["signature"]),
+
+    // سجل جلسات أطلس (أمان + تدقيق دخول).
+    atlasSessions: defineTable({
+      userId: v.id("users"),
+      loginAt: v.number(),
+      logoutAt: v.optional(v.number()),
+      userAgent: v.optional(v.string()),
+    }).index("by_user", ["userId"]),
+
     playerSettings: defineTable({
       userId: v.id("users"),
       soundEnabled: v.boolean(),
