@@ -36,7 +36,7 @@ export default function AtlasLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stars, setStars] = useState<Array<{ x: number; y: number; d: number; s: number }>>([]);
+  const [stars, setStars] = useState<Array<{ x: number; y: number; d: number; s: number; i: number }>>([]);
   const verifyPassword = useMutation(api.playerControl.verifyOwnerPassword);
   const recordSession = useMutation(api.atlas.atlasSessionLogin);
   const ownerIdStatus = useQuery(api.owner.getOwnerIdStatus);
