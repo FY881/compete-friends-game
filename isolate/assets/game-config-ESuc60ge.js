@@ -1,0 +1,1 @@
+const s=5,O=[3,5,7,10],a=15e3,c=3e3,e=[5e3,1e4,15e3,2e4,3e4],r=1;function N(n){const t=Math.round(n/1e3);if(t<60)return`${t} ثانية`;const o=t/60;return`${o} ${o===1?"دقيقة":"دقائق"}`}const T=0,_=[5,10,15];function I(n){return!n||n<=0?"حتى آخر سؤال":`${n} ${n===1?"دقيقة":"دقائق"}`}export{a as A,c as C,T as D,r as L,s as Q,e as T,_ as a,O as b,N as c,I as f};

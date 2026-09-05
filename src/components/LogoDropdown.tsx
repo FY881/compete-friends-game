@@ -1,4 +1,4 @@
-// simple logo dropdown component that can be used to go to the landing page or sign out for the user
+// لوحة تحكم حرب العقول — قائمة التقاطع الخاصة بالشعار للتنقل والدخول
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import logo from "@/assets/logo.svg";
 import { useAuth } from "@/hooks/use-auth";
-import { Home, LogOut } from "lucide-react";
+import { House, LogOut } from "lucide-react";
 import { useNavigate } from "react-router";
 
 export function LogoDropdown() {
@@ -22,7 +22,7 @@ export function LogoDropdown() {
       await signOut();
       navigate("/");
     } catch (error) {
-      console.error("Sign out error:", error);
+      console.error("خطأ في الخروج:", error);
     }
   };
 
@@ -36,17 +36,17 @@ export function LogoDropdown() {
         <Button variant="ghost" size="icon" className="h-10 w-10">
           <img
             src={logo}
-            alt="Logo"
+            alt="حرب العقول"
             width={32}
             height={32}
             className="rounded-lg"
           />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-48">
+      <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem onClick={handleGoHome} className="cursor-pointer">
-          <Home className="mr-2 h-4 w-4" />
-          Landing Page
+          <House className="mr-2 h-4 w-4" />
+          الرئيسية
         </DropdownMenuItem>
         {isAuthenticated && (
           <>
@@ -56,7 +56,7 @@ export function LogoDropdown() {
               className="cursor-pointer text-destructive focus:text-destructive"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
+              تسجيل الخروج
             </DropdownMenuItem>
           </>
         )}

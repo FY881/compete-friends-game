@@ -1,14 +1,13 @@
 /**
- * أطلس كنترول — نظام التصميم المتكامل (Atlas Design System)
+ * حرب العقول — نظام التصميم المتكامل (War of Minds Design System)
  *
  * هوية بريميوم فاخرة: كحلي عميق × ذهبي ملكي × بنفسجي سيطرة.
- * كل مكوّنات أطلس تشتق ألوانها من هنا — مصدر واحد متسق، متوافق مع
+ * كل مكوّنات لوحة تحكم حرب العقول تشتق ألوانها من هنا — مصدر واحد متسق، متوافق مع
  * نظام Tailwind/shadcn الحالي في الوضعين الداكن والفاتح.
  */
-
-export const ATLAS_NAME = "أطلس كنترول";
+export const ATLAS_NAME = "لوحة تحكم حرب العقول";
 export const ATLAS_TAGLINE = "مركز السيطرة الكامل على حرب العقول";
-export const ATLAS_VERSION = "1.0.0";
+export const ATLAS_VERSION = "2.0.0";
 export const ATLAS_GAME = "حرب العقول";
 
 /**
@@ -78,3 +77,4 @@ export function atlasMinutes(ms: number): string {
 export function atlasMB(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+

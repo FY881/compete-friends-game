@@ -16,7 +16,7 @@ import {
 import type { Id } from "@/convex/_generated/dataModel";
 import { StatCard, Panel, SeverityDot, Loading, useRunner } from "./AtlasShared";
 
-/** أنظمة أطلس كنترول العشرة — كل ميزة مربوطة بدالة خادم حقيقية. */
+/** أنظمة اللوحة كنترول العشرة — كل ميزة مربوطة بدالة خادم حقيقية. */
 
 export const SYSTEM_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   control: Radar, players: Users, memberships: KeyRound, content: BookOpen,
@@ -41,7 +41,7 @@ export function ControlSystem({ onOpenPlayer }: { onOpenPlayer: () => void }) {
   if (overview === undefined) return <Loading />;
   if (overview === null) {
     return <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
-      لا صلاحية — أعد الدخول من بوابة أطلس.
+      لا صلاحية — أعد الدخول من بوابة التحكم.
     </div>;
   }
   const t = overview.totals;
@@ -68,7 +68,7 @@ export function ControlSystem({ onOpenPlayer }: { onOpenPlayer: () => void }) {
         <StatCard label="جولات اليوم" value={t.finishedToday} accent={ATLAS_COLORS.emerald} />
         <StatCard label="الملفات" value={t.profiles} accent={ATLAS_COLORS.slate} />
         <StatCard label="إصدار اللعبة" value={overview.release.version} accent={ATLAS_COLORS.gold} sub={`بناء ${overview.release.build}`} />
-        <StatCard label="ميزات أطلس" value={overview.featureCount} accent={ATLAS_COLORS.royal} sub={`${overview.systems.length} أنظمة`} />
+        <StatCard label="ميزات اللوحة" value={overview.featureCount} accent={ATLAS_COLORS.royal} sub={`${overview.systems.length} أنظمة`} />
       </div>
       <button
         onClick={onOpenPlayer}
@@ -226,7 +226,7 @@ export function PlayersSystem() {
                 onClick={() => void run(
                   () => broadcast({
                     title: "رسالة من الإدارة",
-                    body: `رسالة موجهة من أطلس كنترول إلى ${file.user.name}`,
+                    body: `رسالة موجهة من اللوحة كنترول إلى ${file.user.name}`,
                     type: "info",
                     targetUserId: selected!,
                   }),
@@ -529,7 +529,7 @@ export function RoomsSystem() {
             <Button size="sm" disabled={busy} onClick={() => void run(() => seedRules({}), "أُعيدت زراعة القوانين الثلاثين")}
               className="gap-1.5">زرع القوانين</Button>
             <Button size="sm" variant="outline" disabled={busy}
-              onClick={() => void run(() => think({ prompt: "فكّر في حالة المجتمع" }), "أطلس حلّل المجتمع — انظر الأنظمة الحرة")}
+              onClick={() => void run(() => think({ prompt: "فكّر في حالة المجتمع" }), "اللوحة حلّلت المجتمع — انظر الأنظمة الحرة")}
               className="border-violet-500/40 text-violet-300">تحليل مجتمعي</Button>
           </div>
           <div className="max-h-64 space-y-1 overflow-y-auto">
@@ -575,7 +575,7 @@ export function ReportsSystem() {
           accent={ATLAS_COLORS.crimson}
           action={
             <Button size="sm" variant="outline" disabled={busy}
-              onClick={() => void run(() => think({ prompt: "حلّل البلاغات" }), "أطلس حلّل البلاغات")}
+              onClick={() => void run(() => think({ prompt: "حلّل البلاغات" }), "اللوحة حلّلت البلاغات")}
               className="border-violet-500/40 text-[11px] text-violet-300">تحليل ذكي</Button>
           }
         >
@@ -680,7 +680,7 @@ export function AiSystem() {
 
       <div className="flex flex-wrap gap-2">
         <Button disabled={busy}
-          onClick={() => void run(() => think({}), "أطلس فكّر في اللعبة — النتائج في قسم الأنظمة الحرة")}
+          onClick={() => void run(() => think({}), "اللوحة فكرت في اللعبة — النتائج في قسم الأنظمة الحرة")}
           className="gap-1.5 font-bold">
           <BrainCircuit className="size-4" /> طلب تفكير شامل الآن (l2)
         </Button>
@@ -867,7 +867,7 @@ export function EmergencySystem() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="جلسات أطلس" value={data.sessions} accent={ATLAS_COLORS.royal} sub="دخول موثّق (x6)" />
+        <StatCard label="جلسات اللوحة" value={data.sessions} accent={ATLAS_COLORS.royal} sub="دخول موثّق (x6)" />
         <StatCard label="أوامر مسجّلة" value={data.audit.length} accent={ATLAS_COLORS.cyan} sub="سجل التدقيق (x4)" />
         <StatCard label="أخطاء غير معالجة" value={totalErrors} accent={ATLAS_COLORS.crimson} sub="مركز الأخطاء (x3)" />
         <StatCard label="أخطاء حرجة" value={data.bySeverity.critical ?? 0} accent={ATLAS_SEVERITY.red.color} sub="أعلى خطورة (x7)" />

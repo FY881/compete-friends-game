@@ -1,7 +1,7 @@
 {
-  "name": "ذكاء",
-  "short_name": "ذكاء",
-  "description": "لعبة تحديات تنافسية سريعة بين الأصدقاء: نفس الأسئلة، نفس الوقت، وأسرع عقل يفوز.",
+  "name": "حرب العقول",
+  "short_name": "حرب العقول",
+  "description": "حرب العقول — أقوى تحدي ذكاء بين الأصدقاء: نفس الأسئلة، نفس الوقت، وأسرع عقل يفوز.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -9,8 +9,8 @@
   "orientation": "portrait",
   "lang": "ar",
   "dir": "rtl",
-  "background_color": "#f6faf9",
-  "theme_color": "#0d9488",
+  "background_color": "#0B1121",
+  "theme_color": "#2563eb",
   "categories": ["games", "entertainment"],
   "icons": [
     {

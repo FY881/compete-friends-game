@@ -67,7 +67,7 @@ export default function AtlasLogin() {
       } catch {
         // تسجيل الجلسة لا يعيق الدخول
       }
-      toast.success("مرحباً بك في أطلس كنترول 👑");
+      toast.success("مرحباً بك في لوحة تحكم حرب العقول 👑");
       navigate("/atlas", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "فشل التحقق");

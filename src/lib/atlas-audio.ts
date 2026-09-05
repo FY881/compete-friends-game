@@ -1,7 +1,7 @@
 /**
- * أطلس كنترول — محرّك الصوت البريميوم
+ * لوحة تحكم حرب العقول — محرّك الصوت البريميوم
  *
- * حزمة الأصوات الحقيقية (حزمة أطلس الصوتية ≥100MB) محمّلة داخل الأصول
+ * حزمة الأصوات الحقيقية (حزمة اللوحة الصوتية ≥100MB) محمّلة داخل الأصول
  * في /atlas-audio/* — كل نظام من الأنظمة العشرة له طابع صوتي خاص يُشغّل
  * عند تنفيذ الأوامر والانتقال بين الأنظمة، إضافة إلى المزيج المحيطي
  * (Ambient) القابل للتشغيل/الإيقاف من الترويسة.
@@ -36,7 +36,7 @@ let muted = false;
 /** يقرأ تفضيل الكتم من التخزين المحلي عند أول استخدام */
 function initMuted(): void {
   try {
-    muted = typeof localStorage !== "undefined" && localStorage.getItem("atlas-audio-muted") === "1";
+    muted = typeof localStorage !== "undefined" && localStorage.getItem("harb-audio-muted") === "1";
   } catch {
     muted = false;
   }

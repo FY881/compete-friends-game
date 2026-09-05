@@ -1,7 +1,7 @@
 /**
- * أطلس كنترول — طبقة الأنظمة الخلفية (Atlas Control Backend)
+ * لوحة تحكم حرب العقول — طبقة الأنظمة الخلفية (Atlas Control Backend)
  *
- * العقل التنفيذي لتطبيق «أطلس كنترول» المستقل:
+ * العقل التنفيذي لتطبيق «لوحة تحكم حرب العقول» المستقل:
  * - سجل الأنظمة العشرة الكبرى + الـ 80 ميزة (مصدر واحد تتقاسمه الخلفية والواجهة).
  * - كل ميزة تُنفَّذ عبر دوال خادم فعلية تقرأ وتكتب في قاعدة بيانات اللعبة
  *   نفسها (users / games / reports / memberships / settings / notifications /
@@ -203,7 +203,7 @@ async function requireAtlasOwner(ctx: {
   if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
   const user = await ctx.db.get(userId);
   if (!user || !isOwnerUser(user)) {
-    throw new Error("أطلس كنترول للمالك الرسمي فقط");
+    throw new Error("لوحة تحكم حرب العقول للمالك الرسمي فقط");
   }
   return user;
 }
@@ -216,7 +216,7 @@ async function requireAtlasOwnerMutation(ctx: {
   if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
   const user = await ctx.db.get(userId);
   if (!user || !isOwnerUser(user)) {
-    throw new Error("أطلس كنترول للمالك الرسمي فقط");
+    throw new Error("لوحة تحكم حرب العقول للمالك الرسمي فقط");
   }
   return user;
 }

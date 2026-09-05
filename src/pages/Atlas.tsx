@@ -15,7 +15,7 @@ import {
 } from "@/components/atlas/AtlasSystems";
 
 /**
- * أطلس كنترول — لوحة السيطرة الكاملة على حرب العقول.
+ * لوحة تحكم حرب العقول — centro de control completo del juego.
  * 10 أنظمة كبرى × 8 ميزات = 80 ميزة حقيقية مربوطة بخادم اللعبة نفسه.
  */
 
@@ -44,7 +44,7 @@ export default function Atlas() {
           <div className="flex min-w-0 items-center gap-3">
             <img
               src="/icons/atlas-icon-192.png"
-              alt={ATLAS_NAME}
+              alt="لوحة تحكم حرب العقول"
               className="size-11 rounded-xl shadow-lg"
               draggable={false}
             />
@@ -77,12 +77,12 @@ export default function Atlas() {
           <Loading />
         ) : registry === null ? (
           <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-5 text-sm text-amber-200">
-            أطلس كنترول للمالك الرسمي فقط — أعد الدخول من بوابة أطلس.
+            لوحة تحكم حرب العقول للمالك الرسمي فقط — أعد الدخول من بوابة التحكم.
           </div>
         ) : (
           <>
             {/* شريط الأنظمة العشرة */}
-            <nav className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" aria-label="أنظمة أطلس">
+            <nav className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" aria-label="أنظمة لوحة التحكم">
               {systems.map((s) => {
                 const Icon = SYSTEM_ICONS[s.id] ?? Radar;
                 const isActive = active === s.id;
