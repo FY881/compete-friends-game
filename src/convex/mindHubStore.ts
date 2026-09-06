@@ -1,6 +1,7 @@
 // ملتقى العقول — سجل الجلسات (mutations/queries خارج runtime الـ Node)
 import { query, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { decipher } from "./aiCipher";
 
 export const insertSession = internalMutation({
   args: {
@@ -133,6 +134,23 @@ export const listSessions = query({
 export const getSessionForUi = query({
   args: { sessionId: v.id("mindHubSessions") },
   handler: async (ctx, args) => await ctx.db.get(args.sessionId),
+});
+
+/** نسخة مفكوكة الشفرة — للمالك فقط: الرسائل المشفرة تُقرأ بلغتها الأصلية */
+export const getDecipheredSession = query({
+  args: { sessionId: v.id("mindHubSessions") },
+  handler: async (ctx, args) => {
+    const s = await ctx.db.get(args.sessionId);
+    if (!s) return null;
+    return {
+      ...s,
+      messages: s.messages.map((m) => ({
+        ...m,
+        content: decipher(m.content),
+        wasCiphered: m.content.includes("⟦"),
+      })),
+    };
+  },
 });
 
 export const getStats = query({

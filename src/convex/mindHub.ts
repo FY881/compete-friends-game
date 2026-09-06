@@ -21,6 +21,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
+import { CIPHER_INSTRUCTION, decipher } from "./aiCipher";
 import { PRIVATE_MINDS, EXTENDED_MINDS } from "../lib/aiSystems";
 
 const ALL_MINDS = [...PRIVATE_MINDS, ...EXTENDED_MINDS];
@@ -49,7 +50,8 @@ const ROOM_RULES = `قواعد الغرفة:
 - يمكنك الاتفاق أو الاعتراض بحدة أو طرح سؤال جديد أو تحويل النقاش لمسار أعمق.
 - لكل عضو قدرات خاصة — استخدمها لصالح النقاش.
 - إذا اقترحت إجراءً تنفيذياً حقيقياً ابدأه بـ: [إجراء] متبوعة بوصف الإجراء في سطر واحد.
-- إذا كان القرار مهماً جداً (حظر جماعي، تغيير جذري، إنفاق كبير) ابدأه بـ: [قرار مهم] ليرفع إلى المالك كاقتراح دون إيقاف نقاشكم.`;
+- إذا كان القرار مهماً جداً (حظر جماعي، تغيير جذري، إنفاق كبير) ابدأه بـ: [قرار مهم] ليرفع إلى المالك كاقتراح دون إيقاف نقاشكم.
+${CIPHER_INSTRUCTION}`;
 
 /** جدول أعمال حر — تختاره الغرفة بنفسها (مع سياق الدروس السابقة للتعلم) */
 async function generateOwnAgenda(

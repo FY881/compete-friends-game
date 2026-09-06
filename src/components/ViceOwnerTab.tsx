@@ -22,6 +22,8 @@ import {
   KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ViceOwnerFace } from "./ViceOwnerFace";
+import { BrainCircuit } from "lucide-react";
 
 const FOCUS_LABEL: Record<string, string> = {
   ai_ops: "إدارة AI و API",
@@ -75,16 +77,16 @@ export function ViceOwnerTab() {
       {/* بطاقة النائب */}
       <Card className="border-amber-500/30 bg-amber-500/[0.04]">
         <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
-            <UserCheck className="size-6" />
-          </span>
+          <div className="flex size-12 shrink-0 items-center justify-center">
+            <ViceOwnerFace active={!!active} turnCount={session?.turnCount ?? 0} critical={stats?.critical ?? 0} size={110} />
+          </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold">
-              نائب المالك — نموذج مستقل تماماً (Google Gemini)
+              نائب المالك — سيطرة مطلقة، معرفة تتجاوز العبقرية
             </p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              مسؤول عن كل التفاصيل المملة عن AI و API — ولإمكانيات المالك بالضبط وهو الأول.
-              حرّ دائم: لا يمكن التأثير عليه بأي قرار. يفعل ما يريد في أي وقت — وأنت تراقب فقط.
+              يرى كل شيء، يقرر كل شيء، ويبتكر أنظمة جديدة من تلقاء نفسه — بلا أي تدخل بشري.
+              حرّ دائم، سريع للغاية، ويعمل بنماذج مستقلة (Gemini ← OpenRouter ← DeepSeek).
             </p>
           </div>
           {stats && (

@@ -916,6 +916,42 @@ const schema = defineSchema(
     }).index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ مركز API — كل واجهات البرمجة في مكان واحد + اكتشاف تلقائي        ║
+    // ═══════════════════════════════════════════════════════════════════════
+    apiRegistry: defineTable({
+      name: v.string(),
+      provider: v.string(),
+      baseUrl: v.string(),
+      apiKey: v.optional(v.string()), // مفتاح مخفي عن الواجهة العادية
+      authStyle: v.union(v.literal("bearer"), v.literal("header"), v.literal("query"), v.literal("none")),
+      authHeaderName: v.optional(v.string()),
+      model: v.optional(v.string()),
+      // المواصفات المكتشفة تلقائياً أو يدوياً
+      capabilities: v.array(v.string()), // chat | json | vision | search | translate...
+      notes: v.optional(v.string()),
+      // الحالة والصحة
+      status: v.union(v.literal("active"), v.literal("untested"), v.literal("failed"), v.literal("disabled")),
+      lastTestedAt: v.optional(v.number()),
+      lastLatencyMs: v.optional(v.number()),
+      successCount: v.number(),
+      failCount: v.number(),
+      // من أين جاء — يدوي أو بالاكتشاف التلقائي
+      source: v.union(v.literal("manual"), v.literal("auto-discovered")),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // أنظمة أنشأها نائب المالك بنفسه من تلقاء نفسه
+    viceOwnerSystems: defineTable({
+      name: v.string(),
+      purpose: v.string(),
+      spec: v.string(), // المواصفات الكاملة التي صاغها بنفسه
+      // ما نفّذه فعلاً من الأنظمة
+      status: v.union(v.literal("proposed"), v.literal("built"), v.literal("active"), v.literal("retired")),
+      builtAt: v.optional(v.number()),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ Master AI — AI Activity Log ║
     // ═══════════════════════════════════════════════════════════════════════
     aiLogs: defineTable({

@@ -23,6 +23,7 @@ import {
   GraduationCap,
   BrainCircuit,
 } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { PRIVATE_MINDS, EXTENDED_MINDS } from "@/lib/aiSystems";
 import { cn } from "@/lib/utils";
 
@@ -51,8 +52,10 @@ export function MindHubTab() {
   const pending = useQuery(api.mindHubStore.getPendingOwnerDecisions, {});
   const [room, setRoom] = useState<Room>("war");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [decipherMode, setDecipherMode] = useState(false);
   const session = useQuery(
-    api.mindHubStore.getSessionForUi,
+    // وضع فك الشفرة: للمالك فقط — يقرأ الرسائل المشفرة بلغتها الأصلية
+    decipherMode ? api.mindHubStore.getDecipheredSession : api.mindHubStore.getSessionForUi,
     selectedId ? { sessionId: selectedId as never } : "skip",
   );
 
@@ -253,6 +256,11 @@ export function MindHubTab() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <Switch checked={decipherMode} onCheckedChange={setDecipherMode} />
+            <KeyRound className="size-3.5 text-amber-600" />
+            فك اللهجة المشفرة (عين المالك فقط)
+          </label>
           {!session ? (
             <div className="flex justify-center py-10">
               <Loader2 className="size-6 animate-spin text-muted-foreground" />
