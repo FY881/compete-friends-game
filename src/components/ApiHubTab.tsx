@@ -1,17 +1,10 @@
-/**
- * 🌐 مركز API — كل واجهات البرمجة في مكان واحد
- * سجل + اختبار حي + اكتشاف تلقائي من أمر curl + أنظمة نائب المالك المبتكرة
- */
-import { useState } from "react";
+import { useState, type ChangeEvent, type FC, type LucideProps } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
+import { Button, Input, Textarea, Badge, Switch, Card, CardHeader, CardTitle, CardContent, Separator } from "@/components/ui";
+import { ADMIN_AI_KEY, ADMIN_AI_MODEL, ADMIN_AI_PROVIDER } from "@/lib/aiCredentials";
 import {
+  Code,
   Loader2,
   Globe,
   Plug,
@@ -21,15 +14,24 @@ import {
   Hammer,
   CheckCircle2,
   XCircle,
+  GitBranch,
+  Layers,
+  Cpu,
+  ShieldCheck,
+  Zap,
+  KeyRound,
+  Scope as ScopeIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-const STATUS_META: Record<string, { label: string; cls: string }> = {
-  active: { label: "يعمل", cls: "text-emerald-600" },
-  untested: { label: "لم يُختبر", cls: "text-muted-foreground" },
-  failed: { label: "فشل", cls: "text-rose-600" },
-  disabled: { label: "معطّل", cls: "text-amber-600" },
-};
+const ScopeIconFC: FC<LucideProps> = ScopeIcon;
+
+const SCOPE_OPTIONS = [
+  { value: "everything", label: "كل شيء في اللعبة", icon: Layers, hint: "وظائف متنوعة" },
+  { value: "side", label: "قسم محدد (اختر من القائمة)", icon: GitBranch, hint: "مثال: غرف / PEG / أسئلة" },
+  { value: "item", label: "شئ محدد واحد", icon: ScopeIconFC, hint: "تعيين هدف واحد" },
+];
 
 export function ApiHubTab() {
   const apis = useQuery(api.apiHubStore.listApisSafe, {});
@@ -44,6 +46,12 @@ export function ApiHubTab() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [lastDiscovered, setLastDiscovered] = useState<string | null>(null);
   const [testMsg, setTestMsg] = useState("");
+  const [scopeMode, setScopeMode] = useState<string>("everything");
+  const [scopeTarget, setScopeTarget] = useState("");
+  const [keyMasked, setKeyMasked] = useState(true);
+  const [autoDiscoverEnabled, setAutoDiscoverEnabled] = useState(true);
+  const [fallbackChainEnabled, setFallbackChainEnabled] = useState(true);
+  const [liveStatsEnabled, setLiveStatsEnabled] = useState(true);
 
   const handleDiscover = async () => {
     if (!curlInput.trim()) return toast.error("الصق أمر curl أولاً");
@@ -87,9 +95,145 @@ export function ApiHubTab() {
     }
   };
 
+  const maskedKey = keyMasked
+    ? `${ADMIN_AI_KEY.slice(0, 8)}…${ADMIN_AI_KEY.slice(-4)}`
+    : ADMIN_AI_KEY;
+
   return (
-    <div className="space-y-5">
-      {/* الاكتشاف التلقائي */}
+    <div className="space-y-6">
+      <Card className="border-amber-500/30 bg-amber-500/[0.04]">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <KeyRound className="size-4 text-amber-600" />
+            مفتاح نائب الرئيس الرسمي
+            <Badge variant="outline" className="ms-auto rounded-full text-[10px] text-amber-600">
+              المتحكم الرئيسي
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <ShieldCheck className="size-3.5 text-emerald-600" />
+            <span className="text-muted-foreground">هذا المفتاح يتحكم في كل أنظمة الذكاء داخل اللعبة — نائب الرئيس + كل الأنظمة الآلية.</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/20 p-3">
+            <Code className="size-4 text-muted-foreground" />
+            <Textarea
+              value={maskedKey}
+              readOnly
+              rows={2}
+              className="rounded-md font-mono text-xs resize-none border-0 bg-transparent p-0 shadow-none h-auto"
+              dir="ltr"
+            />
+            <Button variant="outline" size="sm" className="shrink-0 rounded-lg" onClick={() => setKeyMasked((v) => !v)}>
+              {keyMasked ? "إظهار" : "إخفاء"}
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge variant="outline" className="rounded-full text-[10px] font-mono">{ADMIN_AI_PROVIDER}</Badge>
+            <Badge variant="outline" className="rounded-full text-[10px] font-mono">{ADMIN_AI_MODEL}</Badge>
+            <Badge variant="outline" className="rounded-full text-[10px]">نائب الرئيس</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ScopeIconFC className="size-4 text-primary" />
+            نطاق تحكم الـ API — شئ معين / قسم / كل شيء
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-3">
+            {SCOPE_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={cn(
+                    "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all",
+                    scopeMode === opt.value
+                      ? "border-primary/50 bg-primary/5"
+                      : "border-border/60 bg-muted/20 hover:bg-muted/40",
+                  )}
+                  onClick={() => setScopeMode(opt.value)}
+                >
+                  <Icon className="size-4 text-primary" />
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-bold">{opt.label}</p>
+                    <p className="text-[10px] text-muted-foreground">{opt.hint}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {scopeMode === "side" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">القسم أو النظام:</label>
+              <Input
+                value={scopeTarget}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setScopeTarget(e.target.value)}
+                placeholder="مثال: apiHub, questionBank, rooms, viceOwner"
+                className="rounded-xl font-mono text-xs w-72"
+              />
+            </div>
+          )}
+          {scopeMode === "item" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">الشئ المحدد:</label>
+              <Input
+                value={scopeTarget}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setScopeTarget(e.target.value)}
+                placeholder="مثال: rooms:live, questions:ai-123"
+                className="rounded-xl font-mono text-xs w-72"
+              />
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            النطاق يحدد أي أقسام يُسمح للـ API بالتحكم فيها عند الاستدعاءات الموجّهة من نائب الرئيس.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Cpu className="size-4 text-primary" />
+            خيارات مركز API
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Radar className="size-4 text-primary" />
+              <span className="text-sm font-semibold">اكتشاف تلقائي من أوامر curl</span>
+            </div>
+            <Switch checked={autoDiscoverEnabled} onCheckedChange={setAutoDiscoverEnabled} />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <GitBranch className="size-4 text-primary" />
+              <span className="text-sm font-semibold">سلسلة بديلة ذكية</span>
+            </div>
+            <Switch checked={fallbackChainEnabled} onCheckedChange={setFallbackChainEnabled} />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Zap className="size-4 text-primary" />
+              <span className="text-sm font-semibold">إحصائيات حية للاستدعاءات</span>
+            </div>
+            <Switch checked={liveStatsEnabled} onCheckedChange={setLiveStatsEnabled} />
+          </div>
+          <Separator />
+          <div className="flex flex-wrap justify-between gap-3 text-xs text-muted-foreground">
+            <span>المفتاح الرسمي للنائب: {maskedKey}</span>
+            <span className="font-mono">{ADMIN_AI_PROVIDER} · {ADMIN_AI_MODEL}</span>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="border-primary/25 bg-primary/[0.03]">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -100,8 +244,8 @@ export function ApiHubTab() {
         <CardContent className="space-y-3">
           <Textarea
             value={curlInput}
-            onChange={(e) => setCurlInput(e.target.value)}
-            placeholder={"curl https://api.example.com/v1/chat \\\n  -H 'Authorization: Bearer sk-...' \\\n  -d '{\"model\":\"...\",\"messages\":[...]}'"}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCurlInput(e.target.value)}
+            placeholder={"curl https://api.example.com/v1/chat \\n  -H 'Authorization: Bearer sk-...' \\n  -d '{\"model\":\"...\",\"messages\":[...]} '"}
             rows={4}
             className="rounded-xl font-mono text-xs"
             dir="ltr"
@@ -123,7 +267,6 @@ export function ApiHubTab() {
         </CardContent>
       </Card>
 
-      {/* سجل الـ APIs */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
@@ -146,7 +289,12 @@ export function ApiHubTab() {
             </p>
           ) : (
             apis.map((a) => {
-              const meta = STATUS_META[a.status] ?? STATUS_META.untested;
+              const statusMeta = {
+                active: { label: "يعمل", cls: "text-emerald-600" },
+                untested: { label: "لم يُختبر", cls: "text-muted-foreground" },
+                failed: { label: "فشل", cls: "text-rose-600" },
+                disabled: { label: "معطّل", cls: "text-amber-600" },
+              }[a.status] ?? { label: "لم يُختبر", cls: "text-muted-foreground" };
               return (
                 <div key={a._id} className="rounded-xl border border-border/60 bg-card p-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -157,14 +305,14 @@ export function ApiHubTab() {
                     {a.source === "auto-discovered" && (
                       <Badge variant="outline" className="rounded-full text-[10px] text-sky-600">اكتُشف تلقائياً</Badge>
                     )}
-                    <span className={cn("ms-auto flex items-center gap-1 text-[10px] font-bold", meta.cls)}>
+                    <span className={cn("ms-auto flex items-center gap-1 text-[10px] font-bold", statusMeta.cls)}>
                       {a.status === "active" ? <CheckCircle2 className="size-3" /> : a.status === "failed" ? <XCircle className="size-3" /> : null}
-                      {meta.label}
+                      {statusMeta.label}
                     </span>
                   </div>
                   <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground" dir="ltr">{a.baseUrl}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {a.capabilities.map((c) => (
+                    {a.capabilities?.map((c) => (
                       <span key={c} className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-semibold">{c}</span>
                     ))}
                     {a.lastLatencyMs !== undefined && (
@@ -181,7 +329,7 @@ export function ApiHubTab() {
                         size="sm"
                         className="h-7 rounded-lg text-rose-600"
                         onClick={async () => {
-                          await removeApi({ apiId: a._id as never });
+                          await removeApi({ apiId: a._id });
                           toast("حُذف من السجل");
                         }}
                       >
@@ -196,7 +344,6 @@ export function ApiHubTab() {
         </CardContent>
       </Card>
 
-      {/* أنظمة نائب المالك المبتكرة */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">

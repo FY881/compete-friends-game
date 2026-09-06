@@ -11,7 +11,10 @@
  * المُخوَّلة، ويُمرَّر فقط عبر مسارات آمنة (أctions Convex / owner UI).
  */
 export const ADMIN_AI_KEY =
-  "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn";
+  "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn";export const ADMIN_AI_PROVIDER = "openrouter";
 
-export const ADMIN_AI_PROVIDER = "openrouter";
 export const ADMIN_AI_MODEL = "deepseek/deepseek-v4-flash";
+
+export const AI_CREDENTIALS_README =
+  "هذا الملف خاص بالمفاتيح العامة والثابتة فقط. المفاتيح الحساسة تُدار من مشروعك في Keys/API keys ولا تُكتب هنا.";
+
