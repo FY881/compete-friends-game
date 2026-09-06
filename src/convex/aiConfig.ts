@@ -51,9 +51,10 @@ export const FREE_MODELS = [
 export const DEFAULT_MODEL = "openrouter/free";
 
 /**
- * ⚡ الاستدعاء الموحّد مع تجربة البديل تلقائياً —
- * يستدعي OpenRouter أولاً، وإذا فشل (خطأ شبكة/مفتاح/حد استخدام)
- * يعيد المحاولة عبر OneHop بنفس رسائل المحادثة.
+ * ⚡ الاستدعاء الموحّد مع تحكم المفتاح الرسمي ومعالجة 429 والبديل التلقائي —
+ * يستدعي OpenRouter أولاً بالمفتاح الرسمي، وإذا تعيّق حد الاستخدام (429)
+ * يعرض رسالة واضحة ويوقف الطلبات المؤقتة. عند فشل غير حد الاستخدام
+ * ينتقل تلقائياً إلى OneHop بنفس رسائل المحادثة.
  * تعيد كل أنظمة AI استدعاء هذه الدالة بدلاً من fetch المباشر.
  */
 export async function callLlm(
@@ -61,32 +62,43 @@ export async function callLlm(
   maxTokens = 900,
   temperature = 0.9,
   label = "Zaka AI",
+  apiKey?: string | null,
 ): Promise<string> {
   // ── المحاولة 1: OpenRouter ──
   try {
-    return await callOpenRouterDirect(messages, maxTokens, temperature, label);
+    return await callOpenRouterDirect(messages, maxTokens, temperature, label, apiKey);
   } catch (orErr) {
+    const msg = orErr instanceof Error ? orErr.message : String(orErr);
+    if (msg.includes("429") || msg.includes("Rate limit exceeded")) {
+      throw new Error(
+        `OpenRouter معطّل مؤقتاً — تم تجاوز حد الاستخدام اليومي (429).` +
+        ` أُوقف الاستدعاء حتى تفعيله مجدداً من مركز الـ API،` +
+        ` وسيعود نائب الرئيس والأنظمة عندها دون تدخل منك.` +
+        (apiKey && apiKey.startsWith("sk-") ? " · مفتاح رئيسي مضبوط." : ""),
+      );
+    }
     // ── المحاولة 2: OneHop (البديل المؤقت) ──
     try {
       return await callOneHop(messages, maxTokens, temperature);
     } catch {
-      // أعطِ خطأ OpenRouter الأصلي لأنه الأكثر دلالة
       throw orErr;
     }
   }
 }
 
-/** OpenRouter مباشر */
+/** OpenRouter مباشر مع تحكم المفتاح الرسمي */
 async function callOpenRouterDirect(
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
   temperature: number,
   label: string,
+  apiKey?: string | null,
 ): Promise<string> {
+  const effectiveKey = apiKey && apiKey.trim().length > 10 ? apiKey.trim() : ADMIN_AI_KEY;
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${getOpenRouterKey()}`,
+      Authorization: `Bearer ${effectiveKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "https://zaka.app",
       "X-Title": label,
@@ -108,11 +120,12 @@ export async function callOneHop(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 900,
   temperature = 0.9,
+  apiKey?: string | null,
 ): Promise<string> {
   const response = await fetch(ONEHOP_BASE_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${ONEHOP_KEY}`,
+      Authorization: `Bearer ${apiKey && apiKey.trim().length > 10 ? apiKey.trim() : ONEHOP_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model: ONEHOP_MODEL, messages, max_tokens: maxTokens, temperature }),
@@ -125,6 +138,11 @@ export async function callOneHop(
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("OneHop أعاد رداً فارغاً");
   return content;
+}
+
+
+export function getAdminKeyPreview(): string {
+  return ADMIN_AI_KEY.slice(0, 12) + "...";
 }
 
 /**
@@ -146,8 +164,10 @@ export function getSystemInfo() {
     envKeyPreview: process.env.OPENROUTER_API_KEY
       ? process.env.OPENROUTER_API_KEY.slice(0, 15) + "..."
       : "غير مضبوط",
-    fallbackKeyPreview: HARDCODED_KEY.slice(0, 15) + "...",
+    adminKeyPreview: ADMIN_AI_KEY.slice(0, 12) + "...",
+    onehopKeyPreview: ONEHOP_KEY.slice(0, 12) + "...",
     models: FREE_MODELS,
+    defaultModel: DEFAULT_MODEL,
     backup: { provider: "OneHop", model: ONEHOP_MODEL },
   };
 }
