@@ -721,6 +721,16 @@ const schema = defineSchema(
 
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ AI Suite — سجل نشاط أنظمة الذكاء الثلاثين ║
+    // ═══════════════════════════════════════════════════════════════════════
+    aiSuiteActivity: defineTable({
+      systemId: v.string(),
+      systemName: v.string(),
+      summary: v.string(),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ Master AI — AI Activity Log ║
     // ═══════════════════════════════════════════════════════════════════════
     aiLogs: defineTable({

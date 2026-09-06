@@ -93,12 +93,47 @@ export const EXTRA_FEATURES: Feature[] = [
   { id: "f50", name: "Reduce Motion", description: "تقليل الحركات للمستخدمين", category: "quality", enabled: true, icon: "♿" },
 ];
 
+// ─── 30 ميزات متقدمة جديدة (المرحلة الثانية) ─────────────────────────
+export const ADVANCED_FEATURES: Feature[] = [
+  { id: "f51", name: "جناح AI موسّع", description: "30 نظام AI حرة تعتمد على API وتفكر بشكل كامل", category: "ai", enabled: true, icon: "🧠" },
+  { id: "f52", name: "محلل الأداء الاستراتيجي", description: "تحليل استراتيجي شامل لبيانات اللعبة", category: "ai", enabled: true, icon: "📊" },
+  { id: "f53", name: "خبير الأمن السيبراني", description: "فحص الثغرات واقتراح الإصلاحات أونلاين", category: "ai", enabled: true, icon: "🛡️" },
+  { id: "f54", name: "مولّد المحتوى الإبداعي", description: "كتابة نصوص وإعلانات وأوصاف تلقائياً", category: "ai", enabled: true, icon: "✍️" },
+  { id: "f55", name: "محلل سلوك اللاعبين", description: "رصد الأنماط غير الطبيعية والغش", category: "ai", enabled: true, icon: "🕵️" },
+  { id: "f56", name: "مستشار الاقتصاد", description: "موازنة المتجر والعملات والعروض", category: "ai", enabled: true, icon: "💰" },
+  { id: "f57", name: "مخطط الأحداث", description: "تخطيط مواسم وأحداث وجدولة ذكية", category: "ai", enabled: true, icon: "🗓️" },
+  { id: "f58", name: "مسؤول المجتمع", description: "صياغة قوانين وردود رسمية للبلاغات", category: "ai", enabled: true, icon: "🤝" },
+  { id: "f59", name: "مدقق الأسئلة الذكي", description: "مراجعة دقة أسئلة بنك اللعبة آلياً", category: "ai", enabled: true, icon: "✅" },
+  { id: "f60", name: "مترجم المحتوى", description: "ترجمة المحتوى لغات متعددة بجودة عالية", category: "ai", enabled: true, icon: "🌍" },
+  { id: "f61", name: "محلل المشاعر", description: "تحليل مزاج المجتمع من الدردشة والبلاغات", category: "ai", enabled: true, icon: "❤️‍🔥" },
+  { id: "f62", name: "مصمم الألعاب المصغرة", description: "اقتراح ألعاب وأنماط تحديات جديدة", category: "ai", enabled: true, icon: "🎮" },
+  { id: "f63", name: "محلل الاحتفاظ", description: "توقّع هجر اللاعبين وخطط استرجاعهم", category: "ai", enabled: true, icon: "📉" },
+  { id: "f64", name: "مدرب اللاعبين", description: "نصائح شخصية لتحسين أداء كل لاعب", category: "ai", enabled: true, icon: "🏋️" },
+  { id: "f65", name: "مراقب السيرفرات", description: "تشخيص بطء الأداء ومشاكل الاتصال", category: "ai", enabled: true, icon: "🖥️" },
+  { id: "f66", name: "مولّد التحديات اليومية", description: "تحدي يومي فريد مولّد بالذكاء الاصطناعي", category: "gameplay", enabled: true, icon: "📅" },
+  { id: "f67", name: "نظام الألقاب الذكية", description: "ألقاب ديناميكية تتغير حسب الأداء", category: "progression", enabled: true, icon: "🎖️" },
+  { id: "f68", name: "لوحة قيادة قابلة للتخصيص", description: "رتب أدوات المالك بترتيبك المفضل", category: "analytics", enabled: true, icon: "🧩" },
+  { id: "f69", name: "تنبيهات ذكية مرتبة", description: "تنبيهات ملونة حسب الخطورة مع أولوية ذكية", category: "quality", enabled: true, icon: "🚨" },
+  { id: "f70", name: "تقارير قابلة للتصدير", description: "تصدير CSV/JSON لأي بيانات في النظام", category: "analytics", enabled: true, icon: "📄" },
+  { id: "f71", name: "سجل تدقيق كامل", description: "أرشيف مفصّل لكل إجراء مالك أو مشرف", category: "analytics", enabled: true, icon: "🧾" },
+  { id: "f72", name: "وضع الطوارئ الفوري", description: "إيقاف شامل للعبة بضغطة واحدة", category: "quality", enabled: true, icon: "🆘" },
+  { id: "f73", name: "البحث الموحّد", description: "بحث واحد في كل بيانات النظام دفعة واحدة", category: "analytics", enabled: true, icon: "🔎" },
+  { id: "f74", name: "إجراءات جماعية سريعة", description: "حدّد عدة لاعبين ونفّذ أمراً واحداً", category: "quality", enabled: true, icon: "⚡" },
+  { id: "f75", name: "جدولة العروض الموسمية", description: "عروض متجر تُفعّل وتُنهى تلقائياً", category: "economy", enabled: true, icon: "🏷️" },
+  { id: "f76", name: "حماية الحسابات", description: "رصد محاولات الاختراق والحسابات المشبوهة", category: "social", enabled: true, icon: "🔐" },
+  { id: "f77", name: "ملخصات المالك الذكية", description: "ملخص يومي ذكي لحالة كل الأنظمة", category: "ai", enabled: true, icon: "📬" },
+  { id: "f78", name: "محرك الأفكار الحر", description: "AI حر بدون قيود لأي مهمة أو سؤال", category: "ai", enabled: true, icon: "🕊️" },
+  { id: "f79", name: "التعلم من قرارات المالك", description: "الأنظمة تتحسن من قراراتك السابقة", category: "ai", enabled: true, icon: "📚" },
+  { id: "f80", name: "الربط الهجين API", description: "كل أنظمة AI تعمل عبر OpenRouter API مجاناً", category: "ai", enabled: true, icon: "🔗" },
+];
+
 export const ALL_FEATURES: Feature[] = [
   ...GAMEPLAY_FEATURES,
   ...SOCIAL_FEATURES,
   ...PROGRESSION_FEATURES,
   ...ECONOMY_FEATURES,
   ...EXTRA_FEATURES,
+  ...ADVANCED_FEATURES,
 ];
 
 export const FEATURE_CATEGORIES: { key: FeatureCategory; label: string; icon: string }[] = [
@@ -108,4 +143,5 @@ export const FEATURE_CATEGORIES: { key: FeatureCategory; label: string; icon: st
   { key: "economy", label: "الاقتصاد والمكافآت", icon: "💰" },
   { key: "ai", label: "أنظمة الذكاء الاصطناعي", icon: "🤖" },
   { key: "quality", label: "جودة النظام", icon: "⚙️" },
+  { key: "analytics", label: "التحليلات والتقارير", icon: "📊" },
 ];

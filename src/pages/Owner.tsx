@@ -104,6 +104,7 @@ import MembershipAdmin from "@/components/owner/MembershipAdmin";
 import { AiFreeChatTab } from "@/components/AiFreeChatTab";
 import { AiTransparencyTab } from "@/components/AiTransparencyTab";
 import { AiSystemsTab } from "@/components/AiSystemsTab";
+import { AiSuiteTab } from "@/components/AiSuiteTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
 import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
@@ -2209,6 +2210,7 @@ const NAV_GROUPS = [
       { id: "aiadmin", icon: BrainCircuit, label: "المدير الآلي" },
       { id: "aicontrol", icon: Sparkles, label: "تحكم AI" },
       { id: "transparency", icon: EyeOff, label: "الشفافية" },
+      { id: "aisuite", icon: Bot, label: "AI Suite (30 نظاماً)" },
       { id: "aisystems", icon: KeyRound, label: "أنظمة AI" },
       { id: "freechat", icon: Skull, label: "AI حر" },
       { id: "problems", icon: Bug, label: "المشاكل" },
@@ -2285,6 +2287,7 @@ export default function Owner() {
       if (item.id === "aicontrol" && !access.isOwner) return false;
       if (item.id === "transparency" && !access.isOwner) return false;
       if (item.id === "aisystems" && !access.isOwner) return false;
+      if (item.id === "aisuite" && !access.isOwner) return false;
       if (item.id === "freechat" && !access.isOwner) return false;
       if (item.id === "problems" && !access.isOwner) return false;
       if (item.id === "errorhunter" && !access.isOwner) return false;
@@ -2316,6 +2319,8 @@ export default function Owner() {
         return <AiControlTab />;
       case "transparency":
         return <AiTransparencyTab />;
+      case "aisuite":
+        return <AiSuiteTab />;
       case "aisystems":
         return <AiSystemsTab />;
       case "freechat":
