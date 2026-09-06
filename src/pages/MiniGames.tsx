@@ -106,15 +106,14 @@ export default function MiniGames() {
         </header>
         <main className="mx-auto max-w-6xl px-5 pb-24 pt-10">
           <div className="mb-8">
-            <h1 className="text-2xl font-bold tracking-tight">{category.name}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              اختر لعبة واثبت مهاراتك — 80 لعبة في انتظارك!
-        
-        {/* AI Difficulty Info */}
-        <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-center">
-          <p className="text-xs font-bold text-primary">🤖 الذكاء الاصطناعي يضبط مستوى الصعوبة تلقائياً بناءً على أدائك</p>
-        </div>
+            <h1 className="text-2xl font-bold tracking-tight">{category.name}</h1>              <p className="mt-1 text-sm text-muted-foreground">
+              اختر لعبة واثبت مهاراتك — 96 لعبة في انتظارك!
             </p>
+
+            {/* AI Difficulty Info */}
+            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-center">
+              <p className="text-xs font-bold text-primary">🤖 الذكاء الاصطناعي يضبط مستوى الصعوبة تلقائياً بناءً على أدائك</p>
+            </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {category.games.map((game) => {

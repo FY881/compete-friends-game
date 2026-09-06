@@ -942,9 +942,31 @@ export default function Play() {
           </div>
         </section>
 
-        {/* ── 5 Game Modes ────────────────────────────────────── */}
-        <section className="mt-12">
+        {/* ── 5 Game Modes ────────────────────────────────────── */}          <section className="mt-14">
           <GameModes />
+        </section>
+
+        {/* ── Hub / Mini-Games ─────────────────────────────────── */}
+        <section className="mt-14">
+          <div className="rounded-3xl border border-primary/25 bg-card p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-primary">مركز الألعاب</p>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  80 لعبة مصغرة — حدة ذكاء بكل فئة
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  الذاكرة · السرعة · الكلمات · المنطق · الأرقام · الإدراك · التحدي · الخبير
+                </p>
+              </div>
+              <Button asChild size="lg" className="rounded-xl bg-gradient-to-l from-primary to-primary/90 shadow-sm">
+                <Link to="/games">
+                  <Gamepad2 className="size-4.5" />
+                  افتح المركز كل_async
+                </Link>
+              </Button>
+            </div>
+          </div>
         </section>
 
         {/* ── Time-based Challenges ── */}
