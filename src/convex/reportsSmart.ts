@@ -9,7 +9,7 @@
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { callLlm, getOpenRouterKey } from "./aiConfig";
 
 // ═══════════════════════════════════════════════════════════════════════
 // ① تصنيفات البلاغات
@@ -200,28 +200,16 @@ export const analyzeReport = mutation({
 }`;
 
     try {
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://mindclash.app",
-          "X-Title": "MindClash Report Analysis",
-        },
-        body: JSON.stringify({
-          model: DEFAULT_MODEL,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: "حلل هذا البلاغ وأعطني التقييم والإجراء المقترح بصيغة JSON" },
-          ],
-          max_tokens: 512,
-          temperature: 0.3,
-        }),
-      });
-
-      if (!response.ok) throw new Error("AI API error");
-      const data = await response.json();
-      const content: string = data.choices?.[0]?.message?.content ?? "";
+      // عبر callLlm — OpenRouter مع بديل OneHop (DeepSeek) تلقائي عند الفشل
+      const content: string = await callLlm(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "حلل هذا البلاغ وأعطني التقييم والإجراء المقترح بصيغة JSON" },
+        ],
+        512,
+        0.3,
+        "MindClash Report Analysis",
+      );
 
       // Parse JSON response
       const jsonMatch = content.match(/\{[\s\S]*\}/);

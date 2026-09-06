@@ -15,8 +15,9 @@
  */
 "use node";
 
-import { action, internalAction } from "./_generated/server";
-import { internal, api } from "./_generated/api";import { v } from "convex/values";
+import { action, internalAction } from "./_generated/server";import { internal, api } from "./_generated/api";
+import { v } from "convex/values";
+import { callLlm } from "./aiConfig";
 
 // ── نموذج مختلف تماماً: Google Gemini عبر Google AI Studio ──
 // أقوى وأسرع نموذج مجاني مستقل عن OpenRouter تماماً.
@@ -63,7 +64,21 @@ async function callGemini(
       lastErr = e instanceof Error ? e.message : "خطأ شبكة";
     }
   }
-  throw new Error(lastErr || "فشل الاتصال بـ Gemini");
+
+  // ── البديل المؤقت: OpenRouter ثم OneHop (DeepSeek) — لا يتوقف النائب أبداً ──
+  try {
+    return await callLlm(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      maxTokens,
+      0.95,
+      "Zaka Vice Owner",
+    );
+  } catch (fallbackErr) {
+    throw new Error(`${lastErr || "فشل Gemini"} | البديل فشل أيضاً: ${fallbackErr instanceof Error ? fallbackErr.message : ""}`);
+  }
 }
 
 // ── هوية نائب المالك ─────────────────────────────────────────

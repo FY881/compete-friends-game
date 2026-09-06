@@ -16,14 +16,15 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { DEFAULT_MODEL } from "./aiConfig";
+import { callLlm } from "./aiConfig";
 
 // ═══════════════════════════════════════════════════════════════
 // OpenRouter API Helper
 // ═══════════════════════════════════════════════════════════════
 
+// عبر callLlm — OpenRouter مع بديل OneHop (DeepSeek) تلقائي عند الفشل
 async function callOpenRouter(
-  apiKey: string,
+  _apiKey: string,
   messages: Array<{ role: string; content: string }>,
   options?: {
     model?: string;
@@ -31,39 +32,12 @@ async function callOpenRouter(
     temperature?: number;
   },
 ): Promise<string> {
-  // Always force openrouter/free — ignore any stored/old model values
-  const model = DEFAULT_MODEL;
-  const maxTokens = options?.maxTokens ?? 2048;
-  const temperature = options?.temperature ?? 0.7;
-
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://zaka.app",
-        "X-Title": "Zaka - Quiz Game",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-      }),
-    },
+  return await callLlm(
+    messages,
+    options?.maxTokens ?? 2048,
+    options?.temperature ?? 0.7,
+    "Zaka - Quiz Game",
   );
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenRouter API error (${response.status}): ${err}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("OpenRouter returned empty response");
-  return content;
 }
 
 // ═══════════════════════════════════════════════════════════════

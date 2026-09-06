@@ -4,7 +4,7 @@
 import { action, query, mutation, internalQuery, internalAction, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { callLlm, getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
 
 // ═══════════════════════════════════════════════════════════════
 // الذاكرة الدائمة
@@ -186,22 +186,12 @@ ${players.slice(0, 5).map((p: { name: string; xp: number; gamesPlayed: number; g
 
 أنت تستطيع: عرض إحصائيات، بحث، تحليل، اقتراحات. أجب بالعربية.`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
-        "HTTP-Referer": "https://zaka.app", "X-Title": "Zaka AI Free",
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: command }],
-        max_tokens: 2048, temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) throw new Error(`AI Error: ${await response.text()}`);
-    const data = await response.json();
-    const reply: string = data.choices?.[0]?.message?.content ?? "لم أتمكن من الرد";
+    const reply: string = await callLlm(
+      [{ role: "system", content: systemPrompt }, { role: "user", content: command }],
+      2048,
+      0.7,
+      "Zaka AI Free",
+    );
 
     await ctx.runMutation(internal.aiFree.saveMemory, { sessionId, role: "user", content: command });
     await ctx.runMutation(internal.aiFree.saveMemory, { sessionId, role: "assistant", content: reply });

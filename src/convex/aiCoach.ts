@@ -8,7 +8,7 @@ import { query, action, mutation, internalMutation, internalQuery } from "./_gen
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { callLlm, getOpenRouterKey } from "./aiConfig";
 
 // ─── Analyze Player Performance ────────────────────────────────
 export const analyzePerformance = query({
@@ -162,28 +162,16 @@ ${playerContext}
 إذا سأل عن نصائح، أعطِ نصيحة محددة وعملية.
 إذا سأل عن تحدي، اقترح تحدياً مناسباً لمستواه.`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://mindclash.app",
-        "X-Title": "MindClash AI Coach",
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message },
-        ],
-        max_tokens: 1024,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) throw new Error("AI Coach error");
-    const data = await response.json();
-    const reply: string = data.choices?.[0]?.message?.content ?? "لم أتمكن من الرد";
+    const response = await callLlm(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message },
+      ],
+      1024,
+      0.7,
+      "MindClash AI Coach",
+    );
+    const reply: string = response ?? "لم أتمكن من الرد";
 
     // Save to memory
     await ctx.runMutation((internal as any).aiCoach.saveCoachMemory, {

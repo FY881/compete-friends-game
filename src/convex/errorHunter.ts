@@ -9,7 +9,7 @@
 
 import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
-import { getOpenRouterKey } from "./aiConfig";
+import { callLlm } from "./aiConfig";
 
 // ═══════════════════════════════════════════════════════════════
 // التسجيل — تسجيل الخطأ مع التجميع الذكي
@@ -476,8 +476,6 @@ export const cleanupOldErrors = mutation({
 export const analyzeErrorsWithAI = action({
   args: {},
   handler: async (ctx) => {
-    const apiKey = getOpenRouterKey();
-    if (!apiKey) return { success: false, reason: "No API key" };
 
     // جلب الأخطاء غير المحلولة — نستخدم api reference عبر dynamic import
     // لتجنب الاستيراد الدائري
@@ -508,24 +506,13 @@ ${errorContext}
 [{"fingerprint":"...","analysis":"تحليل عربي","fixSuggestion":"حل مقترح","canAutoFix":true/false,"actualSeverity":"low|medium|high|critical"}]`;
 
     try {
-      const response: Response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "meta-llama/llama-4-scout:free",
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.3,
-          max_tokens: 2000,
-        }),
-      });
-
-      if (!response.ok) return { success: false, reason: `API ${response.status}` };
-
-      const data: any = await response.json();
-      const content: string = data.choices?.[0]?.message?.content || "";
+      // عبر callLlm — OpenRouter مع بديل OneHop (DeepSeek) تلقائي عند الفشل
+      const content: string = await callLlm(
+        [{ role: "user", content: prompt }],
+        2000,
+        0.3,
+        "Zaka Error Hunter",
+      );
 
       // محاولة استخراج JSON
       const jsonMatch = content.match(/\[[\s\S]*\]/);
