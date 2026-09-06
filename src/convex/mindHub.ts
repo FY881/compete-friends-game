@@ -27,13 +27,13 @@ import { PRIVATE_MINDS, EXTENDED_MINDS } from "../lib/aiSystems";
 
 const ALL_MINDS = [...PRIVATE_MINDS, ...EXTENDED_MINDS];
 
-// عبر callLlm — OpenRouter مع بديل OneHop تلقائي عند الفشل
+// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-...) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 900,
   temperature = 0.9,
 ): Promise<string> {
-  return await callLlm(messages, maxTokens, temperature, "Zaka Mind Hub");
+  return await callLlm(messages, maxTokens, temperature, "Zaka Mind Hub", "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn");
 }
 
 const mindById = (id: string) => ALL_MINDS.find((m) => m.id === id);

@@ -14,13 +14,13 @@ import { callLlm } from "./aiConfig";
 import { AI_SYSTEMS } from "../lib/aiSystems";
 import { upgradedLlm } from "./aiUpgradeKit";
 
-// عبر callLlm — OpenRouter مع بديل OneHop تلقائي عند الفشل
+// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-...) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 2048,
   temperature = 0.7,
 ): Promise<string> {
-  return await callLlm(messages, maxTokens, temperature, "Zaka Council of Minds");
+  return await callLlm(messages, maxTokens, temperature, "Zaka Council of Minds", "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn");
 }
 
 function systemById(id: string) {

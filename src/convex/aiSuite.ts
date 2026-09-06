@@ -15,13 +15,13 @@ import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 // 30 نظام AI — مصدر واحد مشترك في src/lib/aiSystems.ts (نفس قائمة الواجهة)
 const SYSTEMS = AI_SYSTEMS;
 
-// عبر callLlm — OpenRouter مع بديل OneHop تلقائي عند الفشل
+// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-...) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 2048,
   temperature = 0.7,
 ): Promise<string> {
-  return await callLlm(messages, maxTokens, temperature, "Zaka AI Suite");
+  return await callLlm(messages, maxTokens, temperature, "Zaka AI Suite", "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn");
 }
 
 // ملاحظة: القائمة المشتركة للـ 30 نظاماً موجودة في src/lib/aiSystems.ts وتُستخدم من هنا وللواجهة

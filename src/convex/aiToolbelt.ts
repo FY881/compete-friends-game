@@ -12,9 +12,9 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
 
-// عبر callLlm — OpenRouter مع بديل OneHop تلقائي عند الفشل
+// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-...) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
 export async function llm(messages: Array<{ role: string; content: string }>, maxTokens = 1500, temperature = 0.8): Promise<string> {
-  return await callLlm(messages, maxTokens, temperature, "Zaka Toolbelt");
+  return await callLlm(messages, maxTokens, temperature, "Zaka Toolbelt", "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn");
 }
 
 /** بحث ويب حقيقي — DuckDuckGo Instant Answer API (مجاني بدون مفتاح) */

@@ -17,7 +17,7 @@
 
 import { action, internalAction } from "./_generated/server";import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
-import { callLlm } from "./aiConfig";
+import { callLlm, callOneHop } from "./aiConfig";
 import { recallFor, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
 
 // ── نموذج مختلف تماماً: Google Gemini عبر Google AI Studio ──
@@ -29,6 +29,15 @@ function getGeminiKey(): string {
   if (key && key.trim().length > 10) return key.trim();
   throw new Error(
     "مفتاح GOOGLE_API_KEY غير مضبوط — أضفه من Keys/API keys (مجاني من aistudio.google.com)",
+  );
+}
+
+/** المفتاح الرسمي لنائب الرئيس — DeepSeek عبر OpenRouter */
+function getAdminAiKey(): string {
+  const key = process.env.ADMIN_AI_KEY || "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn";
+  if (key && key.trim().length > 10) return key.trim();
+  throw new Error(
+    "مفتاح ADMIN_AI_KEY غير مضبوط — هذا المفتاح مسؤول عن كل أنظمة AI في اللعبة.",
   );
 }
 
@@ -66,7 +75,7 @@ async function callGemini(
     }
   }
 
-  // ── البديل المؤقت: OpenRouter ثم OneHop (DeepSeek) — لا يتوقف النائب أبداً ──
+  // ── البديل المؤقت: مفتاح نائب الرئيس الرسمي (DeepSeek) ثم OneHop — لا يتوقف النائب أبداً ──
   try {
     return await callLlm(
       [
@@ -76,9 +85,23 @@ async function callGemini(
       maxTokens,
       0.95,
       "Zaka Vice Owner",
+      getAdminAiKey(),
     );
   } catch (fallbackErr) {
-    throw new Error(`${lastErr || "فشل Gemini"} | البديل فشل أيضاً: ${fallbackErr instanceof Error ? fallbackErr.message : ""}`);
+    // آخر ملجأ: OneHop بنفس النموذج DeepSeek
+    try {
+      return await callOneHop(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        maxTokens,
+        0.95,
+        getAdminAiKey(),
+      );
+    } catch (onehopErr) {
+      throw new Error(`${lastErr || "فشل Gemini"} | البدائل فشلت: ${fallbackErr instanceof Error ? fallbackErr.message : ""} | ${onehopErr instanceof Error ? onehopErr.message : "OneHop"}`);
+    }
   }
 }
 

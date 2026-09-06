@@ -7,9 +7,11 @@
  * تلقائياً إلى OneHop بنموذج deepseek/deepseek-v4-flash دون أي تدخل.
  */
 
-// المفتاح الافتراضي الدائم — يعمل مع كل الأنظمة
-const HARDCODED_KEY =
-  "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";
+// المفتاح الرسمي الوحيد للعبة — من module المفاتيح الداخلي
+import { ADMIN_AI_KEY } from "../lib/aiCredentials";
+
+// المفتاح الاحتياطي القديم (يُزال reliance عليه من المسار الرئيسي)
+
 
 // ── البديل المؤقت: OneHop ──────────────────────────────────
 export const ONEHOP_BASE_URL = "https://api.onehop.ai/v1/chat/completions";
@@ -32,8 +34,8 @@ export function getOpenRouterKey(providedKey?: string | null): string {
     return envKey.trim();
   }
 
-  // 3. المفتاح الافتراضي الدائم
-  return HARDCODED_KEY;
+  // 3. المفتاح الرسمي الدائم (الوحيد المُستخدَم حالياً)
+  return ADMIN_AI_KEY;
 }
 
 /**
@@ -87,7 +89,7 @@ export async function callLlm(
 }
 
 /** OpenRouter مباشر مع تحكم المفتاح الرسمي */
-async function callOpenRouterDirect(
+export async function callOpenRouterDirect(
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
   temperature: number,
@@ -122,10 +124,11 @@ export async function callOneHop(
   temperature = 0.9,
   apiKey?: string | null,
 ): Promise<string> {
+  const effectiveKey = apiKey && apiKey.trim().length > 10 ? apiKey.trim() : ONEHOP_KEY;
   const response = await fetch(ONEHOP_BASE_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey && apiKey.trim().length > 10 ? apiKey.trim() : ONEHOP_KEY}`,
+      Authorization: `Bearer ${effectiveKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model: ONEHOP_MODEL, messages, max_tokens: maxTokens, temperature }),
