@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FC, type LucideProps } from "react";
+import React, { useState, type ChangeEvent, type ElementType } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button, Input, Textarea, Badge, Switch, Card, CardHeader, CardTitle, CardContent, Separator } from "@/components/ui";
@@ -20,18 +20,32 @@ import {
   ShieldCheck,
   Zap,
   KeyRound,
-  Scope as ScopeIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-const ScopeIconFC: FC<LucideProps> = ScopeIcon;
-
-const SCOPE_OPTIONS = [
+const SCOPE_OPTIONS: Array<{ value: string; label: string; icon: ElementType; hint: string }> = [
   { value: "everything", label: "كل شيء في اللعبة", icon: Layers, hint: "وظائف متنوعة" },
   { value: "side", label: "قسم محدد (اختر من القائمة)", icon: GitBranch, hint: "مثال: غرف / PEG / أسئلة" },
-  { value: "item", label: "شئ محدد واحد", icon: ScopeIconFC, hint: "تعيين هدف واحد" },
+  { value: "item", label: "شئ محدد واحد", icon: InboxIcon, hint: "تعيين هدف واحد" },
 ];
+
+function InboxIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+  );
+}
 
 export function ApiHubTab() {
   const apis = useQuery(api.apiHubStore.listApisSafe, {});
@@ -140,7 +154,7 @@ export function ApiHubTab() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <ScopeIconFC className="size-4 text-primary" />
+            <Layers className="size-4 text-primary" />
             نطاق تحكم الـ API — شئ معين / قسم / كل شيء
           </CardTitle>
         </CardHeader>
