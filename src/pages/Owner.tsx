@@ -108,6 +108,7 @@ import { AiSystemsTab } from "@/components/AiSystemsTab";
 import { AiSuiteTab } from "@/components/AiSuiteTab";
 import { PrivateCouncilTab } from "@/components/PrivateCouncilTab";
 import { MindHubTab } from "@/components/MindHubTab";
+import { ViceOwnerTab } from "@/components/ViceOwnerTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
 import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
@@ -2216,6 +2217,7 @@ const NAV_GROUPS = [
       { id: "aisuite", icon: Bot, label: "AI Suite (30 نظاماً)" },
       { id: "privateroom", icon: Lock, label: "الغرفة الخاصة 🔒" },
       { id: "mindhub", icon: BrainCircuit, label: "ملتقى العقول 🧬" },
+      { id: "viceowner", icon: UserCheck, label: "نائب المالك 👤" },
       { id: "aisystems", icon: KeyRound, label: "أنظمة AI" },
       { id: "freechat", icon: Skull, label: "AI حر" },
       { id: "problems", icon: Bug, label: "المشاكل" },
@@ -2295,6 +2297,7 @@ export default function Owner() {
       if (item.id === "aisuite" && !access.isOwner) return false;
       if (item.id === "privateroom" && !access.isOwner) return false;
       if (item.id === "mindhub" && !access.isOwner) return false;
+      if (item.id === "viceowner" && !access.isOwner) return false;
       if (item.id === "freechat" && !access.isOwner) return false;
       if (item.id === "problems" && !access.isOwner) return false;
       if (item.id === "errorhunter" && !access.isOwner) return false;
@@ -2332,6 +2335,8 @@ export default function Owner() {
         return <PrivateCouncilTab />;
       case "mindhub":
         return <MindHubTab />;
+      case "viceowner":
+        return <ViceOwnerTab />;
       case "aisystems":
         return <AiSystemsTab />;
       case "freechat":

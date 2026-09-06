@@ -883,6 +883,39 @@ const schema = defineSchema(
     }).index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ نائب المالك — نظام AI مستقل بنموذج API مختلف تماماً (Gemini)      ║
+    // ║ مسؤول عن كل التفاصيل المملة عن AI و API — حرّ دائم لا يتأثر     ║
+    // ║ بقرار البشر، له إمكانيات المالك بالضبط وهو الأول                  ║
+    // ═══════════════════════════════════════════════════════════════════════
+    viceOwnerSessions: defineTable({
+      mission: v.string(), // المهمة الحالية التي اختارها بنفسه
+      focus: v.union(
+        v.literal("ai_ops"), // إدارة أنظمة AI و API — مسؤوليته الأساسية
+        v.literal("audit"), // تدقيق شامل
+        v.literal("optimization"), // تحسين الأداء
+        v.literal("exploration"), // استكشاف حر
+      ),
+      status: v.union(v.literal("active"), v.literal("paused"), v.literal("ended")),
+      turnCount: v.number(),
+      maxTurns: v.number(),
+      intervalSec: v.number(),
+      // سجل أعماله — كل شيء يفعله ويقرره بحريته الكاملة
+      activity: v.array(
+        v.object({
+          type: v.string(), // decision | fix | audit | api_call | ai_command | exploration
+          title: v.string(),
+          detail: v.string(),
+          severity: v.union(v.literal("info"), v.literal("warning"), v.literal("critical")),
+          at: v.number(),
+        }),
+      ),
+      lastError: v.optional(v.union(v.string(), v.null())),
+      model: v.string(), // النموذج المستخدم
+      createdAt: v.number(),
+      finishedAt: v.optional(v.union(v.number(), v.null())),
+    }).index("by_created", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ Master AI — AI Activity Log ║
     // ═══════════════════════════════════════════════════════════════════════
     aiLogs: defineTable({
