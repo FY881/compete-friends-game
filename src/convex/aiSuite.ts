@@ -10,6 +10,7 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
 import { AI_SYSTEMS } from "../lib/aiSystems";
+export type { AiSystemDef } from "../lib/aiSystems";
 import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 
 // جميع الأنظمة المسجّلة للعب

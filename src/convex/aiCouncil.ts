@@ -13,6 +13,9 @@ import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
 import { AI_SYSTEMS, ELITE_MINDS } from "../lib/aiSystems";
 
+export type { AiSystemDef, PrivateMindDef, EliteMindDef } from "../lib/aiSystems";
+export { AI_SYSTEMS, PRIVATE_MINDS, EXTENDED_MINDS, ELITE_MINDS };
+
 export {}; // keep exports clean
 import { upgradedLlm } from "./aiUpgradeKit";
 
