@@ -53,6 +53,7 @@ export type MiniGameDef = {
   component: React.ComponentType<MiniGameProps>;
   /** الحد الأدنى للعضوية المطلوبة: bronze=freetier, silver, gold, diamond, exclusive */
   tier?: "bronze" | "silver" | "gold" | "diamond" | "exclusive";
+  features?: string[];
 };
 
 export type MiniGameProps = {

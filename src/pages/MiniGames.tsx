@@ -258,9 +258,24 @@ export default function MiniGames() {
                       <span className={cn("flex size-11 items-center justify-center rounded-xl", cat.color)}>
                         <Icon className="size-5.5" />
                       </span>
-                      <Badge variant="outline" className="rounded-full text-[10px]">
-                        {cat.games.length} ألعاب
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="rounded-full text-[10px]">
+                          {cat.games.length} ألعاب
+                        </Badge>
+                        {cat.games.some(g => g.features && g.features.length > 0) && (
+                          <span className="text-[10px] text-muted-foreground">• 5 مميزات AI</span>
+                        )}
+                      </div>
+                        {cat.games.some(g => g.features && g.features.length > 0) && (
+                          <span className="text-[10px] text-muted-foreground">• 5 مميزات AI</span>
+                        )}
+                      </div>
+                        {cat.games.some(g => g.features && g.features.length > 0) && (
+                          <span className="text-[10px] text-muted-foreground">· 5 مميزات AI</span>
+                        )}
+                      </div>
                     </div>
                     <h3 className="mt-4 font-bold">{cat.name}</h3>
                     <p className="mt-1 text-xs text-muted-foreground">
