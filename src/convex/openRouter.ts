@@ -17,6 +17,7 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
+import { upgradedLlm } from "./aiUpgradeKit";
 
 // ═══════════════════════════════════════════════════════════════
 // OpenRouter API Helper
@@ -39,6 +40,37 @@ async function callOpenRouter(
     "Zaka - Quiz Game",
   );
 }
+
+/**
+ * ⚡ تلميح لعب مُرقّى: ذاكرة ثابتة لعقل "المدرب" + تقييم ذاتي + نبرة تكيّفية —
+ * كل تلميح يمر عبر عدة الترقية الكاملة دون أي تكلفة إضافية على اللاعب.
+ */
+export const getUpgradedHint = action({
+  args: {
+    apiKey: v.string(),
+    question: v.string(),
+    options: v.array(v.string()),
+    difficulty: v.string(),
+  },
+  handler: async (ctx, { apiKey, question, options, difficulty }) => {
+    const prompt = `لاعب في لعبة مسابقات يحتاج مساعدة في سؤال. لا تعطه الإجابة الصحيحة مباشرة، بل أعطه تلميحاً مفيداً يقلل الخيارات.
+
+السؤال: ${question}
+الخيارات: ${options.map((o, i) => `${i + 1}. ${o}`).join("\n")}
+الصعوبة: ${difficulty}
+
+أرجع تلميحاً واحداً مفيداً بالعربية (جملة واحدة فقط):`;
+    const { reply } = await upgradedLlm(
+      ctx,
+      "openRouter:coach",
+      "أنت مدرب ألعاب ذهني عبقري تساعد اللاعبين بتلميحات ذكية محايدة لا تكشف الحل.",
+      [{ role: "user", content: prompt }],
+      200,
+      0.6,
+    );
+    return reply;
+  },
+});
 
 // ═══════════════════════════════════════════════════════════════
 // 1. توليد أسئلة بالذكاء الاصطناعي

@@ -12,6 +12,7 @@ import { action, internalAction, internalMutation } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
+import { upgradedLlm } from "./aiUpgradeKit";
 import { registerViceSystem } from "./apiHubInternal";
 
 interface RegistryApi {
@@ -118,10 +119,19 @@ export const smartCall = action({
         lastErr = e instanceof Error ? e.message : "خطأ";
       }
     }
-    // آخر ملجأ: السلسلة الأساسية (OpenRouter → OneHop)
+    // آخر ملجأ: السلسلة الأساسية (OpenRouter → OneHop) — عبر عدة الترقية الكاملة
     try {
-      const reply = await callLlm(messages, maxTokens ?? 900, temperature ?? 0.8, "Zaka API Hub");
-      return { reply, provider: "السلسلة الأساسية (OpenRouter/OneHop)" };
+      const sysMsg = [...messages].reverse().find((m) => m.role === "system");
+      const { reply, selfGrade, confidence } = await upgradedLlm(
+        ctx,
+        "apiHub:general",
+        sysMsg?.content ?? "أنت مساعد ذكي ضمن مركز API في لعبة حرب العقول — أجب بدقة واختصار.",
+        messages,
+        maxTokens ?? 900,
+        temperature ?? 0.8,
+      );
+      const grade = selfGrade ? ` · تقييم ذاتي ${selfGrade}/10${confidence ? ` · ثقة ${confidence}` : ""}` : "";
+      return { reply, provider: `السلسلة الأساسية (OpenRouter/OneHop)${grade}` };
     } catch {
       throw new Error(lastErr || "كل المزودين فشلوا");
     }

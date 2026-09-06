@@ -115,6 +115,7 @@ import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
 import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
 import MasterAIDashboard from "@/components/owner/MasterAIDashboard";
 import { LawEnforcementTab } from "@/components/owner/LawEnforcementTab";
+import { AiUpgradeCenterTab } from "@/components/AiUpgradeCenterTab";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -2220,6 +2221,7 @@ const NAV_GROUPS = [
       { id: "mindhub", icon: BrainCircuit, label: "ملتقى العقول 🧬" },
       { id: "viceowner", icon: UserCheck, label: "نائب المالك 👤" },
       { id: "apihub", icon: Globe, label: "مركز API 🌐" },
+      { id: "aiupgrade", icon: Sparkles, label: "مركز ترقية AI ⚡" },
       { id: "aisystems", icon: KeyRound, label: "أنظمة AI" },
       { id: "freechat", icon: Skull, label: "AI حر" },
       { id: "problems", icon: Bug, label: "المشاكل" },
@@ -2301,6 +2303,7 @@ export default function Owner() {
       if (item.id === "mindhub" && !access.isOwner) return false;
       if (item.id === "viceowner" && !access.isOwner) return false;
       if (item.id === "apihub" && !access.isOwner) return false;
+      if (item.id === "aiupgrade" && !access.isOwner) return false;
       if (item.id === "freechat" && !access.isOwner) return false;
       if (item.id === "problems" && !access.isOwner) return false;
       if (item.id === "errorhunter" && !access.isOwner) return false;
@@ -2342,6 +2345,8 @@ export default function Owner() {
         return <ViceOwnerTab />;
       case "apihub":
         return <ApiHubTab />;
+      case "aiupgrade":
+        return <AiUpgradeCenterTab />;
       case "aisystems":
         return <AiSystemsTab />;
       case "freechat":
