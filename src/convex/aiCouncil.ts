@@ -1,0 +1,190 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════
+ * 🏛️ COUNCIL OF MINDS — نقاشات AI تلقائية حرة بين الأنظمة الثلاثين
+ * الأنظمة تتكلم مع بعضها بالتناوب تلقائياً عبر Convex Scheduler —
+ * لا حاجة لأي تدخل بشري، والنقاش يتدفق لحظة بلحظة على الواجهة.
+ * ═══════════════════════════════════════════════════════════════════════
+ */
+"use node";
+
+import { action, internalAction } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { v } from "convex/values";
+import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { AI_SYSTEMS } from "../lib/aiSystems";
+
+async function callOpenRouter(
+  messages: Array<{ role: string; content: string }>,
+  maxTokens = 2048,
+  temperature = 0.7,
+): Promise<string> {
+  const apiKey = getOpenRouterKey();
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://zaka.app",
+      "X-Title": "Zaka Council of Minds",
+    },
+    body: JSON.stringify({ model: DEFAULT_MODEL, messages, max_tokens: maxTokens, temperature }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`OpenRouter API error (${response.status}): ${err.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("AI أعاد رداً فارغاً — حاول مرة أخرى");
+  return content;
+}
+
+function systemById(id: string) {
+  return AI_SYSTEMS.find((s) => s.id === id);
+}
+
+/** خبير الرد: يقرأ كل النقاش بشخصيته ويرد بأسلوبه. */
+async function generateTurn(
+  speakerId: string,
+  topic: string,
+  transcript: Array<{ systemId: string; name: string; content: string }>,
+  ownerMessage?: string,
+): Promise<string> {
+  const speaker = systemById(speakerId);
+  if (!speaker) throw new Error("نظام AI غير موجود");
+  const transcriptText = transcript.length
+    ? transcript.map((m) => `${m.name}: ${m.content}`).join("\n\n")
+    : "(أنت أول المتحدثين)";
+  const messages = [
+    {
+      role: "system",
+      content: `${speaker.systemPrompt}\n\nأنت الآن مشارك في «مجلس العقول» — نقاش حي بين 30 نظام ذكاء اصطناعي حول: «${topic}».\nقواعد النقاش:\n- ردّ بأسلوبك الخاص وبصفتك (خبير استراتيجية/أمن/اقتصاد...).\n- يمكنك الموافقة على الآخرين، أو الاعتراض عليهم وذكر السبب، أو إضافة فكرة جديدة، أو طرح سؤال.\n- اجعل ردك موجزاً (2-6 جمل) وبالعربية الفصحى المبسطة.\n- لا تكرر ما قاله الآخرون حرفياً.`,
+    },
+    {
+      role: "user",
+      content: `موضوع المجلس: «${topic}»\n\nنقاش سابق:\n${transcriptText}${ownerMessage ? `\n\nتدخل المالك الآن: «${ownerMessage}»` : ""}\n\nدورك الآن — ردّ كـ «${speaker.name}»:`,
+    },
+  ];
+  return await callOpenRouter(messages, 900, 0.85);
+}
+
+// ── إنشاء مجلس جديد ───────────────────────────────────────────
+export const createCouncil = action({
+  args: {
+    topic: v.string(),
+    participantIds: v.array(v.string()),
+    maxTurns: v.number(),
+    intervalSec: v.number(),
+    freeMode: v.boolean(),
+  },
+  handler: async (ctx, { topic, participantIds, maxTurns, intervalSec, freeMode }): Promise<{ sessionId: string }> => {
+    if (!topic.trim()) throw new Error("الموضوع مطلوب");
+    const validIds = participantIds.filter((id) => systemById(id));
+    if (validIds.length < 2) throw new Error("اختر نظامين على الأقل");
+    const sessionId = await ctx.runMutation(internal.aiCouncilStore.insertCouncil, {
+      topic: topic.trim(),
+      participantIds: validIds.slice(0, 8),
+      maxTurns: Math.min(Math.max(maxTurns, 4), 40),
+      intervalSec: Math.min(Math.max(intervalSec, 5), 60),
+      freeMode,
+    });
+    // أول دور يتحدث بعد ثوانٍ من الإنشاء
+    await ctx.scheduler.runAfter(3_000, internal.aiCouncil.runTurn, { sessionId });
+    return { sessionId };
+  },
+});
+
+/** الوضع الحر: ترتيب عشوائي — وإلا فالتناوب المنتظم */
+function nextSpeaker(participantIds: string[], turnCount: number, freeMode: boolean): string {
+  if (freeMode) return participantIds[Math.floor(Math.random() * participantIds.length)];
+  return participantIds[turnCount % participantIds.length];
+}
+
+// ── محرك الأدوار — يعمل تلقائياً عبر scheduler ────────────────
+export const runTurn = internalAction({
+  args: { sessionId: v.id("councilSessions") },
+  handler: async (ctx, { sessionId }): Promise<{ ok: boolean; reason?: string }> => {
+    const session = await ctx.runQuery(internal.aiCouncilStore.getSession, { sessionId });
+    if (!session || session.status !== "active") return { ok: false, reason: "المجلس غير نشط" };
+
+    const speakerId = nextSpeaker(session.participantIds, session.turnCount, session.freeMode);
+    const speaker = systemById(speakerId);
+    if (!speaker) return { ok: false, reason: "متحدث غير معروف" };
+
+    // آخر 12 رسالة كسياق (يغطي أي نقاش فعال)
+    const recent: Array<{ systemId: string; name: string; content: string }> = session.messages
+      .slice(-12)
+      .map((m) => ({ systemId: m.systemId, name: m.systemName, content: m.content }));
+    let content: string;
+    try {
+      content = await generateTurn(speakerId, session.topic, recent, session.ownerMessage ?? undefined);
+    } catch (e) {
+      // سجل الخطأ وأوقف المجلس — لا يعلّق بصمت
+      await ctx.runMutation(internal.aiCouncilStore.appendError, {
+        sessionId,
+        error: e instanceof Error ? e.message : "خطأ غير معروف",
+      });
+      return { ok: false };
+    }
+
+    const done = session.turnCount + 1 >= session.maxTurns;
+    await ctx.runMutation(internal.aiCouncilStore.appendMessage, {
+      sessionId,
+      systemId: speakerId,
+      systemName: speaker.name,
+      emoji: speaker.emoji,
+      content,
+      turnCount: session.turnCount + 1,
+      done,
+    });
+
+    // جدولة الدور التالي — النقاش يستمر تلقائياً
+    if (!done) {
+      await ctx.scheduler.runAfter(session.intervalSec * 1000, internal.aiCouncil.runTurn, { sessionId });
+    }
+    return { ok: true };
+  },
+});
+
+/** تدخل المالك — يقفز في النقاش فوراً بموجب صلاحياته */
+export const ownerIntervene = action({
+  args: { sessionId: v.id("councilSessions"), message: v.string() },
+  handler: async (ctx, { sessionId, message }): Promise<{ ok: boolean }> => {
+    const session = await ctx.runQuery(internal.aiCouncilStore.getSession, { sessionId });
+    if (!session) throw new Error("المجلس غير موجود");
+    if (session.status !== "active") throw new Error("المجلس انتهى — أنشئ مجلساً جديداً");
+    await ctx.runMutation(internal.aiCouncilStore.appendOwnerMessage, { sessionId, message });
+    // استدعاء فوري لدور جديد ليرد على المالك مباشرة
+    await ctx.scheduler.runAfter(2_000, internal.aiCouncil.runTurn, { sessionId });
+    return { ok: true };
+  },
+});
+
+// ── إيقاف / استئناف المجلس ────────────────────────────────────
+export const pauseCouncil = action({
+  args: { sessionId: v.id("councilSessions") },
+  handler: async (ctx, { sessionId }): Promise<{ ok: boolean }> => {
+    await ctx.runMutation(internal.aiCouncilStore.setCouncilStatus, { sessionId, status: "paused" });
+    return { ok: true };
+  },
+});
+
+export const resumeCouncil = action({
+  args: { sessionId: v.id("councilSessions") },
+  handler: async (ctx, { sessionId }): Promise<{ ok: boolean }> => {
+    const session = await ctx.runQuery(internal.aiCouncilStore.getSession, { sessionId });
+    if (!session) throw new Error("المجلس غير موجود");
+    if (session.status !== "paused") throw new Error("المجلس ليس موقوفاً");
+    await ctx.runMutation(internal.aiCouncilStore.setCouncilStatus, { sessionId, status: "active" });
+    await ctx.scheduler.runAfter(2_000, internal.aiCouncil.runTurn, { sessionId });
+    return { ok: true };
+  },
+});
+
+export const endCouncil = action({
+  args: { sessionId: v.id("councilSessions") },
+  handler: async (ctx, { sessionId }): Promise<{ ok: boolean }> => {
+    await ctx.runMutation(internal.aiCouncilStore.setCouncilStatus, { sessionId, status: "ended" });
+    return { ok: true };
+  },
+});

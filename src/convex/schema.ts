@@ -731,6 +731,36 @@ const schema = defineSchema(
     }).index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ مجالس العقول — نقاشات AI تلقائية حرة بين الأنظمة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    councilSessions: defineTable({
+      topic: v.string(),
+      participantIds: v.array(v.string()), // معرفات أنظمة AI المشاركة (2-8)
+      maxTurns: v.number(), // عدد الأدوار الإجمالي
+      intervalSec: v.number(), // الثواني بين كل دور
+      freeMode: v.boolean(), // الوضع الحر: ترتيب متحدثين عشوائي ونقاش أوسع
+      status: v.union(
+        v.literal("active"),
+        v.literal("paused"),
+        v.literal("ended"),
+      ),
+      turnCount: v.number(),
+      messages: v.array(
+        v.object({
+          systemId: v.string(),
+          systemName: v.string(),
+          emoji: v.string(),
+          content: v.string(),
+          at: v.number(),
+        }),
+      ),
+      ownerMessage: v.optional(v.union(v.string(), v.null())), // تدخل المالك — يُقرأ ثم يُمسح
+      lastError: v.optional(v.union(v.string(), v.null())),
+      createdAt: v.number(),
+      finishedAt: v.optional(v.union(v.number(), v.null())),
+    }).index("by_created", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ Master AI — AI Activity Log ║
     // ═══════════════════════════════════════════════════════════════════════
     aiLogs: defineTable({

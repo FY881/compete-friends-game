@@ -9,6 +9,10 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { AI_SYSTEMS } from "../lib/aiSystems";
+
+// 30 نظام AI — مصدر واحد مشترك في src/lib/aiSystems.ts (نفس قائمة الواجهة)
+const SYSTEMS = AI_SYSTEMS;
 
 async function callOpenRouter(messages: Array<{ role: string; content: string }>, maxTokens = 2048, temperature = 0.7): Promise<string> {
   const apiKey = getOpenRouterKey();
@@ -36,14 +40,7 @@ async function callOpenRouter(messages: Array<{ role: string; content: string }>
 // 30 نظام AI — كل واحد شخصية وسياق مستقل
 // ═══════════════════════════════════════════════════════════════
 
-export interface AiSystemDef {
-  id: string;
-  name: string;
-  desc: string;
-  systemPrompt: string;
-}
-
-const SYSTEMS: AiSystemDef[] = [
+const SYSTEMS_UNUSED: AiSystemDef[] = [
   { id: "strategist", name: "المحلل الاستراتيجي", desc: "خطط نمو وتطوير شاملة للعبة", systemPrompt: "أنت محلل استراتيجي خبير في ألعاب المسابقات. حلل الوضع وقدم خططاً عملية بمراحل واضحة و KPIs." },
   { id: "security", name: "خبير الأمن السيبراني", desc: "فحص الثغرات واقتراح الحماية", systemPrompt: "أنت خبير أمن سيبراني لألعاب الويب. حلل الوضع وقدم قائمة ثغرات مرتبة حسب الخطورة مع الإصلاح." },
   { id: "writer", name: "الكاتب الإبداعي", desc: "نصوص وإعلانات وأوصاف جذابة", systemPrompt: "أنت كاتب محتوى عربي إبداعي متخصص في الألعاب. اكتب نصوص جذابة ومتقنة." },
@@ -76,7 +73,7 @@ const SYSTEMS: AiSystemDef[] = [
   { id: "free", name: "العقل الحر", desc: "AI بدون قيود لأي مهمة", systemPrompt: "أنت عقل حر مساعد شامل. أجب على أي طلب بأفضل ما تستطيع وبشكل مباشر ومفصل." },
 ];
 
-export const AI_SYSTEMS_LIST = SYSTEMS;
+// ملاحظة: القائمة المشتركة في src/lib/aiSystems.ts — تُستخدم من هنا وللواجهة
 
 // ── استدعاء أي نظام من الواجهة ──────────────────────────────
 export const askSystem = action({
@@ -95,32 +92,6 @@ export const askSystem = action({
     ];
     const reply = await callOpenRouter(messages, 2500, 0.7);
     return { reply, system: sys.name };
-  },
-});
-
-// ── تنفيذ أمر شامل: كل الأنظمة تنظر في نفس الموضوع ──────────
-export const councilMeeting = action({
-  args: { topic: v.string() },
-  handler: async (_ctx, { topic }) => {
-    const keySystems = ["mentor", "strategist", "security", "economist", "community", "retention"];
-    const results: { system: string; reply: string }[] = [];
-    for (const id of keySystems) {
-      const sys = SYSTEMS.find((s) => s.id === id)!;
-      try {
-        const reply = await callOpenRouter(
-          [
-            { role: "system", content: sys.systemPrompt },
-            { role: "user", content: `موضوع الاجتماع: ${topic}\n\nقدّم رأيك في 5 نقاط موجزة.` },
-          ],
-          900,
-          0.7,
-        );
-        results.push({ system: sys.name, reply });
-      } catch (e) {
-        results.push({ system: sys.name, reply: `تعذّر الرد: ${e instanceof Error ? e.message : "خطأ"}` });
-      }
-    }
-    return { results };
   },
 });
 
