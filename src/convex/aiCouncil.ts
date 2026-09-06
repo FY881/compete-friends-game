@@ -12,6 +12,8 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
 import { AI_SYSTEMS, ELITE_MINDS } from "../lib/aiSystems";
+
+export {}; // keep exports clean
 import { upgradedLlm } from "./aiUpgradeKit";
 
 // عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn) مع تعامل 429 وبديل OneHop تلقائي عند الفشل

@@ -9,15 +9,13 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
-import { AI_SYSTEMS, ELITE_MINDS } from "../lib/aiSystems";
+import { AI_SYSTEMS } from "../lib/aiSystems";
 import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 
-// جميع الأنظمة المسجّلة للعب: 30 نظام أساسي + 100 عقل موسع ونخبة
+// جميع الأنظمة المسجّلة للعب
 const SYSTEMS = AI_SYSTEMS;
 
-const ELITE_SYSTEM_IDS = ELITE_MINDS.map((m: { id: string }) => m.id);
-
-// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-...) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
+// عبر callLlm — مفتاح نائب الرئيس الرسمي مع تعامل 429 وبديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 2048,

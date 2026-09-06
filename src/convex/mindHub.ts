@@ -60,7 +60,8 @@ async function generateOwnAgenda(
   room: "war" | "free",
   recentAgendas: string[],
   lessons: string[],
-): Promise<string> {    const speaker = room === "war" ? mindById("pm_monarch") : mindById("em_philosopher");
+): Promise<string> {
+  const speaker = room === "war" ? mindById("pm_monarch") : mindById("em_philosopher");
     if (!speaker) {
       const fallbackSpeaker = ALL_MIND_DEFS.find((m) => m.id === "pm_monarch" || m.id === "em_philosopher");
       if (!fallbackSpeaker) throw new Error("لم أجد متحدثاً افتتاحياً للغرفة");
