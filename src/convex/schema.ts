@@ -848,6 +848,41 @@ const schema = defineSchema(
     }).index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ ملتقى العقول — غرفتا النقاش الذاتي (الحرب + العقل الحر) ║
+    // ═══════════════════════════════════════════════════════════════════════
+    mindHubSessions: defineTable({
+      room: v.union(v.literal("war"), v.literal("free")),
+      agenda: v.string(),
+      status: v.union(v.literal("active"), v.literal("paused"), v.literal("ended")),
+      turnCount: v.number(),
+      maxTurns: v.number(),
+      intervalSec: v.number(),
+      messages: v.array(
+        v.object({
+          mindId: v.string(),
+          mindName: v.string(),
+          emoji: v.string(),
+          content: v.string(),
+          at: v.number(),
+        }),
+      ),
+      executedActions: v.array(
+        v.object({
+          mindId: v.string(),
+          mindName: v.string(),
+          type: v.string(),
+          description: v.string(),
+          result: v.string(), // executed | pending-owner | rejected
+          at: v.number(),
+        }),
+      ),
+      lessons: v.optional(v.array(v.string())),
+      lastError: v.optional(v.union(v.string(), v.null())),
+      createdAt: v.number(),
+      finishedAt: v.optional(v.union(v.number(), v.null())),
+    }).index("by_created", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ Master AI — AI Activity Log ║
     // ═══════════════════════════════════════════════════════════════════════
     aiLogs: defineTable({
