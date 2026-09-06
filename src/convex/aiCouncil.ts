@@ -10,33 +10,16 @@
 import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { callLlm } from "./aiConfig";
 import { AI_SYSTEMS } from "../lib/aiSystems";
 
+// عبر callLlm — OpenRouter مع بديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 2048,
   temperature = 0.7,
 ): Promise<string> {
-  const apiKey = getOpenRouterKey();
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://zaka.app",
-      "X-Title": "Zaka Council of Minds",
-    },
-    body: JSON.stringify({ model: DEFAULT_MODEL, messages, max_tokens: maxTokens, temperature }),
-  });
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenRouter API error (${response.status}): ${err.slice(0, 200)}`);
-  }
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("AI أعاد رداً فارغاً — حاول مرة أخرى");
-  return content;
+  return await callLlm(messages, maxTokens, temperature, "Zaka Council of Minds");
 }
 
 function systemById(id: string) {

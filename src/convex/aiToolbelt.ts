@@ -10,25 +10,11 @@
 import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { callLlm } from "./aiConfig";
 
+// عبر callLlm — OpenRouter مع بديل OneHop تلقائي عند الفشل
 export async function llm(messages: Array<{ role: string; content: string }>, maxTokens = 1500, temperature = 0.8): Promise<string> {
-  const apiKey = getOpenRouterKey();
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://zaka.app",
-      "X-Title": "Zaka Toolbelt",
-    },
-    body: JSON.stringify({ model: DEFAULT_MODEL, messages, max_tokens: maxTokens, temperature }),
-  });
-  if (!response.ok) throw new Error(`OpenRouter error ${response.status}`);
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("رد فارغ");
-  return content;
+  return await callLlm(messages, maxTokens, temperature, "Zaka Toolbelt");
 }
 
 /** بحث ويب حقيقي — DuckDuckGo Instant Answer API (مجاني بدون مفتاح) */
