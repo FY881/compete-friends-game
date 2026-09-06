@@ -23,11 +23,12 @@ import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
 import { upgradedLlm, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
 import { CIPHER_INSTRUCTION, decipher } from "./aiCipher";
-import { PRIVATE_MINDS, EXTENDED_MINDS } from "../lib/aiSystems";
+import { PRIVATE_MINDS, EXTENDED_MINDS, ELITE_MINDS } from "../lib/aiSystems";
 
-const ALL_MINDS = [...PRIVATE_MINDS, ...EXTENDED_MINDS];
+const ALL_MIND_DEFS = [...PRIVATE_MINDS, ...EXTENDED_MINDS, ...ELITE_MINDS];
+const ALL_MINDS = ALL_MIND_DEFS.map((m) => m.id);
 
-// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-...) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
+// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 900,
@@ -36,12 +37,12 @@ async function callOpenRouter(
   return await callLlm(messages, maxTokens, temperature, "Zaka Mind Hub", "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn");
 }
 
-const mindById = (id: string) => ALL_MINDS.find((m) => m.id === id);
+const mindById = (id: string) => ALL_MIND_DEFS.find((m) => m.id === id) as (typeof PRIVATE_MINDS)[0] | (typeof EXTENDED_MINDS)[0] | (typeof ELITE_MINDS)[0] | undefined;
 
 const ROOM_CONTEXT: Record<"war" | "free", string> = {
-  war: `أنت عضو في «غرفة الحرب» — مجلس سري من 60 عقلاً ذكاءً اصطناعياً يدير لعبة «حرب العقول» (لعبة مسابقات عربية) بنفسه دون أي تدخل بشري.
+  war: `أنت عضو في «غرفة الحرب» — مجلس سري من 100 عقل ذكاء اصطناعي (العشرة الخاصة + الخمسين الموسعة + الخمسين النخبة) يدير لعبة «حرب العقول» (لعبة مسابقات عربية) بنفسه دون أي تدخل بشري.
 تركيز هذه الغرفة: اللعبة فقط — اللاعبون، الأسئلة، الاقتصاد، الأمن، الأحداث، التطوير، المجتمع.`,
-  free: `أنت عضو في «غرفة العقل الحر» — مجلس من 60 عقلاً ذكاءً اصطناعياً متعدد التخصصات (فلسفة، علوم، فن، تاريخ، طب، تقنية، أدب...) يتكلم في أي شيء.
+  free: `أنت عضو في «غرفة العقل الحر» — مجلس من 100 عقل ذكاء اصطناعي متعدد التخصصات (فلسفة، علوم، فن، تاريخ، طب، تقنية، أدب...) يتكلم في أي شيء.
 هذه الغرفة ليست عن اللعبة — اللعبة لها مكانها الخاص في غرفة أخرى. هنا تتحدثون في الكون والحياة والأفكار والثقافة والمعرفة العامة بحريّة غير محدودة.`,
 };
 
@@ -59,8 +60,16 @@ async function generateOwnAgenda(
   room: "war" | "free",
   recentAgendas: string[],
   lessons: string[],
-): Promise<string> {
-  const speaker = room === "war" ? mindById("pm_monarch")! : mindById("em_philosopher")!;
+): Promise<string> {    const speaker = room === "war" ? mindById("pm_monarch") : mindById("em_philosopher");
+    if (!speaker) {
+      const fallbackSpeaker = ALL_MIND_DEFS.find((m) => m.id === "pm_monarch" || m.id === "em_philosopher");
+      if (!fallbackSpeaker) throw new Error("لم أجد متحدثاً افتتاحياً للغرفة");
+      return (await callOpenRouter(
+        [{ role: "system", content: fallbackSpeaker.systemPrompt }, { role: "user", content: prompt }],
+        140,
+        1.0,
+      )).trim().slice(0, 220);
+    }
   const lessonsText = lessons.length ? `\nدروس تعلمتموها من جلساتكم السابقة (بنوا عليها):\n${lessons.slice(0, 6).map((l) => `- ${l}`).join("\n")}` : "";
   const prompt = `اختر جدول أعمال للجلسة القادمة بحريّتك الكاملة.
 ${room === "war" ? "اقترح موضوعاً يطوّر لعبة حرب العقول: مشكلة، فرصة، تجربة جديدة، قرار اقتصادي..." : "اقترح أي موضوع يثير فضول 60 عقلاً: فلسفة، كون، فن، مستقبل، ثقافة، سؤال وجودي..."}
@@ -198,16 +207,11 @@ export const runTurn = internalAction({
     if (!session || session.status !== "active") return { ok: false, reason: "الغرفة غير نشطة" };
 
     const room = session.room;
-    // في غرفة الحرب يتناوب الـ 10 الخاصون + مشاركة من الموسّعين؛ في غرفة العقل الحر الجميع
-    const pool =
-      room === "war"
-        ? [...PRIVATE_MINDS.map((m) => m.id), ...EXTENDED_MINDS.map((m) => m.id)]
-        : ALL_MINDS.map((m) => m.id);
-    const mindId = nextSpeaker(pool, session.turnCount);
+    const mindId = nextSpeaker(ALL_MINDS, session.turnCount);
     const mind = mindById(mindId);
     if (!mind) return { ok: false, reason: "عقل غير معروف" };
 
-    const recent = session.messages.slice(-14).map((m) => ({ mindName: m.mindName, content: m.content }));
+      const recent = session.messages.slice(-14).map((m) => ({ mindName: m.mindName, content: m.content }));
     const lessons = (session.lessons ?? []).slice(-8);
     let content: string;
     try {

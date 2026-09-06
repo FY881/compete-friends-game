@@ -11,10 +11,10 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
-import { AI_SYSTEMS } from "../lib/aiSystems";
+import { AI_SYSTEMS, ELITE_MINDS } from "../lib/aiSystems";
 import { upgradedLlm } from "./aiUpgradeKit";
 
-// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-...) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
+// عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 2048,
@@ -23,8 +23,17 @@ async function callOpenRouter(
   return await callLlm(messages, maxTokens, temperature, "Zaka Council of Minds", "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn");
 }
 
+// مجلس العقول شامل الآن 30 نظاماً أساسياً + 100 عقل موسع ونخبة
+const COUNCIL_SYSTEMS = [...AI_SYSTEMS, ...ELITE_MINDS.map((m) => ({
+  id: m.id,
+  name: m.name,
+  desc: m.skill,
+  emoji: m.emoji,
+  systemPrompt: m.systemPrompt,
+}))];
+
 function systemById(id: string) {
-  return AI_SYSTEMS.find((s) => s.id === id);
+  return COUNCIL_SYSTEMS.find((s) => s.id === id);
 }
 
 /** خبير الرد: يقرأ كل النقاش بشخصيته ويرد بأسلوبه — مع الترقية الكاملة */
@@ -69,7 +78,7 @@ export const createCouncil = action({
   },
   handler: async (ctx, { topic, participantIds, maxTurns, intervalSec, freeMode }): Promise<{ sessionId: string }> => {
     if (!topic.trim()) throw new Error("الموضوع مطلوب");
-    const validIds = participantIds.filter((id) => systemById(id));
+    const validIds = participantIds.filter((id) => systemById(id) ?? AI_SYSTEMS.some((s) => s.id === id));
     if (validIds.length < 2) throw new Error("اختر نظامين على الأقل");
     const sessionId = await ctx.runMutation(internal.aiCouncilStore.insertCouncil, {
       topic: topic.trim(),

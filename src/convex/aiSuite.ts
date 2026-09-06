@@ -12,8 +12,11 @@ import { callLlm } from "./aiConfig";
 import { AI_SYSTEMS } from "../lib/aiSystems";
 import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 
-// 30 نظام AI — مصدر واحد مشترك في src/lib/aiSystems.ts (نفس قائمة الواجهة)
+// جميع الأنظمة المسجّلة للعب: 30 نظام أساسي + 100 عقل موسع ونخبة
+// مصدر واحد مشترك في src/lib/aiSystems.ts
 const SYSTEMS = AI_SYSTEMS;
+
+const ELITE_SYSTEM_IDS = ELITE_MINDS.map((m) => m.id);
 
 // عبر callLlm — مفتاح نائب الرئيس الرسمي (sk-...) مع تعامل 429 وبديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
