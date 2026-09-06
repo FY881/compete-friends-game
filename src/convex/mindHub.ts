@@ -64,8 +64,12 @@ async function generateOwnAgenda(
     if (!speaker) {
       const fallbackSpeaker = ALL_MIND_DEFS.find((m) => m.id === "pm_monarch" || m.id === "em_philosopher");
       if (!fallbackSpeaker) throw new Error("لم أجد متحدثاً افتتاحياً للغرفة");
+      const fallbackPrompt = `اختر جدول أعمال للجلسة القادمة بحريّتك الكاملة.
+${room === "war" ? "اقترح موضوعاً يطوّر لعبة حرب العقول: مشكلة، فرصة، تجربة جديدة، قرار اقتصادي..." : "اقترح أي موضوع يثير فضول 60 عقلاً: فلسفة، كون، فن، مستقبل، ثقافة، سؤال وجودي..."}
+جدول الأعمال الأخير (لا تكرره): ${recentAgendas.join(" | ") || "لا شيء"}
+أرجع سطراً واحداً فقط بالعربية (جملة واحدة قصيرة).`;
       return (await callOpenRouter(
-        [{ role: "system", content: fallbackSpeaker.systemPrompt }, { role: "user", content: prompt }],
+        [{ role: "system", content: fallbackSpeaker.systemPrompt }, { role: "user", content: fallbackPrompt }],
         140,
         1.0,
       )).trim().slice(0, 220);
