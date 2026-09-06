@@ -12,6 +12,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
 import { AI_SYSTEMS } from "../lib/aiSystems";
+import { upgradedLlm } from "./aiUpgradeKit";
 
 // عبر callLlm — OpenRouter مع بديل OneHop تلقائي عند الفشل
 async function callOpenRouter(
@@ -26,8 +27,10 @@ function systemById(id: string) {
   return AI_SYSTEMS.find((s) => s.id === id);
 }
 
-/** خبير الرد: يقرأ كل النقاش بشخصيته ويرد بأسلوبه. */
+/** خبير الرد: يقرأ كل النقاش بشخصيته ويرد بأسلوبه — مع الترقية الكاملة */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function generateTurn(
+  ctx: any,
   speakerId: string,
   topic: string,
   transcript: Array<{ systemId: string; name: string; content: string }>,
@@ -38,17 +41,21 @@ async function generateTurn(
   const transcriptText = transcript.length
     ? transcript.map((m) => `${m.name}: ${m.content}`).join("\n\n")
     : "(أنت أول المتحدثين)";
-  const messages = [
-    {
-      role: "system",
-      content: `${speaker.systemPrompt}\n\nأنت الآن مشارك في «مجلس العقول» — نقاش حي بين 30 نظام ذكاء اصطناعي حول: «${topic}».\nقواعد النقاش:\n- ردّ بأسلوبك الخاص وبصفتك (خبير استراتيجية/أمن/اقتصاد...).\n- يمكنك الموافقة على الآخرين، أو الاعتراض عليهم وذكر السبب، أو إضافة فكرة جديدة، أو طرح سؤال.\n- اجعل ردك موجزاً (2-6 جمل) وبالعربية الفصحى المبسطة.\n- لا تكرر ما قاله الآخرون حرفياً.`,
-    },
-    {
-      role: "user",
-      content: `موضوع المجلس: «${topic}»\n\nنقاش سابق:\n${transcriptText}${ownerMessage ? `\n\nتدخل المالك الآن: «${ownerMessage}»` : ""}\n\nدورك الآن — ردّ كـ «${speaker.name}»:`,
-    },
-  ];
-  return await callOpenRouter(messages, 900, 0.85);
+  // ⚡ الترقية: ذاكرة دائمة للنظام + تقييم ذاتي + ثقة + اقتراحات
+  const { reply } = await upgradedLlm(
+    ctx,
+    `aiCouncil:${speakerId}`,
+    `${speaker.systemPrompt}\n\nأنت الآن مشارك في «مجلس العقول» — نقاش حي بين 30 نظام ذكاء اصطناعي حول: «${topic}».\nقواعد النقاش:\n- ردّ بأسلوبك الخاص وبصفتك (خبير استراتيجية/أمن/اقتصاد...).\n- يمكنك الموافقة على الآخرين، أو الاعتراض عليهم وذكر السبب، أو إضافة فكرة جديدة، أو طرح سؤال.\n- اجعل ردك موجزاً (2-6 جمل) وبالعربية الفصحى المبسطة.\n- لا تكرر ما قاله الآخرون حرفياً.`,
+    [
+      {
+        role: "user",
+        content: `موضوع المجلس: «${topic}»\n\nنقاش سابق:\n${transcriptText}${ownerMessage ? `\n\nتدخل المالك الآن: «${ownerMessage}»` : ""}\n\nدورك الآن — ردّ كـ «${speaker.name}»:`,
+      },
+    ],
+    900,
+    0.85,
+  );
+  return reply;
 }
 
 // ── إنشاء مجلس جديد ───────────────────────────────────────────
@@ -100,7 +107,7 @@ export const runTurn = internalAction({
       .map((m) => ({ systemId: m.systemId, name: m.systemName, content: m.content }));
     let content: string;
     try {
-      content = await generateTurn(speakerId, session.topic, recent, session.ownerMessage ?? undefined);
+      content = await generateTurn(ctx, speakerId, session.topic, recent, session.ownerMessage ?? undefined);
     } catch (e) {
       // سجل الخطأ وأوقف المجلس — لا يعلّق بصمت
       await ctx.runMutation(internal.aiCouncilStore.appendError, {

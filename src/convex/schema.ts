@@ -952,6 +952,38 @@ const schema = defineSchema(
     }).index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ ترقية AI الشاملة — ذاكرة دائمة + تقييمات + اقتراحات استباقية      ║
+    // ═══════════════════════════════════════════════════════════════════════
+    aiMemories: defineTable({
+      agentId: v.string(), // aiSuite:coder | mindHub:em_quantum | viceOwner | aiCoach:user123
+      kind: v.union(v.literal("lesson"), v.literal("preference"), v.literal("fact"), v.literal("style")),
+      content: v.string(),
+      importance: v.number(), // 1-10
+      createdAt: v.number(),
+      lastUsedAt: v.optional(v.number()),
+      useCount: v.number(),
+    }).index("by_agent", ["agentId", "importance"]),
+
+    aiFeedback: defineTable({
+      agentId: v.string(),
+      sessionId: v.optional(v.string()),
+      rating: v.number(), // 1-5
+      comment: v.optional(v.string()),
+      createdAt: v.number(),
+    }).index("by_agent", ["agentId"]),
+
+    aiSuggestions: defineTable({
+      agentId: v.string(),
+      agentName: v.string(),
+      title: v.string(),
+      detail: v.string(),
+      impact: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+      category: v.string(),
+      status: v.union(v.literal("open"), v.literal("accepted"), v.literal("dismissed")),
+      createdAt: v.number(),
+    }).index("by_status", ["status", "createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ Master AI — AI Activity Log ║
     // ═══════════════════════════════════════════════════════════════════════
     aiLogs: defineTable({

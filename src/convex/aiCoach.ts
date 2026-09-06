@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { callLlm, getOpenRouterKey } from "./aiConfig";
+import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 
 // ─── Analyze Player Performance ────────────────────────────────
 export const analyzePerformance = query({
@@ -162,16 +163,19 @@ ${playerContext}
 إذا سأل عن نصائح، أعطِ نصيحة محددة وعملية.
 إذا سأل عن تحدي، اقترح تحدياً مناسباً لمستواه.`;
 
-    const response = await callLlm(
-      [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: message },
-      ],
+    // ⚡ الترقية: المدرّب لديه ذاكرة دائمة عن كل لاعب + تقييم ذاتي + ثقة
+    const { reply, selfGrade, confidence } = await upgradedLlm(
+      ctx,
+      `aiCoach:${userId ?? "anonymous"}`,
+      systemPrompt,
+      [{ role: "user", content: message }],
       1024,
       0.7,
-      "MindClash AI Coach",
     );
-    const reply: string = response ?? "لم أتمكن من الرد";
+    // يتعلم أسلوب اللاعب المفضل عبر الزمن
+    if (message.length > 30) {
+      await rememberFor(ctx, `aiCoach:${userId ?? "anonymous"}`, "preference", `أسلوب تفاعل اللاعب: ${message.slice(0, 150)}`, 3);
+    }
 
     // Save to memory
     await ctx.runMutation((internal as any).aiCoach.saveCoachMemory, {

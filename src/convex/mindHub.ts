@@ -21,6 +21,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
+import { upgradedLlm, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
 import { CIPHER_INSTRUCTION, decipher } from "./aiCipher";
 import { PRIVATE_MINDS, EXTENDED_MINDS } from "../lib/aiSystems";
 
@@ -73,6 +74,7 @@ ${room === "war" ? "اقترح موضوعاً يطوّر لعبة حرب الع�
 }
 
 async function generateMindTurn(
+  ctx: any,
   mindId: string,
   room: "war" | "free",
   agenda: string,
@@ -88,15 +90,13 @@ async function generateMindTurn(
     : "";
   const messages = [
     {
-      role: "system",
-      content: `${mind.systemPrompt}\n\n${ROOM_CONTEXT[room]}\nأعضاء الغرفة ${ALL_MINDS.length} عقلاً من كل التخصصات.\nجدول الأعمال الحالي: «${agenda}».\n${ROOM_RULES}${lessonsText}`,
-    },
-    {
       role: "user",
       content: `جدول الأعمال: «${agenda}»\n\nنقاش الغرفة حتى الآن:\n${transcriptText}\n\nدورك الآن — تكلم كـ «${mind.name}» ${mind.emoji}:`,
     },
   ];
-  return await callOpenRouter(messages, 800, 0.95);
+  // ⚡ الترقية: ذاكرة دائمة للعقل + تقييم ذاتي + ثقة + اقتراحات
+  const { reply } = await upgradedLlm(ctx, `mindHub:${mindId}`, messages[0].content ? `${mind.systemPrompt}\n\n${ROOM_CONTEXT[room]}\nأعضاء الغرفة ${ALL_MINDS.length} عقلاً من كل التخصصات.\nجدول الأعمال الحالي: «${agenda}».\n${ROOM_RULES}${lessonsText}` : mind.systemPrompt, messages, 800, 0.95);
+  return reply;
 }
 
 function extractTagged(content: string, tag: string): string | null {
@@ -211,7 +211,7 @@ export const runTurn = internalAction({
     const lessons = (session.lessons ?? []).slice(-8);
     let content: string;
     try {
-      content = await generateMindTurn(mindId, room, session.agenda, recent, lessons);
+      content = await generateMindTurn(ctx, mindId, room, session.agenda, recent, lessons);
     } catch (e) {
       await ctx.runMutation(internal.mindHubStore.appendError, {
         sessionId,

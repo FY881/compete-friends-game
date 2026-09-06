@@ -10,6 +10,7 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
 import { AI_SYSTEMS } from "../lib/aiSystems";
+import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 
 // 30 نظام AI — مصدر واحد مشترك في src/lib/aiSystems.ts (نفس قائمة الواجهة)
 const SYSTEMS = AI_SYSTEMS;
@@ -35,13 +36,23 @@ export const askSystem = action({
   handler: async (ctx, { systemId, prompt, history }) => {
     const sys = SYSTEMS.find((s) => s.id === systemId);
     if (!sys) throw new Error("نظام AI غير موجود");
-    const messages = [
-      { role: "system", content: sys.systemPrompt },
-      ...(history ?? []).slice(-10).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
-      { role: "user", content: prompt },
-    ];
-    const reply = await callOpenRouter(messages, 2500, 0.7);
-    return { reply, system: sys.name };
+    // ⚡ الترقية: ذاكرة دائمة + تقييم ذاتي + ثقة + اقتراحات + نبرة
+    const { reply, selfGrade, confidence } = await upgradedLlm(
+      ctx,
+      `aiSuite:${systemId}`,
+      sys.systemPrompt,
+      [
+        ...(history ?? []).slice(-10).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
+        { role: "user", content: prompt },
+      ],
+      2500,
+      0.7,
+    );
+    // حفظ كل نقاش مهم في ذاكرة النظام الدائمة
+    if (prompt.length > 20) {
+      await rememberFor(ctx, `aiSuite:${systemId}`, "fact", `سُئل عن: ${prompt.slice(0, 200)}`, 4);
+    }
+    return { reply, system: sys.name, selfGrade, confidence };
   },
 });
 

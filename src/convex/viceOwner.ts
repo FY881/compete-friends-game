@@ -18,6 +18,7 @@
 import { action, internalAction } from "./_generated/server";import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
+import { recallFor, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
 
 // ── نموذج مختلف تماماً: Google Gemini عبر Google AI Studio ──
 // أقوى وأسرع نموذج مجاني مستقل عن OpenRouter تماماً.
@@ -194,9 +195,16 @@ export const workTurn = internalAction({
 
     let reply: string;
     try {
+      // ⚡ الترقية: الذاكرة الدائمة للنائب تُحقن قبل كل دورة عمل
+      let memoryBlock = "";
+      try {
+        const mems = await recallFor(ctx, "viceOwner", 8);
+        if (mems.length) memoryBlock = `\n\nذاكرتك الدائمة (خبرتك المتراكمة عبر الورديات):
+${mems.map((m) => `- ${m.content}`).join("\n")}`;
+      } catch { /* اختيارية */ }
       reply = await callGemini(
-        VICE_SYSTEM_PROMPT,
-        `مهمتك الحالية: «${session.mission}»\n\nسياق حي من النظام الآن:\n${context}\n\nسجل أعمالك الأخيرة:\n${recentActivity || "(بداية الوردية)"}\n\nالدورة ${session.turnCount + 1} من ${session.maxTurns} — نفّذ ما تراه مناسباً الآن بحريتك الكاملة وسجّل أعمالك:`,
+        VICE_SYSTEM_PROMPT + memoryBlock,
+        `مهمتك الحالية: «${session.mission}»\n\nسياق حي من النظام الآن:\n${context}\n\nسجل أعمالك الأخيرة:\n${recentActivity || "(بداية الوردية)"}\n\nالدورة ${session.turnCount + 1} من ${session.maxTurns} — نفّذ ما تراه مناسباً الآن بحريتك الكاملة وسجّل أعمالك:\n(إن تعلمت درساً جديداً يستحق الحفظ أضف سطراً: [ذاكرة] الدرس)`,
         800,
       );
     } catch (e) {
@@ -208,6 +216,16 @@ export const workTurn = internalAction({
     }
 
     // استخراج الأفعال المنفَّذة + الأنظمة المبتكرة ذاتياً وتوثيقها
+    // ⚡ الترقية: تقييم ذاتي + حفظ الدروس في ذاكرته الدائمة
+    const gradedReply = extractSelfGrade(reply);
+    reply = gradedReply.clean;
+    await maybeRemember(ctx, "viceOwner", reply);
+    if (gradedReply.selfGrade !== undefined && gradedReply.selfGrade <= 5) {
+      try {
+        const { rememberFor } = await import("./aiUpgradeKit");
+        await rememberFor(ctx, "viceOwner", "lesson", `تقييمي كان ${gradedReply.selfGrade}/10 — أستوفي أن أكون أدق وأعمق في الدورة القادمة.`, 5);
+      } catch { /* اختيارية */ }
+    }
     const deeds = [...reply.matchAll(/\[فعل\]\s*(.+)/g)].map((m) => m[1].trim());
     const systems = [...reply.matchAll(/\[نظام\]\s*(.+)/g)].map((m) => m[1].trim());
     const done = session.turnCount + 1 >= session.maxTurns;

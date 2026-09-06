@@ -15,6 +15,7 @@ import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { PRIVATE_MINDS, ELITE_MINDS } from "../lib/aiSystems";
 import { llm, webSearch } from "./aiToolbelt";
+import { rememberFor, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
 
 const ALL_MINDS = [
   ...PRIVATE_MINDS.map((m) => ({ id: m.id, name: m.name, emoji: m.emoji, prompt: m.systemPrompt, privilege: m.privilege })),
@@ -158,7 +159,15 @@ ${transcriptText}${memoryText}
         sessionId,
         error: e instanceof Error ? e.message : "خطأ",
       });
-      return { ok: false };
+      return { ok: false, reason: "فشل استدعاء AI" };
+    }
+
+    // ⚡ الترقية: تقييم ذاتي + ثقة + ذاكرة دائمة شخصية للعقل
+    const graded = extractSelfGrade(content);
+    content = graded.clean;
+    await maybeRemember(ctx, `privateCouncil:${mindId}`, content);
+    if (graded.selfGrade !== undefined && graded.selfGrade <= 5) {
+      await rememberFor(ctx, `privateCouncil:${mindId}`, "lesson", `بما أن تقييمي كان ${graded.selfGrade}/10 في «${session.agenda.slice(0, 80)}» — أستوفي: أعمّق تفكيري وابعد عن السطحيّة.`, 5);
     }
 
     // تنفيذ الأوامر

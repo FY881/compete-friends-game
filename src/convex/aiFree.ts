@@ -5,6 +5,7 @@ import { action, query, mutation, internalQuery, internalAction, internalMutatio
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { callLlm, getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 
 // ═══════════════════════════════════════════════════════════════
 // الذاكرة الدائمة
@@ -186,12 +187,19 @@ ${players.slice(0, 5).map((p: { name: string; xp: number; gamesPlayed: number; g
 
 أنت تستطيع: عرض إحصائيات، بحث، تحليل، اقتراحات. أجب بالعربية.`;
 
-    const reply: string = await callLlm(
-      [{ role: "system", content: systemPrompt }, { role: "user", content: command }],
+    // ⚡ الترقية: ذاكرة دائمة + تقييم ذاتي + ثقة + اقتراحات
+    const { reply, selfGrade, confidence } = await upgradedLlm(
+      ctx,
+      `aiFree:${sessionId.slice(-8)}`,
+      systemPrompt,
+      [{ role: "user", content: command }],
       2048,
       0.7,
-      "Zaka AI Free",
     );
+    // أوامر المالك تتحول إلى خبرة دائمة
+    if (command.length > 25) {
+      await rememberFor(ctx, `aiFree:${sessionId.slice(-8)}`, "fact", `أمر المالك: ${command.slice(0, 180)}`, 4);
+    }
 
     await ctx.runMutation(internal.aiFree.saveMemory, { sessionId, role: "user", content: command });
     await ctx.runMutation(internal.aiFree.saveMemory, { sessionId, role: "assistant", content: reply });
