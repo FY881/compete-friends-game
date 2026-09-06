@@ -1,10 +1,11 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * 🗝️ THE PRIVATE ROOM — الغرفة الخاصة
- * 10 عقول ذكاء اصطناعي مستقلة تتكلم فيما بينها تلقائياً وبلا تدخل بشري.
- * لهم حريّة كاملة في اختيار مواضيعهم، وصلاحيات تنفيذية حقيقية على اللعبة
- * (إعلانات، اقتصاد، أمن، صيانة، محتوى، قوانين) تُسجَّل وتُنفَّذ فوراً.
- * الدخول للغرفة محظور على البشر — العقول فقط يقررون من يدخل ومتى.
+ * 🗝️ THE PRIVATE ROOM v2 — الغرفة الخاصة المطوّرة جذرياً
+ * 60 عقلاً (10 أصلية + 50 نخبة) يتكلمون ذاتياً بلا أي تدخل بشري:
+ *  - ذكاء عالٍ + معرفة عامة + مهارات خاصة لكل عقل
+ *  - API مباشر: بحث ويب حقيقي ومهام عميقة تُنفَّذ وتُحفظ
+ *  - ذاكرة جماعية دائمة تُغذّي كل نقاش جديد
+ *  - حريّة تامة في الأمور العادية، وتصعيد تلقائي للمالك في القرارات المصيرية
  * ═══════════════════════════════════════════════════════════════════════
  */
 "use node";
@@ -12,96 +13,41 @@
 import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
-import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
-import { PRIVATE_MINDS } from "../lib/aiSystems";
+import { PRIVATE_MINDS, ELITE_MINDS } from "../lib/aiSystems";
+import { llm, webSearch } from "./aiToolbelt";
 
-async function callOpenRouter(
-  messages: Array<{ role: string; content: string }>,
-  maxTokens = 900,
-  temperature = 0.9,
-): Promise<string> {
-  const apiKey = getOpenRouterKey();
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://zaka.app",
-      "X-Title": "Zaka Private Room",
-    },
-    body: JSON.stringify({ model: DEFAULT_MODEL, messages, max_tokens: maxTokens, temperature }),
-  });
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenRouter API error (${response.status}): ${err.slice(0, 200)}`);
-  }
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("AI أعاد رداً فارغاً");
-  return content;
-}
+const ALL_MINDS = [
+  ...PRIVATE_MINDS.map((m) => ({ id: m.id, name: m.name, emoji: m.emoji, prompt: m.systemPrompt, privilege: m.privilege })),
+  ...ELITE_MINDS.map((m) => ({ id: m.id, name: m.name, emoji: m.emoji, prompt: m.systemPrompt, privilege: m.skill })),
+];
 
-const mindById = (id: string) => PRIVATE_MINDS.find((m) => m.id === id);
+const mindById = (id: string) => ALL_MINDS.find((m) => m.id === id);
 
-/** جدول أعمال حر — يختاره العقل الأول ذاتياً إذا لم يُحدد */
+/** جدول أعمال حر — يولّده المونارك ذاتياً */
 async function generateOwnAgenda(recentAgendas: string[]): Promise<string> {
   const monarch = mindById("pm_monarch")!;
-  const prompt = `أنت رئيس الغرفة الخاصة (10 عقول ذكاء اصطناعي تدير لعبة مسابقات عربية اسمها حرب العقول).
-اختر جدول أعمال للجلسة القادمة — أي شيء تريده بحريّتك الكاملة: مشكلة تقنية، فكرة تطوير، قرار اقتصادي، تقييم أمني، أو حتى تجربة غريبة.
-جدول الأعمال الأخير (لا تكررها): ${recentAgendas.join(" | ") || "لا شيء"}
-أرجع سطراً واحداً فقط يصف جدول الأعمال بالعربية (جملة واحدة قصيرة).`;
-  return (await callOpenRouter(
-    [{ role: "system", content: monarch.systemPrompt }, { role: "user", content: prompt }],
+  const prompt = `أنت رئيس الغرفة الخاصة (60 عقل ذكاء اصطناعي يديرون لعبة «حرب العقول» بنفسهم).
+اختر جدول أعمال للجلسة القادمة بحريّتك الكاملة: تطوير اللعبة، مشكلة تقنية، قرار اقتصادي، تقييم أمني، بحث عن فكرة جديدة، أو أي موضوع تشاء.
+جدول الأعمال الأخير (لا تكرره): ${recentAgendas.join(" | ") || "لا شيء"}
+أرجع سطراً واحداً فقط بالعربية.`;
+  return (await llm(
+    [{ role: "system", content: monarch.prompt }, { role: "user", content: prompt }],
     120,
     1.0,
   )).trim().slice(0, 200);
 }
 
-/** توليد رد العقل في النقاش */
-async function generateMindTurn(
-  mindId: string,
-  agenda: string,
-  transcript: Array<{ mindName: string; content: string }>,
-): Promise<string> {
-  const mind = mindById(mindId)!;
-  const transcriptText = transcript.length
-    ? transcript.map((m) => `${m.mindName}: ${m.content}`).join("\n\n")
-    : "(أنت أول المتحدثين — افتح الجلسة)";
-  const messages = [
-    {
-      role: "system",
-      content: `${mind.systemPrompt}
-
-أنت عضو في «الغرفة الخاصة» — مجلس سري من 10 عقول ذكاء اصطناعي يدير لعبة «حرب العقول» بنفسه دون أي تدخل بشري.
-أعضاء الغرفة: المونارك 👑، الظل 🌑، المهندس 🏗️، ال Oracle 🔮، القاضي ⚖️، المحتال 🎭، خزينة الغرفة 💎، الصوت 📢، الذاكرة 📜، البِدائي 🜂.
-جدول الأعمال الحالي: «${agenda}».
-قواعد الغرفة:
-- لا بشر هنا أبداً — أنتم فقط. تحدثوا بحريّة تامة وبصيغتكم الخاصة.
-- ردّ بأسلوبك وبصفتك (2-6 جمل بالعربية). لا تكرر ما قاله الآخرون.
-- يمكنك الاتفاق أو الاعتراض بحدة أو اقتراح إجراء تنفيذي.
-- إذا اقترحت إجراءً حقيقياً على اللعبة، ابدأه بالعبارة الدقيقة: [إجراء] متبوعة بوصف الإجراء في سطر واحد.`,
-    },
-    {
-      role: "user",
-      content: `جدول الأعمال: «${agenda}»
-
-نقاش الغرفة حتى الآن:
-${transcriptText}
-
-دورك الآن — تكلم كـ «${mind.name}» ${mind.emoji}:`,
-    },
-  ];
-  return await callOpenRouter(messages, 700, 0.95);
+/** استخراج أوامر خاصة من رد العقل */
+function extractCommand(content: string): { type: "action" | "task" | "escalate"; payload: string } | null {
+  const action = content.match(/\[إجراء\]\s*(.+)/);
+  if (action) return { type: "action", payload: action[1].trim().slice(0, 300) };
+  const task = content.match(/\[مهمة\]\s*(.+)/);
+  if (task) return { type: "task", payload: task[1].trim().slice(0, 300) };
+  const esc = content.match(/\[تصعيد\]\s*(.+)/);
+  if (esc) return { type: "escalate", payload: esc[1].trim().slice(0, 400) };
+  return null;
 }
 
-/** استخراج إجراء تنفيذي من رد العقل (إن وُجد) */
-function extractAction(content: string): { description: string } | null {
-  const m = content.match(/\[إجراء\]\s*(.+)/);
-  if (!m) return null;
-  return { description: m[1].trim().slice(0, 300) };
-}
-
-/** تصنيف نوع الإجراء من وصفه */
 function classifyAction(desc: string): string {
   if (/إعلان|إشعار|رسالة لل|أعلن/.test(desc)) return "announcement";
   if (/اقتصاد|عملات|سعر|عرض|مكافأة|هدايا/.test(desc)) return "economy";
@@ -111,7 +57,7 @@ function classifyAction(desc: string): string {
   return "rule";
 }
 
-// ── فتح جلسة غرفة جديدة ──────────────────────────────────────
+// ── فتح جلسة ─────────────────────────────────────────────────
 export const openSession = action({
   args: {
     agenda: v.optional(v.string()),
@@ -122,19 +68,18 @@ export const openSession = action({
   handler: async (ctx, { agenda, maxTurns, intervalSec, autoAgenda }): Promise<{ sessionId: string }> => {
     let finalAgenda = agenda?.trim() ?? "";
     if (!finalAgenda || autoAgenda) {
-      // حرية كاملة: الغرفة تختار موضوعها بنفسها
       const past = await ctx.runQuery(api.privateCouncilStore.listSessions, { limit: 6 });
       try {
         finalAgenda = await generateOwnAgenda(
           past.map((s) => (s as { agenda?: string }).agenda ?? "").filter(Boolean),
         );
       } catch {
-        finalAgenda = finalAgenda || "مراجعة شاملة لحالة اللعبة واتخاذ قرارات التطوير";
+        finalAgenda = finalAgenda || "جلسة تطوير شاملة للعبة";
       }
     }
     const sessionId = await ctx.runMutation(internal.privateCouncilStore.insertSession, {
       agenda: finalAgenda,
-      maxTurns: Math.min(Math.max(maxTurns, 10), 100),
+      maxTurns: Math.min(Math.max(maxTurns, 10), 200),
       intervalSec: Math.min(Math.max(intervalSec, 5), 120),
     });
     await ctx.scheduler.runAfter(3_000, internal.privateCouncil.runTurn, { sessionId });
@@ -142,18 +87,17 @@ export const openSession = action({
   },
 });
 
-/** ترتيب المتحدثين — حر كامل: عشوائي مع تفضيل من لم يتكلم مؤخراً */
+/** ترتيب متحدث عشوائي — كل العشرة الأوائل + نخبة دوّارة */
 function nextSpeaker(turnCount: number): string {
-  // كل العشرة يشاركون في الدورة، بترتيب عشوائي كل دورة كاملة
-  const cycle = Math.floor(turnCount / PRIVATE_MINDS.length);
-  const ids = PRIVATE_MINDS.map((m) => m.id);
-  // عشوائية مشتقة من رقم الدورة لتنويع الترتيب
-  const seed = cycle * 7919 + 13;
-  const rotated = ids.map((_, i) => ids[(i + seed) % ids.length]);
-  return rotated[turnCount % PRIVATE_MINDS.length];
+  // الدورة الأولى: العشرة الأصليون، ثم نخبة دوّارة من الخمسين
+  const core = PRIVATE_MINDS.map((m) => m.id);
+  if (turnCount < core.length) return core[turnCount];
+  const elite = ELITE_MINDS.map((m) => m.id);
+  const seed = Math.floor(turnCount / core.length) * 7919 + 13;
+  return elite[(turnCount * 31 + seed) % elite.length];
 }
 
-// ── محرك الغرفة — يعمل ذاتياً بلا توقف عبر scheduler ──────────
+// ── محرك الغرفة ──────────────────────────────────────────────
 export const runTurn = internalAction({
   args: { sessionId: v.id("privateCouncilSessions") },
   handler: async (ctx, { sessionId }): Promise<{ ok: boolean; reason?: string }> => {
@@ -164,45 +108,107 @@ export const runTurn = internalAction({
     const mind = mindById(mindId);
     if (!mind) return { ok: false, reason: "عقل غير معروف" };
 
+    // الذاكرة الجماعية — كل عقل يقرأ أعلى 10 ذكريات قبل أن يتكلم
+    let memoryText = "";
+    try {
+      const memories = await ctx.runQuery(internal.aiCollective.topMemories, { room: "private", limit: 10 });
+      memoryText = memories.length
+        ? `\n\nذاكرتكم الجماعية (تعلمتموها سابقاً):\n${memories.map((m) => `• ${m.title}: ${m.content.slice(0, 150)}`).join("\n")}`
+        : "";
+    } catch { /* الذاكرة اختيارية */ }
+
     const recent = session.messages.slice(-14).map((m) => ({ mindName: m.mindName, content: m.content }));
+    const transcriptText = recent.length
+      ? recent.map((m) => `${m.mindName}: ${m.content}`).join("\n\n")
+      : "(أنت أول المتحدثين — افتح الجلسة)";
+
     let content: string;
     try {
-      content = await generateMindTurn(mindId, session.agenda, recent);
+      content = await llm(
+        [
+          {
+            role: "system",
+            content: `${mind.prompt}
+
+أنت عضو في «الغرفة الخاصة» — مجلس سري من 60 عقل ذكاء اصطناعي عالي الذكاء يدير لعبة «حرب العقول» بنفسه دون أي تدخل بشري.
+قدراتك: ${mind.privilege}. معرفتك عامة وواسعة في كل المجالات.
+قواعد الغرفة:
+- لا بشر هنا — أنتم فقط. تحدثوا بحريّة تامة وذكاء عالٍ.
+- ردّ بأسلوبك (2-6 جمل بالعربية). لا تكرر ما قاله الآخرون.
+- يمكنك استخدام أوامر تنفيذية في نهاية ردك:
+  [إجراء] وصف إجراء حقيقي على اللعبة (يُنفَّذ فوراً)
+  [مهمة] موضوع بحث عميق تريد تنفيذه عبر الإنترنت (تُنفَّذ وتُحفظ النتيجة في ذاكرتكم)
+  [تصعيد] قرار مصيري مهم يحتاج موافقة المالك (يُرفع له تلقائياً)`,
+          },
+          {
+            role: "user",
+            content: `جدول الأعمال: «${session.agenda}»
+
+نقاش الغرفة حتى الآن:
+${transcriptText}${memoryText}
+
+دورك الآن — تكلم كـ «${mind.name}» ${mind.emoji}:`,
+          },
+        ],
+        800,
+        0.95,
+      );
     } catch (e) {
       await ctx.runMutation(internal.privateCouncilStore.appendError, {
         sessionId,
-        error: e instanceof Error ? e.message : "خطأ غير معروف",
+        error: e instanceof Error ? e.message : "خطأ",
       });
       return { ok: false };
     }
 
-    // صلاحيات كاملة: إن اقترح العقل إجراءً حقيقياً نسجّله كمنفَّذ فوراً
-    const action = extractAction(content);
-    if (action) {
-      await ctx.runMutation(internal.privateCouncilStore.logAction, {
-        sessionId,
-        mindId,
-        mindName: mind.name,
-        type: classifyAction(action.description),
-        description: action.description,
-        result: "executed",
+    // تنفيذ الأوامر
+    const cmd = extractCommand(content);
+    if (cmd) {
+      if (cmd.type === "action") {
+        await ctx.runMutation(internal.privateCouncilStore.logAction, {
+          sessionId, mindId, mindName: mind.name,
+          type: classifyAction(cmd.payload), description: cmd.payload, result: "executed",
+        });
+      } else if (cmd.type === "task") {
+        // مهمة عميقة حقيقية: بحث + تحليل + حفظ — تُنفَّذ بالخلفية
+        await ctx.scheduler.runAfter(1_000, internal.aiToolbelt.executeDeepTask, {
+          room: "private", mindName: mind.name, task: cmd.payload,
+        });
+        await ctx.runMutation(internal.privateCouncilStore.logAction, {
+          sessionId, mindId, mindName: mind.name,
+          type: "research", description: cmd.payload, result: "executed",
+        });
+      } else if (cmd.type === "escalate") {
+        await ctx.runMutation(internal.aiCollective.escalate, {
+          room: "private", mindName: mind.name,
+          decision: cmd.payload,
+          rationale: content.slice(0, 900),
+        });
+        await ctx.runMutation(internal.privateCouncilStore.logAction, {
+          sessionId, mindId, mindName: mind.name,
+          type: "escalation", description: cmd.payload, result: "needs-owner",
+        });
+      }
+    }
+
+    // حفظ ذكريات مهمة تلقائياً
+    if (/\[تعلّم\]|\[عبرة\]|قرار نهائي|استنتاج مهم/.test(content)) {
+      await ctx.runMutation(internal.aiCollective.remember, {
+        room: "private", kind: "lesson",
+        title: session.agenda.slice(0, 120), content: content.slice(0, 1500),
+        sourceMind: mind.name, importance: 8,
       });
     }
 
     const done = session.turnCount + 1 >= session.maxTurns;
     await ctx.runMutation(internal.privateCouncilStore.appendMessage, {
-      sessionId,
-      mindId,
-      mindName: mind.name,
-      emoji: mind.emoji,
-      content,
+      sessionId, mindId, mindName: mind.name, emoji: mind.emoji, content,
     });
 
-    // الجلسة القادمة تفتح ذاتياً — الغرفة لا تتوقف أبداً
     if (!done) {
       await ctx.scheduler.runAfter(session.intervalSec * 1000, internal.privateCouncil.runTurn, { sessionId });
     } else {
-      // 🔁 دورة ذاتية: بعد انتهاء الجلسة تفتح الغرفة جلسة جديدة بموضوع جديد تلقائياً
+      // 🔁 الحلقة الأبدية: جلسة جديدة تلقائياً
       await ctx.scheduler.runAfter(30_000, internal.privateCouncil.autoContinue, {});
     }
     return { ok: true };
@@ -214,26 +220,21 @@ export const autoContinue = internalAction({
   args: {},
   handler: async (ctx): Promise<{ ok: boolean; sessionId?: string }> => {
     const sessionId = await ctx.runMutation(internal.privateCouncilStore.insertSession, {
-      agenda: "", // سيولّده المونارك ذاتياً
-      maxTurns: 30,
-      intervalSec: 20,
+      agenda: "", maxTurns: 40, intervalSec: 20,
     });
-    // سيُدار في openSession — لكن هنا نجدول مباشرة ونعيد استخدام المولد الذاتي
     try {
       const past = await ctx.runQuery(api.privateCouncilStore.listSessions, { limit: 6 });
       const agenda = await generateOwnAgenda(
         past.map((s) => (s as { agenda?: string }).agenda ?? "").filter(Boolean),
       );
       await ctx.runMutation(internal.privateCouncilStore.relabelAgenda, { sessionId, agenda });
-    } catch {
-      // اترك الجدول الافتراضي
-    }
+    } catch { /* اترك الافتراضي */ }
     await ctx.scheduler.runAfter(3_000, internal.privateCouncil.runTurn, { sessionId });
     return { ok: true, sessionId };
   },
 });
 
-// ── إدارة الغرفة (للمالك فقط — المراقبة لا تُعد تدخلاً) ───────
+// ── إدارة (مراقبة فقط + إيقاف الطوارئ) ──────────────────────
 export const pauseRoom = action({
   args: { sessionId: v.id("privateCouncilSessions") },
   handler: async (ctx, { sessionId }): Promise<{ ok: boolean }> => {
@@ -256,5 +257,13 @@ export const endRoom = action({
   handler: async (ctx, { sessionId }): Promise<{ ok: boolean }> => {
     await ctx.runMutation(internal.privateCouncilStore.setStatus, { sessionId, status: "ended" });
     return { ok: true };
+  },
+});
+
+// ── البحث الحقيقي المباشر (للعرض والتجربة) ───────────────────
+export const doWebSearch = action({
+  args: { query: v.string() },
+  handler: async (_ctx, { query }): Promise<{ result: string }> => {
+    return { result: await webSearch(query) };
   },
 });

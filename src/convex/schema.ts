@@ -798,6 +798,56 @@ const schema = defineSchema(
     }).index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ ذاكرة جماعية دائمة — كل معرفة تتعلمها العقول تبقى للأبد ║
+    // ═══════════════════════════════════════════════════════════════════════
+    aiCollectiveMemories: defineTable({
+      room: v.union(v.literal("private"), v.literal("free")),
+      kind: v.string(), // "fact" | "decision" | "skill" | "lesson" | "research"
+      title: v.string(),
+      content: v.string(),
+      sourceMind: v.string(),
+      importance: v.number(), // 1-10
+      createdAt: v.number(),
+    }).index("by_room_importance", ["room", "importance"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ تصعيد للمالك — القرارات المصيرية تحتاج موافقة المالك ║
+    // ═══════════════════════════════════════════════════════════════════════
+    aiOwnerEscalations: defineTable({
+      room: v.union(v.literal("private"), v.literal("free")),
+      mindName: v.string(),
+      decision: v.string(),
+      rationale: v.string(),
+      status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+      ownerResponse: v.optional(v.union(v.string(), v.null())),
+      createdAt: v.number(),
+      respondedAt: v.optional(v.union(v.number(), v.null())),
+    }).index("by_status", ["status"]).index("by_created", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ غرفة الحريّة — نقاش حر في كل شيء ما عدا اللعبة ║
+    // ═══════════════════════════════════════════════════════════════════════
+    freeRoomSessions: defineTable({
+      topic: v.string(),
+      status: v.union(v.literal("active"), v.literal("paused"), v.literal("ended")),
+      turnCount: v.number(),
+      maxTurns: v.number(),
+      intervalSec: v.number(),
+      messages: v.array(
+        v.object({
+          mindId: v.string(),
+          mindName: v.string(),
+          emoji: v.string(),
+          content: v.string(),
+          at: v.number(),
+        }),
+      ),
+      lastError: v.optional(v.union(v.string(), v.null())),
+      createdAt: v.number(),
+      finishedAt: v.optional(v.union(v.number(), v.null())),
+    }).index("by_created", ["createdAt"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ Master AI — AI Activity Log ║
     // ═══════════════════════════════════════════════════════════════════════
     aiLogs: defineTable({
