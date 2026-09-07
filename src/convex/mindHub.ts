@@ -49,3 +49,25 @@ export const endSession = action({
     return { ok: true };
   },
 });
+
+/** ملتقى عقول موسّع — 80 عقل في جلسة واحدة (العشرة + الخمسين + الخمسين النخبة) */
+export const openExpandedSession = action({
+  args: {
+    room: v.union(v.literal("war"), v.literal("free")),
+    maxTurns: v.number(),
+    intervalSec: v.number(),
+  },
+  handler: async (ctx, { room, maxTurns, intervalSec }) => {
+    const agendas = {
+      war: `مراجعة شاملة لحالة لعبة حرب العقول واتخاذ قرارات تنفيذية — بحضور 80 عقلًا: العشرة الاستراتيجيين، الخمسون المتعددون التخصصات، والخمسون النخبة بالمهارات العميقة`,
+      free: `نقاش حر مفتوح — العلوم، الفكر، الفن، الكون، الحياة — بحضور 80 عقلًا يفكر كل منهم من زاويته دون خجل وبدون سيطرة بشرية`,
+    } as const;
+    const sessionId = await ctx.runMutation("mindHubStore:insertSession" as never, {
+      room,
+      agenda: agendas[room],
+      maxTurns,
+      intervalSec,
+    } as never);
+    return { sessionId };
+  },
+});
