@@ -104,13 +104,13 @@ export const recentCallCount = internalQuery({
 
 export const getCircuit = internalQuery({
   args: {},
-  handler: async (ctx) => await ctx.db.query("apiCircuit").withIndex("by_id", (q) => q.eq("id", "main")).first(),
+  handler: async (ctx) => await ctx.db.query("apiCircuit").withIndex("by_main", (q) => q.eq("id", "main")).first(),
 });
 
 export const recordSuccess = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const c = await ctx.db.query("apiCircuit").withIndex("by_id", (q) => q.eq("id", "main")).first();
+    const c = await ctx.db.query("apiCircuit").withIndex("by_main", (q) => q.eq("id", "main")).first();
     if (c) await ctx.db.patch(c._id, { failures: 0, open: false, openedAt: null });
     else await ctx.db.insert("apiCircuit", { id: "main", failures: 0, open: false, openedAt: null });
   },
@@ -119,7 +119,7 @@ export const recordSuccess = internalMutation({
 export const recordFailure = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const c = await ctx.db.query("apiCircuit").withIndex("by_id", (q) => q.eq("id", "main")).first();
+    const c = await ctx.db.query("apiCircuit").withIndex("by_main", (q) => q.eq("id", "main")).first();
     if (c) {
       const failures = c.failures + 1;
       await ctx.db.patch(c._id, {

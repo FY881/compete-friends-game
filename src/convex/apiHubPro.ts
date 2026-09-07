@@ -71,7 +71,11 @@ export const smartCallPro = action({
     if (!bypassCache) {
       const fp = requestFingerprint(messages);
       try {
-        const cached = await ctx.runQuery(internal.apiHubStore.getCached, { fp });
+        const cached = (await ctx.runQuery(internal.apiHubStore.getCached, { fp })) as {
+          createdAt: number;
+          reply: string;
+          provider: string;
+        } | null;
         if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
           return {
             reply: cached.reply,
@@ -337,12 +341,12 @@ export const issueViceCommand = action({
     payload: v.optional(v.string()),
   },
   handler: async (ctx, { command, targetSystem, payload }) => {
-    const id = await ctx.runMutation(internal.apiHubStore.pushCommand, {
+    const id = (await ctx.runMutation(internal.apiHubStore.pushCommand, {
       command: command.slice(0, 500),
       targetSystem,
       payload: payload?.slice(0, 2000),
       issuedBy: "vice-owner",
-    });
+    })) as string;
     return { commandId: id };
   },
 });

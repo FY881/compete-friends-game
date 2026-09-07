@@ -1238,7 +1238,7 @@ const schema = defineSchema(
       failures: v.number(),
       open: v.boolean(),
       openedAt: v.optional(v.union(v.number(), v.null())),
-    }).index("by_id", ["id"]),
+    }).index("by_main", ["id"]),
 
     apiKeyProbes: defineTable({
       results: v.array(
