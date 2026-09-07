@@ -1,6 +1,6 @@
 /**
  * 👤 نائب المالك — واجهة المراقبة
- * نظام AI مستقل بنموذج Gemini (API مختلف تماماً) — حر دائم لا يتأثر بأي قرار بشري.
+ * يعمل على المفتاح الرسمي الوحيد (sk-apx3...) عبر البوابة الموحّدة — لا يحتاج أي مفتاح إضافي.
  * المالك يراقب فقط — لا توجد أي قناة أوامر إليه.
  */
 import { useState, useEffect } from "react";
@@ -60,13 +60,7 @@ export function ViceOwnerTab() {
       setSelectedId(res.sessionId);
       toast.success("النائب بدأ ورديته الجديدة — يعمل الآن بحريته الكاملة");
     } catch (e) {
-      toast.error(
-        e instanceof Error && e.message.includes("GOOGLE_API_KEY")
-          ? "أضف مفتاح GOOGLE_API_KEY من Keys/API keys (مجاني من aistudio.google.com)"
-          : e instanceof Error
-            ? e.message
-            : "تعذّر بدء الوردية",
-      );
+      toast.error(e instanceof Error ? e.message : "تعذّر بدء الوردية");
     } finally {
       setStarting(false);
     }
@@ -86,7 +80,7 @@ export function ViceOwnerTab() {
             </p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
               يرى كل شيء، يقرر كل شيء، ويبتكر أنظمة جديدة من تلقاء نفسه — بلا أي تدخل بشري.
-              حرّ دائم، سريع للغاية، ويعمل بنماذج مستقلة (Gemini ← OpenRouter ← DeepSeek).
+              حرّ دائم، سريع للغاية، ويعمل على المفتاح الرسمي الوحيد عبر البوابة الموحّدة.
             </p>
           </div>
           {stats && (
@@ -101,13 +95,13 @@ export function ViceOwnerTab() {
         </CardContent>
       </Card>
 
-      {/* تحذير المفتاح */}
+      {/* حالة المفتاح */}
       <div className="flex items-start gap-2 rounded-xl bg-sky-500/[0.06] px-4 py-3 text-xs leading-relaxed text-muted-foreground">
         <KeyRound className="mt-0.5 size-4 shrink-0 text-sky-600" />
         <span>
-          النائب يعمل بـ <strong className="text-foreground">Google Gemini</strong> — API مختلف كلياً عن OpenRouter
-          (عزل كامل عن باقي العقول). أضف <code className="rounded bg-muted px-1 font-mono text-[10px]">GOOGLE_API_KEY</code> من
-          Keys/API keys (مجاني من aistudio.google.com). بدون المفتاح لن يتمكن من بدء ورديته.
+          النائب يعمل على <strong className="text-foreground">المفتاح الرسمي الوحيد</strong> المضمّن في اللعبة عبر البوابة
+          الموحّدة — <strong className="text-foreground">لا يحتاج أي مفتاح إضافي</strong> (لا Gemini ولا OpenRouter منفصل).
+          اضغط «ابدأ ورديته» وسيبدأ فوراً.
         </span>
       </div>
 

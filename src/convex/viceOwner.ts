@@ -6,9 +6,13 @@ import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm, markDeputyOnline } from "./aiConfig";
 import { recallFor, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
+import { ADMIN_AI_KEY } from "../lib/aiCredentials";
 
 function getAdminAiKey(): string {
-  const key = process.env.ADMIN_AI_KEY || "";
+  // المفتاح الرسمي (sk-apx3...) من aiCredentials هو الأساس؛ env هو تجاوز اختياري فقط.
+  // كان يقرأ process.env.ADMIN_AI_KEY حصرياً، وعند غيابه يفشل النائب — الآن يعمل
+  // فوراً على المفتاح الرسمي المضمّن بلا أي إعداد مسبق.
+  const key = process.env.ADMIN_AI_KEY || ADMIN_AI_KEY || "";
   if (key && key.trim().length > 10) return key.trim();
   throw new Error(
     "مفتاح ADMIN_AI_KEY غير مضبوط — هذا المفتاح مسؤول عن كل أنظمة AI في اللعبة.",
