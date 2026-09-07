@@ -64,6 +64,7 @@ export function AiSuiteTab() {
   const pauseCouncil = useAction(api.aiCouncil.pauseCouncil);
   const resumeCouncil = useAction(api.aiCouncil.resumeCouncil);
   const endCouncil = useAction(api.aiCouncil.endCouncil);
+  const intervene = useAction(api.aiCouncil.intervene);
 
   const sessions = useQuery(api.aiCouncilStore.listSessions, { limit: 15 });
   const activeSession = useQuery(
