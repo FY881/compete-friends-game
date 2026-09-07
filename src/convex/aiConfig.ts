@@ -1,63 +1,29 @@
 /**
  * AI Configuration — مركز الإعدادات الذكية
- * يوفر مفتاح API من أي مصدر (متغير بيئة، إعدادات المالك، أو مفتاح افتراضي).
- * جميع أنظمة AI تستخدم هذا الملف للحصول على المفتاح.
- *
- * 🔄 البديل المؤقت: OneHop (onehop.ai) — إذا فشل OpenRouter تنتقل كل الأنظمة
- * تلقائياً إلى OneHop بنموذج deepseek/deepseek-v4-flash دون أي تدخل.
+ * المفتاح الرسمي الوحيد: sk-apx3... (AI Gateway متوافق مع OpenRouter).
+ * OpenRouter المباشر و OneHop أُزيلوا تماماً — كل شيء عبر المفتاح الرسمي.
  */
 
-// المفتاح الرسمي الوحيد للعبة — من module المفاتيح الداخلي
 import { ADMIN_AI_KEY, BACKUP_AI_KEY } from "../lib/aiCredentials";
 
-// المفتاح الاحتياطي القديم (يُزال reliance عليه من المسار الرئيسي)
+const GATEWAY_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-
-// ── البديل المؤقت: OneHop ──────────────────────────────────
-export const ONEHOP_BASE_URL = "https://api.onehop.ai/v1/chat/completions";
-export const ONEHOP_KEY = "oh_live_-gwnQrTscb21FyPFFOtzJBRjb5svkS6I";
-export const ONEHOP_MODEL = "deepseek/deepseek-v4-flash";
-
-/**
- * يحصل على مفتاح OpenRouter من أي مصدر متاح.
- * الأولوية: متغير البيئة > المفتاح المُمرّر > الافتراضي
- */
+/** المفتاح الفعّال: المُمرَّر إن وُجد، وإلا المفتاح الرسمي، وإلا env، وإلا الاحتياطي */
 export function getOpenRouterKey(providedKey?: string | null): string {
-  // 1. المفتاح المُمرّر من الواجهة (إذا كان هناك إعدادات مخصصة)
-  if (providedKey && providedKey.trim().length > 10) {
-    return providedKey.trim();
-  }
-
-  // 2. متغير البيئة (الذي يُضبط في المنصة)
+  if (providedKey && providedKey.trim().length > 10) return providedKey.trim();
   const envKey = process.env.OPENROUTER_API_KEY;
-  if (envKey && envKey.trim().length > 10) {
-    return envKey.trim();
-  }
-
-  // 3. المفتاح الرسمي الدائم (الوحيد المُستخدَم حالياً)
-  return ADMIN_AI_KEY;
+  if (envKey && envKey.trim().length > 10) return envKey.trim();
+  if (ADMIN_AI_KEY && ADMIN_AI_KEY.trim().length > 10) return ADMIN_AI_KEY.trim();
+  if (BACKUP_AI_KEY && BACKUP_AI_KEY.trim().length > 10) return BACKUP_AI_KEY.trim();
+  return "";
 }
 
-/**
- * النموذج الوحيد working — openrouter/free هو موزّع ذكي يختار تلقائياً
- * نموذجاً مجانياً متاحاً. جميع النماذج الفردية بـ :free انتهت.
- */
-export const FREE_MODELS = [
-  "openrouter/free",
-];
-
-/**
- * النموذج الافتراضي لكل الاستدعاءات — مُثبّت على openrouter/free.
- * لا تغيّر هذا إلا إذا أثبت OpenRouter نموذجاً مجانياً جديداً.
- */
+export const FREE_MODELS = ["openrouter/free"];
 export const DEFAULT_MODEL = "openrouter/free";
 
 /**
- * ⚡ الاستدعاء الموحّد مع تحكم المفتاح الرسمي ومعالجة 429 والبديل التلقائي —
- * يستدعي OpenRouter أولاً بالمفتاح الرسمي، وإذا تعيّق حد الاستخدام (429)
- * يعرض رسالة واضحة ويوقف الطلبات المؤقتة. عند فشل غير حد الاستخدام
- * ينتقل تلقائياً إلى OneHop بنفس رسائل المحادثة.
- * تعيد كل أنظمة AI استدعاء هذه الدالة بدلاً من fetch المباشر.
+ * ⚡ الاستدعاء الموحّد — عبر المفتاح الرسمي فقط.
+ * لا OpenRouter منفصل ولا OneHop: فشل المفتاح = رسالة واضحة من مركز API.
  */
 export async function callLlm(
   messages: Array<{ role: string; content: string }>,
@@ -66,47 +32,14 @@ export async function callLlm(
   label = "Zaka AI",
   apiKey?: string | null,
 ): Promise<string> {
-  // ── المحاولة 1: OpenRouter ──
-  try {
-    return await callOpenRouterDirect(messages, maxTokens, temperature, label, apiKey);
-  } catch (orErr) {
-    const msg = orErr instanceof Error ? orErr.message : String(orErr);
-    if (msg.includes("429") || msg.includes("Rate limit exceeded")) {
-      throw new Error(
-        `OpenRouter معطّل مؤقتاً — تم تجاوز حد الاستخدام اليومي (429).` +
-        ` أُوقف الاستدعاء حتى تفعيله مجدداً من مركز الـ API،` +
-        ` وسيعود نائب الرئيس والأنظمة عندها دون تدخل منك.` +
-        (apiKey && apiKey.startsWith("sk-") ? " · مفتاح رئيسي مضبوط." : ""),
-      );
-    }
-    // ── المحاولة 2: المفتاح الاحتياطي الثاني عبر OpenRouter ──
-    try {
-      return await callOpenRouterDirect(messages, maxTokens, temperature, `${label} (backup)`, BACKUP_AI_KEY);
-    } catch {
-      /* تجاهل — ننتقل للبديل التالي */
-    }
-    // ── المحاولة 3: OneHop (البديل المؤقت) ──
-    try {
-      return await callOneHop(messages, maxTokens, temperature);
-    } catch {
-      throw orErr;
-    }
+  const key = getOpenRouterKey(apiKey);
+  if (!key) {
+    throw new Error("لا يوجد مفتاح AI — أضف المفتاح من مركز API.");
   }
-}
-
-/** OpenRouter مباشر مع تحكم المفتاح الرسمي */
-export async function callOpenRouterDirect(
-  messages: Array<{ role: string; content: string }>,
-  maxTokens: number,
-  temperature: number,
-  label: string,
-  apiKey?: string | null,
-): Promise<string> {
-  const effectiveKey = apiKey && apiKey.trim().length > 10 ? apiKey.trim() : ADMIN_AI_KEY;
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const response = await fetch(GATEWAY_BASE_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${effectiveKey}`,
+      Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "https://zaka.app",
       "X-Title": label,
@@ -115,7 +48,12 @@ export async function callOpenRouterDirect(
   });
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`OpenRouter API error (${response.status}): ${err.slice(0, 200)}`);
+    if (response.status === 429) {
+      throw new Error(
+        `المفتاح الرسمي معطّل مؤقتاً — تجاوز حد الاستخدام (429). أُوقف الاستدعاء حتى إعادة التفعيل من مركز API.`,
+      );
+    }
+    throw new Error(`AI Gateway error (${response.status}): ${err.slice(0, 200)}`);
   }
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
@@ -123,50 +61,31 @@ export async function callOpenRouterDirect(
   return content;
 }
 
-/** OneHop — البديل المؤقت */
-export async function callOneHop(
+/** توافق مع الملفات القديمة — نفس الاستدعاء الموحّد */
+export async function callOpenRouterDirect(
   messages: Array<{ role: string; content: string }>,
-  maxTokens = 900,
-  temperature = 0.9,
+  maxTokens: number,
+  temperature: number,
+  label: string,
   apiKey?: string | null,
 ): Promise<string> {
-  const effectiveKey = apiKey && apiKey.trim().length > 10 ? apiKey.trim() : ONEHOP_KEY;
-  const response = await fetch(ONEHOP_BASE_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${effectiveKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: ONEHOP_MODEL, messages, max_tokens: maxTokens, temperature }),
-  });
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OneHop API error (${response.status}): ${err.slice(0, 200)}`);
-  }
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("OneHop أعاد رداً فارغاً");
-  return content;
+  return callLlm(messages, maxTokens, temperature, label, apiKey);
 }
 
+/** أُزيل — يبقى كجسر توافق يرمي خطأ واضحاً */
+export async function callOneHop(): Promise<string> {
+  throw new Error("OneHop أُزيل نهائياً — استخدم callLlm بالمفتاح الرسمي.");
+}
 
 export function getAdminKeyPreview(): string {
   return ADMIN_AI_KEY.slice(0, 12) + "...";
 }
 
-/**
- * يتحقق من أن النموذج صالح ويُعيد الافتراضي إذا كان معطلاً
- */
 export function ensureWorkingModel(model?: string | null): string {
-  if (!model || model.includes(":free") || model === "openrouter/auto") {
-    return DEFAULT_MODEL;
-  }
+  if (!model || model.includes(":free") || model === "openrouter/auto") return DEFAULT_MODEL;
   return model;
 }
 
-/**
- * معلومات النظام للتشخيص
- */
 export function getSystemInfo() {
   return {
     hasEnvKey: Boolean(process.env.OPENROUTER_API_KEY),
@@ -174,10 +93,10 @@ export function getSystemInfo() {
       ? process.env.OPENROUTER_API_KEY.slice(0, 15) + "..."
       : "غير مضبوط",
     adminKeyPreview: ADMIN_AI_KEY.slice(0, 12) + "...",
-    backupKeyPreview: BACKUP_AI_KEY.slice(0, 12) + "...",
-    onehopKeyPreview: ONEHOP_KEY.slice(0, 12) + "...",
+    backupKeyPreview: BACKUP_AI_KEY ? BACKUP_AI_KEY.slice(0, 12) + "..." : "أُزيل",
+    onehopKeyPreview: "أُزيل نهائياً",
     models: FREE_MODELS,
     defaultModel: DEFAULT_MODEL,
-    backup: { provider: "OneHop", model: ONEHOP_MODEL },
+    backup: null as null | { provider: string; model: string },
   };
 }
