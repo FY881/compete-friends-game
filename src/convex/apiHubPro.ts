@@ -23,8 +23,8 @@
 import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
-import { callLlm, callOpenRouterDirect, callOneHop, getOpenRouterKey } from "./aiConfig";
-import { ADMIN_AI_KEY, BACKUP_AI_KEY } from "../lib/aiCredentials";
+import { callLlm, callOpenRouterDirect, getOpenRouterKey, isDeputyOnline } from "./aiConfig";
+import { ADMIN_AI_KEY } from "../lib/aiCredentials";
 
 type Ctx = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,8 +127,8 @@ export const smartCallPro = action({
     };
     const routedModel = ROUTE_MAP[taskType ?? "general"] ?? "openrouter/free";
 
-    // ── 15. تبديل المفاتيح: الأساسي ← الاحتياطي ← OneHop ──
-    const keyChain = [ADMIN_AI_KEY, BACKUP_AI_KEY];
+    // ── المفتاح الرسمي فقط — لا مفاتيح احتياطية ولا مزودين خارجيين ──
+    const keyChain = [ADMIN_AI_KEY];
     let lastErr = "";
     for (const key of keyChain) {
       try {
@@ -153,7 +153,7 @@ export const smartCallPro = action({
             provider: "OpenRouter",
           }).catch(() => {});
         }
-        return { reply, provider: key === ADMIN_AI_KEY ? "المفتاح الرئيسي" : "المفتاح الاحتياطي", latencyMs, cached: false };
+        return { reply, provider: "المفتاح الرسمي", latencyMs, cached: false };
       } catch (e) {
         lastErr = e instanceof Error ? e.message : String(e);
         if (lastErr.includes("429") || lastErr.includes("Rate limit")) {
@@ -163,27 +163,8 @@ export const smartCallPro = action({
       }
     }
 
-    // ── OneHop كحل أخير ──
-    try {
-      const reply = await callOneHop(messages, maxTokens ?? 900, temperature ?? 0.8);
-      const latencyMs = Date.now() - started;
-      await ctx.runMutation(internal.apiHubStore.logCall, {
-        ok: true,
-        provider: "OneHop",
-        model: "deepseek/deepseek-v4-flash",
-        keyUsed: "onehop",
-        latencyMs,
-        tokensIn: messages.reduce((s, m) => s + m.content.length, 0),
-        tokensOut: reply.length,
-        taskType: taskType ?? "general",
-      });
-      return { reply, provider: "OneHop (بديل)", latencyMs, cached: false };
-    } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e);
-    }
-
     await ctx.runMutation(internal.apiHubStore.recordFailure, {}).catch(() => {});
-    throw new Error(lastErr || "كل المزودين فشلوا");
+    throw new Error(lastErr || "المفتاح الرسمي فشل — أعد التفعيل من مركز API");
   },
 });
 

@@ -72,9 +72,32 @@ export async function callOpenRouterDirect(
   return callLlm(messages, maxTokens, temperature, label, apiKey);
 }
 
-/** أُزيل — يبقى كجسر توافق يرمي خطأ واضحاً */
-export async function callOneHop(): Promise<string> {
-  throw new Error("OneHop أُزيل نهائياً — استخدم callLlm بالمفتاح الرسمي.");
+// ═══════════════════════════════════════════════════════════════
+// بوابة الحرية — كل أنظمة AI تعمل بحرية كاملة فقط بعد نجاح نائب المالك
+// ═══════════════════════════════════════════════════════════════
+let deputyOnline = false;
+let deputyOnlineAt = 0;
+
+export function markDeputyOnline(): void {
+  deputyOnline = true;
+  deputyOnlineAt = Date.now();
+}
+
+export function isDeputyOnline(): boolean {
+  return deputyOnline;
+}
+
+export function getDeputyStatus() {
+  return { online: deputyOnline, onlineAt: deputyOnlineAt };
+}
+
+/** تُستخدم في الأنظمة الحرة: إن لم ينجح نائب المالك بعد، ارفض بوضوح */
+export function requireDeputyOnline(): void {
+  if (!deputyOnline) {
+    throw new Error(
+      "أنظمة AI الحرة معطّلة — انتظر نجاح نائب المالك على المفتاح الرسمي أولًا.",
+    );
+  }
 }
 
 export function getAdminKeyPreview(): string {

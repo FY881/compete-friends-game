@@ -4,12 +4,11 @@
 import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
-import { callLlm, callOneHop } from "./aiConfig";
+import { callLlm, markDeputyOnline } from "./aiConfig";
 import { recallFor, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
 
 function getAdminAiKey(): string {
-  const key =
-    process.env.ADMIN_AI_KEY || "sk-J3x07DW6NCnFG2DBReSsHJVTJhlCgnwYy3DSkL8M68WlVPHn";
+  const key = process.env.ADMIN_AI_KEY || "";
   if (key && key.trim().length > 10) return key.trim();
   throw new Error(
     "مفتاح ADMIN_AI_KEY غير مضبوط — هذا المفتاح مسؤول عن كل أنظمة AI في اللعبة.",
@@ -22,28 +21,16 @@ async function callDeputyPrimary(
   maxTokens = 900,
   temperature = 0.95,
 ): Promise<string> {
-  try {
-    return await callLlm(
-      [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-      maxTokens,
-      temperature,
-      "Zaka Vice Owner",
-      getAdminAiKey(),
-    );
-  } catch (fallbackErr) {
-    try {
-      return await callOneHop(
-        [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-        maxTokens,
-        temperature,
-        getAdminAiKey(),
-      );
-    } catch (onehopErr) {
-      throw new Error(
-        `${fallbackErr instanceof Error ? fallbackErr.message : "فشل المسار الأساسي"} | OneHop فشل: ${onehopErr instanceof Error ? onehopErr.message : "OneHop"}`,
-      );
-    }
-  }
+  const reply = await callLlm(
+    [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+    maxTokens,
+    temperature,
+    "Zaka Vice Owner",
+    getAdminAiKey(),
+  );
+  // نجاح نائب المالك على المفتاح الرسمي = فتح بوابة الحرية لكل أنظمة AI
+  markDeputyOnline();
+  return reply;
 }
 
 const VICE_SYSTEM_PROMPT =
