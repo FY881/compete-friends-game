@@ -199,8 +199,9 @@ export const batchCall = action({
 export const probeKeys = action({
   args: {},
   handler: async (ctx) => {
+    // المفتاح الرسمي الوحيد — لا مفاتيح احتياطية بعد إزالة OneHop
     const results: Array<{ key: string; ok: boolean; latencyMs: number; error?: string }> = [];
-    for (const [label, key] of [["primary", ADMIN_AI_KEY], ["backup", BACKUP_AI_KEY]] as const) {
+    for (const [label, key] of [["primary", ADMIN_AI_KEY]] as const) {
       const started = Date.now();
       try {
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {

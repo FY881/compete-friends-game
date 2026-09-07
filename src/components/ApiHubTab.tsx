@@ -54,9 +54,28 @@ export function ApiHubTab() {
   const testApi = useAction(api.apiHub.testApi);
   const discoverFromCurl = useAction(api.apiHub.discoverFromCurl);
   const smartCall = useAction(api.apiHub.smartCall);
+  const analyzeAndAddKey = useAction(api.apiHub.analyzeAndAddKey);
 
   const [curlInput, setCurlInput] = useState("");
   const [discovering, setDiscovering] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [analyzingKey, setAnalyzingKey] = useState(false);
+  const [keyReport, setKeyReport] = useState<{
+    ok: boolean;
+    latencyMs: number;
+    sample: string;
+    probeError: string;
+    keyPreview: string;
+    analysis: {
+      provider: string;
+      model: string;
+      likelyService: string;
+      usageHint: string;
+      notes: string;
+      quality: number;
+      capabilities: string[];
+    };
+  } | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [lastDiscovered, setLastDiscovered] = useState<string | null>(null);
   const [testMsg, setTestMsg] = useState("");
@@ -66,6 +85,26 @@ export function ApiHubTab() {
   const [autoDiscoverEnabled, setAutoDiscoverEnabled] = useState(true);
   const [fallbackChainEnabled, setFallbackChainEnabled] = useState(true);
   const [liveStatsEnabled, setLiveStatsEnabled] = useState(true);
+
+  const handleAnalyzeKey = async () => {
+    if (!keyInput.trim()) return toast.error("الصق مفتاح AI أولاً");
+    setAnalyzingKey(true);
+    setKeyReport(null);
+    try {
+      const res = await analyzeAndAddKey({ rawKey: keyInput.trim() });
+      setKeyReport(res);
+      if (res.ok) {
+        toast.success(`المفتاح يعمل ورُبط باللعبة (${res.latencyMs}ms)`);
+      } else {
+        toast.error("تعذّر التحقق من المفتاح — تفاصيل التحليل في التقرير أدناه");
+      }
+      setKeyInput("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل التحليل");
+    } finally {
+      setAnalyzingKey(false);
+    }
+  };
 
   const handleDiscover = async () => {
     if (!curlInput.trim()) return toast.error("الصق أمر curl أولاً");
@@ -148,6 +187,71 @@ export function ApiHubTab() {
             <Badge variant="outline" className="rounded-full text-[10px] font-mono">{ADMIN_AI_MODEL}</Badge>
             <Badge variant="outline" className="rounded-full text-[10px]">نائب الرئيس</Badge>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/30 bg-primary/[0.03]">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Zap className="size-4 text-primary" />
+            أضف أي مفتاح AI تلقائياً — المحلل الذكي يفحصه ويربطه باللعبة
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea
+            value={keyInput}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setKeyInput(e.target.value)}
+            placeholder="الصق مفتاح API هنا (مثل sk-...)"
+            rows={2}
+            className="rounded-xl font-mono text-xs"
+            dir="ltr"
+          />
+          <div className="flex items-center gap-2">
+            <Button onClick={handleAnalyzeKey} disabled={analyzingKey} className="gap-1.5 rounded-xl">
+              {analyzingKey ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+              حلّل واربط باللعبة
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              يحلل AI المفتاح (المزود والنموذج)، يفحصه باختبار حي، ويضيفه لسلسلة الاستدعاء الذكي.
+            </p>
+          </div>
+          {keyReport && (
+            <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-bold">
+                  {keyReport.ok ? <CheckCircle2 className="size-4 text-emerald-600" /> : <XCircle className="size-4 text-rose-600" />}
+                  {keyReport.ok ? "المفتاح يعمل ورُبط باللعبة" : "المفتاح غير صالح — لم يُربط"}
+                </span>
+                <Badge variant="outline" className="rounded-full text-[10px]">{keyReport.keyPreview}</Badge>
+                {keyReport.ok && <Badge variant="outline" className="rounded-full text-[10px] text-emerald-600">{keyReport.latencyMs}ms</Badge>}
+              </div>
+              <div className="flex flex-wrap gap-2 text-[10px]">
+                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold">المزود: {keyReport.analysis.provider}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold font-mono">{keyReport.analysis.model}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold">الخدمة المرجحة: {keyReport.analysis.likelyService}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold">جودة {keyReport.analysis.quality}/100</span>
+              </div>
+              {keyReport.analysis.capabilities?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {keyReport.analysis.capabilities.map((c) => (
+                    <span key={c} className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary">{c}</span>
+                  ))}
+                </div>
+              )}
+              {keyReport.ok && keyReport.sample && (
+                <p className="rounded-lg bg-muted/40 px-3 py-2 text-[11px]" dir="auto">عيّنة الرد: {keyReport.sample}</p>
+              )}
+              {!keyReport.ok && keyReport.probeError && (
+                <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-[11px] text-rose-700">{keyReport.probeError}</p>
+              )}
+              {keyReport.analysis.usageHint && (
+                <p className="text-[11px] text-muted-foreground">نصيحة: {keyReport.analysis.usageHint}</p>
+              )}
+              {keyReport.analysis.notes && (
+                <p className="text-[11px] text-muted-foreground">{keyReport.analysis.notes}</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

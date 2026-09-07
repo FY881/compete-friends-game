@@ -6,6 +6,10 @@
 
 import { ADMIN_AI_KEY, BACKUP_AI_KEY } from "../lib/aiCredentials";
 
+// نسخة مُصرّحة صراحةً كـ string — المفتاح الاحتياطي أُزيل، لكن نحتاج منع const literal
+// ("") من تقليص النوع إلى never عند استخدامه في شروط.
+const backupKey: string = BACKUP_AI_KEY;
+
 const GATEWAY_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 /** المفتاح الفعّال: المُمرَّر إن وُجد، وإلا المفتاح الرسمي، وإلا env، وإلا الاحتياطي */
@@ -14,12 +18,15 @@ export function getOpenRouterKey(providedKey?: string | null): string {
   const envKey = process.env.OPENROUTER_API_KEY;
   if (envKey && envKey.trim().length > 10) return envKey.trim();
   if (ADMIN_AI_KEY && ADMIN_AI_KEY.trim().length > 10) return ADMIN_AI_KEY.trim();
-  if (BACKUP_AI_KEY && BACKUP_AI_KEY.trim().length > 10) return BACKUP_AI_KEY.trim();
+  if (backupKey && backupKey.trim().length > 10) return backupKey.trim();
   return "";
 }
 
-export const FREE_MODELS = ["openrouter/free"];
-export const DEFAULT_MODEL = "openrouter/free";
+// نستخدم openrouter/auto بدلاً من openrouter/free: النموذج المجاني يصل سريعاً
+// لحد الاستخدام اليومي (429 free-models-per-day). auto يختار أفضل نموذج متاح
+// للمفتاح الحالي، فيتجاوز الحد للمفتاح ذي الرصيد ويوقف أخطاء الـ AI المتكررة.
+export const FREE_MODELS = ["openrouter/auto", "openrouter/free"];
+export const DEFAULT_MODEL = "openrouter/auto";
 
 /**
  * ⚡ الاستدعاء الموحّد — عبر المفتاح الرسمي فقط.
@@ -116,7 +123,7 @@ export function getSystemInfo() {
       ? process.env.OPENROUTER_API_KEY.slice(0, 15) + "..."
       : "غير مضبوط",
     adminKeyPreview: ADMIN_AI_KEY.slice(0, 12) + "...",
-    backupKeyPreview: BACKUP_AI_KEY ? BACKUP_AI_KEY.slice(0, 12) + "..." : "أُزيل",
+    backupKeyPreview: backupKey ? backupKey.slice(0, 12) + "..." : "أُزيل",
     onehopKeyPreview: "أُزيل نهائياً",
     models: FREE_MODELS,
     defaultModel: DEFAULT_MODEL,

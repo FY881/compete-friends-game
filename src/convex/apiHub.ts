@@ -220,3 +220,178 @@ export const discoverFromCurl = action({
     return { apiId, name: spec.name, spec: JSON.stringify(spec, null, 2) };
   },
 });
+
+// ═══════════════════════════════════════════════════════════════
+// 🔑 المحلل الذكي للمفاتيح — الصق أي مفتاح AI، يتعرّف عليه AI،
+// يفحصه باختبار حي، يربطه باللعبة كلها، ويعطيك تقريراً عميقاً عنه.
+// ═══════════════════════════════════════════════════════════════
+
+interface KeyAnalysis {
+  provider: string;
+  model: string;
+  authStyle: "bearer" | "header" | "query" | "none";
+  authHeaderName?: string;
+  capabilities: string[];
+  notes: string;
+  likelyService: string;
+  usageHint: string;
+  quality: number;
+}
+
+const DEFAULT_KEY_ANALYSIS: KeyAnalysis = {
+  provider: "openrouter",
+  model: "openrouter/auto",
+  authStyle: "bearer",
+  capabilities: ["chat"],
+  notes: "أُضيف تلقائياً عبر المحلل الذكي للمفاتيح",
+  likelyService: "غير محدد",
+  usageHint: 'جرّب "openrouter/auto" أولاً؛ وإن لم يعمل اختر نموذجاً متاحاً من مركز الموديلز.',
+  quality: 50,
+};
+
+export const analyzeAndAddKey = action({
+  args: {
+    rawKey: v.string(),
+    providerHint: v.optional(v.string()),
+    modelHint: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    { rawKey, providerHint, modelHint },
+  ): Promise<{
+    apiId: string;
+    ok: boolean;
+    latencyMs: number;
+    sample: string;
+    probeError: string;
+    analysis: KeyAnalysis;
+    keyPreview: string;
+    connected: boolean;
+  }> => {
+    const key = (rawKey ?? "").trim();
+    if (key.length < 10)
+      throw new Error("المفتاح قصير جداً — تأكد أنك لصقت المفتاح كاملاً.");
+
+    // 1) تحليل عميق بالمحلل الذكي: يخمّن المزود والنموذج ونمط المصادقة والمزايا
+    let analysis: KeyAnalysis = {
+      ...DEFAULT_KEY_ANALYSIS,
+      provider: providerHint || DEFAULT_KEY_ANALYSIS.provider,
+      model: modelHint || DEFAULT_KEY_ANALYSIS.model,
+    };
+    const keyPreview = `${key.slice(0, 6)}••••${key.slice(-4)}`;
+    try {
+      const analysisText = await callLlm(
+        [
+          {
+            role: "system",
+            content:
+              'أنت خبير بوابة ذكاء اصطناعي. حلّل مفتاح API هذا بذكاء وأرجع JSON فقط بالشكل: {"provider":"المزود الأرجح (openrouter|deepseek|openai|anthropic|mistral|groq|together|other)","model":"نموذج مقترح يعمل غالباً","authStyle":"bearer|header|query|none","authHeaderName":"اسم الترويسة إن لزم","capabilities":["chat","json"],"likelyService":"الخدمة التي يُرجح أن المفتاح منها وعلامات تدل على ذلك من شكل البادئة","usageHint":"نصيحة استخدام عملية قصيرة بالعربية","notes":"ملاحظة تقنية قصيرة بالعربية","quality":"رقم من 0 إلى 100"}',
+          },
+          {
+            role: "user",
+            content: `المفتاح: ${keyPreview}\nالطول: ${key.length} حرف\nالبداية: ${key.slice(0, 12)}\n${providerHint ? `تلميح المزود من المستخدم: ${providerHint}\n` : ""}${modelHint ? `تلميح النموذج: ${modelHint}` : ""}`,
+          },
+        ],
+        500,
+        0.2,
+        "Zaka Key Analyzer",
+      );
+      const m = analysisText.match(/\{[\s\S]*\}/);
+      if (m) {
+        const parsed = JSON.parse(m[0]) as Partial<KeyAnalysis>;
+        const authStyle = ["bearer", "header", "query", "none"].includes(
+          parsed.authStyle ?? "",
+        )
+          ? (parsed.authStyle as "bearer" | "header" | "query" | "none")
+          : "bearer";
+        analysis = {
+          ...DEFAULT_KEY_ANALYSIS,
+          provider: String(parsed.provider ?? "openrouter"),
+          model: String(parsed.model ?? analysis.model),
+          authStyle,
+          authHeaderName: parsed.authHeaderName
+            ? String(parsed.authHeaderName)
+            : undefined,
+          capabilities: Array.isArray(parsed.capabilities) && parsed.capabilities.length
+            ? parsed.capabilities.map(String)
+            : ["chat"],
+          notes: String(parsed.notes ?? DEFAULT_KEY_ANALYSIS.notes),
+          likelyService: String(parsed.likelyService ?? "غير محدد"),
+          usageHint: String(parsed.usageHint ?? DEFAULT_KEY_ANALYSIS.usageHint),
+          quality: Number(parsed.quality) || 50,
+        };
+      }
+    } catch {
+      // فشل التحليل لا يوقف المحاولة — نكمل بالافتراضات
+    }
+
+    // 2) اختبار حي للمفتاح: اتصال حقيقي يقيس الزمن ويتحقق من الصلاحية
+    const baseUrl = "https://openrouter.ai/api/v1/chat/completions";
+    const started = Date.now();
+    let ok = false;
+    let sample = "";
+    let probeError = "";
+    try {
+      const response = await fetch(baseUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://zaka.app",
+          "X-Title": "Zaka Key Probe",
+        },
+        body: JSON.stringify({
+          model: analysis.model || "openrouter/auto",
+          messages: [{ role: "user", content: "قل: جاهز" }],
+          max_tokens: 20,
+        }),
+      });
+      const latencyMs = Date.now() - started;
+      if (response.ok) {
+        ok = true;
+        const data = await response.json();
+        sample = String(
+          data.choices?.[0]?.message?.content ?? data.reply ?? "",
+        ).slice(0, 80);
+      } else {
+        const err = await response.text();
+        probeError =
+          response.status === 429
+            ? "المفتاح تجاوز حد الاستخدام (429) — أضف رصيداً أو جرّب نموذجاً آخر."
+            : `المزود رفض المفتاح (${response.status}): ${err.slice(0, 160)}`;
+      }
+    } catch (e) {
+      probeError = e instanceof Error ? e.message : "خطأ شبكة أثناء الفحص";
+    }
+
+    // 3) الربط باللعبة كلها: نسجّل الـ API في السجل ليدخل سلسلة الاستدعاء الذكي
+    const apiId = await ctx.runMutation(api.apiHubStore.registerApi, {
+      name: `${analysis.provider} (محلّل ذكي)`,
+      provider: analysis.provider,
+      baseUrl,
+      apiKey: ok ? key : undefined,
+      authStyle: analysis.authStyle,
+      authHeaderName:
+        analysis.authStyle === "header" || analysis.authStyle === "query"
+          ? analysis.authHeaderName
+          : undefined,
+      model: analysis.model,
+      capabilities: analysis.capabilities?.length
+        ? analysis.capabilities
+        : ["chat"],
+      notes: analysis.notes || "أُضيف تلقائياً عبر المحلل الذكي للمفاتيح",
+      source: "auto-discovered",
+    });
+
+    return {
+      apiId,
+      ok,
+      latencyMs: Date.now() - started,
+      sample,
+      probeError,
+      analysis,
+      keyPreview,
+      connected: ok,
+    };
+  },
+});

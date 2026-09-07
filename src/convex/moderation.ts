@@ -8,7 +8,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getSettingsData, isStaffUser } from "./owner";
-import { getOpenRouterKey, DEFAULT_MODEL, ONEHOP_BASE_URL, ONEHOP_KEY, ONEHOP_MODEL } from "./aiConfig";
+import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
 
 // ---------------------------------------------------------------------------
 // AI moderation agent — "رقيب العقول".
@@ -107,16 +107,7 @@ export async function callOpenRouter(
       content: `قيّم المحتوى التالي وفق قوانين الموقع:\n\n${userContent}`,
     },
   ];
-  try {
-    return await parseOpenRouterVerdict(apiKey, model, messages);
-  } catch (orErr) {
-    // البديل المؤقت: OneHop
-    try {
-      return await parseOneHopVerdict(messages);
-    } catch {
-      throw orErr;
-    }
-  }
+  return await parseOpenRouterVerdict(apiKey, model, messages);
 }
 
 async function parseOpenRouterVerdict(
@@ -150,33 +141,6 @@ async function parseOpenRouterVerdict(
   };
   const text = data.choices?.[0]?.message?.content ?? "";
   if (!text) throw new Error("OpenRouter لم يُرجع رداً");
-  return parseVerdict(text);
-}
-
-async function parseOneHopVerdict(
-  messages: Array<{ role: string; content: string }>,
-): Promise<AiVerdict> {
-  const response = await fetch(ONEHOP_BASE_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${ONEHOP_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: ONEHOP_MODEL,
-      temperature: 0.1,
-      messages,
-    }),
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`OneHop فشل: ${response.status} ${body.slice(0, 200)}`);
-  }
-  const data = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const text = data.choices?.[0]?.message?.content ?? "";
-  if (!text) throw new Error("OneHop لم يُرجع رداً");
   return parseVerdict(text);
 }
 
