@@ -24,6 +24,15 @@ crons.interval(
   {},
 );
 
+// 🛡️ حارس AI — كل 10 دقائق: يفحص المفتاح الرسمي بنداء حي، ويصلح فشلات
+// AI تلقائياً (تصفير قاطع الدائرة، إعادة تفعيل المزودين) بلا أي تدخل بشري.
+crons.interval(
+  "ai-guardian-patrol",
+  { minutes: 10 },
+  internal.aiGuardian.patrol,
+  {},
+);
+
 export default crons;
 
 

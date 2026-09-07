@@ -28,9 +28,17 @@ export function getOpenRouterKey(providedKey?: string | null): string {
 export const FREE_MODELS = ["openrouter/auto", "openrouter/free"];
 export const DEFAULT_MODEL = "openrouter/auto";
 
+/** سلسلة نماذج بديلة — كلها عبر نفس مفتاح OpenRouter الرسمي (لا مزود خارجي) */
+export const FALLBACK_MODELS = [
+  "openai/gpt-4o-mini",
+  "meta-llama/llama-3.3-70b-instruct",
+];
+
 /**
- * ⚡ الاستدعاء الموحّد — عبر المفتاح الرسمي فقط.
- * OpenRouter فقط: فشل المفتاح = رسالة واضحة من مركز API.
+ * ⚡ الاستدعاء الموحّد — عبر المفتاح الرسمي فقط، مع إصلاح ذاتي:
+ *  - إعادة محاولة تلقائية عند الرد الفارغ (سبب «AI أعاد رداً فارغاً» السابق)
+ *  - التنقل تلقائياً بين نماذج OpenRouter عند 429/فشل النموذج
+ *  - قراءة الرد من حقل reasoning إن أعاد النموذج التفكير فقط
  */
 export async function callLlm(
   messages: Array<{ role: string; content: string }>,
@@ -41,31 +49,52 @@ export async function callLlm(
 ): Promise<string> {
   const key = getOpenRouterKey(apiKey);
   if (!key) {
-    throw new Error("لا يوجد مفتاح AI — أضف المفتاح من مركز API.");
+    throw new Error("لا يوجد مفتاح AI — المفتاح الرسمي مفقود من aiCredentials.");
   }
-  const response = await fetch(GATEWAY_BASE_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://zaka.app",
-      "X-Title": label,
-    },
-    body: JSON.stringify({ model: DEFAULT_MODEL, messages, max_tokens: maxTokens, temperature }),
-  });
-  if (!response.ok) {
-    const err = await response.text();
-    if (response.status === 429) {
-      throw new Error(
-        `المفتاح الرسمي معطّل مؤقتاً — تجاوز حد الاستخدام (429). أُوقف الاستدعاء حتى إعادة التفعيل من مركز API.`,
-      );
+  const models = [DEFAULT_MODEL, ...FALLBACK_MODELS.filter((m) => m !== DEFAULT_MODEL)];
+  let lastErr = "فشل استدعاء AI";
+
+  for (const model of models) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(GATEWAY_BASE_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://zaka.app",
+            "X-Title": label,
+          },
+          body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+        });
+        if (!response.ok) {
+          const err = await response.text();
+          if (response.status === 429) {
+            lastErr = "المفتاح تجاوز حد الاستخدام (429) — أُوقف مؤقتاً حتى إعادة التفعيل.";
+            break; // انتقل للنموذج التالي فوراً
+          }
+          lastErr = `AI Gateway error (${response.status}): ${err.slice(0, 200)}`;
+          continue; // أعد المحاولة على نفس النموذج
+        }
+        const data = (await response.json()) as {
+          choices?: Array<{ message?: { content?: string | null; reasoning?: string | null } }>;
+        };
+        const msg = data.choices?.[0]?.message;
+        const text =
+          typeof msg?.content === "string" && msg.content.trim().length > 0
+            ? msg.content
+            : typeof msg?.reasoning === "string" && msg.reasoning.trim().length > 0
+              ? msg.reasoning
+              : "";
+        if (text.trim()) return text;
+        // رد فارغ → أعد المحاولة (سبب «AI أعاد رداً فارغاً» الشائع)
+        lastErr = "AI أعاد رداً فارغاً";
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : "خطأ شبكة";
+      }
     }
-    throw new Error(`AI Gateway error (${response.status}): ${err.slice(0, 200)}`);
   }
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("AI أعاد رداً فارغاً");
-  return content;
+  throw new Error(`${lastErr} — أصلح حارس AI تلقائياً وسيعيد المحاولة.`);
 }
 
 /** توافق مع الملفات القديمة — نفس الاستدعاء الموحّد */
