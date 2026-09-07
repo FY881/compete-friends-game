@@ -8,7 +8,7 @@
  */
 
 // المفتاح الرسمي الوحيد للعبة — من module المفاتيح الداخلي
-import { ADMIN_AI_KEY } from "../lib/aiCredentials";
+import { ADMIN_AI_KEY, BACKUP_AI_KEY } from "../lib/aiCredentials";
 
 // المفتاح الاحتياطي القديم (يُزال reliance عليه من المسار الرئيسي)
 
@@ -79,7 +79,13 @@ export async function callLlm(
         (apiKey && apiKey.startsWith("sk-") ? " · مفتاح رئيسي مضبوط." : ""),
       );
     }
-    // ── المحاولة 2: OneHop (البديل المؤقت) ──
+    // ── المحاولة 2: المفتاح الاحتياطي الثاني عبر OpenRouter ──
+    try {
+      return await callOpenRouterDirect(messages, maxTokens, temperature, `${label} (backup)`, BACKUP_AI_KEY);
+    } catch {
+      /* تجاهل — ننتقل للبديل التالي */
+    }
+    // ── المحاولة 3: OneHop (البديل المؤقت) ──
     try {
       return await callOneHop(messages, maxTokens, temperature);
     } catch {
@@ -168,6 +174,7 @@ export function getSystemInfo() {
       ? process.env.OPENROUTER_API_KEY.slice(0, 15) + "..."
       : "غير مضبوط",
     adminKeyPreview: ADMIN_AI_KEY.slice(0, 12) + "...",
+    backupKeyPreview: BACKUP_AI_KEY.slice(0, 12) + "...",
     onehopKeyPreview: ONEHOP_KEY.slice(0, 12) + "...",
     models: FREE_MODELS,
     defaultModel: DEFAULT_MODEL,
