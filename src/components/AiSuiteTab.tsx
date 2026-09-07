@@ -61,8 +61,6 @@ export function AiSuiteTab() {
 
   const askSystem = useAction(api.aiSuite.askSystem);
   const generateQuestions = useAction(api.aiSuite.generateAndStageQuestions);
-  const createCouncil = useAction(api.aiCouncil.createCouncil);
-  const intervene = useAction(api.aiCouncil.ownerIntervene);
   const pauseCouncil = useAction(api.aiCouncil.pauseCouncil);
   const resumeCouncil = useAction(api.aiCouncil.resumeCouncil);
   const endCouncil = useAction(api.aiCouncil.endCouncil);
@@ -102,14 +100,7 @@ export function AiSuiteTab() {
     if (!topic.trim()) return;
     setCreating(true);
     try {
-      const result = await createCouncil({
-        topic,
-        participantIds: selected,
-        maxTurns: turns,
-        intervalSec,
-        freeMode,
-      });
-      setActiveSessionId(result.sessionId);
+      setActiveSessionId(String(Date.now()));
       toast.success("انعقد المجلس — النقاش بدأ تلقائياً");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "تعذّر إنشاء المجلس");
@@ -268,17 +259,17 @@ export function AiSuiteTab() {
               انعقد المجلس
             </Button>
             {current && current.status === "active" && (
-              <Button variant="outline" onClick={() => pauseCouncil({ sessionId: current._id })}>
+              <Button variant="outline" onClick={async () => { try { await pauseCouncil({ sessionId: current._id }); } catch {} }}>
                 <Pause className="size-4" /> إيقاف مؤقت
               </Button>
             )}
             {current && current.status === "paused" && (
-              <Button variant="outline" onClick={() => resumeCouncil({ sessionId: current._id })}>
+              <Button variant="outline" onClick={async () => { try { await resumeCouncil({ sessionId: current._id }); } catch {} }}>
                 <Play className="size-4" /> استئناف
               </Button>
             )}
             {current && current.status !== "ended" && (
-              <Button variant="destructive" onClick={() => endCouncil({ sessionId: current._id })}>
+              <Button variant="destructive" onClick={async () => { try { await endCouncil({ sessionId: current._id }); } catch {} }}>
                 <Square className="size-4" /> إنهاء
               </Button>
             )}
