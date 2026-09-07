@@ -1271,16 +1271,6 @@ const schema = defineSchema(
       maxTokens: v.number(),
       createdAt: v.number(),
     }).index("by_name", ["name"]),
-
-    viceCommands: defineTable({
-      command: v.string(),
-      targetSystem: v.string(),
-      payload: v.optional(v.string()),
-      issuedBy: v.string(),
-      status: v.union(v.literal("pending"), v.literal("executed")),
-      createdAt: v.number(),
-      executedAt: v.optional(v.number()),
-    }).index("by_created", ["createdAt"]),
   },
   {
     schemaValidation: false,
