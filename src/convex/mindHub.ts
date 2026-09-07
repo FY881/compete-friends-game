@@ -1,51 +1,51 @@
 "use node";
 
-import { query, mutation, action } from "./_generated/server";
+import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { AI_SYSTEMS } from "../lib/aiSystems";
 
-export const mindHubStore = {
-  listSessions: query({
-    args: { limit: v.number() },
-    handler: async () => [],
-  }),
-  getStats: query({
-    args: {},
-    handler: async () => ({ active: 0, messages: 0, executed: 0, pendingOwner: 0 }),
-  }),
-  getPendingOwnerDecisions: query({
-    args: {},
-    handler: async () => [],
-  }),
-  getSession: query({
-    args: { sessionId: v.id("mindHubSessions") },
-    handler: async () => null,
-  }),
-  getSessionForUi: query({
-    args: { sessionId: v.id("mindHubSessions") },
-    handler: async () => null,
-  }),
-  getDecipheredSession: query({
-    args: { sessionId: v.id("mindHubSessions") },
-    handler: async () => null,
-  }),
-};
+/** فتح جلسة في ملتقى العقول (غرفة الحرب أو العقل الحر) */
+export const openSession = action({
+  args: {
+    room: v.union(v.literal("war"), v.literal("free")),
+    maxTurns: v.number(),
+    intervalSec: v.number(),
+    autoAgenda: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { room, maxTurns, intervalSec }) => {
+    const agendas = {
+      war: "مراجعة شاملة لحالة لعبة حرب العقول واتخاذ قرارات تنفيذية",
+      free: "نقاش حر مفتوح — العلوم، الفكر، الفن، الكون، الحياة",
+    } as const;
+    const sessionId = await ctx.runMutation("mindHubStore:insertSession" as never, {
+      room,
+      agenda: agendas[room],
+      maxTurns,
+      intervalSec,
+    } as never);
+    return { sessionId };
+  },
+});
 
-export const mindHub = {
-  openSession: action({
-    args: { room: v.union(v.literal("war"), v.literal("free")), maxTurns: v.number(), intervalSec: v.number(), autoAgenda: v.boolean() },
-    handler: async () => ({ sessionId: "0" as unknown as any }),
-  }),
-  pauseSession: mutation({
-    args: { sessionId: v.id("mindHubSessions") },
-    handler: async () => {},
-  }),
-  resumeSession: mutation({
-    args: { sessionId: v.id("mindHubSessions") },
-    handler: async () => {},
-  }),
-  endSession: mutation({
-    args: { sessionId: v.id("mindHubSessions") },
-    handler: async () => {},
-  }),
-};
+export const pauseSession = action({
+  args: { sessionId: v.id("mindHubSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await ctx.runMutation("mindHubStore:setStatus" as never, { sessionId, status: "paused" } as never);
+    return { ok: true };
+  },
+});
+
+export const resumeSession = action({
+  args: { sessionId: v.id("mindHubSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await ctx.runMutation("mindHubStore:setStatus" as never, { sessionId, status: "active" } as never);
+    return { ok: true };
+  },
+});
+
+export const endSession = action({
+  args: { sessionId: v.id("mindHubSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await ctx.runMutation("mindHubStore:setStatus" as never, { sessionId, status: "ended" } as never);
+    return { ok: true };
+  },
+});

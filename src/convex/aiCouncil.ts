@@ -1,18 +1,50 @@
 "use node";
 
-import { query, action } from "./_generated/server";
+import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { AI_SYSTEMS, ELITE_MINDS } from "../lib/aiSystems";
 
-export const aiCouncilStore = {
-  getStats: query(() => ({ active: 0, messages: 0, actions: 0 })),
-};
+/** إنشاء جلسة مجلس عقول — تُدار الجلسة الفعلية في aiCouncilStore و crons */
+export const pauseCouncil = action({
+  args: { sessionId: v.id("councilSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await ctx.runMutation("aiCouncilStore:setCouncilStatus" as never, {
+      sessionId,
+      status: "paused",
+    } as never);
+    return { ok: true };
+  },
+});
 
-export const aiCouncil = {
-  systems: query(() => AI_SYSTEMS.slice(0, 5).map((s) => ({ id: s.id, name: s.name, status: "active" as const }))),
-  eliteMinds: query(() => ELITE_MINDS.map((m) => ({ id: m.id, name: m.name }))),
-  startDeliberation: action({
-    args: { topic: v.string() },
-    handler: async () => ({ ok: true }),
-  }),
-};
+export const resumeCouncil = action({
+  args: { sessionId: v.id("councilSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await ctx.runMutation("aiCouncilStore:setCouncilStatus" as never, {
+      sessionId,
+      status: "active",
+    } as never);
+    return { ok: true };
+  },
+});
+
+export const endCouncil = action({
+  args: { sessionId: v.id("councilSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await ctx.runMutation("aiCouncilStore:setCouncilStatus" as never, {
+      sessionId,
+      status: "ended",
+    } as never);
+    return { ok: true };
+  },
+});
+
+/** تدخل المالك — تُحقن الرسالة في النقاش الجاري */
+export const intervene = action({
+  args: { sessionId: v.id("councilSessions"), message: v.string() },
+  handler: async (ctx, { sessionId, message }) => {
+    await ctx.runMutation("aiCouncilStore:appendOwnerMessage" as never, {
+      sessionId,
+      message,
+    } as never);
+    return { ok: true };
+  },
+});
