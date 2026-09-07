@@ -9,9 +9,9 @@ import { recallFor, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
 import { ADMIN_AI_KEY } from "../lib/aiCredentials";
 
 function getAdminAiKey(): string {
-  // المفتاح الرسمي (sk-apx3...) من aiCredentials هو الأساس؛ env هو تجاوز اختياري فقط.
+  // مفتاح OpenRouter الرسمي الوحيد (sk-or-v1...) من aiCredentials هو الأساس؛ env تجاوز اختياري.
   // كان يقرأ process.env.ADMIN_AI_KEY حصرياً، وعند غيابه يفشل النائب — الآن يعمل
-  // فوراً على المفتاح الرسمي المضمّن بلا أي إعداد مسبق.
+  // فوراً على المفتاح المضمّن بلا أي إعداد مسبق.
   const key = process.env.ADMIN_AI_KEY || ADMIN_AI_KEY || "";
   if (key && key.trim().length > 10) return key.trim();
   throw new Error(

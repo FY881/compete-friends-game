@@ -11,14 +11,14 @@
  * المُخوَّلة، ويُمرَّر فقط عبر مسارات آمنة (actions Convex / owner UI).
  */
 export const ADMIN_AI_KEY =
-  "sk-apx3b03c6023a7bd97c1da347628421b1c39bf4475261ad88f";
+  "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";
 
-/** تمت إزالة المفتاح القديم (sk-J3x...) و OneHop نهائياً — المفتاح أعلاه هو الوحيد. */
+/** لا مفاتيح احتياطية — OpenRouter فقط. */
 export const BACKUP_AI_KEY = "";
 
-export const ADMIN_AI_PROVIDER = "ai-gateway";
+export const ADMIN_AI_PROVIDER = "OpenRouter";
 
-export const ADMIN_AI_MODEL = "openrouter/free";
+export const ADMIN_AI_MODEL = "openrouter/auto";
 
 export const AI_CREDENTIALS_README =
   "هذا الملف خاص بالمفاتيح العامة والثابتة فقط. المفاتيح الحساسة تُدار من مشروعك في Keys/API keys ولا تُكتب هنا.";

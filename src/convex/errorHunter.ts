@@ -506,7 +506,7 @@ ${errorContext}
 [{"fingerprint":"...","analysis":"تحليل عربي","fixSuggestion":"حل مقترح","canAutoFix":true/false,"actualSeverity":"low|medium|high|critical"}]`;
 
     try {
-      // عبر callLlm — OpenRouter مع بديل OneHop (DeepSeek) تلقائي عند الفشل
+      // عبر callLlm — OpenRouter فقط عبر المفتاح الرسمي
       const content: string = await callLlm(
         [{ role: "user", content: prompt }],
         2000,

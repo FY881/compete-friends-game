@@ -131,7 +131,7 @@ export const smartCall = action({
         temperature ?? 0.8,
       );
       const grade = selfGrade ? ` · تقييم ذاتي ${selfGrade}/10${confidence ? ` · ثقة ${confidence}` : ""}` : "";
-      return { reply, provider: `السلسلة الأساسية (نائب الرئيس / DeepSeek)${grade}` };
+      return { reply, provider: `السلسلة الأساسية (نائب الرئيس / OpenRouter)${grade}` };
     } catch {
       throw new Error(lastErr || "كل المزودين فشلوا");
     }
@@ -285,7 +285,7 @@ export const analyzeAndAddKey = action({
           {
             role: "system",
             content:
-              'أنت خبير بوابة ذكاء اصطناعي. حلّل مفتاح API هذا بذكاء وأرجع JSON فقط بالشكل: {"provider":"المزود الأرجح (openrouter|deepseek|openai|anthropic|mistral|groq|together|other)","model":"نموذج مقترح يعمل غالباً","authStyle":"bearer|header|query|none","authHeaderName":"اسم الترويسة إن لزم","capabilities":["chat","json"],"likelyService":"الخدمة التي يُرجح أن المفتاح منها وعلامات تدل على ذلك من شكل البادئة","usageHint":"نصيحة استخدام عملية قصيرة بالعربية","notes":"ملاحظة تقنية قصيرة بالعربية","quality":"رقم من 0 إلى 100"}',
+              'أنت خبير بوابة ذكاء اصطناعي. حلّل مفتاح API هذا بذكاء وأرجع JSON فقط بالشكل: {"provider":"المزود الأرجح (openrouter|openai|anthropic|mistral|groq|together|other)","model":"نموذج مقترح يعمل غالباً","authStyle":"bearer|header|query|none","authHeaderName":"اسم الترويسة إن لزم","capabilities":["chat","json"],"likelyService":"الخدمة التي يُرجح أن المفتاح منها وعلامات تدل على ذلك من شكل البادئة","usageHint":"نصيحة استخدام عملية قصيرة بالعربية","notes":"ملاحظة تقنية قصيرة بالعربية","quality":"رقم من 0 إلى 100"}',
           },
           {
             role: "user",

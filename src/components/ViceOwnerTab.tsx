@@ -1,6 +1,6 @@
 /**
  * 👤 نائب المالك — واجهة المراقبة
- * يعمل على المفتاح الرسمي الوحيد (sk-apx3...) عبر البوابة الموحّدة — لا يحتاج أي مفتاح إضافي.
+ * يعمل على مفتاح OpenRouter الرسمي الوحيد (sk-or-v1...) — لا يحتاج أي مفتاح إضافي.
  * المالك يراقب فقط — لا توجد أي قناة أوامر إليه.
  */
 import { useState, useEffect } from "react";
@@ -99,8 +99,8 @@ export function ViceOwnerTab() {
       <div className="flex items-start gap-2 rounded-xl bg-sky-500/[0.06] px-4 py-3 text-xs leading-relaxed text-muted-foreground">
         <KeyRound className="mt-0.5 size-4 shrink-0 text-sky-600" />
         <span>
-          النائب يعمل على <strong className="text-foreground">المفتاح الرسمي الوحيد</strong> المضمّن في اللعبة عبر البوابة
-          الموحّدة — <strong className="text-foreground">لا يحتاج أي مفتاح إضافي</strong> (لا Gemini ولا OpenRouter منفصل).
+          النائب يعمل على <strong className="text-foreground">مفتاح OpenRouter الرسمي الوحيد</strong> المضمّن في اللعبة
+          — <strong className="text-foreground">لا Gemini ولا أي مزود آخر</strong>، وكل أنظمة AI تمر عبره.
           اضغط «ابدأ ورديته» وسيبدأ فوراً.
         </span>
       </div>

@@ -200,7 +200,7 @@ export const analyzeReport = mutation({
 }`;
 
     try {
-      // عبر callLlm — OpenRouter مع بديل OneHop (DeepSeek) تلقائي عند الفشل
+      // عبر callLlm — OpenRouter فقط عبر المفتاح الرسمي
       const content: string = await callLlm(
         [
           { role: "system", content: systemPrompt },

@@ -1,7 +1,7 @@
 /**
  * AI Configuration — مركز الإعدادات الذكية
- * المفتاح الرسمي الوحيد: sk-apx3... (AI Gateway متوافق مع OpenRouter).
- * OpenRouter المباشر و OneHop أُزيلوا تماماً — كل شيء عبر المفتاح الرسمي.
+ * المفتاح الرسمي الوحيد: OpenRouter (sk-or-v1...). لا Gemini ولا أي مزود آخر.
+ * كل أنظمة AI في اللعبة تمر عبر هذا المفتاح فقط.
  */
 
 import { ADMIN_AI_KEY, BACKUP_AI_KEY } from "../lib/aiCredentials";
@@ -30,7 +30,7 @@ export const DEFAULT_MODEL = "openrouter/auto";
 
 /**
  * ⚡ الاستدعاء الموحّد — عبر المفتاح الرسمي فقط.
- * لا OpenRouter منفصل ولا OneHop: فشل المفتاح = رسالة واضحة من مركز API.
+ * OpenRouter فقط: فشل المفتاح = رسالة واضحة من مركز API.
  */
 export async function callLlm(
   messages: Array<{ role: string; content: string }>,
@@ -124,7 +124,7 @@ export function getSystemInfo() {
       : "غير مضبوط",
     adminKeyPreview: ADMIN_AI_KEY.slice(0, 12) + "...",
     backupKeyPreview: backupKey ? backupKey.slice(0, 12) + "..." : "أُزيل",
-    onehopKeyPreview: "أُزيل نهائياً",
+    onehopKeyPreview: "غير موجود — OpenRouter فقط",
     models: FREE_MODELS,
     defaultModel: DEFAULT_MODEL,
     backup: null as null | { provider: string; model: string },

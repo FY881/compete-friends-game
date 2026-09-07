@@ -23,7 +23,7 @@ import { upgradedLlm } from "./aiUpgradeKit";
 // OpenRouter API Helper
 // ═══════════════════════════════════════════════════════════════
 
-// عبر callLlm — OpenRouter مع بديل OneHop (DeepSeek) تلقائي عند الفشل
+// عبر callLlm — OpenRouter فقط عبر المفتاح الرسمي
 async function callOpenRouter(
   _apiKey: string,
   messages: Array<{ role: string; content: string }>,
