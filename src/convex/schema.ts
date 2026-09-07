@@ -1252,6 +1252,19 @@ const schema = defineSchema(
       probedAt: v.number(),
     }).index("by_probed", ["probedAt"]),
 
+    // ═══ أوامر نائب المالك ─────────────────────────────── ═══
+    // ═══ الأوامر المُصدرة من الواجهة أو من circulatedHumansReadable
+    // ═══ النائب يقرأها خلال دورته ويُنفّذها بالترتيب               ═══
+    viceCommands: defineTable({
+      command: v.string(),
+      targetSystem: v.string(), // "viceOwner" | اسم نظام محدد | "all"
+      payload: v.optional(v.string()),
+      issuedBy: v.string(),
+      status: v.union(v.literal("pending"), v.literal("executed"), v.literal("rejected")),
+      executedAt: v.optional(v.number()),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
     apiPromptTemplates: defineTable({
       name: v.string(),
       systemPrompt: v.string(),
