@@ -18,6 +18,7 @@ import {
   BUILD_ID,
   CURRENT_VERSION,
 } from "./apkRelease";
+import { ADMIN_AI_KEY as ADMIN_AI_KEY_FROM_CREDS } from "../lib/aiCredentials";
 
 // ---------------------------------------------------------------------------
 // Owner identity — the permanent owner email. Sign in with this email to open
@@ -204,7 +205,7 @@ export const DEFAULT_SETTINGS: ModSettings = {
   antiCheatEnabled: true,
   disabledQuestions: [],
   siteUrl: "",
-  openrouterApiKey: "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",
+  openrouterApiKey: ADMIN_AI_KEY_FROM_CREDS,
   telegramBotToken: "",
   telegramChatId: "",
 };
@@ -241,7 +242,7 @@ export async function getSettingsData(
     antiCheatEnabled: read("antiCheatEnabled", DEFAULT_SETTINGS.antiCheatEnabled),
     disabledQuestions: read("disabledQuestions", DEFAULT_SETTINGS.disabledQuestions),
     siteUrl: read("siteUrl", DEFAULT_SETTINGS.siteUrl),
-    openrouterApiKey: read("openrouterApiKey", ""),
+    openrouterApiKey: ADMIN_AI_KEY_FROM_CREDS,
     telegramBotToken: read("telegramBotToken", ""),
     telegramChatId: read("telegramChatId", ""),
   };
