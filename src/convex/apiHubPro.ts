@@ -20,7 +20,7 @@
  */
 "use node";
 
-import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm, callOpenRouterDirect, callOneHop, getOpenRouterKey } from "./aiConfig";
@@ -71,7 +71,7 @@ export const smartCallPro = action({
     if (!bypassCache) {
       const fp = requestFingerprint(messages);
       try {
-        const cached = await ctx.runQuery(internal.apiHubPro.getCached, { fp });
+        const cached = await ctx.runQuery(internal.apiHubStore.getCached, { fp });
         if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
           return {
             reply: cached.reply,
@@ -87,7 +87,7 @@ export const smartCallPro = action({
 
     // ── 3. حارس الحدود: هل تجاوزنا الحد خلال الدقيقة؟ ──
     try {
-      const recent = (await ctx.runQuery(internal.apiHubPro.recentCallCount, { sinceMs: 60_000 })) as number;
+      const recent = (await ctx.runQuery(internal.apiHubStore.recentCallCount, { sinceMs: 60_000 })) as number;
       if (recent >= RATE_LIMIT_PER_MIN) {
         throw new Error(
           `حارس الحدود: ${recent} استدعاء خلال الدقيقة الأخيرة (الحد ${RATE_LIMIT_PER_MIN}) — انتظر لحظة.`,
@@ -100,7 +100,7 @@ export const smartCallPro = action({
 
     // ── 2. القاطع: مزود مفتوح؟ ──
     try {
-      const circuit = (await ctx.runQuery(internal.apiHubPro.getCircuit, {})) as {
+      const circuit = (await ctx.runQuery(internal.apiHubStore.getCircuit, {})) as {
         open: boolean;
         openedAt: number | null;
         failures: number;
@@ -130,7 +130,7 @@ export const smartCallPro = action({
       try {
         const reply = await callOpenRouterDirect(messages, maxTokens ?? 900, temperature ?? 0.8, "API Hub Pro", key);
         const latencyMs = Date.now() - started;
-        await ctx.runMutation(internal.apiHubPro.logCall, {
+        await ctx.runMutation(internal.apiHubStore.logCall, {
           ok: true,
           provider: "OpenRouter",
           model: routedModel,
@@ -140,10 +140,10 @@ export const smartCallPro = action({
           tokensOut: reply.length,
           taskType: taskType ?? "general",
         });
-        await ctx.runMutation(internal.apiHubPro.recordSuccess, {});
+        await ctx.runMutation(internal.apiHubStore.recordSuccess, {});
         // ── 4. احفظ في الكاش ──
         if (!bypassCache) {
-          await ctx.runMutation(internal.apiHubPro.putCache, {
+          await ctx.runMutation(internal.apiHubStore.putCache, {
             fp: requestFingerprint(messages),
             reply,
             provider: "OpenRouter",
@@ -153,7 +153,7 @@ export const smartCallPro = action({
       } catch (e) {
         lastErr = e instanceof Error ? e.message : String(e);
         if (lastErr.includes("429") || lastErr.includes("Rate limit")) {
-          await ctx.runMutation(internal.apiHubPro.recordFailure, {}).catch(() => {});
+          await ctx.runMutation(internal.apiHubStore.recordFailure, {}).catch(() => {});
           continue; // جرّب المفتاح التالي فوراً
         }
       }
@@ -163,7 +163,7 @@ export const smartCallPro = action({
     try {
       const reply = await callOneHop(messages, maxTokens ?? 900, temperature ?? 0.8);
       const latencyMs = Date.now() - started;
-      await ctx.runMutation(internal.apiHubPro.logCall, {
+      await ctx.runMutation(internal.apiHubStore.logCall, {
         ok: true,
         provider: "OneHop",
         model: "deepseek/deepseek-v4-flash",
@@ -178,7 +178,7 @@ export const smartCallPro = action({
       lastErr = e instanceof Error ? e.message : String(e);
     }
 
-    await ctx.runMutation(internal.apiHubPro.recordFailure, {}).catch(() => {});
+    await ctx.runMutation(internal.apiHubStore.recordFailure, {}).catch(() => {});
     throw new Error(lastErr || "كل المزودين فشلوا");
   },
 });
@@ -195,7 +195,7 @@ export const batchCall = action({
     const results: Array<{ ok: boolean; reply?: string; error?: string }> = [];
     for (const messages of requests.slice(0, 10)) {
       try {
-        const res = (await ctx.runAction(api.apiHubPro.smartCallPro, {
+        const res = (await ctx.runAction((api as unknown as { apiHubPro: { smartCallPro: never } }).apiHubPro.smartCallPro, {
           messages,
           maxTokens: maxTokens ?? 500,
         } as never)) as { reply: string };
@@ -244,7 +244,7 @@ export const probeKeys = action({
         });
       }
     }
-    await ctx.runMutation(internal.apiHubPro.saveProbeResults, { results });
+    await ctx.runMutation(internal.apiHubStore.saveProbeResults, { results });
     return { results };
   },
 });
@@ -266,7 +266,7 @@ export const autoHealProviders = action({
       if (a.status === "failed" && a.failCount >= 3) {
         const cooldown = 10 * 60 * 1000;
         if (!a.lastTestedAt || Date.now() - a.lastTestedAt > cooldown) {
-          await ctx.runMutation(internal.apiHubPro.resetProvider, { apiId: a._id as never });
+          await ctx.runMutation(internal.apiHubStore.resetProvider, { apiId: a._id as never });
           healed++;
         }
       }
@@ -285,7 +285,7 @@ export const setScope = action({
     target: v.optional(v.string()),
   },
   handler: async (ctx, { apiId, scope, target }) => {
-    await ctx.runMutation(internal.apiHubPro.saveScope, { apiId, scope, target: target ?? "" });
+    await ctx.runMutation(internal.apiHubStore.saveScope, { apiId, scope, target: target ?? "" });
     return { ok: true };
   },
 });
@@ -294,7 +294,7 @@ export const setScope = action({
 export const checkScope = action({
   args: { apiId: v.id("apiRegistry"), section: v.string() },
   handler: async (ctx, { apiId, section }) => {
-    const rec = (await ctx.runQuery(internal.apiHubPro.getScope, { apiId })) as {
+    const rec = (await ctx.runQuery(internal.apiHubStore.getScope, { apiId })) as {
       scope: string;
       target?: string;
     } | null;
@@ -311,7 +311,7 @@ export const checkScope = action({
 export const saveTemplate = action({
   args: { name: v.string(), systemPrompt: v.string(), maxTokens: v.optional(v.number()) },
   handler: async (ctx, { name, systemPrompt, maxTokens }) => {
-    await ctx.runMutation(internal.apiHubPro.upsertTemplate, {
+    await ctx.runMutation(internal.apiHubStore.upsertTemplate, {
       name,
       systemPrompt,
       maxTokens: maxTokens ?? 900,
@@ -320,55 +320,12 @@ export const saveTemplate = action({
   },
 });
 
-export const listTemplates = query({
-  args: {},
-  handler: async (ctx) => await ctx.db.query("apiPromptTemplates").order("desc").take(50),
-});
-
-export const deleteTemplate = action({
-  args: { id: v.id("apiPromptTemplates") },
-  handler: async (ctx, { id }) => {
-    await ctx.db.delete(id);
-    return { ok: true };
-  },
-});
+// listTemplates / deleteTemplate moved to apiHubStore.ts (queries/mutations can't live in Node runtime)
 
 // ═══════════════════════════════════════════════════════════════
-// 9+6+12+13. التحليلات والتكلفة والتدقيق والحصص
+// 9+6+12+13. التحليلات والتكلفة والتدقيق والحصص — نُقلت إلى apiHubStore.ts
 // ═══════════════════════════════════════════════════════════════
-export const getHubAnalytics = query({
-  args: {},
-  handler: async (ctx) => {
-    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    const calls = await ctx.db.query("apiCallLogs").withIndex("by_created", (q) => q.gte("createdAt", dayAgo)).take(500);
-    const ok = calls.filter((c) => c.ok);
-    const avgLatency = ok.length ? Math.round(ok.reduce((s, c) => s + c.latencyMs, 0) / ok.length) : 0;
-    const byProvider: Record<string, number> = {};
-    const byKey: Record<string, number> = {};
-    for (const c of calls) {
-      byProvider[c.provider] = (byProvider[c.provider] || 0) + 1;
-      byKey[c.keyUsed] = (byKey[c.keyUsed] || 0) + 1;
-    }
-    const minuteAgo = Date.now() - 60_000;
-    const callsLastMinute = calls.filter((c) => c.createdAt > minuteAgo).length;
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayCalls = calls.filter((c) => c.createdAt >= todayStart.getTime()).length;
-    return {
-      totalCalls: calls.length,
-      successRate: calls.length ? Math.round((ok.length / calls.length) * 100) : 100,
-      avgLatency,
-      byProvider,
-      byKey,
-      callsLastMinute,
-      todayCalls,
-      dailyQuota: DAILY_QUOTA,
-      quotaRemaining: Math.max(0, DAILY_QUOTA - todayCalls),
-      quotaExceeded: todayCalls >= DAILY_QUOTA,
-      recent: calls.slice(0, 20),
-    };
-  },
-});
+// getHubAnalytics moved to apiHubStore.ts (query can't live in Node runtime)
 
 // ═══════════════════════════════════════════════════════════════
 // 14. ناقل أوامر نائب الرئيس — أوامر تنفّذها العقول
@@ -380,7 +337,7 @@ export const issueViceCommand = action({
     payload: v.optional(v.string()),
   },
   handler: async (ctx, { command, targetSystem, payload }) => {
-    const id = await ctx.runMutation(internal.apiHubPro.pushCommand, {
+    const id = await ctx.runMutation(internal.apiHubStore.pushCommand, {
       command: command.slice(0, 500),
       targetSystem,
       payload: payload?.slice(0, 2000),
@@ -394,161 +351,20 @@ export const issueViceCommand = action({
 export const pullCommands = action({
   args: { targetSystem: v.string() },
   handler: async (ctx, { targetSystem }) => {
-    const cmds = (await ctx.runQuery(internal.apiHubPro.pendingCommands, { targetSystem })) as Array<{
+    const cmds = (await ctx.runQuery(internal.apiHubStore.pendingCommands, { targetSystem })) as Array<{
       _id: string;
       command: string;
       payload?: string;
     }>;
     for (const c of cmds) {
-      await ctx.runMutation(internal.apiHubPro.markExecuted, { id: c._id as never });
+      await ctx.runMutation(internal.apiHubStore.markExecuted, { id: c._id as never });
     }
     return { commands: cmds };
   },
 });
 
-export const listCommandLog = query({
-  args: {},
-  handler: async (ctx) => await ctx.db.query("viceCommands").withIndex("by_created", (q) => q.gte("createdAt", 0)).order("desc").take(50),
-});
+// listCommandLog moved to apiHubStore.ts
 
 // ═══════════════════════════════════════════════════════════════
-// قراءات ومutations داخلية
+// قراءات ومutations داخلية — نُقلت إلى apiHubStore.ts
 // ═══════════════════════════════════════════════════════════════
-export const getCached = internalQuery({
-  args: { fp: v.string() },
-  handler: async (ctx, { fp }) =>
-    await ctx.db.query("apiCache").withIndex("by_fp", (q) => q.eq("fp", fp)).first(),
-});
-
-export const recentCallCount = internalQuery({
-  args: { sinceMs: v.number() },
-  handler: async (ctx, { sinceMs }) => {
-    const since = Date.now() - sinceMs;
-    const rows = await ctx.db.query("apiCallLogs").withIndex("by_created", (q) => q.gte("createdAt", since)).collect();
-    return rows.length;
-  },
-});
-
-export const getCircuit = internalQuery({
-  args: {},
-  handler: async (ctx) => await ctx.db.query("apiCircuit").withIndex("by_id", (q) => q.eq("id", "main")).first(),
-});
-
-export const recordSuccess = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const c = await ctx.db.query("apiCircuit").withIndex("by_id", (q) => q.eq("id", "main")).first();
-    if (c) await ctx.db.patch(c._id, { failures: 0, open: false, openedAt: null });
-    else await ctx.db.insert("apiCircuit", { id: "main", failures: 0, open: false, openedAt: null });
-  },
-});
-
-export const recordFailure = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const c = await ctx.db.query("apiCircuit").withIndex("by_id", (q) => q.eq("id", "main")).first();
-    if (c) {
-      const failures = c.failures + 1;
-      await ctx.db.patch(c._id, {
-        failures,
-        open: failures >= CIRCUIT_THRESHOLD,
-        openedAt: failures >= CIRCUIT_THRESHOLD ? Date.now() : c.openedAt,
-      });
-    } else {
-      await ctx.db.insert("apiCircuit", { id: "main", failures: 1, open: false, openedAt: null });
-    }
-  },
-});
-
-export const logCall = internalMutation({
-  args: {
-    ok: v.boolean(),
-    provider: v.string(),
-    model: v.string(),
-    keyUsed: v.string(),
-    latencyMs: v.number(),
-    tokensIn: v.number(),
-    tokensOut: v.number(),
-    taskType: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.insert("apiCallLogs", { ...args, createdAt: Date.now() });
-  },
-});
-
-export const putCache = internalMutation({
-  args: { fp: v.string(), reply: v.string(), provider: v.string() },
-  handler: async (ctx, { fp, reply, provider }) => {
-    const existing = await ctx.db.query("apiCache").withIndex("by_fp", (q) => q.eq("fp", fp)).first();
-    if (existing) await ctx.db.patch(existing._id, { reply, provider, createdAt: Date.now() });
-    else await ctx.db.insert("apiCache", { fp, reply, provider, createdAt: Date.now() });
-  },
-});
-
-export const saveProbeResults = internalMutation({
-  args: {
-    results: v.array(v.object({ key: v.string(), ok: v.boolean(), latencyMs: v.number(), error: v.optional(v.string()) })),
-  },
-  handler: async (ctx, { results }) => {
-    await ctx.db.insert("apiKeyProbes", { results, probedAt: Date.now() });
-  },
-});
-
-export const resetProvider = internalMutation({
-  args: { apiId: v.id("apiRegistry") },
-  handler: async (ctx, { apiId }) => {
-    await ctx.db.patch(apiId, { status: "untested", failCount: 0 });
-  },
-});
-
-export const saveScope = internalMutation({
-  args: {
-    apiId: v.id("apiRegistry"),
-    scope: v.union(v.literal("everything"), v.literal("side"), v.literal("item")),
-    target: v.string(),
-  },
-  handler: async (ctx, { apiId, scope, target }) => {
-    await ctx.db.patch(apiId, { notes: `scope:${scope}|target:${target}` });
-  },
-});
-
-export const getScope = internalQuery({
-  args: { apiId: v.id("apiRegistry") },
-  handler: async (ctx, { apiId }) => {
-    const api = await ctx.db.get(apiId);
-    if (!api?.notes?.startsWith("scope:")) return null;
-    const [scopePart, targetPart] = api.notes.split("|");
-    return { scope: scopePart.replace("scope:", ""), target: targetPart?.replace("target:", "") ?? "" };
-  },
-});
-
-export const upsertTemplate = internalMutation({
-  args: { name: v.string(), systemPrompt: v.string(), maxTokens: v.number() },
-  handler: async (ctx, { name, systemPrompt, maxTokens }) => {
-    const existing = await ctx.db.query("apiPromptTemplates").withIndex("by_name", (q) => q.eq("name", name)).first();
-    if (existing) await ctx.db.patch(existing._id, { systemPrompt, maxTokens });
-    else await ctx.db.insert("apiPromptTemplates", { name, systemPrompt, maxTokens, createdAt: Date.now() });
-  },
-});
-
-export const pushCommand = internalMutation({
-  args: { command: v.string(), targetSystem: v.string(), payload: v.optional(v.string()), issuedBy: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("viceCommands", { ...args, status: "pending", createdAt: Date.now() });
-  },
-});
-
-export const pendingCommands = internalQuery({
-  args: { targetSystem: v.string() },
-  handler: async (ctx, { targetSystem }) => {
-    const all = await ctx.db.query("viceCommands").withIndex("by_created", (q) => q.gte("createdAt", 0)).order("desc").take(20);
-    return all.filter((c) => c.status === "pending" && (c.targetSystem === targetSystem || c.targetSystem === "all"));
-  },
-});
-
-export const markExecuted = internalMutation({
-  args: { id: v.id("viceCommands") },
-  handler: async (ctx, { id }) => {
-    await ctx.db.patch(id, { status: "executed", executedAt: Date.now() });
-  },
-});

@@ -1212,6 +1212,62 @@ const schema = defineSchema(
       equippedTitle: v.optional(v.string()),
       updatedAt: v.number(),
     }).index("by_user", ["userId"]),
+
+    // ═══ مركز API الاحترافي — جداول الحرس والكاش والتدقيق ═══
+    apiCache: defineTable({
+      fp: v.string(),
+      reply: v.string(),
+      provider: v.string(),
+      createdAt: v.number(),
+    }).index("by_fp", ["fp"]),
+
+    apiCallLogs: defineTable({
+      ok: v.boolean(),
+      provider: v.string(),
+      model: v.string(),
+      keyUsed: v.string(),
+      latencyMs: v.number(),
+      tokensIn: v.number(),
+      tokensOut: v.number(),
+      taskType: v.string(),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    apiCircuit: defineTable({
+      id: v.string(),
+      failures: v.number(),
+      open: v.boolean(),
+      openedAt: v.optional(v.union(v.number(), v.null())),
+    }).index("by_id", ["id"]),
+
+    apiKeyProbes: defineTable({
+      results: v.array(
+        v.object({
+          key: v.string(),
+          ok: v.boolean(),
+          latencyMs: v.number(),
+          error: v.optional(v.string()),
+        }),
+      ),
+      probedAt: v.number(),
+    }).index("by_probed", ["probedAt"]),
+
+    apiPromptTemplates: defineTable({
+      name: v.string(),
+      systemPrompt: v.string(),
+      maxTokens: v.number(),
+      createdAt: v.number(),
+    }).index("by_name", ["name"]),
+
+    viceCommands: defineTable({
+      command: v.string(),
+      targetSystem: v.string(),
+      payload: v.optional(v.string()),
+      issuedBy: v.string(),
+      status: v.union(v.literal("pending"), v.literal("executed")),
+      createdAt: v.number(),
+      executedAt: v.optional(v.number()),
+    }).index("by_created", ["createdAt"]),
   },
   {
     schemaValidation: false,
