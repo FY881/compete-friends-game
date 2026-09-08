@@ -27,45 +27,15 @@ export const executeCommand = action({
     executor: v.optional(v.string()), // "vice_owner" (افتراضي) أو معرف مساعد
   },
   handler: async (ctx, { command, executor }): Promise<{ ok: boolean; result: string; action: string }> => {
-    const who = executor && assistantById(executor) ? assistantById(executor)! : null;
-    const executorName = who ? `${who.emoji} ${who.name}` : "👤 نائب المالك";
-    const executorId = who ? who.id : "vice_owner";
-    const cmd = command.trim();
-
-    try {
-      const outcome = await dispatch(ctx, cmd);
-      await ctx.runMutation(internal.assistantsStore.writeAudit, {
-        executor: executorId,
-        executorName,
-        command: cmd,
-        action: outcome.action,
-        target: outcome.target,
-        params: outcome.params,
-        result: "executed",
-        detail: outcome.detail,
-      });
-      return { ok: true, result: outcome.detail, action: outcome.action };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "خطأ غير معروف";
-      await ctx.runMutation(internal.assistantsStore.writeAudit, {
-        executor: executorId,
-        executorName,
-        command: cmd,
-        action: "unknown",
-        target: cmd.slice(0, 60),
-        result: "failed",
-        detail: msg,
-      });
-      return { ok: false, result: msg, action: "failed" };
-    }
+    return await runCommand(ctx, command, executor);
   },
 });
 
 /** إصدار أمر لنائب المالك: تنفيذ فوري + تسجيل */
 export const issueViceOrder = action({
   args: { command: v.string() },
-  handler: async (ctx, { command }) => {
-    return await ctx.runAction(api.viceControl.executeCommand, { command, executor: "vice_owner" });
+  handler: async (ctx, { command }): Promise<{ ok: boolean; result: string; action: string }> => {
+    return await runCommand(ctx, command);
   },
 });
 
@@ -101,7 +71,19 @@ export const orderAssistants = action({
 /** فحص شامل للعالم والمساعدين والسجل — يُنفَّذ فعلياً من الأنظمة الحية */
 export const systemStatus = action({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{
+    world: {
+      assistants: number;
+      active: number;
+      totalActions: number;
+      totalTasks: number;
+      totalLogs: number;
+      pendingOrders: number;
+      totalOrders: number;
+      avgReputation: number;
+    };
+    audit: { total: number; failed: number };
+  }> => {
     const world = await ctx.runQuery(api.assistantsStore.getWorldStats, {});
     const audit = await ctx.runQuery(api.assistantsStore.getAuditStats, {});
     return { world, audit };
@@ -109,6 +91,45 @@ export const systemStatus = action({
 });
 
 // ── موزّع الأوامر — كل أمر يُنفَّذ على بيانات حقيقية ───────────
+/** منطق التنفيذ المشترك: يصرف الأمر على بيانات حقيقية ويسجله في السجل المركزي */
+async function runCommand(
+  ctx: Ctx,
+  command: string,
+  executor?: string,
+): Promise<{ ok: boolean; result: string; action: string }> {
+  const who = executor && assistantById(executor) ? assistantById(executor)! : null;
+  const executorName = who ? `${who.emoji} ${who.name}` : "👤 نائب المالك";
+  const executorId = who ? who.id : "vice_owner";
+  const cmd = command.trim();
+
+  try {
+    const outcome = await dispatch(ctx, cmd);
+    await ctx.runMutation(internal.assistantsStore.writeAudit, {
+      executor: executorId,
+      executorName,
+      command: cmd,
+      action: outcome.action,
+      target: outcome.target,
+      params: outcome.params,
+      result: "executed",
+      detail: outcome.detail,
+    });
+    return { ok: true, result: outcome.detail, action: outcome.action };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "خطأ غير معروف";
+    await ctx.runMutation(internal.assistantsStore.writeAudit, {
+      executor: executorId,
+      executorName,
+      command: cmd,
+      action: "unknown",
+      target: cmd.slice(0, 60),
+      result: "failed",
+      detail: msg,
+    });
+    return { ok: false, result: msg, action: "failed" };
+  }
+}
+
 async function dispatch(
   ctx: Ctx,
   cmd: string,

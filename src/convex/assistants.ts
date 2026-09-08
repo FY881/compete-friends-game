@@ -50,7 +50,7 @@ async function think(assistant: (typeof ASSISTANT_MINDS)[number], context: strin
 /** فتح العالم: تهيئة كل المساعدين + بدء دورة الحياة */
 export const startWorld = action({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ ok: true; created: number; total: number }> => {
     const seeded = await ctx.runMutation(internal.assistantsStore.seedWorld, {});
     await ctx.scheduler.runAfter(4_000, internal.assistants.lifeTick, {});
     return { ok: true, ...seeded };

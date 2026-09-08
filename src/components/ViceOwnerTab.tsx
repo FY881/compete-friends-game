@@ -20,6 +20,10 @@ import {
   ShieldAlert,
   History,
   KeyRound,
+  Terminal,
+  Activity,
+  Users,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ViceOwnerFace } from "./ViceOwnerFace";
@@ -44,6 +48,32 @@ export function ViceOwnerTab() {
   const startShift = useAction(api.viceOwner.startShift);
   const pauseShift = useAction(api.viceOwner.pauseShift);
   const resumeShift = useAction(api.viceOwner.resumeShift);
+
+  // ══ النظام المركزي للسيطرة + عالم المساعدين ══
+  const world = useQuery(api.assistantsStore.getWorld, {});
+  const worldStats = useQuery(api.assistantsStore.getWorldStats, {});
+  const auditStats = useQuery(api.assistantsStore.getAuditStats, {});
+  const startWorld = useAction(api.assistants.startWorld);
+  const executeCommand = useAction(api.viceControl.executeCommand);
+  const systemStatus = useAction(api.viceControl.systemStatus);
+  const [command, setCommand] = useState("");
+  const [commandResult, setCommandResult] = useState<string | null>(null);
+  const [commandBusy, setCommandBusy] = useState(false);
+  const [worldBusy, setWorldBusy] = useState(false);
+
+  const runCommand = async () => {
+    if (!command.trim()) return;
+    setCommandBusy(true);
+    setCommandResult(null);
+    try {
+      const r = await executeCommand({ command: command.trim() });
+      setCommandResult(r.ok ? `✅ ${r.result}` : `❌ ${r.result}`);
+    } catch (e) {
+      setCommandResult(`❌ ${e instanceof Error ? e.message : "تعذّر التنفيذ"}`);
+    } finally {
+      setCommandBusy(false);
+    }
+  };
 
   const [starting, setStarting] = useState(false);
 
@@ -198,6 +228,157 @@ export function ViceOwnerTab() {
           )}
           {session?.lastError && (
             <p className="rounded-xl bg-rose-500/10 px-4 py-2.5 text-xs text-rose-600">{session.lastError}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ═══ النظام المركزي للسيطرة — أوامر حقيقية تُنفَّذ فوراً ═══ */}
+      <Card className="border-violet-500/25 bg-violet-500/[0.03]">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+            <Terminal className="size-4 text-violet-600" />
+            النظام المركزي للسيطرة — صلاحيات مطلقة
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            اكتب أي أمر بصيغة عربية أو إنجليزية وسيُنفَّذ فعلياً على بيانات اللعبة فوراً:
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">ban اسم 24</code>
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">mute اسم</code>
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">warn اسم سبب</code>
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">grant_xp اسم 500</code>
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">announce نص</code>
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">order all مهمة</code>
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">system اسم | هدف | مواصفات</code>
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">sweep</code>
+            <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">status</code>
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && runCommand()}
+              placeholder="أمر تنفيذي… (مثال: grant_xp أحمد 500)"
+              className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-violet-500/60"
+            />
+            <div className="flex gap-2">
+              <Button onClick={runCommand} disabled={commandBusy || !command.trim()} className="gap-1.5 rounded-xl">
+                {commandBusy ? <Loader2 className="size-4 animate-spin" /> : <Terminal className="size-4" />}
+                نفّذ الآن
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-xl"
+                title="وضع النظام الحي"
+                onClick={async () => {
+                  setCommandBusy(true);
+                  try {
+                    const s = await systemStatus();
+                    setCommandResult(`وضع النظام الحي: ${s.world.assistants} مساعداً (${s.world.active} نشط)، ${s.world.pendingOrders} أمراً بانتظار التنفيذ، ${s.audit.total} أمراً نُفّذ في السجل المركزي (${s.audit.failed} فشل).`);
+                  } catch (e) {
+                    setCommandResult(`خطأ: ${e instanceof Error ? e.message : "غير معروف"}`);
+                  } finally {
+                    setCommandBusy(false);
+                  }
+                }}
+              >
+                <Activity className="size-4" />
+              </Button>
+            </div>
+          </div>
+          {commandResult && (
+            <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.05] px-3 py-2.5 text-xs leading-relaxed text-foreground">
+              {commandResult}
+            </div>
+          )}
+          {auditStats && (
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="rounded-full text-[10px]">السجل المركزي: {auditStats.total} أمراً</Badge>
+              <Badge variant="outline" className="rounded-full text-[10px] text-emerald-600">{auditStats.executed} منفَّذ</Badge>
+              {auditStats.failed > 0 && <Badge variant="outline" className="rounded-full text-[10px] text-rose-600">{auditStats.failed} فشل</Badge>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ═══ عالم المساعدين — 24 كياناً حياً بأجهزة حقيقية ═══ */}
+      <Card className="border-emerald-500/25 bg-emerald-500/[0.03]">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+            <Users className="size-4 text-emerald-600" />
+            عالم المساعدين — {worldStats?.assistants ?? 0} كياناً حياً بأجهزتهم
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              className="gap-1.5 rounded-xl"
+              onClick={async () => {
+                setWorldBusy(true);
+                try {
+                  const r = await startWorld();
+                  toast.success(`العالم جاهز: ${r.total} مساعداً (أُنشئ ${r.created} جديداً)`);
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "تعذّر فتح العالم");
+                } finally {
+                  setWorldBusy(false);
+                }
+              }}
+              disabled={worldBusy}
+            >
+              {worldBusy ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
+              افتح العالم وابدأ الحياة
+            </Button>
+            {worldStats && (
+              <>
+                <Badge variant="outline" className="rounded-full text-[10px] text-emerald-600">{worldStats.active} نشط</Badge>
+                <Badge variant="outline" className="rounded-full text-[10px]">{worldStats.totalActions} فعلاً نُفّذ</Badge>
+                <Badge variant="outline" className="rounded-full text-[10px]">{worldStats.pendingOrders} أمراً بانتظار التنفيذ</Badge>
+                <Badge variant="outline" className="rounded-full text-[10px]">{worldStats.avgReputation}% متوسط السمعة</Badge>
+              </>
+            )}
+          </div>
+          {world && world.assistants.length > 0 && (
+            <div className="max-h-64 space-y-2 overflow-y-auto pe-1">
+              {world.assistants.map((a) => (
+                <div key={a._id} className="rounded-xl border border-border/60 bg-card p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base">{a.emoji}</span>
+                    <span className="text-xs font-bold">{a.name}</span>
+                    <span className="hidden text-[10px] text-muted-foreground sm:inline">{a.title}</span>
+                    <span className="ms-auto flex items-center gap-1.5">
+                      <span className="text-[10px] text-muted-foreground">طاقة {a.energy}%</span>
+                      <span className="text-[10px] text-muted-foreground">مستوى {a.level}</span>
+                      <span className="text-[10px] text-muted-foreground">سمعة {a.reputation}</span>
+                      <span className="text-[10px] text-muted-foreground">CPU {a.computer.cpuLoad}%</span>
+                    </span>
+                  </div>
+                  {a.lastActivity && (
+                    <p className="mt-1 truncate text-[10px] text-muted-foreground">{a.lastActivity}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {world && world.recentLogs && world.recentLogs.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                <ScrollText className="size-3.5" /> آخر نشاط حي
+              </p>
+              {world.recentLogs.slice(0, 8).map((l, i) => (
+                <div key={i} className="flex items-start gap-2 rounded-lg bg-muted/30 px-3 py-1.5">
+                  <span className="text-xs">{l.emoji}</span>
+                  <p className="min-w-0 flex-1 truncate text-[11px] leading-relaxed text-muted-foreground">
+                    <strong className="text-foreground">{l.name}</strong> — {l.detail}
+                  </p>
+                  <span className="shrink-0 text-[9px] text-muted-foreground">
+                    {new Date(l.at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
