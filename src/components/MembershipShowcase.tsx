@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { sounds } from "@/lib/sounds";
+import { MembershipAssistantPanel } from "@/components/MembershipAssistantPanel";
 import {
   Crown,
   Zap,
@@ -349,7 +350,7 @@ function AiLevelCard({ tier }: { tier: string }) {
 
 // ─── Main Component ───────────────────────────────────────────
 export default function MembershipShowcase() {
-  const [activeTab, setActiveTab] = useState<"tiers" | "games" | "sounds" | "ai">("tiers");
+  const [activeTab, setActiveTab] = useState<"tiers" | "games" | "sounds" | "ai" | "assistant">("tiers");
   const [showActivate, setShowActivate] = useState(false);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [activationCode, setActivationCode] = useState("");
@@ -449,6 +450,7 @@ export default function MembershipShowcase() {
           { id: "games" as const, label: "الألعاب", icon: Gamepad2 },
           { id: "sounds" as const, label: "الصوتيات", icon: Headphones },
           { id: "ai" as const, label: "الذكاء", icon: Brain },
+          { id: "assistant" as const, label: "جيم", icon: Gem },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -595,6 +597,17 @@ export default function MembershipShowcase() {
                 </div>
               );
             })}
+          </motion.div>
+        )}
+
+        {activeTab === "assistant" && (
+          <motion.div
+            key="assistant"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <MembershipAssistantPanel />
           </motion.div>
         )}
 
