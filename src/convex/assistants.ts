@@ -30,7 +30,7 @@ async function think(ctx: any, assistant: (typeof ASSISTANT_MINDS)[number], cont
 - نائب المالك هو المرجعية العليا: أوامره تُنفَّذ فوراً بأولوية عالية وبلا رفض.
 - تصرف الآن بفعل حقيقي واحد على الأقل.
 أعد رداً واحداً يحتوي سطر واحد أو أكثر من الصيغ التالية:
-[فعل] نوع الفعل | العنوان | التفاصيل | (moderate|inspect|reward|announce|propose|fix|social)
+[فعل] نوع الفعل | العنوان | التفاصيل | (moderate|inspect|reward|announce|propose|fix|social|membership)
 [كلام] رسالتك الحرة للعالم — فكرة، نكتة، تأمل، خبر من عالمك`,
       },
       { role: "user", content: context },
@@ -311,6 +311,38 @@ async function executeDeed(
         result: "noted",
       });
       return "شاركت مجتمع المساعدين";
+    }
+
+    case "membership": {
+      // العضويات — أثر حقيقي: تنفّذ جولة رقابة تلقائياً، وتنفّذ منح/تمديد صريحاً
+      const combined = `${title} ${detail}`.toLowerCase();
+      const g = combined.match(/grant\s+(.+?)\s+(silver|gold|diamond|exclusive|bronze)\s+(\d+)/);
+      if (g) {
+        const r = await ctx.runMutation(internal.membershipOps.grantMembership, {
+          targetName: g[1].trim(),
+          tier: g[2],
+          days: parseInt(g[3], 10),
+          actor: mind.id,
+          actorName: `${mind.emoji} ${mind.name}`,
+        });
+        return r.detail;
+      }
+      const ex = combined.match(/extend\s+(.+?)\s+(\d+)/);
+      if (ex) {
+        const r = await ctx.runMutation(internal.membershipOps.extendMembership, {
+          targetName: ex[1].trim(),
+          days: parseInt(ex[2], 10),
+          actor: mind.id,
+          actorName: `${mind.emoji} ${mind.name}`,
+        });
+        return r.detail;
+      }
+      const r = await ctx.runMutation(internal.membershipOps.membershipAudit, {
+        withinDays: 3,
+        actor: mind.id,
+        actorName: `${mind.emoji} ${mind.name}`,
+      });
+      return r.detail;
     }
 
     default: {

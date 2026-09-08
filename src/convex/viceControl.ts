@@ -103,7 +103,7 @@ async function runCommand(
   const cmd = command.trim();
 
   try {
-    const outcome = await dispatch(ctx, cmd);
+    const outcome = await dispatch(ctx, cmd, executorId, executorName);
     await ctx.runMutation(internal.assistantsStore.writeAudit, {
       executor: executorId,
       executorName,
@@ -133,6 +133,8 @@ async function runCommand(
 async function dispatch(
   ctx: Ctx,
   cmd: string,
+  executorId: string,
+  executorName: string,
 ): Promise<{ action: string; target: string; params?: string; detail: string }> {
   const lower = cmd.toLowerCase();
 
@@ -304,6 +306,68 @@ async function dispatch(
       target: "system",
       detail: `الوضع الحي: ${world.assistants} مساعداً (${world.active} نشط)، ${world.pendingOrders} أمراً بانتظار التنفيذ، ${audit.total} أمراً نُفّذ في السجل المركزي، ${audit.failed} فشل`,
     };
+  }
+
+  // ══ أوامر العضوية — منح/تمديد/سحب/جولة رقابة/إصدار أكواد ══
+  if (lower.startsWith("membership ") || lower.startsWith("member ")) {
+    const rest = cmd.replace(/^(membership|member)\s+/i, "").trim();
+    const sub = rest.toLowerCase();
+    if (sub.startsWith("grant ")) {
+      const p = rest.slice(6).split(/\s+/).filter(Boolean);
+      if (p.length < 3) throw new Error("صيغة: membership grant <اسم> <المستوى> <الأيام> (0 = دائم)");
+      const days = parseInt(p[p.length - 1], 10);
+      const tier = p[p.length - 2].toLowerCase();
+      const name = p.slice(0, p.length - 2).join(" ");
+      const r = await ctx.runMutation(internal.membershipOps.grantMembership, {
+        targetName: name, tier, days, actor: executorId, actorName: executorName,
+      });
+      return { action: "membership_grant", target: name, params: `${tier} ${days}d`, detail: r.detail };
+    }
+    if (sub.startsWith("extend ")) {
+      const p = rest.slice(7).split(/\s+/).filter(Boolean);
+      if (p.length < 2) throw new Error("صيغة: membership extend <اسم> <الأيام>");
+      const days = parseInt(p[p.length - 1], 10);
+      const name = p.slice(0, p.length - 1).join(" ");
+      const r = await ctx.runMutation(internal.membershipOps.extendMembership, {
+        targetName: name, days, actor: executorId, actorName: executorName,
+      });
+      return { action: "membership_extend", target: name, params: `${days}d`, detail: r.detail };
+    }
+    if (sub.startsWith("revoke ")) {
+      const name = rest.slice(7).trim();
+      const r = await ctx.runMutation(internal.membershipOps.revokeMembership, {
+        targetName: name, actor: executorId, actorName: executorName,
+      });
+      return { action: "membership_revoke", target: name, detail: r.detail };
+    }
+    if (sub.startsWith("code ")) {
+      const p = rest.slice(5).split(/\s+/).filter(Boolean);
+      if (p.length < 2) throw new Error("صيغة: membership code <المستوى> <الأيام> [العدد]");
+      const count = p.length >= 3 ? parseInt(p[p.length - 1], 10) : 1;
+      const days = parseInt(p[p.length - 2], 10);
+      const tier = p.slice(0, p.length - (p.length >= 3 ? 2 : 1)).join(" ").toLowerCase();
+      const r = await ctx.runMutation(internal.membershipOps.createRedeemableCodes, {
+        tier, days, count, actor: executorId, actorName: executorName,
+      });
+      return { action: "membership_code", target: tier, params: `${days}d x${r.codes.length}`, detail: `${r.detail} — الكود: ${r.codes[0] ?? ""}` };
+    }
+    if (sub === "audit" || sub.startsWith("audit ")) {
+      const days = sub === "audit" ? 3 : parseInt(sub.replace("audit", "").trim(), 10) || 3;
+      const r = await ctx.runMutation(internal.membershipOps.membershipAudit, {
+        withinDays: days, actor: executorId, actorName: executorName,
+      });
+      return { action: "membership_audit", target: "memberships", params: `${r.reminded} تذكير`, detail: r.detail };
+    }
+    if (sub === "insights" || sub === "stats") {
+      const expiring = await ctx.runQuery(internal.membershipOps.listExpiringMemberships, { withinDays: 7 });
+      const detail = expiring.length
+        ? `رصد: ${expiring.length} عضوية تنتهي خلال 7 أيام — أقربها «${expiring[0].name}» (${expiring[0].daysLeft} يوم)`
+        : "رصد: لا توجد عضويات تنتهي خلال 7 أيام — الوضع مستقر";
+      return { action: "membership_insights", target: "memberships", detail };
+    }
+    throw new Error(
+      `أمر عضوية غير معروف: «${rest.slice(0, 40)}». المتاح: membership grant|extend|revoke|code|audit|insights`,
+    );
   }
 
   // grant_badge <name> <badge>

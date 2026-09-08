@@ -373,6 +373,39 @@ const schema = defineSchema(
     }).index("by_code", ["code"]).index("by_active", ["active"]),
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ سجل أفعال العضوية — أثر حقيقي قابل للتحقق لكل عملية (منح/تمديد/سحب) ║
+    // ║ يسجّله المالك وحارسة العضويات «جيم» ونائب المالك — ويظهر للرصد. ║
+    // ═══════════════════════════════════════════════════════════════════════
+    membershipLogs: defineTable({
+      actor: v.string(), // "owner" | "as_gem" | "vice_owner" | "system"
+      actorName: v.string(),
+      action: v.union(
+        v.literal("grant"),
+        v.literal("extend"),
+        v.literal("revoke"),
+        v.literal("audit"),
+        v.literal("reminder"),
+        v.literal("code"),
+        v.literal("review"),
+      ),
+      targetUserId: v.optional(v.id("users")),
+      targetName: v.optional(v.string()),
+      tier: v.optional(
+        v.union(
+          v.literal("bronze"),
+          v.literal("silver"),
+          v.literal("gold"),
+          v.literal("diamond"),
+          v.literal("exclusive"),
+        ),
+      ),
+      detail: v.string(),
+      at: v.number(),
+    })
+      .index("by_created", ["at"])
+      .index("by_actor", ["actor", "at"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ غرف المناقشة المتطورة ║
     // ═══════════════════════════════════════════════════════════════════════
     chatRooms: defineTable({

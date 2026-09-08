@@ -5,7 +5,7 @@
  */
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,12 @@ import {
   Headphones,
   Brain,
   Flame,
+  Gem,
+  Send,
+  BellRing,
+  CalendarClock,
+  ShieldAlert,
+  ScrollText,
 } from "lucide-react";
 
 const TIER_ORDER = ["bronze", "silver", "gold", "diamond", "exclusive"];
@@ -356,9 +362,214 @@ function AiLevelsReference() {
   );
 }
 
+// ─── حارسة العضويات «جيم» — ربط نظام العضويات بمساعد نائب المالك ───
+const GEM_ID = "as_gem";
+function StewardPanel() {
+  const insights = useQuery(api.membershipOps.getMembershipInsights);
+  const world = useQuery(api.assistantsStore.getWorld);
+  const executeCommand = useAction(api.viceControl.executeCommand);
+  const [order, setOrder] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+
+  const gem = world?.assistants.find((a) => a.assistantId === GEM_ID);
+  const gemLogs = (insights?.recentLogs ?? []).filter((l) => l.actor === GEM_ID || l.actor === "owner");
+
+  const runAsGem = async (command: string) => {
+    if (!command.trim()) return;
+    setBusy(true);
+    setLastResult(null);
+    try {
+      const r = await executeCommand({ command: command.trim(), executor: GEM_ID });
+      const msg = r.ok ? `💎 جيم: ${r.result}` : `❌ ${r.result}`;
+      setLastResult(msg);
+      sounds.victory();
+      toast.success(r.ok ? "نفّذت جيم الأمر فعلياً — سُجّل في السجل" : r.result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "تعذّر التنفيذ";
+      setLastResult(`❌ ${msg}`);
+      sounds.error();
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      {/* بطاقة حارسة العضويات */}
+      <Card className="border-emerald-500/30 bg-emerald-500/[0.04]">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/10 text-2xl">💎</div>
+            <div className="min-w-0 flex-1">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-bold">
+                جيم — أمينة الخزينة وحارسة العضويات
+                <Badge variant="outline" className="rounded-full text-[10px] text-emerald-600">مساعدة نائب المالك</Badge>
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                تراقب العضويات وتُرسل تذكيرات التجديد، وتنفّذ منح/تمديد العضويات بأمرك وتوثّق كل حركة في السجل.
+              </p>
+            </div>
+            {gem && (
+              <div className="flex gap-2 text-[10px] text-muted-foreground">
+                <span>طاقة {gem.energy}%</span>
+                <span>سمعة {gem.reputation}</span>
+                <span>أنجزت {gem.tasksCompleted} مهام</span>
+              </div>
+            )}
+          </div>
+
+          {/* مؤشرات حية */}
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { label: "عضويات مدفوعة", value: insights?.paidActive ?? 0, icon: Crown, color: "text-yellow-400" },
+              { label: "نسبة التحويل", value: `${insights?.conversionRate ?? 0}%`, icon: TrendingUp, color: "text-purple-400" },
+              { label: "متوسط الأيام", value: insights?.avgDays ?? 0, icon: Calendar, color: "text-blue-400" },
+              { label: "تنتهي خلال 7 أيام", value: insights?.expiringSoon?.length ?? 0, icon: CalendarClock, color: "text-rose-400" },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-xl border border-border/60 bg-white/5 p-2.5">
+                <div className="flex items-center gap-1.5">
+                  <stat.icon className={cn("size-3", stat.color)} />
+                  <span className="text-[9px] text-muted-foreground">{stat.label}</span>
+                </div>
+                <div className="mt-0.5 text-base font-bold">{stat.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* أزرار حية */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" className="gap-1.5 rounded-xl" onClick={() => runAsGem("membership audit")} disabled={busy}>
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}
+              جولة رقابة وتذكيرات (جيم)
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5 rounded-xl" onClick={() => runAsGem("membership insights")} disabled={busy}>
+              <ShieldAlert className="size-4" />
+              تقرير الانتهاء القريب
+            </Button>
+          </div>
+
+          {/* أمر مباشر إلى جيم */}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              value={order}
+              onChange={(e) => setOrder(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && runAsGem(order)}
+              placeholder="أمر إلى جيم… مثال: membership grant أحمد gold 30"
+              className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-emerald-500/60"
+            />
+            <Button onClick={() => runAsGem(order)} disabled={busy || !order.trim()} className="gap-1.5 rounded-xl">
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+              أرسل لجيم
+            </Button>
+          </div>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            الأوامر المتاحة: <code className="rounded bg-muted px-1 py-0.5">membership grant اسم مستوى الأيام</code> · <code className="rounded bg-muted px-1 py-0.5">membership extend اسم الأيام</code> · <code className="rounded bg-muted px-1 py-0.5">membership revoke اسم</code> · <code className="rounded bg-muted px-1 py-0.5">membership code مستوى الأيام العدد</code>
+          </p>
+          {lastResult && (
+            <div className="mt-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2.5 text-xs leading-relaxed">
+              {lastResult}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* تنتهي قريباً — تمديد سريع عبر جيم */}
+      <Card className="border-border/60">
+        <CardContent className="p-4">
+          <h4 className="flex items-center gap-2 text-sm font-bold mb-3">
+            <CalendarClock className="size-4 text-rose-500" />
+            تنتهي عضويتهم خلال 7 أيام
+          </h4>
+          {!insights ? (
+            <div className="flex justify-center py-4"><Loader2 className="size-4 animate-spin" /></div>
+          ) : insights.expiringSoon.length === 0 ? (
+            <p className="py-4 text-center text-xs text-muted-foreground">لا توجد عضويات تنتهي قريباً 🎉</p>
+          ) : (
+            <div className="space-y-2">
+              {insights.expiringSoon.map((m, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl bg-white/5 px-3 py-2.5">
+                  <span>{TIER_INFO[m.tier]?.emoji ?? "🎫"}</span>
+                  <span className="text-xs font-medium">{m.name}</span>
+                  <span className="text-[10px] text-rose-500">{m.daysLeft} يوم متبقٍ</span>
+                  <div className="ms-auto flex gap-1.5">
+                    <Button size="sm" variant="ghost" className="h-7 gap-1 rounded-lg text-[10px]" disabled={busy} onClick={() => runAsGem(`membership extend ${m.name} 7`)}>
+                      <Zap className="size-3" /> تمديد 7
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 gap-1 rounded-lg text-[10px]" disabled={busy} onClick={() => runAsGem(`membership extend ${m.name} 30`)}>
+                      <Zap className="size-3" /> تمديد 30
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* أعلى الأعضاء وفاءً */}
+      <Card className="border-border/60">
+        <CardContent className="p-4">
+          <h4 className="flex items-center gap-2 text-sm font-bold mb-3">
+            <Trophy className="size-4 text-yellow-500" />
+            أطول العضويات المدفوعة
+          </h4>
+          <div className="space-y-1.5">
+            {(insights?.topByDays ?? []).slice(0, 6).map((m, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-xs">
+                <span className="flex items-center gap-2">
+                  <span className="font-bold text-muted-foreground w-5">#{i + 1}</span>
+                  <span>{TIER_INFO[m.tier]?.emoji}</span>
+                  <span className="font-medium">{m.name}</span>
+                </span>
+                <span className="text-muted-foreground">{m.days} يوم</span>
+              </div>
+            ))}
+            {(insights?.topByDays ?? []).length === 0 && (
+              <p className="py-3 text-center text-xs text-muted-foreground">لا توجد عضويات مدفوعة بعد</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* سجل أفعال العضوية — أثر حقيقي قابل للتحقق */}
+      <Card className="border-border/60">
+        <CardContent className="p-4">
+          <h4 className="flex items-center gap-2 text-sm font-bold mb-3">
+            <ScrollText className="size-4 text-primary" />
+            سجل أفعال العضوية (المالك + جيم)
+          </h4>
+          {!insights ? (
+            <div className="flex justify-center py-4"><Loader2 className="size-4 animate-spin" /></div>
+          ) : gemLogs.length === 0 ? (
+            <p className="py-4 text-center text-xs text-muted-foreground">لا سجلات بعد — نفّذ أمراً أو جولة رقابة وستظهر كل حركة هنا.</p>
+          ) : (
+            <div className="max-h-72 space-y-1.5 overflow-y-auto">
+              {gemLogs.map((l, i) => (
+                <div key={i} className="flex items-start gap-2 rounded-lg bg-muted/30 px-3 py-2">
+                  <span className="mt-0.5 text-xs">{l.actor === GEM_ID ? "💎" : "👑"}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] leading-relaxed">
+                      <strong className="text-foreground">{l.actorName}</strong> — {l.detail}
+                    </p>
+                    <span className="text-[9px] text-muted-foreground">
+                      {new Date(l.at).toLocaleString("ar-SA", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────
 export default function MembershipAdmin() {
-  const [activeTab, setActiveTab] = useState<"overview" | "codes" | "honor" | "settings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "codes" | "honor" | "settings" | "steward">("overview");
   const stats = useQuery(api.membershipSystem.getMembershipStats);
   const data = useQuery(api.membershipSystem.getOwnerMembershipData);
 
@@ -379,6 +590,7 @@ export default function MembershipAdmin() {
           { id: "codes" as const, label: "الأكواد", icon: Key },
           { id: "honor" as const, label: "لوحة الشرف", icon: Trophy },
           { id: "settings" as const, label: "الإعدادات", icon: Settings },
+          { id: "steward" as const, label: "حارسة العضويات", icon: Gem },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -511,6 +723,11 @@ export default function MembershipAdmin() {
             </CardContent>
           </Card>
         </motion.div>
+      )}
+
+      {/* ── حارسة العضويات «جيم» — ربط نظام العضويات بمساعد نائب المالك ── */}
+      {activeTab === "steward" && (
+        <StewardPanel />
       )}
     </div>
   );
