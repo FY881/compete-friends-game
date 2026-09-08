@@ -1,8 +1,9 @@
 import React, { useState, type ChangeEvent, type ElementType } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Button, Input, Textarea, Badge, Switch, Card, CardHeader, CardTitle, CardContent, Separator } from "@/components/ui";
+import { Button, Input, Textarea, Badge, Switch, Card, CardHeader, CardTitle, CardContent, Separator, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui";
 import { ADMIN_AI_KEY, ADMIN_AI_MODEL, ADMIN_AI_PROVIDER } from "@/lib/aiCredentials";
+import { ASSISTANT_MINDS } from "@/lib/assistantMinds";
 import {
   Code,
   Loader2,
@@ -20,6 +21,9 @@ import {
   ShieldCheck,
   Zap,
   KeyRound,
+  SearchCheck,
+  Users,
+  Power,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -55,6 +59,10 @@ export function ApiHubTab() {
   const discoverFromCurl = useAction(api.apiHub.discoverFromCurl);
   const smartCall = useAction(api.apiHub.smartCall);
   const analyzeAndAddKey = useAction(api.apiHub.analyzeAndAddKey);
+  const deepInspectKey = useAction(api.apiHub.deepInspectKey);
+  const mergeSafeguard = useAction(api.apiHub.mergeSafeguard);
+  const setApiEnabled = useMutation(api.apiHubStore.setApiEnabled);
+  const replaceApiKey = useMutation(api.apiHubStore.replaceApiKey);
 
   const [curlInput, setCurlInput] = useState("");
   const [discovering, setDiscovering] = useState(false);
@@ -85,6 +93,15 @@ export function ApiHubTab() {
   const [autoDiscoverEnabled, setAutoDiscoverEnabled] = useState(true);
   const [fallbackChainEnabled, setFallbackChainEnabled] = useState(true);
   const [liveStatsEnabled, setLiveStatsEnabled] = useState(true);
+  const [deepRaw, setDeepRaw] = useState("");
+  const [deepReport, setDeepReport] = useState<Awaited<ReturnType<typeof deepInspectKey>> | null>(null);
+  const [deepBusy, setDeepBusy] = useState(false);
+  const [guardAssistant, setGuardAssistant] = useState(ASSISTANT_MINDS[0]?.id ?? "");
+  const [guardOpts, setGuardOpts] = useState({ hunter: true, security: true, economy: true });
+  const [guardBusy, setGuardBusy] = useState(false);
+  const [guardResult, setGuardResult] = useState<Awaited<ReturnType<typeof mergeSafeguard>> | null>(null);
+  const [replaceId, setReplaceId] = useState<string | null>(null);
+  const [replaceKey, setReplaceKey] = useState("");
 
   const handleAnalyzeKey = async () => {
     if (!keyInput.trim()) return toast.error("الصق مفتاح AI أولاً");
@@ -145,6 +162,54 @@ export function ApiHubTab() {
       setTestMsg(`✓ ${res.provider}: ${res.reply.slice(0, 120)}`);
     } catch (e) {
       setTestMsg(`✗ ${e instanceof Error ? e.message : "فشل"}`);
+    }
+  };
+
+  const handleDeepInspect = async () => {
+    if (!deepRaw.trim()) return toast.error("الصق مفتاح API لفحصه بعمق");
+    setDeepBusy(true);
+    setDeepReport(null);
+    try {
+      const res = await deepInspectKey({ rawKey: deepRaw.trim() });
+      setDeepReport(res);
+      toast.success(res.verified ? "المفتاح يعمل فعلياً" : "المفتاح لم يُقبل من أي مزود");
+      setDeepRaw("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل الفحص العميق");
+    } finally {
+      setDeepBusy(false);
+    }
+  };
+
+  const handleRunGuard = async () => {
+    if (!guardAssistant) return toast.error("اختر مساعداً أولاً");
+    setGuardBusy(true);
+    setGuardResult(null);
+    try {
+      const res = await mergeSafeguard({
+        assistantId: guardAssistant,
+        includeErrorHunter: guardOpts.hunter,
+        includeSecurity: guardOpts.security,
+        includeEconomyWatch: guardOpts.economy,
+      });
+      setGuardResult(res);
+      toast.success(`انتهت جولة الحارس: ${res.guardName}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل تشغيل الحارس المدمج");
+    } finally {
+      setGuardBusy(false);
+    }
+  };
+
+  const handleReplace = async (apiId: string) => {
+    if (!replaceKey.trim()) return toast.error("الصق المفتاح الجديد");
+    try {
+      await replaceApiKey({ apiId: apiId as never, apiKey: replaceKey.trim() });
+      toast.success("استُبدل المفتاح وأُعيد ضبطه للفحص");
+      setReplaceId(null);
+      setReplaceKey("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل الاستبدال");
     }
   };
 
@@ -437,7 +502,21 @@ export function ApiHubTab() {
                       <span className="text-[10px] text-muted-foreground">آخر زمن: {a.lastLatencyMs}ms</span>
                     )}
                     <span className="text-[10px] text-muted-foreground">نجاح {a.successCount} / فشل {a.failCount}</span>
-                    <div className="ms-auto flex gap-1.5">
+                    <div className="ms-auto flex flex-wrap items-center gap-1.5">
+                      <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Power className="size-3" />
+                        <Switch
+                          checked={a.status !== "disabled"}
+                          onCheckedChange={async (on) => {
+                            await setApiEnabled({ apiId: a._id, enabled: on });
+                            toast(on ? "تم تفعيل API" : "أُوقف API — لن يُستخدم بعد الآن");
+                          }}
+                          className="scale-75"
+                        />
+                      </label>
+                      <Button variant="outline" size="sm" className="h-7 gap-1 rounded-lg text-[11px]" onClick={() => { setReplaceId(a._id); setReplaceKey(""); }}>
+                        <KeyRound className="size-3" /> استبدال مفتاح
+                      </Button>
                       <Button variant="outline" size="sm" className="h-7 gap-1 rounded-lg text-[11px]" onClick={() => handleTest(a._id)} disabled={testingId === a._id}>
                         {testingId === a._id ? <Loader2 className="size-3 animate-spin" /> : <FlaskConical className="size-3" />}
                         اختبار حي
@@ -454,11 +533,159 @@ export function ApiHubTab() {
                         <Trash2 className="size-3" />
                       </Button>
                     </div>
+                    {replaceId === a._id && (
+                      <div className="mt-2 flex w-full items-center gap-2">
+                        <Input
+                          value={replaceKey}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => setReplaceKey(e.target.value)}
+                          placeholder="الصق المفتاح الجديد هنا…"
+                          className="h-8 rounded-lg font-mono text-xs"
+                          dir="ltr"
+                        />
+                        <Button size="sm" className="h-8 rounded-lg" onClick={() => handleReplace(a._id)}>
+                          تأكيد
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-sky-500/30 bg-sky-500/[0.04]">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <SearchCheck className="size-4 text-sky-600" />
+            الفحص العميق للمفتاح — اعرف كل شيء عنه قبل ربطه
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={deepRaw}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setDeepRaw(e.target.value)}
+              placeholder="الصق مفتاح API لفحصه على 6 مزودين…"
+              className="min-w-0 flex-1 rounded-xl font-mono text-xs"
+              dir="ltr"
+            />
+            <Button onClick={handleDeepInspect} disabled={deepBusy} className="gap-1.5 rounded-xl">
+              {deepBusy ? <Loader2 className="size-4 animate-spin" /> : <SearchCheck className="size-4" />}
+              افحص بعمق
+            </Button>
+          </div>
+          {deepReport && (
+            <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-bold">
+                  {deepReport.verified ? <CheckCircle2 className="size-4 text-emerald-600" /> : <XCircle className="size-4 text-rose-600" />}
+                  {deepReport.verified ? "يعمل فعلياً" : "لا يُقبل من أي مزود"}
+                </span>
+                <Badge variant="outline" className="rounded-full text-[10px]">{deepReport.keyPreview}</Badge>
+                <Badge variant="outline" className="rounded-full text-[10px]">الطول {deepReport.length}</Badge>
+                <Badge variant="outline" className="rounded-full text-[10px]">بادئة: {deepReport.recognizedProvider}</Badge>
+                {deepReport.bestLatencyMs > 0 && <Badge variant="outline" className="rounded-full text-[10px] text-emerald-600">أفضل زمن {deepReport.bestLatencyMs}ms</Badge>}
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {deepReport.matched.map((m) => (
+                  <div key={m.provider} className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-1.5 text-[11px]">
+                    <span>{m.ok ? <CheckCircle2 className="size-3 text-emerald-600" /> : <XCircle className="size-3 text-rose-600" />}</span>
+                    <span className="font-semibold">{m.provider}</span>
+                    <span className="text-muted-foreground">{m.latencyMs}ms</span>
+                    {m.hint && <span className="truncate text-muted-foreground">{m.hint}</span>}
+                  </div>
+                ))}
+              </div>
+              {deepReport.recommendations?.length > 0 && (
+                <ul className="space-y-1">
+                  {deepReport.recommendations.map((r, i) => (
+                    <li key={i} className="text-[11px] text-muted-foreground">• {r}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            يفحص المفتاح فعلياً على OpenRouter / OpenAI / Anthropic / Groq / Mistral / Together — يقيس الزمن، يكشف المزود الحقيقي، يرفع قائمة النماذج المتاحة، ويوصي بما تفعل.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-violet-500/30 bg-violet-500/[0.04]">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Users className="size-4 text-violet-600" />
+            الحارس المدمج — مساعد نائب المالك + صياد الأخطاء
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={guardAssistant} onValueChange={setGuardAssistant}>
+              <SelectTrigger className="w-64 rounded-xl">
+                <SelectValue placeholder="اختر مساعداً…" />
+              </SelectTrigger>
+              <SelectContent>
+                {ASSISTANT_MINDS.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.emoji} {m.name} — {m.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-xs">
+              <Switch checked={guardOpts.hunter} onCheckedChange={(v) => setGuardOpts((o) => ({ ...o, hunter: v }))} />
+              <ShieldCheck className="size-3.5 text-emerald-600" /> صياد الأخطاء
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Switch checked={guardOpts.security} onCheckedChange={(v) => setGuardOpts((o) => ({ ...o, security: v }))} />
+              <ShieldCheck className="size-3.5 text-rose-600" /> المراقبة الأمنية
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Switch checked={guardOpts.economy} onCheckedChange={(v) => setGuardOpts((o) => ({ ...o, economy: v }))} />
+              <ShieldCheck className="size-3.5 text-amber-600" /> الرقابة الاقتصادية
+            </label>
+          </div>
+          <Button onClick={handleRunGuard} disabled={guardBusy} className="gap-1.5 rounded-xl">
+            {guardBusy ? <Loader2 className="size-4 animate-spin" /> : <Users className="size-4" />}
+            شغّل جولة الحارس المدمج
+          </Button>
+          {guardResult && (
+            <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-bold">{guardResult.guardName}</span>
+                <Badge variant="outline" className="rounded-full text-[10px] text-violet-600">حارس فعلي نشط</Badge>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {guardResult.mergedCapabilities.map((c) => (
+                  <span key={c} className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-700">{c}</span>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {Object.entries(guardResult.report).filter(([k]) => !["errorCategories", "healthStatus"].includes(k)).map(([k, val]) => (
+                  <div key={k} className="rounded-lg bg-muted/30 px-2 py-1.5 text-center">
+                    <p className="text-lg font-bold">{String(val)}</p>
+                    <p className="text-[9px] text-muted-foreground">{k}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold text-muted-foreground">الحالة الصحية:</span>
+                <Badge variant="outline" className="rounded-full text-[10px]">{guardResult.report.healthStatus}</Badge>
+              </div>
+              <ul className="space-y-1">
+                {guardResult.findings.map((f, i) => (
+                  <li key={i} className="text-[11px] text-muted-foreground">• {f}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            تدمج قدرات المساعد المختار مع صياد الأخطاء في حارس واحد يراقب الأخطاء والـ APIs والأمن — لضمان سلاسة النظام وخلوه من الأعطال، وهو مدمج فعلياً في سلسلة الاستدعاء الذكي.
+          </p>
         </CardContent>
       </Card>
 

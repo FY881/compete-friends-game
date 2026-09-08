@@ -14,7 +14,8 @@
 
 import { action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
-import { v, type Id } from "convex/values";
+import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { callLlm } from "./aiConfig";
 import { ASSISTANT_MINDS } from "../lib/assistantMinds";
 
