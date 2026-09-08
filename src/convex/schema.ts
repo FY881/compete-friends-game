@@ -1339,6 +1339,18 @@ const schema = defineSchema(
       maxTokens: v.number(),
       createdAt: v.number(),
     }).index("by_name", ["name"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ║ سجل أحداث مركز API — مراقبة، إصلاح ذاتي، حماية                  ║
+    // ═══════════════════════════════════════════════════════════════════════
+    apiEvents: defineTable({
+      apiId: v.optional(v.union(v.id("apiRegistry"), v.null())),
+      provider: v.string(),
+      event: v.string(), // probe | auto-fix | protection | guard | key | lifecycle
+      detail: v.string(),
+      severity: v.union(v.literal("info"), v.literal("warning"), v.literal("critical")),
+      at: v.number(),
+    }).index("by_created", ["at"]),
   },
   {
     schemaValidation: false,

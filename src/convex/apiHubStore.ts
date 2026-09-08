@@ -53,6 +53,101 @@ export const setStatus = internalMutation({
   },
 });
 
+/** إعادة تعيين عدّادات النجاح/الفشل وتصنيف API كغير مُختبر — لإعادة محاولة نظيفة */
+export const resetApi = mutation({
+  args: { apiId: v.id("apiRegistry") },
+  handler: async (ctx, { apiId }) => {
+    await ctx.db.patch(apiId, { status: "untested", successCount: 0, failCount: 0, lastTestedAt: undefined });
+    return { ok: true };
+  },
+});
+
+/** سجل أحداث API — جولة مراقبة، إصلاح ذاتي، حماية */
+export const logApiEvent = internalMutation({
+  args: {
+    apiId: v.optional(v.id("apiRegistry")),
+    provider: v.string(),
+    event: v.string(),
+    detail: v.string(),
+    severity: v.union(v.literal("info"), v.literal("warning"), v.literal("critical")),
+    at: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("apiEvents", {
+      ...args,
+      apiId: args.apiId ?? null,
+    });
+  },
+});
+
+/** آخر أحداث API للوحة المراقبة */
+export const listApiEvents = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("apiEvents").withIndex("by_created", (q) => q.gte("at", 0)).order("desc").take(args.limit ?? 30);
+  },
+});
+
+/** تفاصيل عميقة لمفتاح واحد: كُل ما نعرفه عنه من السجل */
+export const getKeyDeepLog = query({
+  args: { apiId: v.id("apiRegistry") },
+  handler: async (ctx, { apiId }) => {
+    const api = await ctx.db.get(apiId);
+    if (!api) return null;
+    const calls = await ctx.db.query("apiCallLogs").withIndex("by_created", (q) => q.gte("createdAt", 0)).order("desc").take(200);
+    const keyCalls = calls.filter((c) => c.keyUsed === api.apiKey || c.provider === api.provider).slice(0, 25);
+    const okCalls = keyCalls.filter((c) => c.ok);
+    const recentEvents = await ctx.db.query("apiEvents").withIndex("by_created", (q) => q.gte("at", 0)).order("desc").take(50);
+    const keyEvents = recentEvents.filter((e) => e.provider === api.provider || e.apiId === apiId).slice(0, 10);
+    return {
+      api,
+      keyCalls,
+      okCount: okCalls.length,
+      failCount: keyCalls.length - okCalls.length,
+      avgLatency: okCalls.length ? Math.round(okCalls.reduce((s, c) => s + c.latencyMs, 0) / okCalls.length) : null,
+      recentEvents: keyEvents,
+    };
+  },
+});
+
+// ── إدارة حقيقية من الواجهة: تشغيل/إيقاف/تعديل/استبدال/حذف ──
+
+/** تشغيل أو إيقاف API فعلياً (يُحترم في كل الاستدعاءات) */
+export const setApiEnabled = mutation({
+  args: {
+    apiId: v.id("apiRegistry"),
+    enabled: v.boolean(),
+  },
+  handler: async (ctx, { apiId, enabled }) => {
+    const api = await ctx.db.get(apiId);
+    if (!api) throw new Error("API غير موجود");
+    const status = enabled
+      ? api.status === "failed"
+        ? "untested"
+        : "active"
+      : "disabled";
+    await ctx.db.patch(apiId, { status });
+    return { ok: true, status };
+  },
+});
+
+/** استبدال مفتاح API لمفتاح موجود (يُعاد فحصه) */
+export const replaceApiKey = mutation({
+  args: {
+    apiId: v.id("apiRegistry"),
+    apiKey: v.string(),
+  },
+  handler: async (ctx, { apiId, apiKey }) => {
+    const api = await ctx.db.get(apiId);
+    if (!api) throw new Error("API غير موجود");
+    const clean = apiKey.trim();
+    if (clean.length < 10) throw new Error("المفتاح الجديد قصير جداً");
+    await ctx.db.patch(apiId, { apiKey: clean, status: "untested", failCount: 0 });
+    return { ok: true, keyPreview: `${clean.slice(0, 6)}••••${clean.slice(-4)}` };
+  },
+});
+
+/** حذف API نهائياً من السجل */
 export const removeApi = mutation({
   args: { apiId: v.id("apiRegistry") },
   handler: async (ctx, args) => {
