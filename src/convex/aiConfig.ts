@@ -56,8 +56,7 @@ export const FALLBACK_MODELS = [
  * 🔍 حلّ نقطة الاتصال الحقيقية:
  *  1. إن ضُبط النظام الأول (key_url) → استخدم رابطه ومفتاحه.
  *  2. وإلا إن ضُبط النظام الثاني (key_only) → استخدم بوابته الافتراضية ومفتاحه.
- *  3. وإلا اقرأ env (OPENROUTER_API_KEY) — مصدر احتياطي تديره اللعبة.
- *  4. وإلا خطأ واضح: لا يوجد أي نظام مُفعّل.
+ *  3. وإلا خطأ واضح وصريح: لا يوجد أي نظام مُفعّل — لا مسارات خلفية ولا env.
  */
 function resolveEndpoint(): { url: string; key: string } {
   const sysA = runtimeSystems.find((s) => s.kind === "key_url");
@@ -67,10 +66,6 @@ function resolveEndpoint(): { url: string; key: string } {
   const sysB = runtimeSystems.find((s) => s.kind === "key_only");
   if (sysB && sysB.apiKey.trim().length > 10) {
     return { url: DEFAULT_GATEWAY, key: sysB.apiKey.trim() };
-  }
-  const envKey = process.env.OPENROUTER_API_KEY;
-  if (envKey && envKey.trim().length > 10) {
-    return { url: DEFAULT_GATEWAY, key: envKey.trim() };
   }
   throw new Error(
     "لا يوجد نظام API مُفعّل. فعّل النظام الأول (مفتاح + رابط) أو النظام الثاني (مفتاح فقط) من مركز API.",
@@ -86,8 +81,6 @@ export function getOpenRouterKey(providedKey?: string | null): string {
   if (sysA && sysA.apiKey.trim().length > 10) return sysA.apiKey.trim();
   const sysB = runtimeSystems.find((s) => s.kind === "key_only");
   if (sysB && sysB.apiKey.trim().length > 10) return sysB.apiKey.trim();
-  const envKey = process.env.OPENROUTER_API_KEY;
-  if (envKey && envKey.trim().length > 10) return envKey.trim();
   return "";
 }
 
@@ -101,6 +94,7 @@ export async function callLlm(
   temperature = 0.9,
   label = "Zaka AI",
   _apiKey?: string | null,
+  jsonMode = false,
 ): Promise<string> {
   const { url, key } = resolveEndpoint();
   const models = [DEFAULT_MODEL, ...FALLBACK_MODELS.filter((m) => m !== DEFAULT_MODEL)];
@@ -117,7 +111,13 @@ export async function callLlm(
             "HTTP-Referer": "https://zaka.app",
             "X-Title": label,
           },
-          body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+          body: JSON.stringify({
+            model,
+            messages,
+            max_tokens: maxTokens,
+            temperature,
+            ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+          }),
         });
         if (!response.ok) {
           const err = await response.text();
@@ -193,11 +193,12 @@ export function ensureWorkingModel(model?: string | null): string {
 
 export function getSystemInfo() {
   const systems = getRuntimeConfig();
+  const active = systems.find((s) => s.apiKey && s.apiKey.trim().length > 10);
   return {
     systems,
-    hasEnvKey: Boolean(process.env.OPENROUTER_API_KEY),
-    envKeyPreview: process.env.OPENROUTER_API_KEY
-      ? process.env.OPENROUTER_API_KEY.slice(0, 15) + "..."
+    hasEnvKey: Boolean(active),
+    envKeyPreview: active
+      ? `${active.apiKey.slice(0, 6)}••••${active.apiKey.slice(-4)}`
       : "غير مضبوط",
     models: FREE_MODELS,
     defaultModel: DEFAULT_MODEL,

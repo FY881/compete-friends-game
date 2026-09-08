@@ -274,11 +274,12 @@ export const handleReport = internalAction({
       if (!report) return;
       if (!settings.aiEnabled) return;
 
+      await ensureAiRuntime(ctx); // تحميل النظامين المضبوطين من مركز API قبل الفحص
       const apiKey = getOpenRouterKey();
       if (!apiKey) {
         await ctx.runMutation(internal.moderation.recordAiReview, {
           reportId,
-          error: "مفتاح OpenRouter غير مضبوط في الإعدادات",
+          error: "لا يوجد نظام API مُفعّل — فعّل النظام الأول (مفتاح + رابط) أو الثاني (مفتاح فقط) من مركز API",
           autoApply: false,
         });
         return;
@@ -348,50 +349,27 @@ export const aiModerateContent = action({
       {},
     );
 
-    const apiKey = getOpenRouterKey();
-    if (!apiKey) {
-      throw new Error(
-        "مفتاح OpenRouter غير مضبوط — أضِفه في تبويب المفاتيح (OPENROUTER_API_KEY)",
-      );
-    }
-
     const userContent = [context ? `السياق: ${context}` : null, content]
       .filter(Boolean)
       .join("\n");
 
-    // Re-run with the actual active rules for the manual scan.
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://zaka.freebuff.app",
-        "X-Title": "Zaka - Quiz Game",
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: MODERATION_SYSTEM_PROMPT(rulesText) },
-          {
-            role: "user",
-            content: `قيّم المحتوى التالي وفق قوانين الموقع:\n\n${userContent}`,
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`OpenRouter فشل: ${response.status} ${body.slice(0, 200)}`);
-    }
-
-    const data = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const text = data.choices?.[0]?.message?.content ?? "";
-    if (!text) throw new Error("OpenRouter لم يُرجع رداً");
+    // عبر محرك النظامين الوحيد — طلب شبكة حقيقي وخطأ صريح عند الفشل
+    await ensureAiRuntime(ctx);
+    const text = await callLlm(
+      [
+        { role: "system", content: MODERATION_SYSTEM_PROMPT(rulesText) },
+        {
+          role: "user",
+          content: `قيّم المحتوى التالي وفق قوانين الموقع:\n\n${userContent}`,
+        },
+      ],
+      512,
+      0.1,
+      "Zaka Manual Moderation",
+      null,
+      true, // jsonMode — يطلب JSON حقيقياً من المزوّد
+    );
+    if (!text) throw new Error("لم يُرجع النظام رداً");
     return parseVerdict(text);
   },
 });
@@ -405,7 +383,7 @@ export const aiModerateContent = action({
 const HELP_DESK_SYSTEM_PROMPT = `
 أنت "المساعد الذكي" للعبة «ذكاء» — لعبة تحديات تنافسية بين الأصدقاء.
 المنصة: React + Vite + Tailwind + Convex (قاعدة بيانات و Backend) + Convex Auth،
-والذكاء الاصطناعي يعمل عبر OpenRouter (OPENROUTER_API_KEY).
+والذكاء الاصطناعي يعمل عبر النظامين المضبوطين في مركز API (النظام الأول: مفتاح + رابط، النظام الثاني: مفتاح فقط).
 
 لديك صلاحيات المالك/المشرف في غرفة المالك: إدارة المستخدمين والعقوبات والبلاغات،
 القوانين، الرقيب الآلي (فحص البلاغات تلقائياً وتطبيق العقوبات)، المدير الآلي
@@ -430,41 +408,17 @@ export const aiHelpDesk = action({
       internal.moderation.getModSettingsForReview,
       {},
     );
-    const apiKey = getOpenRouterKey();
-    if (!apiKey) {
-      throw new Error(
-        "مفتاح OpenRouter غير مضبوط — أضِفه في تبويب المفاتيح (OPENROUTER_API_KEY)",
-      );
-    }
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://zaka.freebuff.app",
-        "X-Title": "Zaka - Quiz Game",
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        temperature: 0.3,
-        messages: [
-          { role: "system", content: HELP_DESK_SYSTEM_PROMPT },
-          { role: "user", content: question },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`OpenRouter فشل: ${response.status} ${body.slice(0, 200)}`);
-    }
-
-    const data = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const text = data.choices?.[0]?.message?.content ?? "";
-    if (!text) throw new Error("OpenRouter لم يُرجع رداً");
+    await ensureAiRuntime(ctx); // حقن النظامين المضبوطين من مركز API
+    const text = await callLlm(
+      [
+        { role: "system", content: HELP_DESK_SYSTEM_PROMPT },
+        { role: "user", content: question },
+      ],
+      1024,
+      0.3,
+      "Zaka Help Desk",
+    );
+    if (!text) throw new Error("لم يُرجع النظام رداً");
     return { answer: text };
   },
 });

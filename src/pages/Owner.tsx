@@ -1221,11 +1221,11 @@ function AiTab({ settings }: { settings: SettingsData }) {
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-rose-600" />
             <div>
-              <p className="text-sm font-bold text-rose-700">مفتاح OpenRouter غير مضبوط</p>
+              <p className="text-sm font-bold text-rose-700">لا يوجد نظام AI مُفعّل</p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                أضِف المفتاح الكامل في تبويب «المفاتيح / API Keys» في المنصة تحت الاسم{" "}
-                <span className="font-mono font-bold text-foreground">OPENROUTER_API_KEY</span>
-                . حتى ذلك الحين سيتعذر على الرقيب الآلي فحص البلاغات أو تطبيق العقوبات.
+                فعّل النظام الأول (مفتاح API + رابط المزوّد) أو النظام الثاني (مفتاح API فقط)
+                من تبويب «مركز API» في غرفة المالك. حتى ذلك الحين يتعذر على الرقيب الآلي
+                فحص البلاغات أو تطبيق العقوبات أو توليد الأسئلة.
               </p>
             </div>
           </div>
@@ -1234,7 +1234,7 @@ function AiTab({ settings }: { settings: SettingsData }) {
       <FeatureTitle
         n="12"
         title="إعدادات الرقابة الذكية"
-        desc="الرقيب الآلي (عبر OpenRouter) يفحص البلاغات والمحتوى وفق القوانين. فعّل التطبيق التلقائي ليُصدر العقوبات بنفسه — مع تسجيل كل قرار."
+        desc="الرقيب الآلي (عبر نظامي مركز API) يفحص البلاغات والمحتوى وفق القوانين. فعّل التطبيق التلقائي ليُصدر العقوبات بنفسه — مع تسجيل كل قرار."
       />
 
       <Card className="border-border/80 shadow-sm">

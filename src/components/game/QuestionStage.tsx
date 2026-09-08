@@ -360,13 +360,11 @@ export function QuestionStage({
 
   const handleAiHint = async () => {
     if (hintLoading || hintUsed || myAnswer || isRevealing) return;
-    let apiKey = "";
-    try { apiKey = localStorage.getItem("openrouter_api_key") ?? ""; } catch { /* */ }
-    if (!apiKey) { toast.error("مفتاح AI غير مُعد — اضافته من غرفة المالك"); return; }
     setHintLoading(true);
     try {
+      // التلميح يجري عبر نظامي مركز API على الخادم — لا مفتاح من المتصفح
       const res = await getAiHint({
-        apiKey,
+        apiKey: "",
         question: question.question,
         options: question.options,
         difficulty: question.difficulty,

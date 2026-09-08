@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { callLlm, getOpenRouterKey } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 
 // ─── Analyze Player Performance ────────────────────────────────
@@ -133,8 +134,13 @@ export const coachChat = action({
     sessionId: v.string(),
   },
   handler: async (ctx, { message, sessionId }) => {
+    await ensureAiRuntime(ctx); // حقن النظامين المضبوطين من مركز API
     const apiKey = getOpenRouterKey();
-    if (!apiKey) throw new Error("مفتاح API غير متاح");
+    if (!apiKey) {
+      throw new Error(
+        "لا يوجد نظام API مُفعّل — فعّل النظام الأول (مفتاح + رابط) أو الثاني (مفتاح فقط) من مركز API",
+      );
+    }
 
     const userId = await getAuthUserId(ctx);
 

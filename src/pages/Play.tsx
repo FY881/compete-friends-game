@@ -133,16 +133,9 @@ export default function Play() {
     if (dailyChallengeLoading) return;
     setDailyChallengeLoading(true);
     try {
-      // Generate AI daily challenge
-      const apiKey = localStorage.getItem("openrouter_api_key") ?? "";
-      if (apiKey) {
-        toast.success("🎯 جاري تحميل التحدي اليومي بالحرب العقول الاصطناعي...");
-        // Navigate to games with daily mode
-        navigate("/games");
-      } else {
-        toast.info(".authenticate for AI daily challenge");
-        navigate("/games");
-      }
+      // التحدي اليومي يتولّد عبر نظامي مركز API (خادمياً) — لا حاجة لمفتاح من المتصفح
+      toast.success("🎯 جاري تحميل التحدي اليومي بالذكاء الاصطناعي...");
+      navigate("/games");
     } catch (e) {
       toast.error("خطأ في تحميل التحدي");
     } finally {
@@ -153,15 +146,14 @@ export default function Play() {
   const handleAnalyze = async () => {
     if (!profile) return;
     try {
-      const apiKey = localStorage.getItem("openrouter_api_key") ?? "";
-      if (!apiKey) { toast.error("أدخل مفتاح API أولاً"); return; }
+      // التحليل يجري عبر نظامي مركز API على الخادم — لا مفتاح من المتصفح
       const stats = JSON.stringify({
         gamesPlayed: profile.gamesPlayed,
         gamesWon: profile.gamesWon,
         bestScore: profile.bestScore,
         level: profile.level,
       });
-      const res = await analyzePerformance({ apiKey, playerStats: stats });
+      const res = await analyzePerformance({ apiKey: "", playerStats: stats });
       setAiAnalysis(res.overallRating + ": " + (res.suggestions?.join(", ") ?? ""));
       toast.success("🤖 تم تحليل أدائك بالحرب العقول الاصطناعي!");
     } catch (e) {

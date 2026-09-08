@@ -461,7 +461,7 @@ export default function Profile() {
                     accuracy: profile.accuracy,
                   });
                   const res = await analyzePerformance({
-                    apiKey: localStorage.getItem("openrouter_api_key") ?? "",
+                    apiKey: "", // التحليل يجري عبر نظامي مركز API على الخادم
                     playerStats: stats,
                   });
                   alert(res.overallRating + "\n" + (res.suggestions?.join("\n") ?? ""));

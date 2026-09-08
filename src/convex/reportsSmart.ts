@@ -165,9 +165,14 @@ export const saveAiVerdict = internalMutation({
 export const analyzeReport = mutation({
   args: { reportId: v.id("reports") },
   handler: async (ctx, { reportId }) => {
+    await ensureAiRuntime(ctx); // تحميل النظامين من مركز API قبل الفحص والاستدعاء
     const apiKey = getOpenRouterKey();
     if (!apiKey) {
-      return { success: false, message: "مفتاح API غير متاح" };
+      return {
+        success: false,
+        message:
+          "لا يوجد نظام API مُفعّل — فعّل النظام الأول (مفتاح + رابط) أو الثاني (مفتاح فقط) من مركز API",
+      };
     }
 
     const report = await ctx.db.get(reportId);

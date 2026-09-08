@@ -3,15 +3,15 @@
  * 🛡️ حارس AI — نظام جديد يعالج مشاكل الذكاء الاصطناعي تلقائياً
  * ═══════════════════════════════════════════════════════════════
  * يعمل كل 10 دقائق عبر المجدول بلا أي تدخل بشري:
- *  1. يفحص المفتاح الرسمي (OpenRouter) بنداء حي حقيقي.
- *  2. إن فشل النداء: يعيد التفعيل — يعيد تفعيل المزودين الفاشلين
- *     بعد مهلة التهدئة، ويسجل الحالة في سجل نشاط الذكاء.
+ *  1. يفحص النظام المُفعّل (System A: مفتاح + رابط / System B: مفتاح فقط)
+ *     بنداء حي حقيقي عبر محرك النظامين الوحيد.
+ *  2. إن فشل النداء: يسجّل الفشل بوضوح في سجل نشاط الذكاء ليبقى ظاهراً.
  *  3. إن نجح: يوثّق الصحة ويصفّر قاطع الدائرة.
  */
 "use node";
 
 import { internalAction } from "./_generated/server";
-import { internal, api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { callLlm, getAdminKeyPreview, DEFAULT_MODEL } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
 
@@ -53,12 +53,9 @@ export const patrol = internalAction({
         /* اختياري */
       }
     } else {
-      // إصلاح ذاتي: أعد تفعيل المزودين الفاشلين بعد مهلة التهدئة
+      // لا مزودين قديمين — النظامان فقط: سجّل الفشل بوضوح ليظهر في تقرير الحارس
       try {
-        const res = (await ctx.runAction(api.apiHubPro.autoHealProviders, {})) as {
-          healed: number;
-        };
-        autoFixes += res.healed ?? 0;
+        await ctx.runMutation(internal.apiHubStore.recordFailure, {}).catch(() => {});
       } catch {
         /* اختياري */
       }
@@ -75,8 +72,8 @@ export const patrol = internalAction({
       await ctx.runMutation(internal.aiGuardianStore.logGuardianEvent, {
         ok,
         message: ok
-          ? `حارس AI: المفتاح الرسمي سليم (${latencyMs}ms)${autoFixes ? ` — صفّر ${autoFixes} إصلاحاً` : ""}`
-          : `حارس AI: فشل فحص المفتاح الرسمي — ${detail.slice(0, 200)}`,
+          ? `حارس AI: النظام المُفعّل سليم (${latencyMs}ms)${autoFixes ? ` — صفّر ${autoFixes} إصلاحاً` : ""}`
+          : `حارس AI: فشل فحص النظام المُفعّل — ${detail.slice(0, 200)}`,
         severity: ok ? "info" : "critical",
       });
     } catch {

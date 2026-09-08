@@ -395,12 +395,11 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
             <div className="flex items-start gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5">
               <AlertTriangle className="mt-0.5 size-5 shrink-0 text-rose-600" />
               <div>
-                <p className="text-sm font-bold text-rose-700">مفتاح OpenRouter غير مضبوط</p>
+                <p className="text-sm font-bold text-rose-700">لا يوجد نظام AI مُفعّل</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   المدير الآلي يعمل على التنظيف والتصعيد، لكنه لا يستطيع مراجعة البلاغات
-                  بالذكاء الاصطناعي حتى تضيف{" "}
-                  <span className="font-mono font-bold text-foreground">OPENROUTER_API_KEY</span>{" "}
-                  في تبويب «المفاتيح / API Keys».
+                  بالذكاء الاصطناعي حتى تُفعّل النظام الأول (مفتاح + رابط) أو الثاني
+                  (مفتاح فقط) من تبويب «مركز API» في غرفة المالك.
                 </p>
               </div>
             </div>
@@ -777,7 +776,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
             {!settings.aiKeyConfigured && (
               <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-rose-600">
                 <AlertTriangle className="size-3.5 shrink-0" />
-                أضف OPENROUTER_API_KEY في تبويب «المفاتيح / API Keys» لتفعيل التوليد.
+فعّل أحد نظامي مركز API (مفتاح + رابط / مفتاح فقط) في غرفة المالك لتفعيل التوليد.
               </p>
             )}
           </div>

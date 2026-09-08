@@ -4,7 +4,8 @@
 import { action, query, mutation, internalQuery, internalAction, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { callLlm, getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { callLlm, getOpenRouterKey } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 import { upgradedLlm, rememberFor } from "./aiUpgradeKit";
 
 // ═══════════════════════════════════════════════════════════════
@@ -170,8 +171,13 @@ export const notifyAll = mutation({
 export const executeCommand = action({
   args: { command: v.string(), sessionId: v.string() },
   handler: async (ctx, { command, sessionId }) => {
+    await ensureAiRuntime(ctx); // حقن النظامين المضبوطين من مركز API
     const apiKey = getOpenRouterKey();
-    if (!apiKey) throw new Error("مفتاح API غير متاح");
+    if (!apiKey) {
+      throw new Error(
+        "لا يوجد نظام API مُفعّل — فعّل النظام الأول (مفتاح + رابط) أو الثاني (مفتاح فقط) من مركز API",
+      );
+    }
 
     const stats = await ctx.runQuery(internal.aiFree.getGameStatsInternal);
     const players = await ctx.runQuery(internal.aiFree.getAllPlayersInternal);
@@ -215,8 +221,7 @@ ${players.slice(0, 5).map((p: { name: string; xp: number; gamesPlayed: number; g
 export const secretMode = action({
   args: { command: v.string(), sessionId: v.string() },
   handler: async (ctx, { command, sessionId }) => {
-    const apiKey = getOpenRouterKey();
-    if (!apiKey) throw new Error("مفتاح API غير متاح");
+    await ensureAiRuntime(ctx); // حقن النظامين المضبوطين من مركز API
 
     const stats = await ctx.runQuery(internal.aiFree.getGameStatsInternal);
     const players = await ctx.runQuery(internal.aiFree.getAllPlayersInternal);
@@ -225,22 +230,13 @@ export const secretMode = action({
 اللاعبون: ${players.map((p: { name: string; xp: number; gamesPlayed: number; gamesWon: number; warnings: number }) => `${p.name}(XP:${p.xp},G:${p.gamesPlayed},W:${p.gamesWon},W:${p.warnings})`).join(", ")}
 وضع الصراحة المطلقة. أجب بالعربية.`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
-        "HTTP-Referer": "https://zaka.app", "X-Title": "Zaka Secret",
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: command }],
-        max_tokens: 2048, temperature: 0.9,
-      }),
-    });
-
-    if (!response.ok) throw new Error("AI Error");
-    const data = await response.json();
-    const reply: string = data.choices?.[0]?.message?.content ?? "...";
+    // عبر محرك النظامين الوحيد — طلب شبكة حقيقي وخطأ صريح عند الفشل
+    const reply: string = await callLlm(
+      [{ role: "system", content: systemPrompt }, { role: "user", content: command }],
+      2048,
+      0.9,
+      "Zaka Secret",
+    );
 
     await ctx.runMutation(internal.aiFree.saveMemory, { sessionId, role: "system", content: `[سري] ${command}` });
     await ctx.runMutation(internal.aiFree.saveMemory, { sessionId, role: "assistant", content: reply });

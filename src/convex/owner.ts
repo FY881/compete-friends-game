@@ -18,7 +18,6 @@ import {
   BUILD_ID,
   CURRENT_VERSION,
 } from "./apkRelease";
-import { ADMIN_AI_KEY as ADMIN_AI_KEY_FROM_CREDS } from "../lib/aiCredentials";
 
 // ---------------------------------------------------------------------------
 // Owner identity — the permanent owner email. Sign in with this email to open
@@ -205,7 +204,7 @@ export const DEFAULT_SETTINGS: ModSettings = {
   antiCheatEnabled: true,
   disabledQuestions: [],
   siteUrl: "",
-  openrouterApiKey: ADMIN_AI_KEY_FROM_CREDS,
+  openrouterApiKey: "", // لا مفتاح مشفّر — تُدار المفاتيح من مركز API (نظامان فقط)
   telegramBotToken: "",
   telegramChatId: "",
 };
@@ -232,6 +231,15 @@ export async function getSettingsData(
       return fallback;
     }
   };
+  // هل النظامان مُفعّلان في مركز API؟ (مؤشر قدرة — لا يُكشف أي مفتاح)
+  const apiCenterReady = ["apiSystemA", "apiSystemB"].some((k) => {
+    try {
+      const raw = map.get(k);
+      return raw ? Boolean((JSON.parse(raw) as { apiKey?: string })?.apiKey) : false;
+    } catch {
+      return false;
+    }
+  });
   return {
     aiEnabled: read("aiEnabled", DEFAULT_SETTINGS.aiEnabled),
     aiAutoApply: read("aiAutoApply", DEFAULT_SETTINGS.aiAutoApply),
@@ -242,7 +250,8 @@ export async function getSettingsData(
     antiCheatEnabled: read("antiCheatEnabled", DEFAULT_SETTINGS.antiCheatEnabled),
     disabledQuestions: read("disabledQuestions", DEFAULT_SETTINGS.disabledQuestions),
     siteUrl: read("siteUrl", DEFAULT_SETTINGS.siteUrl),
-    openrouterApiKey: ADMIN_AI_KEY_FROM_CREDS,
+    // مؤشر أن أحد نظامي مركز API مفعّل — المفتاح الحقيقي يُدار في مركز API فقط
+    openrouterApiKey: apiCenterReady ? "CONFIGURED-VIA-API-CENTER" : "",
     telegramBotToken: read("telegramBotToken", ""),
     telegramChatId: read("telegramChatId", ""),
   };
@@ -587,10 +596,19 @@ export const getSettings = query({
     if (!isStaffUser(me)) return null;
     const settings = await getSettingsData(ctx);
     const rules = await ctx.db.query("rules").collect();
+    // النظامان المضبوطان في مركز API (Settings) — وليس أي متغير بيئة قديم
+    const sysA = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q: any) => q.eq("key", "apiSystemA"))
+      .first();
+    const sysB = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q: any) => q.eq("key", "apiSystemB"))
+      .first();
     return {
       ...settings,
       rulesCount: rules.filter((r) => r.active).length,
-      aiKeyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
+      aiKeyConfigured: Boolean(sysA || sysB),
     };
   },
 });
