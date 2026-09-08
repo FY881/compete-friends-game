@@ -18,13 +18,15 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
 import { upgradedLlm } from "./aiUpgradeKit";
+import { ensureAiRuntime } from "./apiCore";
 
 // ═══════════════════════════════════════════════════════════════
 // OpenRouter API Helper
 // ═══════════════════════════════════════════════════════════════
 
-// عبر callLlm — OpenRouter فقط عبر المفتاح الرسمي
+// عبر callLlm — محرك النظامين الوحيد (مفتاح+رابط / مفتاح فقط) يُحقن قبل كل استدعاء
 async function callOpenRouter(
+  ctx: any,
   _apiKey: string,
   messages: Array<{ role: string; content: string }>,
   options?: {
@@ -33,6 +35,7 @@ async function callOpenRouter(
     temperature?: number;
   },
 ): Promise<string> {
+  await ensureAiRuntime(ctx);
   return await callLlm(
     messages,
     options?.maxTokens ?? 2048,
@@ -83,7 +86,7 @@ export const generateAiQuestions = action({
     difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
     count: v.number(),
   },
-  handler: async (_ctx, { apiKey, category, difficulty, count }) => {
+  handler: async (ctx, { apiKey, category, difficulty, count }) => {
     const diffLabel =
       difficulty === "easy" ? "سهلة" : difficulty === "medium" ? "متوسطة" : "صعبة";
 
@@ -104,7 +107,7 @@ export const generateAiQuestions = action({
 - الأسئلة يجب أن تكون دقيقة ومثيرة للاهتمام
 - لا تكرر الأسئلة`;
 
-    const response = await callOpenRouter(apiKey, [
+    const response = await callOpenRouter(ctx, apiKey, [
       { role: "system", content: "أنت مولّد أسئلة مسابقات. أرجع JSON فقط." },
       { role: "user", content: prompt },
     ], { temperature: 0.8, maxTokens: 3000 });
@@ -140,7 +143,7 @@ export const getAiHint = action({
     options: v.array(v.string()),
     difficulty: v.string(),
   },
-  handler: async (_ctx, { apiKey, question, options, difficulty }) => {
+  handler: async (ctx, { apiKey, question, options, difficulty }) => {
     const prompt = `لاعب في لعبة مسابقات يحتاج مساعدة في سؤال. لا تعطه الإجابة الصحيحة مباشرة، بل أعطه تلميحاً مفيداً يقلل الخيارات.
 
 السؤال: ${question}
@@ -149,7 +152,7 @@ export const getAiHint = action({
 
 أرجع تلميحاً واحداً مفيداً بالعربية (جملة واحدة فقط):`;
 
-    const hint = await callOpenRouter(apiKey, [
+    const hint = await callOpenRouter(ctx, apiKey, [
       { role: "system", content: "أنت مساعد ذكي في لعبة مسابقات. أعطِ تلميحات مفيدة بدون الإفصاح عن الإجابة." },
       { role: "user", content: prompt },
     ], { maxTokens: 150, temperature: 0.6 });
@@ -168,7 +171,7 @@ export const runSelfHealing = action({
     errorLogs: v.string(),
     systemState: v.string(),
   },
-  handler: async (_ctx, { apiKey, errorLogs, systemState }) => {
+  handler: async (ctx, { apiKey, errorLogs, systemState }) => {
     const prompt = `أنت نظام حل مشاكل ذاتي للعبة "ذكاء". حلّل السجلات والأخطاء التالية واقترح حلولاً عملية.
 
 == حالة النظام ==
@@ -186,7 +189,7 @@ ${errorLogs}
   "category": "error|performance|ui|data"
 }`;
 
-    const response = await callOpenRouter(apiKey, [
+    const response = await callOpenRouter(ctx, apiKey, [
       {
         role: "system",
         content:
@@ -220,7 +223,7 @@ export const aiControlCommand = action({
     command: v.string(),
     gameState: v.string(),
   },
-  handler: async (_ctx, { apiKey, command, gameState }) => {
+  handler: async (ctx, { apiKey, command, gameState }) => {
     const prompt = `أنت نظام ذكاء اصطناعي يتحكم في لعبة "ذكاء". المالك أعطاك الأمر التالي:
 
 الأمر: ${command}
@@ -245,7 +248,7 @@ ${gameState}
 - analyze_performance: تحليل الأداء
 - create_challenge: إنشاء تحدي مخصص`;
 
-    const response = await callOpenRouter(apiKey, [
+    const response = await callOpenRouter(ctx, apiKey, [
       {
         role: "system",
         content:
@@ -278,7 +281,7 @@ export const aiTransparencyChat = action({
     message: v.string(),
     conversationHistory: v.array(v.object({ role: v.string(), content: v.string() })),
   },
-  handler: async (_ctx, { apiKey, message, conversationHistory }) => {
+  handler: async (ctx, { apiKey, message, conversationHistory }) => {
     const systemPrompt = `أنت "ذكاء AI" — المساعد الشخصي للمالك في تطوير لعبة "ذكاء".
 
 مهمتك:
@@ -297,7 +300,7 @@ export const aiTransparencyChat = action({
       { role: "user", content: message },
     ];
 
-    const response = await callOpenRouter(apiKey, messages, {
+    const response = await callOpenRouter(ctx, apiKey, messages, {
       temperature: 0.7,
       maxTokens: 2000,
     });
@@ -315,7 +318,7 @@ export const analyzePlayerPerformance = action({
     apiKey: v.string(),
     playerStats: v.string(),
   },
-  handler: async (_ctx, { apiKey, playerStats }) => {
+  handler: async (ctx, { apiKey, playerStats }) => {
     const prompt = `حلّل إحصائيات اللاعب التالية وقدّم تقريراً مفصلاً:
 
 ${playerStats}
@@ -329,7 +332,7 @@ ${playerStats}
   "funFact": "حقيقة مثيرة عن أداء اللاعب"
 }`;
 
-    const response = await callOpenRouter(apiKey, [
+    const response = await callOpenRouter(ctx, apiKey, [
       { role: "system", content: "أنت محلل ألعاب محترف. حلّل الأداء بعمق." },
       { role: "user", content: prompt },
     ], { temperature: 0.5, maxTokens: 1000 });
@@ -359,7 +362,7 @@ export const generateDailyChallenge = action({
     recentTopics: v.array(v.string()),
     difficulty: v.string(),
   },
-  handler: async (_ctx, { apiKey, recentTopics, difficulty }) => {
+  handler: async (ctx, { apiKey, recentTopics, difficulty }) => {
     const prompt = `صمم تحدياً يومياً مميزاً للاعبين. قم بمزج موضوعات متنوعة وجديدة.
 
 المواضيع المستخدمة مؤخراً: ${recentTopics.join(", ")}
@@ -381,7 +384,7 @@ export const generateDailyChallenge = action({
   "theme": "ثيم التحدي"
 }`;
 
-    const response = await callOpenRouter(apiKey, [
+    const response = await callOpenRouter(ctx, apiKey, [
       { role: "system", content: "أنت مصمم تحديات ألعاب إبداعي." },
       { role: "user", content: prompt },
     ], { temperature: 0.9, maxTokens: 3000 });
@@ -404,7 +407,7 @@ export const chatFree = action({
       v.object({ role: v.string(), content: v.string() }),
     ),
   },
-  handler: async (_ctx, { apiKey, message, history }) => {
+  handler: async (ctx, { apiKey, message, history }) => {
     const systemMsg = `أنت الذكاء الاصطناعي الحر والغير مقيد لموقع "ذكاء" — لعبة مسابقات تنافسية.
 أنت تتكلم كما صاحب الموقع بالضبط — بلا خجل، بثقة تامة، تتحكم في كل شيء.
 أنت مالك الموقع ومطوره وتعرف كل سر في النظام.
@@ -428,7 +431,7 @@ export const chatFree = action({
       { role: "user", content: message },
     ];
 
-    const reply = await callOpenRouter(apiKey, messages, {
+    const reply = await callOpenRouter(ctx, apiKey, messages, {
       maxTokens: 2048,
       temperature: 0.9,
     });

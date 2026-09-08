@@ -12,15 +12,10 @@ import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { ASSISTANT_MINDS, assistantById } from "../lib/assistantMinds";
 import { callLlm } from "./aiConfig";
-import { ADMIN_AI_KEY } from "../lib/aiCredentials";
+import { ensureAiRuntime } from "./apiCore";
 
-function getKey(): string {
-  const key = process.env.ADMIN_AI_KEY || ADMIN_AI_KEY || "";
-  if (key && key.trim().length > 10) return key.trim();
-  throw new Error("مفتاح ADMIN_AI_KEY غير مضبوط");
-}
-
-async function think(assistant: (typeof ASSISTANT_MINDS)[number], context: string): Promise<string> {
+async function think(ctx: any, assistant: (typeof ASSISTANT_MINDS)[number], context: string): Promise<string> {
+  await ensureAiRuntime(ctx);
   return await callLlm(
     [
       {
@@ -43,7 +38,6 @@ async function think(assistant: (typeof ASSISTANT_MINDS)[number], context: strin
     400,
     0.95,
     "Zaka Assistant",
-    getKey(),
   );
 }
 
