@@ -15,7 +15,7 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { DEFAULT_MODEL, setRuntimeConfig } from "./aiConfig";
+import { DEFAULT_MODEL, pickCustomModels, setRuntimeConfig } from "./aiConfig";
 
 /**
  * 🔌 الربط الحقيقي: يقرأ النظامين من قاعدة البيانات ويحقنهما في محرك
@@ -79,6 +79,10 @@ export const verifySystem = action({
     const url = which === "systemA" && stored.baseUrl ? stored.baseUrl : DEFAULT_GATEWAY;
     const systemName = which === "systemA" ? "systemA" : "systemB";
 
+    // النظام الأول (رابط خاص) قد لا يقبل أسماء نماذج OpenRouter — نكتشف نموذجاً حقيقياً صالحاً.
+    const verifyModel =
+      which === "systemA" ? (await pickCustomModels(url, stored.apiKey))[0] : DEFAULT_MODEL;
+
     const started = Date.now();
     try {
       const response = await fetch(url, {
@@ -90,7 +94,7 @@ export const verifySystem = action({
           "X-Title": "Zaka Verify",
         },
         body: JSON.stringify({
-          model: DEFAULT_MODEL,
+          model: verifyModel,
           messages: [{ role: "user", content: "قل: جاهز" }],
           max_tokens: 20,
         }),

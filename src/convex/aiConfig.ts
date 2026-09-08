@@ -44,13 +44,75 @@ export function getRuntimeConfig(): RuntimeSystem[] {
 // البوابة الافتراضية للنظام الثاني (مفتاح فقط) — OpenRouter
 const DEFAULT_GATEWAY = "https://openrouter.ai/api/v1/chat/completions";
 
-// النموذج الافتراضي
+// النموذج الافتراضي (أسماء نماذج OpenRouter — تُستخدم مع البوابة الافتراضية فقط)
 export const DEFAULT_MODEL = "openrouter/auto";
 export const FREE_MODELS = [DEFAULT_MODEL, "openrouter/free"];
 export const FALLBACK_MODELS = [
   "openai/gpt-4o-mini",
   "meta-llama/llama-3.3-70b-instruct",
 ];
+
+// نماذج احتياطية للمزوّدات المخصّصة (النظام الأول — رابط خاص) تُجرَّب عند تعذّر الاكتشاف
+const CUSTOM_FALLBACK_MODELS = [
+  "deepseek-v4-flash-lr",
+  "deepseek-v4-flash",
+  "deepseek-chat",
+  "gpt-4o-mini",
+  "gpt-5.6-new",
+];
+
+// ذاكرة مؤقتة لاكتشاف نماذج المزوّد المخصّص (النظام الأول)
+let customModelsCache: { origin: string; models: string[]; at: number } | null = null;
+
+/** هل النظام الأول (مفتاح + رابط خاص) مفعّل حالياً؟ */
+export function isCustomEndpoint(): boolean {
+  const sysA = runtimeSystems.find((s) => s.kind === "key_url");
+  return !!(
+    sysA &&
+    sysA.apiKey.trim().length > 10 &&
+    sysA.baseUrl &&
+    sysA.baseUrl.trim().startsWith("http")
+  );
+}
+
+/**
+ * 🔍 اكتشاف حقيقي لنموذج يعمل عند مزوّد مخصّص (النظام الأول):
+ * يستدعي {origin}/v1/models بالمفتاح الحقيقي ويعيد قائمة نماذج،
+ * مع تفضيل النماذج السريعة/الرخيصة. عند الفشل يرجع قائمة احتياطية عامة.
+ */
+export async function pickCustomModels(baseUrl: string, key: string): Promise<string[]> {
+  let origin = baseUrl.trim();
+  try {
+    origin = new URL(baseUrl).origin;
+  } catch {
+    // أبقه كما هو
+  }
+  const cacheKey = origin;
+  if (customModelsCache && customModelsCache.origin === cacheKey && Date.now() - customModelsCache.at < 5 * 60_000) {
+    return customModelsCache.models;
+  }
+  const fallback = CUSTOM_FALLBACK_MODELS;
+  try {
+    const res = await fetch(`${origin}/v1/models`, { headers: { Authorization: `Bearer ${key}` } });
+    if (res.ok) {
+      const json = (await res.json()) as { data?: Array<{ id?: string }> };
+      const ids = (json.data ?? []).map((m) => m.id).filter((x): x is string => !!x && x.trim().length > 0);
+      if (ids.length) {
+        const preferred =
+          ids.find((m) => /flash-lr/i.test(m)) ??
+          ids.find((m) => /flash/i.test(m)) ??
+          ids.find((m) => /mini|light|fast|small/i.test(m)) ??
+          ids[0];
+        const models = [preferred, ...fallback.filter((m) => m !== preferred), ...ids.filter((m) => m !== preferred)];
+        customModelsCache = { origin: cacheKey, models, at: Date.now() };
+        return models;
+      }
+    }
+  } catch {
+    // تجاهل — سنعتمد القائمة الاحتياطية
+  }
+  return fallback;
+}
 
 /**
  * 🔍 حلّ نقطة الاتصال الحقيقية:
@@ -97,7 +159,9 @@ export async function callLlm(
   jsonMode = false,
 ): Promise<string> {
   const { url, key } = resolveEndpoint();
-  const models = [DEFAULT_MODEL, ...FALLBACK_MODELS.filter((m) => m !== DEFAULT_MODEL)];
+  const models = isCustomEndpoint()
+    ? await pickCustomModels(url, key)
+    : [DEFAULT_MODEL, ...FALLBACK_MODELS.filter((m) => m !== DEFAULT_MODEL)];
   let lastErr = "فشل استدعاء AI";
 
   for (const model of models) {
