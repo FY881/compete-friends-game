@@ -23,7 +23,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { PRIVATE_MINDS } from "@/lib/aiSystems";
+import { PRIVATE_MINDS, ELITE_MINDS, COUNCIL_MINDS } from "@/lib/aiSystems";
 import { cn } from "@/lib/utils";
 
 export function PrivateCouncilTab() {
@@ -102,17 +102,20 @@ export function PrivateCouncilTab() {
 
       {/* العشرة العقول */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {PRIVATE_MINDS.map((m) => (
+        {[...PRIVATE_MINDS, ...ELITE_MINDS, ...COUNCIL_MINDS].map((m) => {
+          const priv = (m as { privilege?: string; skill?: string }).privilege ?? (m as { skill?: string }).skill ?? "";
+          return (
           <div
             key={m.id}
             className="rounded-xl border border-border/70 bg-card p-3 text-center transition-colors hover:border-primary/40"
-            title={m.privilege}
+            title={priv}
           >
             <span className="text-xl">{m.emoji}</span>
             <p className="mt-1 text-xs font-bold">{m.name}</p>
-            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{m.privilege}</p>
+            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{priv}</p>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* التحكم (مراقبة فقط — لا كتابة داخل الغرفة) */}

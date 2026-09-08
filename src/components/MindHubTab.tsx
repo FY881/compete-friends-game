@@ -24,7 +24,7 @@ import {
   BrainCircuit,
 } from "lucide-react";
 import { KeyRound } from "lucide-react";
-import { PRIVATE_MINDS, EXTENDED_MINDS } from "@/lib/aiSystems";
+import { PRIVATE_MINDS, EXTENDED_MINDS, HUB_MINDS } from "@/lib/aiSystems";
 import { cn } from "@/lib/utils";
 
 type Room = "war" | "free";
@@ -101,7 +101,7 @@ export function MindHubTab() {
             <BrainCircuit className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">ملتقى العقول — {PRIVATE_MINDS.length + EXTENDED_MINDS.length} عقلاً</p>
+            <p className="text-sm font-bold">ملتقى العقول — {PRIVATE_MINDS.length + EXTENDED_MINDS.length + HUB_MINDS.length} عقلاً</p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
               ذكاء عالٍ، تفكير غير محدود، تشغيل ذاتي دائم، تعلّم ذاتي من كل جلسة،
               وصلاحيات تنفيذية كاملة — والقرارات المهمة تُرفع لك كاقتراح.
@@ -153,7 +153,7 @@ export function MindHubTab() {
 
       {/* العقول */}
       <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-        {[...PRIVATE_MINDS, ...EXTENDED_MINDS].map((m) => (
+        {[...PRIVATE_MINDS, ...EXTENDED_MINDS, ...HUB_MINDS].map((m) => (
           <div
             key={m.id}
             className="rounded-lg border border-border/60 bg-card p-2 text-center"

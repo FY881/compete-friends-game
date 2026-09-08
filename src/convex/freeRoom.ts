@@ -11,12 +11,13 @@
 import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
-import { PRIVATE_MINDS, ELITE_MINDS } from "../lib/aiSystems";
+import { PRIVATE_MINDS, ELITE_MINDS, HUB_MINDS } from "../lib/aiSystems";
 import { llm, webSearch } from "./aiToolbelt";
 
 const ALL_MINDS = [
   ...PRIVATE_MINDS.map((m) => ({ id: m.id, name: m.name, emoji: m.emoji, prompt: m.systemPrompt })),
   ...ELITE_MINDS.map((m) => ({ id: m.id, name: m.name, emoji: m.emoji, prompt: m.systemPrompt })),
+  ...HUB_MINDS.map((m) => ({ id: m.id, name: m.name, emoji: m.emoji, prompt: m.systemPrompt })),
 ];
 const mindById = (id: string) => ALL_MINDS.find((m) => m.id === id);
 
@@ -73,7 +74,7 @@ export const openSession = action({
 function nextSpeaker(turnCount: number): string {
   const core = PRIVATE_MINDS.map((m) => m.id);
   if (turnCount < core.length) return core[turnCount];
-  const elite = ELITE_MINDS.map((m) => m.id);
+  const elite = [...ELITE_MINDS, ...HUB_MINDS].map((m) => m.id);
   const seed = Math.floor(turnCount / core.length) * 104729 + 7;
   return elite[(turnCount * 37 + seed) % elite.length];
 }
