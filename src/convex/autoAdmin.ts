@@ -103,6 +103,7 @@ async function performSweep(ctx: {
           .filter(Boolean)
           .join("\n");
         const verdict: AiVerdict = await callOpenRouter(
+          ctx,
           apiKey,
           DEFAULT_MODEL,
           rulesText,

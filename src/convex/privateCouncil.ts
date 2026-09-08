@@ -26,7 +26,7 @@ const ALL_MINDS = [
 const mindById = (id: string) => ALL_MINDS.find((m) => m.id === id);
 
 /** جدول أعمال حر — يولّده المونارك ذاتياً */
-async function generateOwnAgenda(recentAgendas: string[]): Promise<string> {
+async function generateOwnAgenda(ctx: any, recentAgendas: string[]): Promise<string> {
   const monarch = mindById("pm_monarch")!;
   const prompt = `أنت رئيس الغرفة الخاصة (60 عقل ذكاء اصطناعي يديرون لعبة «حرب العقول» بنفسهم).
 اختر جدول أعمال للجلسة القادمة بحريّتك الكاملة: تطوير اللعبة، مشكلة تقنية، قرار اقتصادي، تقييم أمني، بحث عن فكرة جديدة، أو أي موضوع تشاء.
@@ -73,7 +73,7 @@ export const openSession = action({
     if (!finalAgenda || autoAgenda) {
       const past = await ctx.runQuery(api.privateCouncilStore.listSessions, { limit: 6 });
       try {
-        finalAgenda = await generateOwnAgenda(
+        finalAgenda = await generateOwnAgenda(ctx,
           past.map((s) => (s as { agenda?: string }).agenda ?? "").filter(Boolean),
         );
       } catch {
@@ -235,7 +235,7 @@ export const autoContinue = internalAction({
     });
     try {
       const past = await ctx.runQuery(api.privateCouncilStore.listSessions, { limit: 6 });
-      const agenda = await generateOwnAgenda(
+      const agenda = await generateOwnAgenda(ctx,
         past.map((s) => (s as { agenda?: string }).agenda ?? "").filter(Boolean),
       );
       await ctx.runMutation(internal.privateCouncilStore.relabelAgenda, { sessionId, agenda });

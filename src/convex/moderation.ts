@@ -8,7 +8,8 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getSettingsData, isStaffUser } from "./owner";
-import { getOpenRouterKey, DEFAULT_MODEL } from "./aiConfig";
+import { getOpenRouterKey, DEFAULT_MODEL, callLlm } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 
 // ---------------------------------------------------------------------------
 // AI moderation agent — "رقيب العقول".
@@ -95,6 +96,7 @@ export function parseVerdict(raw: string): AiVerdict {
 }
 
 export async function callOpenRouter(
+  ctx: any,
   apiKey: string,
   model: string,
   rulesText: RulesText,
@@ -107,40 +109,19 @@ export async function callOpenRouter(
       content: `قيّم المحتوى التالي وفق قوانين الموقع:\n\n${userContent}`,
     },
   ];
-  return await parseOpenRouterVerdict(apiKey, model, messages);
+  return await parseOpenRouterVerdict(ctx, apiKey, model, messages);
 }
 
 async function parseOpenRouterVerdict(
-  apiKey: string,
-  model: string,
+  ctx: any,
+  _apiKey: string,
+  _model: string,
   messages: Array<{ role: string; content: string }>,
 ): Promise<AiVerdict> {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://zaka.freebuff.app",
-      "X-Title": "Zaka - Quiz Game",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages,
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`OpenRouter فشل: ${response.status} ${body.slice(0, 200)}`);
-  }
-
-  const data = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const text = data.choices?.[0]?.message?.content ?? "";
-  if (!text) throw new Error("OpenRouter لم يُرجع رداً");
+  // عبر محرك النظامين الوحيد — الطلب شبكة حقيقية والخطأ صريح عند الفشل
+  await ensureAiRuntime(ctx);
+  const text = await callLlm(messages, 512, 0.1, "Zaka Moderation");
+  if (!text) throw new Error("لم يُرجع النظام رداً");
   return parseVerdict(text);
 }
 
@@ -313,6 +294,7 @@ export const handleReport = internalAction({
         .join("\n");
 
       const verdict = await callOpenRouter(
+        ctx,
         apiKey,
         DEFAULT_MODEL,
         rulesText,

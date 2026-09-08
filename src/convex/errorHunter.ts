@@ -10,6 +10,7 @@
 import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
 import { callLlm } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 
 // ═══════════════════════════════════════════════════════════════
 // التسجيل — تسجيل الخطأ مع التجميع الذكي
@@ -506,7 +507,8 @@ ${errorContext}
 [{"fingerprint":"...","analysis":"تحليل عربي","fixSuggestion":"حل مقترح","canAutoFix":true/false,"actualSeverity":"low|medium|high|critical"}]`;
 
     try {
-      // عبر callLlm — OpenRouter فقط عبر المفتاح الرسمي
+      // عبر callLlm — محرك النظامين الوحيد
+      await ensureAiRuntime(ctx);
       const content: string = await callLlm(
         [{ role: "user", content: prompt }],
         2000,

@@ -13,6 +13,7 @@
 import { internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { callLlm, getAdminKeyPreview, DEFAULT_MODEL } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 
 const HEALTH_KEY = "ai_guardian";
 
@@ -25,6 +26,7 @@ export const patrol = internalAction({
     let detail = "";
 
     try {
+      await ensureAiRuntime(ctx);
       sample = await callLlm(
         [{ role: "user", content: "أجب بكلمة واحدة فقط: جاهز" }],
         20,

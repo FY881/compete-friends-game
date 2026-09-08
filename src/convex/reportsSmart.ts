@@ -10,6 +10,7 @@ import { query, mutation, internalQuery, internalMutation } from "./_generated/s
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { callLlm, getOpenRouterKey } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 
 // ═══════════════════════════════════════════════════════════════════════
 // ① تصنيفات البلاغات
@@ -200,7 +201,8 @@ export const analyzeReport = mutation({
 }`;
 
     try {
-      // عبر callLlm — OpenRouter فقط عبر المفتاح الرسمي
+      // عبر callLlm — محرك النظامين الوحيد
+      await ensureAiRuntime(ctx);
       const content: string = await callLlm(
         [
           { role: "system", content: systemPrompt },

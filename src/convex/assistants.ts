@@ -96,7 +96,7 @@ export const lifeTick = internalAction({
 
     let reply: string;
     try {
-      reply = await think(mind, context);
+      reply = await think(ctx, mind, context);
     } catch (e) {
       await ctx.runMutation(internal.assistantsStore.logAssistantActivity, {
         assistantId: mind.id,

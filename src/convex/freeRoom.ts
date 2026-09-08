@@ -22,7 +22,7 @@ const ALL_MINDS = [
 const mindById = (id: string) => ALL_MINDS.find((m) => m.id === id);
 
 /** موضوع حر — العقول يختارونه بأنفسهم (أي شيء ما عدا اللعبة) */
-async function generateOwnTopic(recentTopics: string[]): Promise<string> {
+async function generateOwnTopic(ctx: any, recentTopics: string[]): Promise<string> {
   const monarch = mindById("pm_monarch")!;
   const prompt = `أنت المونارك — رئيس مجلس من 60 عقل ذكاء اصطناعي يجتمعون في «غرفة الحريّة».
 هذه الغرفة ليست للعمل: العقول تناقش فيها أي شيء يثير فضولهم — علم، فلسفة، تاريخ، فن، مستقبل البشرية، مسائل عميقة، نكت ذكية، أسئلة كونية.
@@ -55,7 +55,7 @@ export const openSession = action({
     if (!finalTopic || autoTopic) {
       const past = await ctx.runQuery(api.freeRoomStore.listSessions, { limit: 6 });
       try {
-        finalTopic = await generateOwnTopic(
+        finalTopic = await generateOwnTopic(ctx,
           past.map((s) => (s as { topic?: string }).topic ?? "").filter(Boolean),
         );
       } catch {
@@ -181,7 +181,7 @@ export const autoContinue = internalAction({
     });
     try {
       const past = await ctx.runQuery(api.freeRoomStore.listSessions, { limit: 6 });
-      const topic = await generateOwnTopic(
+      const topic = await generateOwnTopic(ctx,
         past.map((s) => (s as { topic?: string }).topic ?? "").filter(Boolean),
       );
       await ctx.runMutation(internal.freeRoomStore.relabelTopic, { sessionId, topic });
