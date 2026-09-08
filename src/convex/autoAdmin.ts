@@ -14,6 +14,7 @@ import {
   setSetting,
 } from "./owner";
 import { DEFAULT_MODEL } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 import { callOpenRouter, parseVerdict, type AiVerdict } from "./moderation";
 import { APK_BYTES, APK_FILE_NAME, APK_MIRROR_URL, APK_SHA256 } from "./apkRelease";
 import { getOpenRouterKey } from "./aiConfig";
@@ -67,6 +68,7 @@ async function performSweep(ctx: {
   );
   if (!settings.aiAdminEnabled) return; // the owner turned the administrator off
 
+  await ensureAiRuntime(ctx); // حقن النظامين المضبوطين قبل القراءة/الاستدعاء
   const apiKey = getOpenRouterKey();
   const issues: SweepIssue[] = [];
   let reportsReviewed = 0;

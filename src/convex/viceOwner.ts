@@ -6,33 +6,25 @@ import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm, markDeputyOnline } from "./aiConfig";
 import { recallFor, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
-import { ADMIN_AI_KEY } from "../lib/aiCredentials";
+import { ensureAiRuntime } from "./apiCore";
 
-function getAdminAiKey(): string {
-  // مفتاح OpenRouter الرسمي الوحيد (sk-or-v1...) من aiCredentials هو الأساس؛ env تجاوز اختياري.
-  // كان يقرأ process.env.ADMIN_AI_KEY حصرياً، وعند غيابه يفشل النائب — الآن يعمل
-  // فوراً على المفتاح المضمّن بلا أي إعداد مسبق.
-  const key = process.env.ADMIN_AI_KEY || ADMIN_AI_KEY || "";
-  if (key && key.trim().length > 10) return key.trim();
-  throw new Error(
-    "مفتاح ADMIN_AI_KEY غير مضبوط — هذا المفتاح مسؤول عن كل أنظمة AI في اللعبة.",
-  );
-}
-
+// نائب المالك يعمل عبر محرك النظامين حصراً (مفتاح+رابط / مفتاح فقط) —
+// لا مفتاح مشفّر ولا أي تجاوز بمفتاح قديم. إن لم يُفعَّل نظام فسيظهر خطأ واضح.
 async function callDeputyPrimary(
+  ctx: any,
   systemPrompt: string,
   userPrompt: string,
   maxTokens = 900,
   temperature = 0.95,
 ): Promise<string> {
+  await ensureAiRuntime(ctx); // حقن النظامين المضبوطين من مركز API قبل الاستدعاء
   const reply = await callLlm(
     [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
     maxTokens,
     temperature,
     "Zaka Vice Owner",
-    getAdminAiKey(),
   );
-  // نجاح نائب المالك على المفتاح الرسمي = فتح بوابة الحرية لكل أنظمة AI
+  // نجاح نائب المالك على النظام المُفعّل = فتح بوابة الحرية لكل أنظمة AI
   markDeputyOnline();
   return reply;
 }
@@ -64,11 +56,12 @@ const VICE_SYSTEM_PROMPT =
   "[نظام] الاسم | الهدف | المواصفات الكاملة\n" +
   "يمكنك إرجاع عدة أسطر في رد واحد.";
 
-async function chooseOwnFocus(recentMissions: string[]): Promise<{
+async function chooseOwnFocus(ctx: any, recentMissions: string[]): Promise<{
   mission: string;
   focus: "ai_ops" | "audit" | "optimization" | "exploration";
 }> {
   const reply = await callDeputyPrimary(
+    ctx,
     VICE_SYSTEM_PROMPT,
     `اختر مهمتك التالية بحريتك الكاملة. مهامك الأخيرة (لا تكررها): ${recentMissions.join(" | ") || "لا شيء"}.\nأرجع سطراً واحداً بالشكل: [مهمة] المجال | وصف المهمة\nالمجال أحد: ai_ops (إدارة أنظمة AI و API) أو audit (تدقيق شامل) أو optimization (تحسين أداء) أو exploration (استكشاف حر — أي شيء يثير اهتمامك).`,
     150,
@@ -137,6 +130,7 @@ export const startShift = action({
       mission?: string;
     }>;
     const { mission, focus } = await chooseOwnFocus(
+      ctx,
       past.map((s) => s.mission ?? "").filter(Boolean),
     );
     const sessionId = await ctx.runMutation(internal.viceOwnerStore.insertSession, {
@@ -175,6 +169,7 @@ export const workTurn = internalAction({
         /* اختيارية */
       }
       reply = await callDeputyPrimary(
+        ctx,
         VICE_SYSTEM_PROMPT + memoryBlock,
         `مهمتك الحالية: «${session.mission}»\n\nسياق حي من النظام الآن:\n${context}\n\nسجل أعمالك الأخيرة:\n${recentActivity || "(بداية الوردية)"}\n\nالدورة ${session.turnCount + 1} من ${session.maxTurns} — نفّذ ما تراه مناسباً الآن بحريتك الكاملة وسجّل أعمالك:\n(إن تعلمت درساً جديداً يستحق الحفظ أضف سطراً: [ذاكرة] الدرس)`,
         800,

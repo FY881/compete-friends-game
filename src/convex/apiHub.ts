@@ -12,6 +12,7 @@ import { action, internalAction, internalMutation } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 import { upgradedLlm } from "./aiUpgradeKit";
 import { registerViceSystem } from "./apiHubInternal";
 import { ASSISTANT_MINDS, assistantById } from "../lib/assistantMinds";
@@ -183,6 +184,7 @@ export const testApi = action({
 export const discoverFromCurl = action({
   args: { curlCommand: v.string() },
   handler: async (ctx, { curlCommand }): Promise<{ apiId: string; name: string; spec: string }> => {
+    await ensureAiRuntime(ctx); // حقن النظامين قبل الاستدعاء
     const analysis = await callLlm(
       [
         {
@@ -269,6 +271,7 @@ export const analyzeAndAddKey = action({
     keyPreview: string;
     connected: boolean;
   }> => {
+    await ensureAiRuntime(ctx); // حقن النظامين قبل الاستدعاء
     const key = (rawKey ?? "").trim();
     if (key.length < 10)
       throw new Error("المفتاح قصير جداً — تأكد أنك لصقت المفتاح كاملاً.");

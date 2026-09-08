@@ -5,6 +5,7 @@
 "use node";
 
 import { callLlm } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 import { api, internal } from "./_generated/api";
 
 type Ctx = {
@@ -132,6 +133,7 @@ export async function upgradedLlm(
     ...messages.filter((m) => m.role !== "system"),
   ];
 
+  await ensureAiRuntime(ctx); // حقن النظامين المضبوطين من مركز API قبل كل استدعاء
   const raw = await callLlm(upgraded, maxTokens, temperature, `Zaka Upgraded AI (${agentId})`);
   const { clean, selfGrade, confidence } = extractSelfGrade(raw);
   await maybeSaveSuggestion(ctx, agentId, agentId, raw);
