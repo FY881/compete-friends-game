@@ -96,6 +96,7 @@ export function ApiHubTab() {
   const [deepRaw, setDeepRaw] = useState("");
   const [deepReport, setDeepReport] = useState<Awaited<ReturnType<typeof deepInspectKey>> | null>(null);
   const [deepBusy, setDeepBusy] = useState(false);
+  const [deepConnecting, setDeepConnecting] = useState(false);
   const [guardAssistant, setGuardAssistant] = useState(ASSISTANT_MINDS[0]?.id ?? "");
   const [guardOpts, setGuardOpts] = useState({ hunter: true, security: true, economy: true });
   const [guardBusy, setGuardBusy] = useState(false);
@@ -172,12 +173,35 @@ export function ApiHubTab() {
     try {
       const res = await deepInspectKey({ rawKey: deepRaw.trim() });
       setDeepReport(res);
-      toast.success(res.verified ? "المفتاح يعمل فعلياً" : "المفتاح لم يُقبل من أي مزود");
-      setDeepRaw("");
+      toast.success(res.verified ? "المفتاح يعمل فعلياً — يمكنك ربطه الآن" : "المفتاح لم يُقبل من أي مزود");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "فشل الفحص العميق");
     } finally {
       setDeepBusy(false);
+    }
+  };
+
+  const handleConnectFromDeep = async () => {
+    const key = deepRaw.trim();
+    if (!key) return toast.error("أعد لصق المفتاح أولاً");
+    const verified = deepReport?.matched.find((m) => m.ok);
+    setDeepConnecting(true);
+    try {
+      const res = await analyzeAndAddKey({
+        rawKey: key,
+        ...(verified ? { providerHint: verified.provider } : {}),
+      });
+      if (res.ok) {
+        toast.success(`المفتاح يعمل ورُبط باللعبة على ${res.analysis.provider} (${res.latencyMs}ms)`);
+        setDeepReport(null);
+        setDeepRaw("");
+      } else {
+        toast.error("تعذّر الربط — تفاصيل في تقرير التحليل");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل الربط");
+    } finally {
+      setDeepConnecting(false);
     }
   };
 
@@ -605,6 +629,14 @@ export function ApiHubTab() {
                   ))}
                 </ul>
               )}
+              <Button
+                onClick={handleConnectFromDeep}
+                disabled={deepConnecting || !deepReport.verified || !deepRaw.trim()}
+                className="gap-1.5 rounded-xl"
+              >
+                {deepConnecting ? <Loader2 className="size-4 animate-spin" /> : <Plug className="size-4" />}
+                {deepReport.verified ? "اربط باللعبة الآن" : "المفتاح غير صالح — لا يمكن ربطه"}
+              </Button>
             </div>
           )}
           <p className="text-xs text-muted-foreground">
