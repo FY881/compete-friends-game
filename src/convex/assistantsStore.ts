@@ -382,14 +382,17 @@ export const getAuditStats = query({
       total: all.length,
       executed: all.filter((a) => a.result === "executed").length,
       failed: all.filter((a) => a.result === "failed").length,
-      byExecutor: Object.fromEntries(
-        Object.entries(
-          all.reduce<Record<string, number>>((acc, a) => {
-            acc[a.executorName] = (acc[a.executorName] ?? 0) + 1;
-            return acc;
-          }, {}),
-        ).sort((a, b) => b[1] - a[1]),
-      ),
+      byExecutor: Object.entries(
+        all.reduce<Record<string, number>>((acc, a) => {
+          acc[a.executor] = (acc[a.executor] ?? 0) + 1;
+          return acc;
+        }, {}),
+      )
+        .sort((a, b) => b[1] - a[1])
+        .map(([executor, count]) => {
+          const name = all.find((a) => a.executor === executor)?.executorName ?? executor;
+          return { executor, name, count };
+        }),
     };
   },
 });
