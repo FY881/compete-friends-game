@@ -952,6 +952,74 @@ const schema = defineSchema(
     }).index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ║ عالم المساعدين — كيانات حية بصلاحيات تنفيذية حقيقية             ║
+    // ═══════════════════════════════════════════════════════════════════════
+    assistantWorld: defineTable({
+      assistantId: v.string(), // as_cobalt ...
+      name: v.string(),
+      emoji: v.string(),
+      title: v.string(), // وظيفته في العالم
+      home: v.string(), // مكان إقامته
+      personality: v.string(),
+      privilege: v.string(), // صلاحياته الحقيقية
+      // حالته الحية
+      energy: v.number(), // 0-100
+      mood: v.string(),
+      reputation: v.number(), // 0-100 — كم يثق به نائب المالك
+      level: v.number(), // يتقدم بإنجازاته
+      tasksCompleted: v.number(),
+      actionsExecuted: v.number(),
+      lastActionAt: v.optional(v.union(v.number(), v.null())),
+      // جهاز الكمبيوتر الخاص به
+      computer: v.object({
+        cpuLoad: v.number(), // 0-100
+        installedTools: v.array(v.string()),
+        uptimeMs: v.number(),
+        lastCommand: v.optional(v.string()),
+        lastCommandResult: v.optional(v.string()),
+        logsCount: v.number(),
+      }),
+      lastActivity: v.optional(v.union(v.string(), v.null())),
+      createdAt: v.number(),
+    }).index("by_assistant", ["assistantId"]),
+
+    assistantLogs: defineTable({
+      assistantId: v.string(),
+      name: v.string(),
+      emoji: v.string(),
+      type: v.union(v.literal("thought"), v.literal("action"), v.literal("order"), v.literal("life")),
+      action: v.string(), // inspect | moderate | reward | announce | propose | fix | chat ...
+      detail: v.string(),
+      result: v.union(v.literal("executed"), v.literal("failed"), v.literal("noted")),
+      at: v.number(),
+    }).index("by_assistant", ["assistantId", "at"]).index("by_created", ["at"]),
+
+    // أوامر نائب المالك للمساعدين — تُنفَّذ بأولوية عالية
+    assistantOrders: defineTable({
+      targetId: v.union(v.literal("all"), v.string()),
+      task: v.string(),
+      priority: v.union(v.literal("high"), v.literal("normal")),
+      status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("done"), v.literal("rejected")),
+      acceptedBy: v.optional(v.string()),
+      result: v.optional(v.string()),
+      createdAt: v.number(),
+      completedAt: v.optional(v.number()),
+    }).index("by_status", ["status", "createdAt"]).index("by_created", ["createdAt"]),
+
+    // السجل المركزي — كل أمر نُفِّذ فعلاً من نائب المالك أو المساعدين
+    viceAudit: defineTable({
+      executor: v.string(), // "vice_owner" | assistant id
+      executorName: v.string(),
+      command: v.string(), // النص الكامل للأمر
+      action: v.string(), // ban | mute | grant_xp | announce | system | order | sweep ...
+      target: v.string(),
+      params: v.optional(v.string()),
+      result: v.union(v.literal("executed"), v.literal("failed"), v.literal("skipped")),
+      detail: v.string(),
+      at: v.number(),
+    }).index("by_created", ["at"]),
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ║ ترقية AI الشاملة — ذاكرة دائمة + تقييمات + اقتراحات استباقية      ║
     // ═══════════════════════════════════════════════════════════════════════
     aiMemories: defineTable({
