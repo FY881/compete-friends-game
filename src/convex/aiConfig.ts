@@ -1,63 +1,115 @@
 /**
- * AI Configuration — مركز الإعدادات الذكية
- * المفتاح الرسمي الوحيد: OpenRouter (sk-or-v1...). لا Gemini ولا أي مزود آخر.
- * كل أنظمة AI في اللعبة تمر عبر هذا المفتاح فقط.
+ * ═══════════════════════════════════════════════════════════════
+ * AI Configuration — محرك الاستدعاء الحقيقي الوحيد في اللعبة
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * النظام المطلوب: نظامان فقط، لا ثالث لهما.
+ *
+ *  ⚙️ النظام الأول (System A): مفتاح API + رابط المزود (URL).
+ *     يُستخدم مع أي مزوّد يعطي رابطاً خاصاً (توافقي مع OpenAI).
+ *
+ *  🔑 النظام الثاني (System B): مفتاح API فقط (بدون URL).
+ *     يُستخدم عبر البوابة الافتراضية الثابتة (OpenRouter) للأنظمة
+ *     التي تدعم هذا النمط.
+ *
+ * كل استدعاء هو طلب شبكة حقيقي (fetch). إن فشل الاتصال يُرمى خطأ
+ * واضح لا يُكتم (لا نتائج وهمية أبداً).
+ *
+ * يعمل محركاً وحيداً: كل أنظمة AI في اللعبة تمر عبر callLlm هنا.
+ * ═══════════════════════════════════════════════════════════════
  */
 
-import { ADMIN_AI_KEY, BACKUP_AI_KEY } from "../lib/aiCredentials";
+// ── النظامان الفعّالان في الذاكرة (يُضبطان من apiCore عبر setRuntimeConfig) ──
+export type RuntimeSystem = {
+  /** "key_url" = النظام الأول (مفتاح + رابط) | "key_only" = النظام الثاني (مفتاح فقط) */
+  kind: "key_url" | "key_only";
+  apiKey: string;
+  baseUrl?: string; // النظام الأول فقط
+};
 
-// نسخة مُصرّحة صراحةً كـ string — المفتاح الاحتياطي أُزيل، لكن نحتاج منع const literal
-// ("") من تقليص النوع إلى never عند استخدامه في شروط.
-const backupKey: string = BACKUP_AI_KEY;
+// الحالة الحية في هذا الـ runtime — لا تُخزَّن بين الجلسات.
+// تُملأ من واجهة النظامين عبر دالة setRuntimeConfig وتُقرأ من env كمصدر احتياطي.
+let runtimeSystems: RuntimeSystem[] = [];
 
-const GATEWAY_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-/** المفتاح الفعّال: المُمرَّر إن وُجد، وإلا المفتاح الرسمي، وإلا env، وإلا الاحتياطي */
-export function getOpenRouterKey(providedKey?: string | null): string {
-  if (providedKey && providedKey.trim().length > 10) return providedKey.trim();
-  const envKey = process.env.OPENROUTER_API_KEY;
-  if (envKey && envKey.trim().length > 10) return envKey.trim();
-  if (ADMIN_AI_KEY && ADMIN_AI_KEY.trim().length > 10) return ADMIN_AI_KEY.trim();
-  if (backupKey && backupKey.trim().length > 10) return backupKey.trim();
-  return "";
+/** ضبط النظامين الفعّالين في هذا الـ runtime (يُستدعى من apiCore عند الحفظ/الحذف) */
+export function setRuntimeConfig(systems: RuntimeSystem[]): void {
+  runtimeSystems = Array.isArray(systems) ? systems : [];
 }
 
-// نستخدم openrouter/auto بدلاً من openrouter/free: النموذج المجاني يصل سريعاً
-// لحد الاستخدام اليومي (429 free-models-per-day). auto يختار أفضل نموذج متاح
-// للمفتاح الحالي، فيتجاوز الحد للمفتاح ذي الرصيد ويوقف أخطاء الـ AI المتكررة.
-export const FREE_MODELS = ["openrouter/auto", "openrouter/free"];
-export const DEFAULT_MODEL = "openrouter/auto";
+/** قراءة النظامين المضبوطين حالياً */
+export function getRuntimeConfig(): RuntimeSystem[] {
+  return [...runtimeSystems];
+}
 
-/** سلسلة نماذج بديلة — كلها عبر نفس مفتاح OpenRouter الرسمي (لا مزود خارجي) */
+// البوابة الافتراضية للنظام الثاني (مفتاح فقط) — OpenRouter
+const DEFAULT_GATEWAY = "https://openrouter.ai/api/v1/chat/completions";
+
+// النموذج الافتراضي
+export const DEFAULT_MODEL = "openrouter/auto";
+export const FREE_MODELS = [DEFAULT_MODEL, "openrouter/free"];
 export const FALLBACK_MODELS = [
   "openai/gpt-4o-mini",
   "meta-llama/llama-3.3-70b-instruct",
 ];
 
 /**
- * ⚡ الاستدعاء الموحّد — عبر المفتاح الرسمي فقط، مع إصلاح ذاتي:
- *  - إعادة محاولة تلقائية عند الرد الفارغ (سبب «AI أعاد رداً فارغاً» السابق)
- *  - التنقل تلقائياً بين نماذج OpenRouter عند 429/فشل النموذج
- *  - قراءة الرد من حقل reasoning إن أعاد النموذج التفكير فقط
+ * 🔍 حلّ نقطة الاتصال الحقيقية:
+ *  1. إن ضُبط النظام الأول (key_url) → استخدم رابطه ومفتاحه.
+ *  2. وإلا إن ضُبط النظام الثاني (key_only) → استخدم بوابته الافتراضية ومفتاحه.
+ *  3. وإلا اقرأ env (OPENROUTER_API_KEY) — مصدر احتياطي تديره اللعبة.
+ *  4. وإلا خطأ واضح: لا يوجد أي نظام مُفعّل.
+ */
+function resolveEndpoint(): { url: string; key: string } {
+  const sysA = runtimeSystems.find((s) => s.kind === "key_url");
+  if (sysA && sysA.apiKey.trim().length > 10 && sysA.baseUrl && sysA.baseUrl.trim().startsWith("http")) {
+    return { url: sysA.baseUrl.trim(), key: sysA.apiKey.trim() };
+  }
+  const sysB = runtimeSystems.find((s) => s.kind === "key_only");
+  if (sysB && sysB.apiKey.trim().length > 10) {
+    return { url: DEFAULT_GATEWAY, key: sysB.apiKey.trim() };
+  }
+  const envKey = process.env.OPENROUTER_API_KEY;
+  if (envKey && envKey.trim().length > 10) {
+    return { url: DEFAULT_GATEWAY, key: envKey.trim() };
+  }
+  throw new Error(
+    "لا يوجد نظام API مُفعّل. فعّل النظام الأول (مفتاح + رابط) أو النظام الثاني (مفتاح فقط) من مركز API.",
+  );
+}
+
+/**
+ * 🔑 استخراج المفتاح الفعّال الحالي (نظام A ثم نظام B ثم env) — للتوافق القديم.
+ */
+export function getOpenRouterKey(providedKey?: string | null): string {
+  if (providedKey && providedKey.trim().length > 10) return providedKey.trim();
+  const sysA = runtimeSystems.find((s) => s.kind === "key_url");
+  if (sysA && sysA.apiKey.trim().length > 10) return sysA.apiKey.trim();
+  const sysB = runtimeSystems.find((s) => s.kind === "key_only");
+  if (sysB && sysB.apiKey.trim().length > 10) return sysB.apiKey.trim();
+  const envKey = process.env.OPENROUTER_API_KEY;
+  if (envKey && envKey.trim().length > 10) return envKey.trim();
+  return "";
+}
+
+/**
+ * ⚡ الاستدعاء الموحّد الحقيقي — عبر النظامين فقط (A ثم B ثم env).
+ * طلب شبكة فعلي مع إعادة محاولة تلقائية عند الفشل والانتقال للنموذج البديل.
  */
 export async function callLlm(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 900,
   temperature = 0.9,
   label = "Zaka AI",
-  apiKey?: string | null,
+  _apiKey?: string | null,
 ): Promise<string> {
-  const key = getOpenRouterKey(apiKey);
-  if (!key) {
-    throw new Error("لا يوجد مفتاح AI — المفتاح الرسمي مفقود من aiCredentials.");
-  }
+  const { url, key } = resolveEndpoint();
   const models = [DEFAULT_MODEL, ...FALLBACK_MODELS.filter((m) => m !== DEFAULT_MODEL)];
   let lastErr = "فشل استدعاء AI";
 
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const response = await fetch(GATEWAY_BASE_URL, {
+        const response = await fetch(url, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${key}`,
@@ -70,11 +122,11 @@ export async function callLlm(
         if (!response.ok) {
           const err = await response.text();
           if (response.status === 429) {
-            lastErr = "المفتاح تجاوز حد الاستخدام (429) — أُوقف مؤقتاً حتى إعادة التفعيل.";
-            break; // انتقل للنموذج التالي فوراً
+            lastErr = "تجاوز حد الاستخدام (429) — أُوقف مؤقتاً.";
+            break;
           }
           lastErr = `AI Gateway error (${response.status}): ${err.slice(0, 200)}`;
-          continue; // أعد المحاولة على نفس النموذج
+          continue;
         }
         const data = (await response.json()) as {
           choices?: Array<{ message?: { content?: string | null; reasoning?: string | null } }>;
@@ -87,14 +139,13 @@ export async function callLlm(
               ? msg.reasoning
               : "";
         if (text.trim()) return text;
-        // رد فارغ → أعد المحاولة (سبب «AI أعاد رداً فارغاً» الشائع)
         lastErr = "AI أعاد رداً فارغاً";
       } catch (e) {
         lastErr = e instanceof Error ? e.message : "خطأ شبكة";
       }
     }
   }
-  throw new Error(`${lastErr} — أصلح حارس AI تلقائياً وسيعيد المحاولة.`);
+  throw new Error(`${lastErr}`);
 }
 
 /** توافق مع الملفات القديمة — نفس الاستدعاء الموحّد */
@@ -108,9 +159,7 @@ export async function callOpenRouterDirect(
   return callLlm(messages, maxTokens, temperature, label, apiKey);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// بوابة الحرية — كل أنظمة AI تعمل بحرية كاملة فقط بعد نجاح نائب المالك
-// ═══════════════════════════════════════════════════════════════
+// ── بوابة الحرية — الأنظمة الحرة تنتظر تفعيل نائب المالك ──
 let deputyOnline = false;
 let deputyOnlineAt = 0;
 
@@ -127,17 +176,14 @@ export function getDeputyStatus() {
   return { online: deputyOnline, onlineAt: deputyOnlineAt };
 }
 
-/** تُستخدم في الأنظمة الحرة: إن لم ينجح نائب المالك بعد، ارفض بوضوح */
 export function requireDeputyOnline(): void {
   if (!deputyOnline) {
-    throw new Error(
-      "أنظمة AI الحرة معطّلة — انتظر نجاح نائب المالك على المفتاح الرسمي أولًا.",
-    );
+    throw new Error("أنظمة AI الحرة معطّلة — انتظر نجاح نائب المالك أولاً.");
   }
 }
 
 export function getAdminKeyPreview(): string {
-  return ADMIN_AI_KEY.slice(0, 12) + "...";
+  return "نظامان مفعّلان (مركز API)";
 }
 
 export function ensureWorkingModel(model?: string | null): string {
@@ -146,16 +192,15 @@ export function ensureWorkingModel(model?: string | null): string {
 }
 
 export function getSystemInfo() {
+  const systems = getRuntimeConfig();
   return {
+    systems,
     hasEnvKey: Boolean(process.env.OPENROUTER_API_KEY),
     envKeyPreview: process.env.OPENROUTER_API_KEY
       ? process.env.OPENROUTER_API_KEY.slice(0, 15) + "..."
       : "غير مضبوط",
-    adminKeyPreview: ADMIN_AI_KEY.slice(0, 12) + "...",
-    backupKeyPreview: backupKey ? backupKey.slice(0, 12) + "..." : "أُزيل",
-    onehopKeyPreview: "غير موجود — OpenRouter فقط",
     models: FREE_MODELS,
     defaultModel: DEFAULT_MODEL,
-    backup: null as null | { provider: string; model: string },
+    deputyOnline,
   };
 }
