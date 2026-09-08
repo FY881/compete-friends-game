@@ -11,10 +11,11 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 
-// عبر callLlm — مفتاح OpenRouter الرسمي الوحيد (sk-or-v1...) يُؤخذ تلقائياً من aiCredentials.
-// (كان يُمرَّر هنا مفتاح قديم ميت سبّب 401 Missing Authentication header.)
-export async function llm(messages: Array<{ role: string; content: string }>, maxTokens = 1500, temperature = 0.8): Promise<string> {
+// عبر callLlm — محرك النظامين الوحيد (مفتاح+رابط / مفتاح فقط) يُحقن قبل كل استدعاء.
+export async function llm(ctx: any, messages: Array<{ role: string; content: string }>, maxTokens = 1500, temperature = 0.8): Promise<string> {
+  await ensureAiRuntime(ctx);
   return await callLlm(messages, maxTokens, temperature, "Zaka Toolbelt");
 }
 
@@ -67,7 +68,7 @@ export const executeDeepTask = internalAction({
     // 1) بحث ويب حقيقي
     const web = await webSearch(task.slice(0, 200));
     // 2) تحليل بذكاء عالٍ
-    const analysis = await llm(
+    const analysis = await llm(ctx,
       [
         { role: "system", content: "أنت عقل تحليلي من نخبة الغرفة الخاصة. تحلل نتائج البحث وتستخرج: الحقائق الأساسية، ما يعنيه ذلك، والتوصية العملية. بالعربية، موجز ومنظم." },
         { role: "user", content: `المهمة: ${task}\n\nنتائج البحث الحقيقي:\n${web}\n\nقدّم تقريراً موجزاً.` },

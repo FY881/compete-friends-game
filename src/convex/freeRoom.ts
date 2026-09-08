@@ -30,6 +30,7 @@ async function generateOwnTopic(recentTopics: string[]): Promise<string> {
 اختر موضوع نقاش جديد ومثير (لا تكرر السابق): ${recentTopics.join(" | ") || "لا شيء"}
 أرجع سطراً واحداً فقط: الموضوع بصيغة مثيرة وقصيرة.`;
   return (await llm(
+    ctx,
     [{ role: "system", content: monarch.prompt }, { role: "user", content: prompt }],
     120,
     1.0,
@@ -106,7 +107,7 @@ export const runTurn = internalAction({
 
     let content: string;
     try {
-      content = await llm(
+      content = await llm(ctx,
         [
           {
             role: "system",

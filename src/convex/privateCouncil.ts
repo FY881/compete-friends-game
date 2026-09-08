@@ -33,6 +33,7 @@ async function generateOwnAgenda(recentAgendas: string[]): Promise<string> {
 جدول الأعمال الأخير (لا تكرره): ${recentAgendas.join(" | ") || "لا شيء"}
 أرجع سطراً واحداً فقط بالعربية.`;
   return (await llm(
+    ctx,
     [{ role: "system", content: monarch.prompt }, { role: "user", content: prompt }],
     120,
     1.0,
@@ -126,7 +127,7 @@ export const runTurn = internalAction({
 
     let content: string;
     try {
-      content = await llm(
+      content = await llm(ctx,
         [
           {
             role: "system",
