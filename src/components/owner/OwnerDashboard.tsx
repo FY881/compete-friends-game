@@ -30,6 +30,7 @@ import { AnnouncementCenter } from "./AnnouncementCenter";
 import { SiteLockPanel } from "./SiteLockPanel";
 import { CouncilHealthBoard } from "./CouncilHealthBoard";
 import { TransparencyBoard } from "./TransparencyBoard";
+import { ToxicityMonitor } from "./ToxicityMonitor";
 
 // ─── Mini Sparkline (pure CSS) ────────────────────────────────
 function MiniSparkline({
@@ -373,6 +374,9 @@ export function OwnerDashboard({
       {/* ── مجلس العقول + شفافية القرارات (موجة 3) ── */}
       <CouncilHealthBoard />
       <TransparencyBoard />
+
+      {/* ── مراقب السمومية (موجة 4) ── */}
+      <ToxicityMonitor />
 
       {/* ── مركز الإعلانات المركزي (موجة 1.3) — واجهة سريعة من القيادة ── */}
       <AnnouncementCenter />

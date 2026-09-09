@@ -75,6 +75,27 @@ function moderateContent(content: string): { passed: boolean; reason?: string } 
   return { passed: true };
 }
 
+// ── موجّة 4.1 — فحص السمومية المتقدم: تنمر / تحرش / تهديد / احتقار ──
+// أنماط صريحة تتجاوز الكلمات المحظورة البسيطة، مع درجة خطورة تُسجّل
+// في سجلّ القرارات الموحّد ليراها المالك من الشفافية.
+const TOXIC_PATTERNS: { pattern: RegExp; severity: "medium" | "high"; label: string }[] = [
+  { pattern: /(اهدى|اسكت اللك|بيت امك|اختك|امك )/, severity: "high", label: "إساءة لفظية مباشرة" },
+  { pattern: /(سأضرب|بضربك|نذبحك|انذبحك|سأقتلك|أقتلك|بدنا نضربك)/, severity: "high", label: "تهديد بالعنف" },
+  { pattern: /(غبي|حقير|فاشل|زبالة|انحطط)/, severity: "medium", label: "تنمر واهانة" },
+  { pattern: /(كلاب|خنازير)/, severity: "high", label: "تشهير عنصري" },
+];
+
+function assessToxicity(content: string): { flagged: boolean; severity: "medium" | "high" | null; label: string | null } {
+  const lower = content.toLowerCase();
+  for (const t of TOXIC_PATTERNS) {
+    if (t.pattern.test(lower)) {
+      return { flagged: true, severity: t.severity, label: t.label };
+    }
+  }
+  // تحرش متكرر: نفس المُحتوى موجهاً لشخص بالإهانة (سكرتب بسيط)
+  return { flagged: false, severity: null, label: null };
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // 1. مؤشر الكتابة (Typing Indicators)
 // ═══════════════════════════════════════════════════════════════════════
@@ -568,9 +589,25 @@ export const sendMessageAdvanced = mutation({
     if (room.archived) throw new Error("الغرفة مُؤرشفة");
     if (!room.members.includes(userId)) throw new Error("أنت لست عضواً في هذه الغرفة");
 
-    // فحص المحتوى قبل الإرسال
+    // فحص المحتوى قبل الإرسال + تقييم السمومية المتقدم (موجة 4.1)
     const moderation = moderateContent(content);
-    const modStatus = moderation.passed ? "passed" as const : "flagged" as const;
+    const toxicity = assessToxicity(content);
+    const modStatus = moderation.passed && !toxicity.flagged ? "passed" as const : "flagged" as const;
+
+    // سجّل الرسائل السامة في سجلّ القرارات الموحّد ليراها المالك
+    if (toxicity.flagged) {
+      const sender = await ctx.db.get(userId);
+      await ctx.db.insert("aiDecisionLog", {
+        system: "moderation",
+        actorName: "فلتر الغرف الذكي",
+        action: "chat_toxicity_flagged",
+        targetId: userId,
+        targetName: sender?.name ?? "مجهول",
+        detail: `رسالة معلّمة في «${room.name}»: ${toxicity.label}`,
+        severity: toxicity.severity ?? "medium",
+        createdAt: Date.now(),
+      });
+    }
 
     // استخراج @mentions
     const mentionRegex = /@(\S+)/g;
@@ -621,7 +658,7 @@ export const sendMessageAdvanced = mutation({
     return {
       messageId: msgId,
       moderation: modStatus,
-      moderationReason: moderation.reason,
+      moderationReason: moderation.reason ?? toxicity.label ?? undefined,
       mentionedUsers: mentionIds.length,
     };
   },
@@ -684,6 +721,34 @@ export const getMemberStats = query({
 // ═══════════════════════════════════════════════════════════════════════
 // 11. تحليل مشاعر الغرفة (Room Mood Analysis)
 // ═══════════════════════════════════════════════════════════════════════
+
+// ── موجّة 4.1 — لوحة السمومية للمالك: أحدث الرسائل المعلّمة عبر كل الغرف ──
+export const getToxicityFeed = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const me = await ctx.db.get(userId);
+    if (!me || (me.role !== "admin" && me.email !== "omw70op@gmail.com")) return null;
+
+    const take = Math.min(Math.max(limit ?? 30, 1), 100);
+    const recent = await ctx.db
+      .query("chatMessages")
+      .order("desc")
+      .take(400);
+    return recent
+      .filter((m) => m.moderationStatus === "flagged" && !m.deleted)
+      .slice(0, take)
+      .map((m) => ({
+        id: m._id,
+        roomId: m.roomId,
+        senderName: m.senderName,
+        content: m.content.slice(0, 160),
+        reason: m.moderationReason ?? null,
+        createdAt: m.createdAt,
+      }));
+  },
+});
 
 export const getRoomMood = query({
   args: { roomId: v.id("chatRooms") },

@@ -213,6 +213,30 @@ export const workTurn = internalAction({
       });
     }
 
+    // ── موجّة 4.2: أعمال نائب المالك تدخل سجلّ القرارات الموحّد ──
+    // ليظهر نشاطه في لوحة شفافية القرارات ومجلس العقول، لا فقط في ورديته.
+    for (const deed of deeds.slice(0, 4)) {
+      const parts = deed.split("|").map((p) => p.trim());
+      const sev =
+        parts[3]?.toLowerCase() === "critical"
+          ? "high"
+          : parts[3]?.toLowerCase() === "warning"
+            ? "medium"
+            : "low";
+      try {
+        await ctx.runMutation(internal.decisionLog.log, {
+          system: "viceowner",
+          actorName: "نائب المالك",
+          action: parts[0] ?? "deed",
+          targetName: (parts[1] ?? "").slice(0, 120) || undefined,
+          detail: `${(parts[1] ?? "فعل").slice(0, 120)}: ${(parts[2] ?? "").slice(0, 250) || reply.slice(0, 200)}`,
+          severity: sev as "low" | "medium" | "high",
+        });
+      } catch {
+        /* السجل اختياري — لا يعطل الوردية */
+      }
+    }
+
     if (deeds.length === 0) {
       await ctx.runMutation(internal.viceOwnerStore.logActivity, {
         sessionId,
