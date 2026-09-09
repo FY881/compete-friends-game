@@ -193,6 +193,37 @@ export const recordRoundLoyalty = internalMutation({
   },
 });
 
+/** زخارف لاعب (إطار/لقب) — عامة، تُعرض بجانب اسمه في الصدارة والبطاقات. */
+export const getDecorations = query({
+  args: { userIds: v.array(v.id("users")) },
+  handler: async (ctx, { userIds }) => {
+    const now = Date.now();
+    const out: Record<
+      string,
+      { frame: string | null; title: { emoji: string; name: string } | null }
+    > = {};
+    for (const uid of userIds) {
+      const w = await ctx.db
+        .query("loyaltyWallets")
+        .withIndex("by_user", (q) => q.eq("userId", uid))
+        .first();
+      if (!w) {
+        out[String(uid)] = { frame: null, title: null };
+        continue;
+      }
+      const alive = w.perks.filter((p) => !p.expiresAt || p.expiresAt > now);
+      const frameKey = alive.find((p) => p.key.startsWith("frame_"))?.key ?? null;
+      const titleKey = alive.find((p) => p.key.startsWith("title_"))?.key ?? null;
+      const titlePerk = titleKey ? PERK_CATALOG.find((c) => c.key === titleKey) : undefined;
+      out[String(uid)] = {
+        frame: frameKey, // "frame_gold" | "frame_neon" | null
+        title: titlePerk ? { emoji: titlePerk.emoji, name: titlePerk.name.replace("لقب ", "").replace(/[«»]/g, "") } : null,
+      };
+    }
+    return out;
+  },
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // الإنفاق — شراء امتياز
 // ─────────────────────────────────────────────────────────────────────────

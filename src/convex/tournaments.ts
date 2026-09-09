@@ -12,7 +12,7 @@
  */
 
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { isStaffUser } from "./owner";
@@ -32,24 +32,56 @@ export const getActive = query({
   },
 });
 
-/** لوحة الصدارة الحية لبطولة (عام — تُعرض للجميع). */
+type LeaderRow = {
+  rank: number;
+  trophy: string | null;
+  userId: string;
+  userName: string;
+  totalScore: number;
+  roundsCounted: number;
+  frame: string | null;
+  title: { emoji: string; name: string } | null;
+};
+
+/** لوحة الصدارة الحية لبطولة (عام — تُعرض للجميع) مع الزخارف المملوكة. */
 export const getLeaderboard = query({
   args: { tournamentId: v.id("tournaments"), limit: v.optional(v.number()) },
-  handler: async (ctx, { tournamentId, limit }) => {
+  handler: async (ctx, { tournamentId, limit }): Promise<LeaderRow[]> => {
     const take = Math.min(Math.max(limit ?? 20, 1), 100);
     const entries = await ctx.db
       .query("tournamentEntries")
       .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
       .collect();
     const sorted = entries.sort((a, b) => b.totalScore - a.totalScore).slice(0, take);
-    return sorted.map((e, i) => ({
-      rank: i + 1,
-      trophy: TROPHY_EMOJIS[i] ?? null,
-      userId: e.userId,
-      userName: e.userName,
-      totalScore: e.totalScore,
-      roundsCounted: e.roundsCounted,
-    }));
+    // موجّة 8 — زخارف الإطار واللقب بجانب الأسماء (نقرأ المحافظ مباشرة لتجنب التعارض النوعي)
+    const now = Date.now();
+    const wallets = await Promise.all(
+      sorted.map((e) =>
+        ctx.db
+          .query("loyaltyWallets")
+          .withIndex("by_user", (q) => q.eq("userId", e.userId))
+          .first(),
+      ),
+    );
+    return sorted.map((e, i) => {
+      const alive = wallets[i]?.perks.filter((p) => !p.expiresAt || p.expiresAt > now) ?? [];
+      const frame = alive.find((p) => p.key.startsWith("frame_"))?.key ?? null;
+      const titleKey = alive.find((p) => p.key.startsWith("title_"))?.key;
+      const titleNames: Record<string, { emoji: string; name: string }> = {
+        title_genius: { emoji: "🧠", name: "العقل المدبّر" },
+        title_champion: { emoji: "🏆", name: "البطل" },
+      };
+      return {
+        rank: i + 1,
+        trophy: TROPHY_EMOJIS[i] ?? null,
+        userId: String(e.userId),
+        userName: e.userName,
+        totalScore: e.totalScore,
+        roundsCounted: e.roundsCounted,
+        frame,
+        title: titleKey ? titleNames[titleKey] ?? null : null,
+      };
+    });
   },
 });
 

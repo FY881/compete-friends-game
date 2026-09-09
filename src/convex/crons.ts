@@ -33,6 +33,15 @@ crons.interval(
   {},
 );
 
+// موجّة 8 — مدير البطولات الآلي: كل ساعة ينهي المنتهي ويطلق بطولة أسبوعية
+// جديدة بأسماء متجددة، ويمنح الفائزين نقاط ولاء — بلا أي تدخل بشري.
+crons.interval(
+  "auto-tournament-manager",
+  { minutes: 60 },
+  internal.autoTournament.manage,
+  {},
+);
+
 export default crons;
 
 

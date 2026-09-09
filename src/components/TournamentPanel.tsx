@@ -103,24 +103,41 @@ export function TournamentPanel() {
             </p>
           ) : (
             <div className="space-y-1">
-              {leaderboard.map((row) => (
-                <div
-                  key={row.userId}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2",
-                    row.rank <= 3 ? "bg-amber-500/10" : "bg-muted/30",
-                  )}
-                >
-                  <span className="w-7 shrink-0 text-center text-sm font-black">
-                    {row.trophy ?? row.rank}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold">{row.userName}</p>
-                    <p className="text-[9px] text-muted-foreground">{row.roundsCounted} جولة محتسبة</p>
+              {leaderboard.map((row) => {
+                // موجّة 8 — الإطار واللقب المملوكان من متجر الولاء
+                const frameCls =
+                  row.frame === "frame_gold"
+                    ? "ring-2 ring-amber-400"
+                    : row.frame === "frame_neon"
+                      ? "ring-2 ring-violet-400"
+                      : "";
+                return (
+                  <div
+                    key={row.userId}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-2",
+                      row.rank <= 3 ? "bg-amber-500/10" : "bg-muted/30",
+                      frameCls,
+                    )}
+                  >
+                    <span className="w-7 shrink-0 text-center text-sm font-black">
+                      {row.trophy ?? row.rank}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-1.5 truncate text-xs font-bold">
+                        {row.userName}
+                        {row.title && (
+                          <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-700">
+                            {row.title.emoji} {row.title.name}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-[9px] text-muted-foreground">{row.roundsCounted} جولة محتسبة</p>
+                    </div>
+                    <span className="shrink-0 text-sm font-black text-amber-600">{row.totalScore}</span>
                   </div>
-                  <span className="shrink-0 text-sm font-black text-amber-600">{row.totalScore}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
