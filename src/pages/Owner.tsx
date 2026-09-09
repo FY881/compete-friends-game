@@ -1604,7 +1604,7 @@ function GamesTab() {
 // ---------------------------------------------------------------------------
 
 function QuestionsTab() {
-  const questions = useQuery(api.owner.getQuestionBank);
+  const questions = useQuery(api.owner.getQuestionQuality);
   const toggleQuestion = useMutation(api.owner.toggleQuestion);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
@@ -1695,6 +1695,35 @@ function QuestionsTab() {
                     {q.difficulty === "easy" ? "سهل" : q.difficulty === "medium" ? "متوسط" : "صعب"}
                   </Badge>
                   <span className="font-mono text-[10px] text-muted-foreground">{q.id}</span>
+                  {(() => {
+                    const qa = q as unknown as {
+                      timesAsked?: number;
+                      successRate?: number;
+                      flag?: "none" | "too_easy" | "too_hard" | "unplayed";
+                    };
+                    if (qa.timesAsked === undefined) return null;
+                    if (qa.flag === "too_easy")
+                      return (
+                        <span className="rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-bold text-sky-700" title="نجاح أعلى من 95% — سهل جداً">
+                          سهل جداً {qa.successRate}%
+                        </span>
+                      );
+                    if (qa.flag === "too_hard")
+                      return (
+                        <span className="rounded-full bg-rose-500/10 px-1.5 py-0.5 text-[9px] font-bold text-rose-700" title="نجاح أقل من 15% — صعب جداً">
+                          صعب جداً {qa.successRate}%
+                        </span>
+                      );
+                    if (qa.flag === "unplayed")
+                      return (
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">لم يُلعب بعد</span>
+                      );
+                    return (
+                      <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                        {qa.timesAsked} لعب · {qa.successRate}%
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="mt-1 truncate text-sm font-medium">{q.question}</p>
               </div>

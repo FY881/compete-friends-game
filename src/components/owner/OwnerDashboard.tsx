@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { HealthPanel } from "./HealthPanel";
 import { AnnouncementCenter } from "./AnnouncementCenter";
+import { SiteLockPanel } from "./SiteLockPanel";
 
 // ─── Mini Sparkline (pure CSS) ────────────────────────────────
 function MiniSparkline({
@@ -363,6 +364,9 @@ export function OwnerDashboard({
 
       {/* ── Health score + Advisors (موجة 1.1) ── */}
       <HealthPanel onNavigate={onNavigate} />
+
+      {/* ── وضع الحماية (موجة 2.2) ── */}
+      <SiteLockPanel locked={dashboard.siteLocked} />
 
       {/* ── مركز الإعلانات المركزي (موجة 1.3) — واجهة سريعة من القيادة ── */}
       <AnnouncementCenter />

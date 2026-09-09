@@ -187,20 +187,23 @@ export function AdvancedPlayersTab({ isOwner }: { isOwner: boolean }) {
     }
   };
 
-  const handleBulkWarn = async () => {
+  const bulkPunish = useMutation(api.owner.bulkPunish);
+
+  const handleBulk = async (action: "warn" | "mute" | "pardon") => {
     if (selected.size === 0) return;
     setBusyAction(true);
     try {
-      for (const id of selected) {
-        const user = usersWithRisk.find((u) => u.id === id);
-        if (user && !user.isOwner) {
-          await applyPunishment({ userId: id as never, type: "warn", reason: "تحذير جماعي من الإدارة" });
-        }
-      }
-      toast.success(`تم إرسال تحذير لـ ${selected.size} لاعب.`);
+      const result = await bulkPunish({
+        userIds: [...selected] as never[],
+        action,
+        reason: action === "warn" ? "تحذير جماعي من الإدارة" : action === "mute" ? "كتم جماعي — سلوك مزعج" : "عفو جماعي",
+        durationMs: action === "mute" ? 60 * 60 * 1000 : undefined,
+      });
+      const label = action === "warn" ? "تحذير" : action === "mute" ? "كتم" : "عفو";
+      toast.success(`تم ${label} ${result.done} لاعب${result.skipped ? ` (تجاوز ${result.skipped})` : ""}.`);
       setSelected(new Set());
     } catch (e) {
-      toast.error("تعذّر تنفيذ الإجراء الجماعي.");
+      toast.error(e instanceof Error ? e.message : "تعذّر تنفيذ الإجراء الجماعي.");
     } finally {
       setBusyAction(false);
     }
@@ -304,16 +307,36 @@ export function AdvancedPlayersTab({ isOwner }: { isOwner: boolean }) {
         </div>
         <div className="flex items-center gap-2">
           {selected.size > 0 && isOwner && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs text-amber-600"
-              onClick={handleBulkWarn}
-              disabled={busyAction}
-            >
-              {busyAction ? <Loader2 className="size-3 animate-spin" /> : <Gavel className="size-3" />}
-              تحذير جماعي
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs text-amber-600"
+                onClick={() => handleBulk("warn")}
+                disabled={busyAction}
+              >
+                {busyAction ? <Loader2 className="size-3 animate-spin" /> : <Gavel className="size-3" />}
+                تحذير جماعي
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs text-orange-600"
+                onClick={() => handleBulk("mute")}
+                disabled={busyAction}
+              >
+                كتم ساعة
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs text-emerald-600"
+                onClick={() => handleBulk("pardon")}
+                disabled={busyAction}
+              >
+                عفو جماعي
+              </Button>
+            </>
           )}
           <select
             value={sortBy}

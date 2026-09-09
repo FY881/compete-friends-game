@@ -186,6 +186,8 @@ export type ModSettings = {
   aiModel: string;
   announcement: string;
   announcementActive: boolean;
+  siteLocked: boolean; // وضع الحماية: قفل اللعبة بالكامل لصيانة/طوارئ
+  siteLockMessage: string;
   antiCheatEnabled: boolean;
   disabledQuestions: string[];
   siteUrl: string; // official web app URL — needed by the Android APK for downloads
@@ -201,6 +203,8 @@ export const DEFAULT_SETTINGS: ModSettings = {
   aiModel: "openrouter/free",
   announcement: "",
   announcementActive: false,
+  siteLocked: false,
+  siteLockMessage: "اللعبة تحت الصيانة حالياً — عد قريباً!",
   antiCheatEnabled: true,
   disabledQuestions: [],
   siteUrl: "",
@@ -247,6 +251,8 @@ export async function getSettingsData(
     aiModel: forceGoodModel(read("aiModel", DEFAULT_SETTINGS.aiModel)),
     announcement: read("announcement", DEFAULT_SETTINGS.announcement),
     announcementActive: read("announcementActive", DEFAULT_SETTINGS.announcementActive),
+    siteLocked: read("siteLocked", DEFAULT_SETTINGS.siteLocked),
+    siteLockMessage: read("siteLockMessage", DEFAULT_SETTINGS.siteLockMessage),
     antiCheatEnabled: read("antiCheatEnabled", DEFAULT_SETTINGS.antiCheatEnabled),
     disabledQuestions: read("disabledQuestions", DEFAULT_SETTINGS.disabledQuestions),
     siteUrl: read("siteUrl", DEFAULT_SETTINGS.siteUrl),
@@ -327,6 +333,8 @@ export const getPublicInfo = query({
         topAnnouncement?.body?.trim() ||
         (settings.announcementActive ? settings.announcement : ""),
       announcementTitle: topAnnouncement?.title ?? null,
+      siteLocked: settings.siteLocked,
+      siteLockMessage: settings.siteLockMessage,
       rulesCount: rulesCount.filter((r) => r.active).length,
     };
   },
@@ -394,6 +402,7 @@ export type DashboardData = {
   aiEnabled: boolean;
   aiAutoApply: boolean;
   antiCheatEnabled: boolean;
+  siteLocked: boolean;
   recentActivity: ModLogEntry[];
   // ── موجّة 1.1: صحة اللعبة + لوحة المستشارين ──
   healthScore: number; // 0-100
@@ -524,6 +533,7 @@ export const getDashboard = query({
       aiEnabled: settings.aiEnabled,
       aiAutoApply: settings.aiAutoApply,
       antiCheatEnabled: settings.antiCheatEnabled,
+      siteLocked: settings.siteLocked,
       recentActivity: logs.map((l) => ({
         id: l._id,
         actorType: l.actorType,
@@ -679,12 +689,14 @@ export const getReports = query({
 
 export type RuleRow = {
   id: string;
+  ref: string; // معرف الاستشهاد — #R1، #R2 …
   title: string;
   category: "essential" | "prohibited" | "punishment";
   description: string;
   severity: "low" | "medium" | "high";
   order: number;
   active: boolean;
+  suggestedAction: "warn" | "mute" | "ban"; // سلم العقوبات المقترح حسب الخطورة
 };
 
 /** Public rules — the site laws & prohibitions shown on /rules. */
@@ -692,18 +704,21 @@ export const getRules = query({
   args: {},
   handler: async (ctx): Promise<RuleRow[]> => {
     const rules = await ctx.db.query("rules").collect();
-    return rules
+    const sorted = rules
       .filter((r) => r.active)
-      .sort((a, b) => a.order - b.order)
-      .map((r) => ({
-        id: r._id,
-        title: r.title,
-        category: r.category,
-        description: r.description,
-        severity: r.severity,
-        order: r.order,
-        active: r.active,
-      }));
+      .sort((a, b) => a.order - b.order);
+    return sorted.map((r, i) => ({
+      id: r._id,
+      ref: `#R${i + 1}`,
+      title: r.title,
+      category: r.category,
+      description: r.description,
+      severity: r.severity,
+      order: r.order,
+      active: r.active,
+      // السلم المقترح: بسيطة=تحذير، متوسطة=كتم، خطيرة=حظر
+      suggestedAction: r.severity === "low" ? "warn" : r.severity === "medium" ? "mute" : "ban",
+    }));
   },
 });
 
@@ -1134,6 +1149,75 @@ export const applyPunishment = mutation({
   },
 });
 
+/**
+ * موجّة 2.1 — إجراء جماعي على مجموعة لاعبين دفعة واحدة (المالك/المشرف).
+ * warn → تحذير جماعي، mute → كتم مؤقت، pardon → رفع العقوبات.
+ * كل هدف يُسجّل في سجل الرقابة وسجلّ القرارات الموحّد.
+ */
+export const bulkPunish = mutation({
+  args: {
+    userIds: v.array(v.id("users")),
+    action: v.union(v.literal("warn"), v.literal("mute"), v.literal("pardon")),
+    reason: v.string(),
+    durationMs: v.optional(v.number()),
+  },
+  handler: async (ctx, { userIds, action, reason, durationMs }) => {
+    const actor = await requireStaff(ctx);
+    if (userIds.length === 0) throw new Error("لم تُحدد أي لاعبين");
+    if (userIds.length > 50) throw new Error("الحد الأقصى 50 لاعباً في المرة الواحدة");
+
+    let done = 0;
+    let skipped = 0;
+    for (const userId of userIds) {
+      const target = await ctx.db.get(userId);
+      if (!target || isOwnerUser(target)) {
+        skipped++;
+        continue;
+      }
+      const now = Date.now();
+      if (action === "warn") {
+        await ctx.db.patch(userId, {
+          warnings: (target.warnings ?? 0) + 1,
+          lastWarningAt: now,
+        });
+      } else if (action === "mute") {
+        const ms = Math.min(durationMs ?? 60 * 60 * 1000, 30 * 24 * 60 * 60 * 1000);
+        await ctx.db.patch(userId, { mutedUntil: now + ms });
+      } else {
+        await ctx.db.patch(userId, {
+          warnings: 0,
+          mutedUntil: undefined,
+          bannedUntil: undefined,
+          bannedPermanent: undefined,
+          banReason: undefined,
+          cheatStrikes: 0,
+        });
+      }
+      await logModeration(ctx, {
+        actorType: "owner",
+        actorName: actor.name ?? "الإدارة",
+        action: action === "warn" ? "warn" : action === "mute" ? "mute" : "pardon",
+        targetId: userId,
+        targetName: target.name ?? "مجهول",
+        reason: `${reason} (إجراء جماعي)`,
+        severity: action === "mute" ? "medium" : "low",
+      });
+      done++;
+    }
+
+    await ctx.db.insert("aiDecisionLog", {
+      system: "owner",
+      actorName: actor.name ?? "الإدارة",
+      action: `bulk_${action}`,
+      detail: `إجراء جماعي (${action === "warn" ? "تحذير" : action === "mute" ? "كتم" : "عفو"}) على ${done} لاعب${skipped ? ` — تجاوز ${skipped}` : ""}: ${reason}`,
+      severity: action === "mute" ? "medium" : "low",
+      createdAt: Date.now(),
+    });
+
+    return { done, skipped };
+  },
+});
+
 /** Lift a user's punishments (warnings, mute, ban). */
 export const pardonUser = mutation({
   args: { userId: v.id("users"), reason: v.string() },
@@ -1332,6 +1416,8 @@ export const updateSettings = mutation({
     announcementActive: v.optional(v.boolean()),
     antiCheatEnabled: v.optional(v.boolean()),
     disabledQuestions: v.optional(v.array(v.string())),
+    siteLocked: v.optional(v.boolean()),
+    siteLockMessage: v.optional(v.string()),
     siteUrl: v.optional(v.string()),
     openrouterApiKey: v.optional(v.string()),
     telegramBotToken: v.optional(v.string()),
@@ -1362,6 +1448,67 @@ export const toggleQuestion = mutation({
     if (set.has(questionId)) set.delete(questionId);
     else set.add(questionId);
     await setSetting(ctx, "disabledQuestions", [...set]);
+  },
+});
+
+// ---------------------------------------------------------------------------
+// موجّة 2.3 — جودة الأسئلة: إحصاءات نجاح حقيقية من جولات فعلية
+// ---------------------------------------------------------------------------
+
+export type QuestionQualityRow = {
+  id: string;
+  category: string;
+  difficulty: "easy" | "medium" | "hard";
+  question: string;
+  disabled: boolean;
+  timesAsked: number;
+  timesCorrect: number;
+  successRate: number; // 0-100
+  flag: "none" | "too_easy" | "too_hard" | "unplayed";
+};
+
+export const getQuestionQuality = query({
+  args: {},
+  handler: async (ctx): Promise<QuestionQualityRow[] | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!isStaffUser(me)) return null;
+
+    const settings = await getSettingsData(ctx);
+    const disabled = new Set(settings.disabledQuestions);
+
+    // اجمع كل الإجابات المسجّلة من gamePlayers (البيانات الحقيقية)
+    const asked = new Map<string, number>();
+    const correct = new Map<string, number>();
+    for await (const gp of ctx.db.query("gamePlayers")) {
+      for (const a of gp.answers) {
+        if (!a) continue;
+        asked.set(a.questionId, (asked.get(a.questionId) ?? 0) + 1);
+        if (a.correct) correct.set(a.questionId, (correct.get(a.questionId) ?? 0) + 1);
+      }
+    }
+
+    return QUESTION_BANK.map((q) => {
+      const t = asked.get(q.id) ?? 0;
+      const c = correct.get(q.id) ?? 0;
+      const rate = t > 0 ? Math.round((c / t) * 100) : 0;
+      let flag: QuestionQualityRow["flag"] = "none";
+      if (t === 0) flag = "unplayed";
+      else if (rate >= 95) flag = "too_easy";
+      else if (rate <= 15) flag = "too_hard";
+      return {
+        id: q.id,
+        category: q.category,
+        difficulty: q.difficulty,
+        question: q.question,
+        disabled: disabled.has(q.id),
+        timesAsked: t,
+        timesCorrect: c,
+        successRate: rate,
+        flag,
+      };
+    }).sort((a, b) => b.timesAsked - a.timesAsked);
   },
 });
 

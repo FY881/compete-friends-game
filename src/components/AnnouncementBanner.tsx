@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Megaphone, X } from "lucide-react";
+import { Megaphone, X, Lock } from "lucide-react";
 
 const DISMISS_KEY = "mindclash.announcement.dismissed";
 
@@ -14,6 +14,21 @@ export function AnnouncementBanner() {
       return null;
     }
   });
+
+  // ── وضع الحماية (موجة 2.2): بانر قفل يحجب الإعلانات العادية ──
+  if (info?.siteLocked) {
+    return (
+      <div
+        dir="rtl"
+        className="relative z-40 flex items-center justify-center gap-3 border-b border-rose-500/30 bg-gradient-to-l from-rose-500/20 via-rose-500/10 to-rose-500/20 px-10 py-3 text-center"
+      >
+        <Lock className="size-4 shrink-0 animate-pulse text-rose-600" />
+        <p className="text-sm font-bold text-rose-700">
+          {info.siteLockMessage || "اللعبة تحت الصيانة حالياً — عد قريباً!"}
+        </p>
+      </div>
+    );
+  }
 
   if (!info?.announcement) return null;
   if (dismissed === info.announcement) return null;
