@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,7 +15,6 @@ import {
   Eye,
   EyeOff,
   CalendarClock,
-  Highlighter,
 } from "lucide-react";
 
 const PRIORITY_TONE: Record<string, { label: string; cls: string }> = {
@@ -44,6 +42,8 @@ export function AnnouncementCenter() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [startsAt, setStartsAt] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -53,10 +53,23 @@ export function AnnouncementCenter() {
     }
     setBusy(true);
     try {
-      await createAnn({ title: title.trim(), body: body.trim(), priority });
-      toast.success("تم إنشاء الإعلان — وهو ظاهر الآن للجميع");
+      const startMs = startsAt ? new Date(startsAt).getTime() : undefined;
+      const endMs = expiresAt ? new Date(expiresAt).getTime() : undefined;
+      if (startMs && endMs && endMs <= startMs) {
+        toast.error("تاريخ النهاية يجب أن يكون بعد البداية");
+        setBusy(false);
+        return;
+      }
+      await createAnn({ title: title.trim(), body: body.trim(), priority, startsAt: startMs, expiresAt: endMs });
+      toast.success(
+        startMs && startMs > Date.now()
+          ? "تم إنشاء الإعلان — سيظهر في موعده المحدد"
+          : "تم إنشاء الإعلان — وهو ظاهر الآن للجميع",
+      );
       setTitle("");
       setBody("");
+      setStartsAt("");
+      setExpiresAt("");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذّر إنشاء الإعلان");
     } finally {
@@ -94,6 +107,30 @@ export function AnnouncementCenter() {
             rows={2}
             className="rounded-lg text-xs"
           />
+          <div className="flex flex-wrap gap-2">
+            <label className="flex-1 min-w-40">
+              <span className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+                <CalendarClock className="size-3" /> يبدأ (اختياري)
+              </span>
+              <Input
+                type="datetime-local"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+                className="h-8 rounded-lg text-[11px]"
+              />
+            </label>
+            <label className="flex-1 min-w-40">
+              <span className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+                <CalendarClock className="size-3" /> ينتهي (اختياري)
+              </span>
+              <Input
+                type="datetime-local"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+                className="h-8 rounded-lg text-[11px]"
+              />
+            </label>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-1">
               {(["low", "medium", "high"] as const).map((p) => (
@@ -149,7 +186,17 @@ export function AnnouncementCenter() {
                   {a.body && <p className="mt-1 text-[11px] text-muted-foreground">{a.body}</p>}
                   <p className="mt-1.5 flex items-center gap-1 text-[9px] text-muted-foreground">
                     <CalendarClock className="size-3" /> {timeAgo(a.createdAt)}
-                    {a.expiresAt && <span>— ينتهي {new Date(a.expiresAt).toLocaleDateString()}</span>}
+                    {a.startsAt && a.startsAt > Date.now() && (
+                      <span className="text-sky-600">— يبدأ {new Date(a.startsAt).toLocaleString()}</span>
+                    )}
+                    {a.startsAt && a.startsAt <= Date.now() && (
+                      <span>— بدأ {new Date(a.startsAt).toLocaleDateString()}</span>
+                    )}
+                    {a.expiresAt && (
+                      <span className={cn(a.expiresAt < Date.now() && "text-rose-600")}>
+                        — ينتهي {new Date(a.expiresAt).toLocaleString()}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
