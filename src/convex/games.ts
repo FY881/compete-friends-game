@@ -330,8 +330,8 @@ function poolSizeFor(settings: GameSettings): number {
 /** Structural db accessor so the helper works from both queries and mutations. */
 type DbCtx = { db: QueryCtx["db"] | MutationCtx["db"] };
 
-// موجّة 11 — واجهات مشتركة لتستخدمها وحدة الحلبة (arena.ts)
-export { pickQuestions, makeUniqueCode, sanitizeName, validateSettings, poolSizeFor };
+// موجّة 11 — واجهات مشتركة لتستخدمها وحدات الحلبة والإعادة
+export { pickQuestions, makeUniqueCode, sanitizeName, validateSettings, poolSizeFor, resolveQuestion };
 export type { DbCtx };
 
 async function getGameByCode(ctx: DbCtx, code: string) {

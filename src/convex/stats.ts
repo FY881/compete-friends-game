@@ -2,6 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { dailyRewardXp, dayKey, levelFromXp, levelTitle, xpToReachLevel } from "./gameConfig";
+import { resolveQuestion } from "./games";
 
 // ---------------------------------------------------------------------------
 // Badge catalog — shared by the server (awards) and the client (rendering).
@@ -47,6 +48,100 @@ export const BADGES: Badge[] = [
 export const BADGE_MAP: Record<string, Badge> = Object.fromEntries(
   BADGES.map((b) => [b.id, b]),
 );
+
+// ---------------------------------------------------------------------------
+// موجّة 14 — إعادة الجولة (Replay)
+// ---------------------------------------------------------------------------
+
+export type ReplayAnswer = {
+  questionIndex: number;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  category: string;
+  difficulty: string;
+  /** من أجاب صحيحاً في هذه المسألة (كل اللاعبين) */
+  byPlayer: Array<{
+    userId: string;
+    name: string;
+    selected: number;
+    correct: boolean;
+    points: number;
+    elapsedMs: number;
+    answered: boolean; // هل أجاب أصلاً (null = لم يجب)
+  }>;
+};
+
+export type RoundReplay = {
+  gameCode: string;
+  playedAt: number;
+  playerCount: number;
+  answers: ReplayAnswer[];
+};
+
+/**
+ * إعادة كاملة لجولة: سؤالاً بسؤال، من أجاب ماذا وكم استغرق —
+ * لكل اللاعبين. تُعرض في صفحة النتائج وصفحة الملف.
+ */
+export const getRoundReplay = query({
+  args: { gameCode: v.string() },
+  handler: async (ctx, { gameCode }): Promise<RoundReplay | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+
+    const game = await ctx.db
+      .query("games")
+      .withIndex("by_code", (q) => q.eq("code", gameCode.toUpperCase().trim()))
+      .first();
+    if (!game || game.status !== "finished") return null;
+
+    // المُشاهد لا بد أن يكون لعب هذه الجولة (خصوصية)
+    const players = await ctx.db
+      .query("gamePlayers")
+      .withIndex("by_game", (q) => q.eq("gameId", game._id))
+      .collect();
+    if (!players.some((p) => p.userId === userId)) return null;
+
+    const history = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_game", (q) => q.eq("gameId", game._id))
+      .first();
+
+    const answers: ReplayAnswer[] = [];
+    for (let qi = 0; qi < game.questionIds.length; qi++) {
+      const question = await resolveQuestion(ctx, game.questionIds[qi]);
+      if (!question) continue;
+      const byPlayer = players.map((p) => {
+        const a = p.answers[qi];
+        return {
+          userId: p.userId,
+          name: p.name,
+          selected: a?.selected ?? -1,
+          correct: a?.correct ?? false,
+          points: a?.points ?? 0,
+          elapsedMs: a?.elapsedMs ?? 0,
+          answered: a !== null && a !== undefined,
+        };
+      });
+      answers.push({
+        questionIndex: qi,
+        question: question.question,
+        options: question.options,
+        correctIndex: question.correctIndex,
+        category: question.category,
+        difficulty: question.difficulty,
+        byPlayer,
+      });
+    }
+
+    return {
+      gameCode: game.code,
+      playedAt: history?.playedAt ?? game.createdAt,
+      playerCount: players.length,
+      answers,
+    };
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Queries

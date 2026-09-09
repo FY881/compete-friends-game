@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { ReplayViewer } from "@/components/ReplayViewer";
 
 export function ResultsStage({ game }: { game: GameData }) {
   const rematch = useMutation(api.games.rematch);
@@ -198,6 +199,11 @@ export function ResultsStage({ game }: { game: GameData }) {
           جولة جديدة (Rematch)
         </Button>
       </div>
+      {/* موجّة 14 — إعادة الجولة + مشاركة النتيجة */}
+      <div className="mt-6 rounded-2xl border border-border/70 bg-card p-5">
+        <ReplayViewer gameCode={game.game.code} />
+      </div>
+
       {/* AI Post-Game Analysis */}
       <div className="mt-6 rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-amber-500/5 p-6">
         <div className="flex items-center gap-3 mb-3">
