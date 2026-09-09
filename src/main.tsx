@@ -16,6 +16,7 @@ import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-ro
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { ErrorHunter, setErrorHunterClient, startPerformanceMonitor } from "@/components/ErrorHunter";
 import { SplashScreen } from "@/components/SplashScreen";
+import { PremiumThemeProvider } from "@/components/PremiumThemeProvider";
 import "./index.css";
 
 // ── أعلام نسخة البناء (محلية لتُمكّن Rollup من إسقاط كود المالك نهائياً) ──
@@ -279,6 +280,7 @@ function AppShell() {
 
   return (
     <ConvexAuthProvider client={convex}>
+      <PremiumThemeProvider>
       <BrowserRouter>
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>
@@ -366,6 +368,7 @@ function AppShell() {
             </Routes>
           </Suspense>
         </BrowserRouter>
+      </PremiumThemeProvider>
         <Toaster />
       </ConvexAuthProvider>
     );

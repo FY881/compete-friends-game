@@ -304,3 +304,198 @@ html {
   --atlas-panel: #0e1428;
   --atlas-header: rgba(7, 11, 22, 0.88);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   حرب العقول — أساس موبايل سليم + ثيم بريميوم حسب العضوية
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 1) منع الفيض الأفقي في كل الشاشات (قلب مشكلة النص الخارج من الشاشة) */
+html {
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scrollbar-gutter: stable;
+}
+body {
+  overflow-x: clip;
+  overflow-wrap: break-word;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100dvh;
+}
+#root {
+  min-height: 100dvh;
+}
+
+/* 2) وسائط وصفحات طويلة لا تكسر العرض */
+img, video, canvas, svg, picture, iframe {
+  max-width: 100%;
+  height: auto;
+}
+table {
+  max-width: 100%;
+}
+pre, code, kbd {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* 3) كلمات/أرقام/روابط طويلة تلتف بدل أن تخرج من بطاقتها */
+.word-break-all {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 4) فراغات آمنة لأجهزة «النوتش» */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+.pt-safe {
+  padding-top: max(1rem, env(safe-area-inset-top, 0px));
+}
+.px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+/* 5) خط النصوص يعاد تحجيمه على الشاشات الضيقة بلا تكسير */
+@media (max-width: 420px) {
+  .text-4xl { font-size: 1.9rem; line-height: 1.25; }
+  .text-5xl { font-size: 2.2rem; line-height: 1.2; }
+  .px-6 { padding-left: 1.15rem; padding-right: 1.15rem; }
+  .px-8 { padding-left: 1.3rem; padding-right: 1.3rem; }
+}
+
+/* ─── متغيرات الثيم البريميوم (تُملأ تلقائياً حسب مستوى العضوية) ─── */
+:root {
+  --premium-accent: 37 99 235;      /* أزرق — الافتراضي */
+  --premium-accent-2: 245 158 11;   /* كهرماني */
+  --premium-ring: 0 0 0 / 0;
+  --premium-gradient: linear-gradient(120deg, rgb(37 99 235 / 0.9), rgb(245 158 11 / 0.8));
+  --premium-ambient-1: rgba(37, 99, 235, 0.05);
+  --premium-ambient-2: rgba(245, 158, 11, 0.04);
+}
+
+/* المستويات: فضّي (لطيف) → ذهبي (توهج) → ماسي (متدرّج متحرك) → أسطوري (كامل) */
+[data-premium-tier="silver"] {
+  --premium-accent: 148 163 184;
+  --premium-accent-2: 100 116 139;
+  --premium-gradient: linear-gradient(120deg, rgb(203 213 225), rgb(148 163 184));
+  --premium-ambient-1: rgba(148, 163, 184, 0.07);
+  --premium-ambient-2: rgba(100, 116, 139, 0.05);
+}
+[data-premium-tier="gold"] {
+  --premium-accent: 234 179 8;
+  --premium-accent-2: 245 158 11;
+  --premium-gradient: linear-gradient(120deg, rgb(253 224 71), rgb(245 158 11));
+  --premium-ambient-1: rgba(234, 179, 8, 0.10);
+  --premium-ambient-2: rgba(245, 158, 11, 0.06);
+}
+[data-premium-tier="diamond"] {
+  --premium-accent: 56 189 248;
+  --premium-accent-2: 99 102 241;
+  --premium-gradient: linear-gradient(120deg, rgb(56 189 248), rgb(99 102 241));
+  --premium-ambient-1: rgba(56, 189, 248, 0.12);
+  --premium-ambient-2: rgba(99, 102, 241, 0.08);
+}
+[data-premium-tier="exclusive"] {
+  --premium-accent: 168 85 247;
+  --premium-accent-2: 236 72 153;
+  --premium-gradient: linear-gradient(120deg, rgb(168 85 247), rgb(236 72 153));
+  --premium-ambient-1: rgba(168, 85, 247, 0.14);
+  --premium-ambient-2: rgba(236, 72, 153, 0.10);
+}
+
+/* خلفية محيطة باهتة تتناسب مع مستوى العضوية.
+   تُرسم باهتة في الأركان فوق المحتوى الثابت (بدون عرقلة) وتحت الأشرطة
+   اللاصقة والنوافذ المنبثقة — فتعطي إحساساً فاخراً بألوان المستوى دون أن
+   تشوّش القراءة أو الحجب. */
+.premium-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    radial-gradient(48rem 32rem at 90% -8%, var(--premium-ambient-1), transparent 62%),
+    radial-gradient(42rem 30rem at 5% 108%, var(--premium-ambient-2), transparent 62%);
+}
+
+/* نص متدرّج بلون العضوية */
+.premium-text-gradient {
+  background-image: var(--premium-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* بطاقة بريميوم: حلقة متوهجة + حدود بلون العضوية */
+.premium-card {
+  position: relative;
+  border: 1px solid rgb(var(--premium-accent) / 0.35) !important;
+  box-shadow: 0 0 0 1px rgb(var(--premium-accent) / 0.06),
+    0 8px 30px -12px rgb(var(--premium-accent) / 0.35) !important;
+}
+
+/* زر/شارة بلون العضوية */
+.premium-accent {
+  background-color: rgb(var(--premium-accent));
+  color: white;
+}
+.premium-accent-soft {
+  background-color: rgb(var(--premium-accent) / 0.12);
+  color: rgb(var(--premium-accent));
+}
+.premium-ring {
+  box-shadow: 0 0 0 1px rgb(var(--premium-accent) / 0.4),
+    0 0 24px -4px rgb(var(--premium-accent) / 0.5);
+}
+
+/* ذهبي+: حد متوهج متحرك */
+@keyframes premium-border-flow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.premium-border-animated {
+  background-image: linear-gradient(
+    120deg,
+    rgb(var(--premium-accent) / 0.2),
+    rgb(var(--premium-accent-2) / 0.5),
+    rgb(var(--premium-accent) / 0.2)
+  );
+  background-size: 200% 200%;
+  animation: premium-border-flow 6s ease infinite;
+}
+
+/* ماسي+: لمعان متحرك على سطح البطاقة */
+@keyframes premium-sheen {
+  0%   { transform: translateX(-130%) rotate(20deg); }
+  100% { transform: translateX(240%) rotate(20deg); }
+}
+.premium-sheen::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgb(var(--premium-accent) / 0.16), transparent);
+  animation: premium-sheen 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* أسطوري: توهج نبضي قوي */
+@keyframes premium-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgb(var(--premium-accent) / 0.35),
+      0 8px 30px -10px rgb(var(--premium-accent) / 0.45); }
+  50% { box-shadow: 0 0 0 1px rgb(var(--premium-accent) / 0.6),
+      0 8px 46px -8px rgb(var(--premium-accent) / 0.65); }
+}
+.premium-glow-pulse {
+  animation: premium-glow-pulse 3.5s ease-in-out infinite;
+}

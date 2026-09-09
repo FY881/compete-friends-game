@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { sounds } from "@/lib/sounds";
 import { MembershipAssistantPanel } from "@/components/MembershipAssistantPanel";
+import { usePremiumTheme } from "@/hooks/use-premium-theme";
+import type { PremiumThemeTier } from "@/hooks/use-premium-theme";
 import {
   Crown,
   Zap,
@@ -47,6 +49,7 @@ import {
   Key,
   BarChart3,
   Flame,
+  Wand2,
 } from "lucide-react";
 
 // ─── Tier Visual Config ───────────────────────────────────────
@@ -203,6 +206,14 @@ const TIERS = [
 
 const TIER_ORDER = ["bronze", "silver", "gold", "diamond", "exclusive"];
 
+const TIER_LABEL: Record<string, string> = {
+  bronze: "برونزي",
+  silver: "فضّي",
+  gold: "ذهبي",
+  diamond: "ماسي",
+  exclusive: "أسطوري",
+};
+
 // ─── Tier Badge Component ─────────────────────────────────────
 function TierBadge({ tier, size = "md" }: { tier: string; size?: "sm" | "md" | "lg" }) {
   const tierData = TIERS.find((t) => t.id === tier);
@@ -348,9 +359,165 @@ function AiLevelCard({ tier }: { tier: string }) {
   );
 }
 
+// ─── Premium Visual Theme Plans (التميّز البصري) ──────────────
+const THEME_PLANS: Array<{
+  tier: PremiumThemeTier;
+  emoji: string;
+  gradient: string;
+  ring: string;
+  desc: string;
+  effects: string[];
+}> = [
+  {
+    tier: "bronze",
+    emoji: "🥉",
+    gradient: "from-gray-400 to-gray-600",
+    ring: "ring-gray-400/30",
+    desc: "التصميم الأساسي النظيف — بلا تأثيرات إضافية.",
+    effects: ["واجهة قياسية واضحة"],
+  },
+  {
+    tier: "silver",
+    emoji: "🥈",
+    gradient: "from-slate-300 to-slate-500",
+    ring: "ring-slate-400/30",
+    desc: "لمعة فضّية لطيفة على البطاقات والحدود.",
+    effects: ["لمعة فضّية على البطاقات", "حدود أنيقة"],
+  },
+  {
+    tier: "gold",
+    emoji: "🥇",
+    gradient: "from-yellow-400 to-amber-600",
+    ring: "ring-yellow-500/30",
+    desc: "توهّج ذهبي دافئ + حد متحرّك فاخر.",
+    effects: ["توهّج ذهبي", "حد متحرّك فاخر", "خلفية محيطية ذهبية"],
+  },
+  {
+    tier: "diamond",
+    emoji: "💎",
+    gradient: "from-blue-400 to-cyan-500",
+    ring: "ring-blue-500/30",
+    desc: "متدرّج أزرق متحرك + لمعان سطحي متلألئ.",
+    effects: ["متدرّج أزرق متحرك", "لمعان سطحي متلألئ", "توهّج أزرق"],
+  },
+  {
+    tier: "exclusive",
+    emoji: "👑",
+    gradient: "from-purple-400 to-violet-600",
+    ring: "ring-purple-500/30",
+    desc: "أقصى تميّز: توهّج نبضي أسطوري وتدرّجات غنية.",
+    effects: ["توهّج نبضي أسطوري", "تدرّجات بنفسجي/وردي", "كامل التأثيرات"],
+  },
+];
+
+function PremiumThemePlans({ currentTier }: { currentTier: string }) {
+  const premium = usePremiumTheme();
+  const currentIndex = TIER_ORDER.indexOf(currentTier);
+
+  return (
+    <div className="space-y-3" dir="rtl">
+      <div className="rounded-xl border border-primary/20 bg-white/5 p-4 text-center">
+        <Wand2 className="mx-auto size-7 text-primary" />
+        <p className="mt-1.5 text-sm font-bold">التميّز البصري حسب العضوية</p>
+        <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
+          كلما ارتفع مستواك، ازداد «فخامة» التصميم حولك في كل التطبيق — لون
+          متدرّج وتوهّج وحركة تليق برتبتك. الحالي:{' '}
+          <span className="font-bold text-foreground">{premium.label}</span>
+        </p>
+      </div>
+
+      {THEME_PLANS.map((plan) => {
+        const isCurrent = TIER_ORDER.indexOf(plan.tier) === currentIndex;
+        const isUnlocked = TIER_ORDER.indexOf(plan.tier) <= currentIndex;
+        return (
+          <motion.div
+            key={plan.tier}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn(
+              "relative overflow-hidden rounded-2xl border p-4 transition-all",
+              isUnlocked ? "bg-card" : "bg-card/40 opacity-60",
+              isCurrent && "ring-2",
+              isCurrent && plan.ring,
+            )}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">{plan.emoji}</span>
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-bold">
+                    {plan.emoji}{" "}
+                    <span>{TIER_LABEL[plan.tier]}</span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      ({plan.tier})
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">{plan.desc}</p>
+                </div>
+              </div>
+              {isCurrent && (
+                <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
+                  الحالي
+                </span>
+              )}
+              {!isCurrent && !isUnlocked && <Lock className="size-3.5 text-muted-foreground/40" />}
+            </div>
+
+            {/* معاينة حيّة للثيم المطابق */}
+            <div
+              className={cn(
+                "mt-3 flex items-center gap-2 rounded-xl border p-2.5",
+                plan.tier === "exclusive" && "premium-border-animated",
+                plan.tier === "diamond" && "premium-glow-pulse",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white",
+                  plan.gradient,
+                )}
+              >
+                <Wand2 className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold">مظهر {TIER_LABEL[plan.tier]}</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {plan.effects.map((e) => (
+                    <span
+                      key={e}
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[9px]",
+                        isUnlocked
+                          ? "bg-white/10 text-foreground"
+                          : "bg-white/5 text-muted-foreground/70",
+                      )}
+                    >
+                      {e}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* شريط متدرّج سفلي */}
+            <div className={cn("mt-3 h-1 rounded-full bg-gradient-to-r", plan.gradient)} />
+          </motion.div>
+        );
+      })}
+
+      <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+        اللمسات البصرية تُطبَّق تلقائياً على كل صفحة حسب مستواك الحالي —
+        بدون أي إعداد. الترقية من غرفة المالك عبر كود العضوية.
+      </p>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────
 export default function MembershipShowcase() {
-  const [activeTab, setActiveTab] = useState<"tiers" | "games" | "sounds" | "ai" | "assistant">("tiers");
+  const [activeTab, setActiveTab] = useState<
+    "tiers" | "games" | "sounds" | "ai" | "assistant" | "premium"
+  >("tiers");
   const [showActivate, setShowActivate] = useState(false);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [activationCode, setActivationCode] = useState("");
@@ -447,6 +614,7 @@ export default function MembershipShowcase() {
       <div className="flex gap-1.5 rounded-xl bg-white/5 p-1">
         {[
           { id: "tiers" as const, label: "المستويات", icon: Crown },
+          { id: "premium" as const, label: "التميّز", icon: Wand2 },
           { id: "games" as const, label: "الألعاب", icon: Gamepad2 },
           { id: "sounds" as const, label: "الصوتيات", icon: Headphones },
           { id: "ai" as const, label: "الذكاء", icon: Brain },
@@ -551,6 +719,18 @@ export default function MembershipShowcase() {
                 </motion.div>
               );
             })}
+          </motion.div>
+        )}
+
+        {activeTab === "premium" && (
+          <motion.div
+            key="premium"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-4"
+          >
+            <PremiumThemePlans currentTier={currentTier} />
           </motion.div>
         )}
 
