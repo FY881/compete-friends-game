@@ -551,6 +551,8 @@ export const getRoomStats = query({
     const room = await ctx.db.get(roomId);
     if (!room) return null;
 
+    const meId = await getAuthUserId(ctx);
+
     const messages = await ctx.db
       .query("chatMessages")
       .withIndex("by_room", (q) => q.eq("roomId", roomId))
@@ -578,6 +580,8 @@ export const getRoomStats = query({
       pinnedCount: pinned,
       topSenders,
       createdAt: room.createdAt,
+      // موجّة 6.3 — هل المُستدعي عريف هذه الغرفة؟ (لإظهار أدوات العُرفة)
+      isModerator: meId !== null && (room.ownerId === meId || room.admins.includes(meId)),
     };
   },
 });

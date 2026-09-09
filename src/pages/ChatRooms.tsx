@@ -211,6 +211,11 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
   const muteMember = useMutation(api.chatRooms.muteMember);
   const kickMember = useMutation(api.chatRooms.kickMember);
   const leaveRoom = useMutation(api.chatRooms.leaveRoom);
+  // موجّة 6.3 — صلاحيات العُريف
+  const moderatorWarn = useMutation(api.chatAdvanced.moderatorWarn);
+  const moderatorMute = useMutation(api.chatAdvanced.moderatorMute);
+  const [warnTarget, setWarnTarget] = useState<{ id: string; name: string } | null>(null);
+  void warnTarget; void setWarnTarget; // محجوز لتوسيع حوار التحذير المخصص
   const searchMessages = useQuery(
     api.chatRooms.searchMessages,
     { roomId: roomId as any, query: "" }
@@ -571,6 +576,40 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
                           <Flag className="size-3.5" />
                         </button>
                       )}
+                      {/* أدوات العُريف (موجّة 6.3): تحذير / كتم سريع */}
+                      {!isOwn && roomStats?.isModerator && (
+                        <>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const reason = window.prompt("سبب التحذير:") || "مخالفة قوانين الغرفة";
+                                await moderatorWarn({ roomId: roomId as any, targetUserId: msg.senderId, reason });
+                                toast.success(`تم تحذير ${msg.senderName}`);
+                              } catch (err: any) {
+                                toast.error(err.message || "تعذّر التحذير");
+                              }
+                            }}
+                            className="size-7 flex items-center justify-center rounded-lg hover:bg-amber-100 text-amber-600"
+                            title="تحذير كعُريف"
+                          >
+                            ⚠️
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const r = await moderatorMute({ roomId: roomId as any, targetUserId: msg.senderId, minutes: 15, reason: "كتم سريع من العُريف" });
+                                toast.success(`تم كتم ${msg.senderName} لمدة ${r.minutes} دقيقة`);
+                              } catch (err: any) {
+                                toast.error(err.message || "تعذّر الكتم");
+                              }
+                            }}
+                            className="size-7 flex items-center justify-center rounded-lg hover:bg-sky-100 text-sky-600"
+                            title="كتم 15 دقيقة كعُريف"
+                          >
+                            🔇
+                          </button>
+                        </>
+                      )}
                       {/* Delete (own or admin) */}
                       {(isOwn || true) && (
                         <button
@@ -657,6 +696,11 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
               <div className="rounded-xl bg-muted/30 p-3">
                 <p className="text-xs font-bold text-muted-foreground mb-2">🛠️ أدوات الإدارة</p>
                 <p className="text-[10px] text-muted-foreground">اضغط على اسم عضو في الرسائل لإدارة صلاحياته</p>
+                {roomStats?.isModerator && (
+                  <p className="mt-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] font-semibold text-amber-700">
+                    ⭐ أنت عُريف هذه الغرفة — لديك أزرار تحذير ⚠️ وكتم 🔇 على رسائل الأعضاء.
+                  </p>
+                )}
               </div>
               {/* Leave Room */}
               <button
