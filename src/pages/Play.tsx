@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { downloadApk } from "@/lib/app-version";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { TournamentPanel } from "@/components/TournamentPanel";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -245,8 +246,9 @@ export default function Play() {
       <AnnouncementBanner />
 
       {/* ── Update notice (server-driven version check) ────────── */}
-      <div className="mx-auto max-w-6xl px-5 pt-5">
+      <div className="mx-auto max-w-6xl space-y-4 px-5 pt-5">
         <UpdateBanner />
+        <TournamentPanel />
       </div>
 
       {/* ── Header ─────────────────────────────────────────────── */}

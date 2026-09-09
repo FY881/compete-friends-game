@@ -1256,7 +1256,7 @@ export const finishGame = internalMutation({
       const stars =
         rank === 1 && correctRatio >= 0.6 ? 3 : rank === 1 || correctRatio >= 0.6 ? 2 : 1;
 
-      await ctx.db.insert("gameHistory", {
+      const historyId = await ctx.db.insert("gameHistory", {
         gameId,
         userId: p.userId,
         gameCode: game.code,
@@ -1272,6 +1272,13 @@ export const finishGame = internalMutation({
         firstOfDay,
         playedAt: now,
       });
+
+      // موجّة 5 — إن كانت جولة داخل نافذة بطولة نشطة، احتسبها تلقائياً
+      try {
+        await ctx.runMutation(internal.tournaments.recordRound, { historyId });
+      } catch {
+        /* احتساب البطولة اختياري — لا يعطل تسجيل الجولة */
+      }
     }
   },
 });

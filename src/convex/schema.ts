@@ -287,6 +287,37 @@ const schema = defineSchema(
       .index("by_game", ["gameId"])
       .index("by_user_game", ["userId", "gameId"]),
 
+    // ═══════════════════════════════════════════════════════════════════
+    // ║ موجّة 5 — البطولات الأسبوعية ║
+    // ║ بطولة تُنشئها الإدارة، يلعب اللاعبون جولات عادية ويُحسب لهم ║
+    // ║ مجموع أفضل جولاتهم خلال نافذة البطولة تلقائياً من gameHistory. ║
+    // ═══════════════════════════════════════════════════════════════════
+    tournaments: defineTable({
+      name: v.string(),
+      description: v.optional(v.string()),
+      status: v.union(
+        v.literal("active"), // تلقي نتائج وجولات اللاعبين
+        v.literal("ended"), // انتهت — النتائج النهائية معروضة
+      ),
+      startsAt: v.number(),
+      endsAt: v.number(),
+      bestRoundsCount: v.number(), // كم جولة تُحتسب لكل لاعب (مثلاً أفضل 5)
+      winnerIds: v.optional(v.array(v.id("users"))), // أعلى 3 عند الإنهاء
+      createdAt: v.number(),
+    }).index("by_status", ["status"]),
+
+    // تسجيل اللاعب في البطولة (يقبل تلقائياً عند أول جولة أيضاً)
+    tournamentEntries: defineTable({
+      tournamentId: v.id("tournaments"),
+      userId: v.id("users"),
+      userName: v.string(),
+      totalScore: v.number(), // مجموع أفضل الجولات المحتسبة
+      roundsCounted: v.number(),
+      joinedAt: v.number(),
+    })
+      .index("by_tournament", ["tournamentId"])
+      .index("by_tournament_user", ["tournamentId", "userId"]),
+
     // Live emoji reactions inside a game lobby — friends hype each other up.
     reactions: defineTable({
       gameId: v.id("games"),
