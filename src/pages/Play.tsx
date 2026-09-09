@@ -10,6 +10,7 @@ import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { TournamentPanel } from "@/components/TournamentPanel";
 import { ArenaPanel } from "@/components/ArenaPanel";
 import { ClanPanel } from "@/components/ClanPanel";
+import { SeasonPassPanel } from "@/components/SeasonPassPanel";
 import { LoyaltyPanel } from "@/components/LoyaltyPanel";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
@@ -254,6 +255,7 @@ export default function Play() {
         <TournamentPanel />
         <ArenaPanel />
         <ClanPanel />
+        <SeasonPassPanel />
         <LoyaltyPanel />
       </div>
 

@@ -212,7 +212,28 @@ export const getDecorations = query({
         continue;
       }
       const alive = w.perks.filter((p) => !p.expiresAt || p.expiresAt > now);
-      const frameKey = alive.find((p) => p.key.startsWith("frame_"))?.key ?? null;
+      // موجّة 13 — الإطارات الموسمية من تذكرة الموسم لها الأولوية
+      let frameKey = alive.find((p) => p.key.startsWith("frame_"))?.key ?? null;
+      const seasonPass = await ctx.db
+        .query("seasonPasses")
+        .withIndex("by_user_season", (q: any) =>
+          q.eq("userId", uid).eq("seasonNumber", Math.floor(Date.now() / (14 * 24 * 60 * 60 * 1000)) + 1),
+        )
+        .first();
+      if (seasonPass?.seasonFrames?.length) {
+        // أحدث إطار موسمي مملوك يتقدم على الإطارات المشتراة
+        const seasonOrder: Record<string, number> = {
+          frame_season_1: 1,
+          frame_season_2: 2,
+          frame_season_3: 3,
+        };
+        const best = [...seasonPass.seasonFrames].sort(
+          (a, b) => (seasonOrder[b] ?? 0) - (seasonOrder[a] ?? 0),
+        )[0];
+        if (best && (seasonOrder[best] ?? 0) >= (seasonOrder[frameKey ?? ""] ?? 0)) {
+          frameKey = best;
+        }
+      }
       const titleKey = alive.find((p) => p.key.startsWith("title_"))?.key ?? null;
       const titlePerk = titleKey ? PERK_CATALOG.find((c) => c.key === titleKey) : undefined;
       out[String(uid)] = {

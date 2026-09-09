@@ -1306,6 +1306,16 @@ export const finishGame = internalMutation({
       } catch {
         /* نقاط الحرب اختيارية — لا تعطل تسجيل الجولة */
       }
+
+      // موجّة 13 — تذكرة الموسم: نقاط التقدم من خبرة الجولة
+      try {
+        await ctx.runMutation(internal.seasonPass.recordPassRound, {
+          userId: p.userId,
+          xpEarned: xp,
+        });
+      } catch {
+        /* نقاط التذكرة اختيارية — لا تعطل تسجيل الجولة */
+      }
     }
 
     // موجّة 11 — مبارزة حلبة: حدّث تصنيف ELO للطرفين (مرة واحدة للجولة)
