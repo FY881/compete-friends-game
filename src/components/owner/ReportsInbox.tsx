@@ -242,8 +242,26 @@ export function ReportsInbox() {
                           </Badge>
                         )}
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        <User className="inline size-3" /> {report.reporterName} — {report.reason}
+                      <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <User className="inline size-3" /> {report.reporterName}
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 text-[9px] font-bold",
+                            report.reporterReputation >= 5
+                              ? "bg-emerald-500/10 text-emerald-700"
+                              : report.reporterReputation <= -3
+                                ? "bg-rose-500/10 text-rose-700"
+                                : "bg-muted text-muted-foreground",
+                          )}
+                          title="سمعة المُبلِّغ: ترتفع بالبلاغات الصحيحة وتنخفض بالكيدية"
+                        >
+                          {report.reporterReputation >= 5
+                            ? "مُبلِّغ موثوق"
+                            : report.reporterReputation <= -3
+                              ? "بلاغات كيدية"
+                              : `سمعة ${report.reporterReputation}`}
+                        </span>
+                        <span>— {report.reason}</span>
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5">

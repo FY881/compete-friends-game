@@ -25,6 +25,8 @@ import {
   Bot,
   ChevronLeft,
 } from "lucide-react";
+import { HealthPanel } from "./HealthPanel";
+import { AnnouncementCenter } from "./AnnouncementCenter";
 
 // ─── Mini Sparkline (pure CSS) ────────────────────────────────
 function MiniSparkline({
@@ -352,13 +354,18 @@ export function OwnerDashboard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <AiStatusBadge enabled={dashboard.aiEnabled} autoApply={dashboard.aiAutoApply} />
         <div className="flex items-center gap-3">
-        <AiStatusBadge enabled={dashboard.aiEnabled} autoApply={dashboard.aiAutoApply} />
-        <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground" onClick={() => setRefreshKey((k) => k + 1)}>
-          <RefreshCw className="size-3.5" />
-          تحديث
-        </Button>
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground" onClick={() => setRefreshKey((k) => k + 1)}>
+            <RefreshCw className="size-3.5" />
+            تحديث
+          </Button>
+        </div>
       </div>
-      </div>
+
+      {/* ── Health score + Advisors (موجة 1.1) ── */}
+      <HealthPanel onNavigate={onNavigate} />
+
+      {/* ── مركز الإعلانات المركزي (موجة 1.3) — واجهة سريعة من القيادة ── */}
+      <AnnouncementCenter />
 
       {/* ── Stat Cards Grid ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

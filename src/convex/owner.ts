@@ -314,8 +314,19 @@ export const getPublicInfo = query({
   handler: async (ctx) => {
     const settings = await getSettingsData(ctx);
     const rulesCount = await ctx.db.query("rules").collect();
+
+    // مركز الإعلانات المركزي: إن وُجد إعلان ظاهر نُفضّله، وإلا نعود للإعلان القديم في الإعدادات.
+    const now = Date.now();
+    const activeRows = await ctx.db.query("announcements").withIndex("by_active", (q) => q.eq("active", true)).collect();
+    const topAnnouncement = activeRows
+      .filter((a) => (a.startsAt ?? 0) <= now && (a.expiresAt ?? Infinity) >= now)
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+
     return {
-      announcement: settings.announcementActive ? settings.announcement : "",
+      announcement:
+        topAnnouncement?.body?.trim() ||
+        (settings.announcementActive ? settings.announcement : ""),
+      announcementTitle: topAnnouncement?.title ?? null,
       rulesCount: rulesCount.filter((r) => r.active).length,
     };
   },
@@ -365,6 +376,15 @@ export type ModLogEntry = {
   createdAt: number;
 };
 
+export type DashboardAdvisor = {
+  id: string;
+  name: string;
+  role: string;
+  status: "active" | "idle" | "off";
+  summary: string;
+  tab: string;
+};
+
 export type DashboardData = {
   userCount: number;
   gameCount: number;
@@ -375,6 +395,13 @@ export type DashboardData = {
   aiAutoApply: boolean;
   antiCheatEnabled: boolean;
   recentActivity: ModLogEntry[];
+  // ── موجّة 1.1: صحة اللعبة + لوحة المستشارين ──
+  healthScore: number; // 0-100
+  healthLabel: string;
+  healthAlerts: string[];
+  advisors: DashboardAdvisor[];
+  suggestions: string[];
+  aiDecisionsToday: number;
 };
 
 export const getDashboard = query({
@@ -400,10 +427,98 @@ export const getDashboard = query({
     const bannedUsers = users.filter((u) => isUserBanned(u).banned).length;
     const totalPunishments = await ctx.db.query("moderationLogs").collect();
 
+    // ── صحة اللعبة: درجة مركّبة 0-100 من مؤشرات قابلة للقياس ──
+    const now = Date.now();
+    const openReports = reports.length;
+    const banRatio = users.length ? bannedUsers / users.length : 0;
+    // مؤشر نشاط المجتمع: متوسط ألعاب لكل لاعب + نشاطات حديثة
+    const activitySignal = users.length
+      ? Math.min(games.length / Math.max(users.length, 1), 1)
+      : 0.4;
+
+    let score = 0;
+    score += settings.aiEnabled ? 12 : 0;
+    score += settings.aiAutoApply ? 8 : 0;
+    score += settings.antiCheatEnabled ? 10 : 0;
+    // نشاط مجتمعي (ألعاب لكل لاعب + وجود نشاطات حديثة)
+    score += Math.round(30 * Math.min(0.35 + activitySignal * 0.35, 1));
+    // بلاغات مفتوحة: خصم تدريجي
+    score -= Math.min(openReports * 3, 18);
+    // نسبة الحظر: خصم إن تجاوزت حداً صحياً
+    if (banRatio > 0.15) score -= 12;
+    else if (banRatio > 0.08) score -= 5;
+    // عقوبات كثيرة = مجتمع مريض
+    if (totalPunishments.length > 200) score -= 6;
+
+    const healthScore = Math.max(0, Math.min(100, score));
+    const healthLabel =
+      healthScore >= 80 ? "ممتازة" : healthScore >= 60 ? "جيدة" : healthScore >= 40 ? "متوسطة" : "حرجة";
+
+    const healthAlerts: string[] = [];
+    if (openReports > 5) healthAlerts.push(`${openReports} بلاغ مفتوح بانتظار المراجعة`);
+    if (banRatio > 0.15) healthAlerts.push("نسبة الحظر مرتفعة — راجع سلم العقوبات");
+    if (!settings.aiEnabled) healthAlerts.push("الرقابة الذكية متوقفة");
+    if (games.length === 0) healthAlerts.push("لا توجد ألعاب بعد — أطلق أول تحدٍّ لجذب الأصدقاء");
+
+    // ── لوحة المستشارين: سطر واحد لكل مساعد يعكس حالته الحقيقية ──
+    const advisors: DashboardAdvisor[] = [
+      {
+        id: "moderation",
+        name: "الرقابة الذكية",
+        role: "شرطة الميدان",
+        status: settings.aiEnabled ? "active" : "off",
+        summary: settings.aiEnabled
+          ? openReports > 0
+            ? `${openReports} بلاغ مفتوح — توصي بالمراجعة`
+            : "تراقب الرسائل والسلوك باستمرار"
+          : "متوقفة — فعّلها من مركز الذكاء",
+        tab: "ai",
+      },
+      {
+        id: "autoadmin",
+        name: "المدير الآلي",
+        role: "نائب المالك التنفيذي",
+        status: settings.aiAdminEnabled ? "active" : "off",
+        summary: settings.aiAdminEnabled
+          ? "ينفّذ جولة تلقائية كل 15 دقيقة"
+          : "متوقف — فعّله من الإدارة الآلية",
+        tab: "aiadmin",
+      },
+      {
+        id: "gem",
+        name: "حارسة الخزينة جيم",
+        role: "راعية العضويات",
+        status: "active",
+        summary: "تحرس العضويات وتجيب لاعبيك عنها",
+        tab: "memberships",
+      },
+      {
+        id: "questions",
+        name: "مولّد الأسئلة AI",
+        role: "محتوى بلا توقف",
+        status: settings.aiEnabled ? "idle" : "off",
+        summary: "يولّد أسئلة جديدة تنتظر موافقتك",
+        tab: "questions",
+      },
+    ];
+
+    const suggestions: string[] = [];
+    if (openReports > 5) suggestions.push("أغلق البلاغات المفتوحة لرفع درجة الصحة");
+    if (!settings.aiEnabled) suggestions.push("فعّل الرقابة الذكية لحماية المجتمع آلياً");
+    if (games.length === 0) suggestions.push("أطلق «تحدي اليوم» أو مكافأة موسمية لجذب اللاعبين");
+    if (banRatio > 0.15) suggestions.push("راجع قوانين العقوبات — قد تكون العقوبات قاسية على المجتمع");
+    if (suggestions.length === 0) suggestions.push("كل شيء تحت السيطرة — واصل الإطلاق، وفكّر في بطولة أسبوعية");
+
+    // عدد قرارات الذكاء اليوم (للشفافية)
+    const decisionsToday = await ctx.db
+      .query("aiDecisionLog")
+      .withIndex("by_created", (q) => q.gte("createdAt", now - 24 * 60 * 60 * 1000))
+      .collect();
+
     return {
       userCount: users.length,
       gameCount: games.length,
-      openReports: reports.length,
+      openReports,
       bannedUsers,
       totalPunishments: totalPunishments.length,
       aiEnabled: settings.aiEnabled,
@@ -421,6 +536,12 @@ export const getDashboard = query({
         gameCode: l.gameCode ?? null,
         createdAt: l.createdAt,
       })),
+      healthScore,
+      healthLabel,
+      healthAlerts,
+      advisors,
+      suggestions,
+      aiDecisionsToday: decisionsToday.length,
     };
   },
 });
@@ -500,6 +621,7 @@ export const listUsers = query({
 export type ReportRow = {
   id: string;
   reporterName: string;
+  reporterReputation: number;
   targetId: string;
   targetName: string;
   reason: string;
@@ -529,9 +651,12 @@ export const getReports = query({
       .withIndex("by_created", (q) => q.gte("createdAt", 0))
       .order("desc")
       .take(60);
-    return reports.map((r) => ({
+    // سمعة المُبلِّغ — تُقرأ من ملف المستخدم المُبلِّغ
+    const reporters = await Promise.all(reports.map((r) => ctx.db.get(r.reporterId)));
+    return reports.map((r, i) => ({
       id: r._id,
       reporterName: r.reporterName,
+      reporterReputation: reporters[i]?.reporterReputation ?? 0,
       targetId: r.targetId,
       targetName: r.targetName,
       reason: r.reason,
@@ -1100,6 +1225,37 @@ export const resolveReport = mutation({
         severity: status === "reviewed" ? "medium" : "low",
       });
     }
+
+    // ── نظام سمعة المُبلِّغ: بلاغ صحيح يرفع السمعة، كيدي يخفضها ──
+    const reporter = await ctx.db.get(report.reporterId);
+    if (reporter) {
+      if (status === "reviewed") {
+        await ctx.db.patch(report.reporterId, {
+          reporterReputation: Math.min((reporter.reporterReputation ?? 0) + 1, 100),
+          validReports: (reporter.validReports ?? 0) + 1,
+        });
+      } else if (status === "dismissed") {
+        await ctx.db.patch(report.reporterId, {
+          reporterReputation: Math.max((reporter.reporterReputation ?? 0) - 2, -100),
+          invalidReports: (reporter.invalidReports ?? 0) + 1,
+        });
+      }
+    }
+
+    // سجلّ القرار الموحّد (مجلس العقول)
+    await ctx.db.insert("aiDecisionLog", {
+      system: "reports",
+      actorName: actor.name ?? "الإدارة",
+      action: status === "reviewed" ? "report_valid" : "report_dismissed",
+      targetId: report.reporterId,
+      targetName: report.reporterName,
+      detail:
+        status === "reviewed"
+          ? `بلاغ صحيح: ${report.reason}`
+          : `بلاغ غير صحيح على ${report.targetName}: ${report.reason}`,
+      severity: status === "reviewed" ? "medium" : "low",
+      createdAt: Date.now(),
+    });
   },
 });
 

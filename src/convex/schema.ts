@@ -58,6 +58,13 @@ const schema = defineSchema(
       banReason: v.optional(v.string()), // why the user was punished
       cheatStrikes: v.optional(v.number()), // anti-cheat detections (tab-switch while answering)
       lastWarningAt: v.optional(v.number()), // when the last formal warning was issued (used by the auto-admin to decay old warnings)
+
+      // ── Reporter reputation (نظام البلاغات الذكي) ──
+      // كسب/خسارة السمعة يقرّره المالك عند مراجعة البلاغ: بلاغ صحيح يرفعها،
+      // بلاغ كيدي يخفضها. تُستخدم كعامل ثقة عند تصنيف البلاغات الجديدة.
+      reporterReputation: v.optional(v.number()),
+      validReports: v.optional(v.number()),
+      invalidReports: v.optional(v.number()),
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     // The site laws: essential rules, prohibitions and the punishment ladder.
@@ -126,6 +133,36 @@ const schema = defineSchema(
       key: v.string(),
       value: v.string(), // JSON-encoded value
     }).index("by_key", ["key"]),
+
+    // ── مركز الإعلانات المركزي ──
+    // إعلانات متعددة قابلة للجدولة — تعرض المالك يُنشئ أي عدد منها،
+    // الأخطر/الأحدث منها يظهر للجميع عبر AnnouncementBanner.
+    announcements: defineTable({
+      title: v.string(),
+      body: v.string(),
+      active: v.boolean(),
+      priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+      startsAt: v.optional(v.number()), // optional schedule start
+      expiresAt: v.optional(v.number()), // optional schedule end
+      createdAt: v.number(),
+    })
+      .index("by_active", ["active"])
+      .index("by_created", ["createdAt"]),
+
+    // ── سجل القرارات الموحّد (مجلس العقول) ──
+    // كل قرار تصدره أنظمة الذكاء (رقابة، إدارة آلية، نائب المالك، حارسة
+    // العضويات، مولّد الأسئلة، نظام البلاغات) يُسجَّل هنا في ناقل واحد
+    // شفاف وقابل للبحث — ليُعرض في لوحة القيادة وتبويب الشفافية.
+    aiDecisionLog: defineTable({
+      system: v.string(), // معرف النظام المُصدِر (moderation | autoadmin | viceowner | gem | questions | reports | owner)
+      actorName: v.string(),
+      action: v.string(), // نوع القرار
+      targetId: v.optional(v.string()),
+      targetName: v.optional(v.string()),
+      detail: v.string(), // سطر عربي موجز
+      severity: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
 
     // A competitive challenge room created by a host.
     games: defineTable({

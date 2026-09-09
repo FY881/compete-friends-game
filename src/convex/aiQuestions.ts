@@ -4,6 +4,8 @@ import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { CATEGORIES, QUESTION_BANK } from "./questions";
 import { isStaffUser } from "./owner";
+import { callLlm, getOpenRouterKey } from "./aiConfig";
+import { ensureAiRuntime } from "./apiCore";
 
 type GeneratedQuestion = {
   id: Id<"aiQuestions">;
@@ -142,25 +144,39 @@ export const generateQuestions = action({
 
     const boundedCount = Math.min(Math.max(count, 1), 10);
 
-    // For now, we'll generate questions directly without OpenRouter
-    // This can be enhanced with OpenRouter API later
-    const questions: {
-      qid: string;
-      category: string;
-      difficulty: "easy" | "medium" | "hard";
-      question: string;
-      options: string[];
-      correctIndex: number;
-    }[] = [];
+    await ensureAiRuntime(_ctx); // تحميل النظامين من مركز API قبل الاستدعاء
+    const apiKey = getOpenRouterKey();
+    if (!apiKey) {
+      throw new Error("لا يوجد نظام API مُفعّل — فعّل النظام الأول (مفتاح + رابط) أو الثاني (مفتاح فقط) من مركز API");
+    }
+
+    const systemPrompt = `أنت مولّد أسئلة ثقافية للعبة "حرب العقول". أنشئ ${boundedCount} أسئلة في الفئة "${category}" باللغة العربية الفصحى.
+لكل سؤال: نص واضح + 4 خيارات (خيار واحد صحيح) + مؤشر الإجابة الصحيحة (0-3) + مستوى صعوبة من (easy|medium|hard).
+لا تكرر الأسئلة المعروفة جداً. أعطِ إجابة بصيغة JSON مصفوفة حصرية دون أي نص آخر:
+[{"question":"...","options":["...","...","...","..."],"correctIndex":0,"difficulty":"medium"}]
+الحقل correctIndex يجب أن يشير إلى موضع الخيار الصحيح داخل المصفوفة options (0 أولاً).`;
+
+    const content = await callLlm(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `أنشئ ${boundedCount} أسئلة عن "${category}"` },
+      ],
+      1200,
+      0.8,
+      "MindClash Question Generator",
+    );
+
+    const questions = parseGeneratedQuestions(content, category).slice(0, boundedCount);
 
     // Store as pending via internal mutation
     if (questions.length > 0) {
       await _ctx.runMutation("aiQuestions:insertBatch" as any, {
         questions,
+        actor: "owner",
       });
     }
 
-    return { created: questions.length };
+    return { created: questions.length, category };
   },
 });
 
@@ -171,10 +187,20 @@ export const approveQuestion = mutation({
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
     const me = await ctx.db.get(userId);
-    if (!isStaffUser(me)) throw new Error("غير مصرح");
+    if (!me || !isStaffUser(me)) throw new Error("غير مصرح");
     const row = await ctx.db.get(id);
     if (!row) throw new Error("السؤال غير موجود");
     await ctx.db.patch(id, { status: "approved" });
+    await ctx.db.insert("aiDecisionLog", {
+      system: "questions",
+      actorName: me.name ?? "المالك",
+      action: "approve_question",
+      targetId: id,
+      targetName: row.question.slice(0, 40),
+      detail: `اعتماد سؤال من فئة ${row.category}`,
+      severity: "low",
+      createdAt: Date.now(),
+    });
   },
 });
 
@@ -185,10 +211,20 @@ export const rejectQuestion = mutation({
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
     const me = await ctx.db.get(userId);
-    if (!isStaffUser(me)) throw new Error("غير مصرح");
+    if (!me || !isStaffUser(me)) throw new Error("غير مصرح");
     const row = await ctx.db.get(id);
     if (!row) throw new Error("السؤال غير موجود");
     await ctx.db.patch(id, { status: "rejected" });
+    await ctx.db.insert("aiDecisionLog", {
+      system: "questions",
+      actorName: me.name ?? "المالك",
+      action: "reject_question",
+      targetId: id,
+      targetName: row.question.slice(0, 40),
+      detail: `رفض سؤال من فئة ${row.category}`,
+      severity: "low",
+      createdAt: Date.now(),
+    });
   },
 });
 

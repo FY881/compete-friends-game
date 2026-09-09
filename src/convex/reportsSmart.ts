@@ -237,6 +237,19 @@ export const analyzeReport = mutation({
           status: "reviewed",
         });
 
+        await ctx.db.insert("aiDecisionLog", {
+          system: "moderation",
+          actorName: "محلل البلاغات AI",
+          action: verdict.suggestedAction,
+          targetId: report.targetId,
+          targetName: report.targetName,
+          detail: verdict.compliant
+            ? `البلاغ مقبول (${verdict.severity}) — ${verdict.reasoning}`
+            : `البلاغ غير مؤكد — ${verdict.reasoning}`,
+          severity: verdict.severity,
+          createdAt: Date.now(),
+        });
+
         return { success: true, verdict };
       }
 
@@ -335,6 +348,18 @@ export const resolveReport = mutation({
           targetId: report.targetId,
           targetName: report.targetName,
           reason: note ?? report.reason,
+          severity: action === "ban" ? "high" : action === "mute" ? "medium" : "low",
+          createdAt: Date.now(),
+        });
+
+        // سجلّ القرار الموحّد
+        await ctx.db.insert("aiDecisionLog", {
+          system: "reports",
+          actorName: me.name ?? "الإدارة",
+          action,
+          targetId: report.targetId,
+          targetName: report.targetName,
+          detail: `${action === "warn" ? "تحذير" : action === "mute" ? "كتم" : "حظر"} على ${report.targetName} — ${note ?? report.reason}`,
           severity: action === "ban" ? "high" : action === "mute" ? "medium" : "low",
           createdAt: Date.now(),
         });
