@@ -186,6 +186,7 @@ const schema = defineSchema(
       settings: gameSettingsValidator, // room rules chosen by the host
       roundEndsAt: v.optional(v.number()), // timed rounds: absolute ms timestamp when the match must stop
       rematchOf: v.optional(v.id("games")), // set when this game is a rematch of another
+      arenaDuel: v.optional(v.boolean()), // موجّة 11: غرفة مبارزة حلبة (لاعبان، تحديث ELO تلقائياً)
     })
       .index("by_code", ["code"])
       .index("by_host", ["hostId"])
@@ -342,6 +343,22 @@ const schema = defineSchema(
       reason: v.string(),
       at: v.number(),
     }).index("by_user", ["userId"]),
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ║ موجّة 11 — الحلبة العالمية: تصنيف ELO لكل لاعب ║
+    // ║ صف واحد لكل لاعب — نقاط التصنيف، عدد الانتصارات/الهزائم،        ║
+    // ║ والدرع (برونز/فضي/ذهب/ماسي/أسطورة) محسوب من النقاط.              ║
+    // ═══════════════════════════════════════════════════════════════════
+    arenaRatings: defineTable({
+      userId: v.id("users"),
+      rating: v.number(), // نقاط ELO (يبدأ من 1000)
+      wins: v.number(),
+      losses: v.number(),
+      draws: v.number(),
+      lastPlayedAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_rating", ["rating"]),
 
     // الإحالات: كل لاعب له كود، ومن يسجل به يحصل الطرفان على نقاط
     referralCodes: defineTable({
@@ -737,6 +754,8 @@ const schema = defineSchema(
       opponentScore: v.number(),
       questionCount: v.number(),
       currentQuestion: v.number(),
+      gameCode: v.optional(v.string()), // موجّة 11: رمز غرفة المبارزة المرتبطة
+      arena: v.optional(v.boolean()), // موجّة 11: مبارزة حلبة عالمية (تزاوج تلقائي)
       winnerId: v.optional(v.id("users")),
       createdAt: v.number(),
     }).index("by_status", ["status"]).index("by_challenger", ["challengerId"]),

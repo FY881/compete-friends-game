@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { downloadApk } from "@/lib/app-version";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { TournamentPanel } from "@/components/TournamentPanel";
+import { ArenaPanel } from "@/components/ArenaPanel";
 import { LoyaltyPanel } from "@/components/LoyaltyPanel";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
@@ -250,6 +251,7 @@ export default function Play() {
       <div className="mx-auto max-w-6xl space-y-4 px-5 pt-5">
         <UpdateBanner />
         <TournamentPanel />
+        <ArenaPanel />
         <LoyaltyPanel />
       </div>
 
