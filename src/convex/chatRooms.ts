@@ -582,6 +582,8 @@ export const getRoomStats = query({
       createdAt: room.createdAt,
       // موجّة 6.3 — هل المُستدعي عريف هذه الغرفة؟ (لإظهار أدوات العُرفة)
       isModerator: meId !== null && (room.ownerId === meId || room.admins.includes(meId)),
+      // موجّة 9.3 — هل المُستدعي مالك الغرفة؟ (لإظهار إدارة العُرفاء)
+      isOwner: meId !== null && room.ownerId === meId,
     };
   },
 });

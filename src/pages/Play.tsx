@@ -1488,12 +1488,25 @@ function LeaderboardSection() {
             <div
               key={player.userId}
               className={`flex items-center gap-3 rounded-xl p-3 transition-all ${
-                i < 3 ? "bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/20" : "bg-muted/30"
+                i < 3
+                  ? player.frame === "frame_gold"
+                    ? "bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border-2 border-amber-400/70"
+                    : player.frame === "frame_neon"
+                      ? "bg-gradient-to-r from-violet-500/20 to-fuchsia-500/10 border-2 border-violet-400/70"
+                      : "bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/20"
+                  : "bg-muted/30"
               }`}
             >
               <span className="text-xl w-8 text-center">{medals[i] || `#${i + 1}`}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate">{player.name}</p>
+                <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold">
+                  <span className="truncate">{player.name}</span>
+                  {player.title && (
+                    <span className="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-bold text-violet-600">
+                      {player.title.emoji} {player.title.name}
+                    </span>
+                  )}
+                </p>
                 <p className="text-[10px] text-muted-foreground">{player.gamesPlayed} لعبة • {player.gamesWon} فوز</p>
               </div>
               <div className="text-right">

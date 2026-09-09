@@ -217,6 +217,15 @@ export type TopPlayer = {
   levelTitle: string;
   gamesWon: number;
   badgeCount: number;
+  // موجة 9 — زخارف الولاء المرئية (إطار/لقب)
+  frame: string | null;
+  title: { emoji: string; name: string } | null;
+};
+
+// موجة 9 — ألقاب الولاء المعروضة بجانب الاسم
+const TITLE_KEYS: Record<string, { emoji: string; name: string }> = {
+  title_genius: { emoji: "🧠", name: "العقل المدبّر" },
+  title_champion: { emoji: "🏆", name: "البطل" },
 };
 
 /** Global leaderboard: the strongest minds on the platform. */
@@ -229,11 +238,20 @@ export const getTopPlayers = query({
       .order("desc")
       .take(Math.min(limit ?? 10, 20));
 
+    const now = Date.now();
     const rows: TopPlayer[] = [];
     for (const profile of profiles) {
       const user = await ctx.db.get(profile.userId);
       if (!user) continue;
       const level = levelFromXp(profile.xp);
+      // موجة 9 — اقرأ امتيازات الولاء النشطة لهذا اللاعب
+      const wallet = await ctx.db
+        .query("loyaltyWallets")
+        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+        .first();
+      const alive = (wallet?.perks ?? []).filter(
+        (p: { expiresAt?: number }) => !p.expiresAt || p.expiresAt > now,
+      );
       rows.push({
         userId: profile.userId,
         name: user.name ?? "لاعب مجهول",
@@ -242,6 +260,8 @@ export const getTopPlayers = query({
         levelTitle: levelTitle(level),
         gamesWon: profile.gamesWon,
         badgeCount: profile.badges.length,
+        frame: alive.find((p: { key: string }) => p.key.startsWith("frame_"))?.key ?? null,
+        title: TITLE_KEYS[alive.find((p: { key: string }) => p.key.startsWith("title_"))?.key ?? ""] ?? null,
       });
     }
     return rows;

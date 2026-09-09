@@ -112,7 +112,15 @@ function formatDate(timestamp: number): string {
   }
 }
 
-function LevelCard({ stats }: { stats: ProfileStats }) {
+function LevelCard({
+  stats,
+  myFrame,
+  myTitle,
+}: {
+  stats: ProfileStats;
+  myFrame: string | null;
+  myTitle: { emoji: string; name: string } | null;
+}) {
   const pct = Math.round(
     (stats.xpIntoLevel / Math.max(1, stats.xpForNextLevel)) * 100,
   );
@@ -123,12 +131,24 @@ function LevelCard({ stats }: { stats: ProfileStats }) {
         className="pointer-events-none absolute -top-20 start-1/2 h-44 w-80 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
       />
       <div className="relative flex flex-wrap items-center gap-5">
-        <div className="flex size-20 items-center justify-center rounded-3xl border border-primary/25 bg-primary/10 text-3xl font-bold text-primary shadow-sm">
+        <div
+          className={cn(
+            "flex size-20 items-center justify-center rounded-3xl border bg-primary/10 text-3xl font-bold text-primary shadow-sm",
+            myFrame === "frame_gold" && "border-2 border-amber-400 ring-2 ring-amber-400/40",
+            myFrame === "frame_neon" && "border-2 border-violet-400 ring-2 ring-violet-400/40",
+            !myFrame && "border-primary/25",
+          )}
+        >
           {stats.level}
         </div>
         <div className="flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+          <p className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
             المستوى {stats.level} — {stats.levelTitle}
+            {myTitle && (
+              <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-bold text-violet-600">
+                {myTitle.emoji} {myTitle.name}
+              </span>
+            )}
           </p>
           <p className="mt-1 text-lg font-bold">{stats.xp.toLocaleString("ar")} نقطة خبرة</p>
           <div className="mt-3 flex items-center gap-3">
@@ -159,9 +179,21 @@ export default function Profile() {
   const profile = useQuery(api.stats.getMyProfile);
   const history = useQuery(api.stats.getMyHistory, { limit: 12 });
   const discipline = useQuery(api.owner.getMyDiscipline);
+  const wallet = useQuery(api.loyalty.getMyWallet);
 
   const displayName = user?.name ?? "ضيف";
   const initial = displayName.slice(0, 1);
+
+  // موجة 9 — زخارفي (إطار/لقب) من محفظة الولاء
+  const now = Date.now();
+  const alivePerks = (wallet?.perks ?? []).filter((p: any) => !p.expiresAt || p.expiresAt > now);
+  const myFrame = alivePerks.find((p: any) => p.key.startsWith("frame_"))?.key ?? null;
+  const myTitleKey = alivePerks.find((p: any) => p.key.startsWith("title_"))?.key ?? null;
+  const TITLE_MAP: Record<string, { emoji: string; name: string }> = {
+    title_genius: { emoji: "🧠", name: "العقل المدبّر" },
+    title_champion: { emoji: "🏆", name: "البطل" },
+  };
+  const myTitle = myTitleKey ? TITLE_MAP[myTitleKey] ?? null : null;
 
   if (profile === undefined || profile === null || history === undefined || history === null) {
     return (
@@ -282,7 +314,7 @@ export default function Profile() {
 
         {/* Level */}
         <div className="mt-8">
-          <LevelCard stats={profile} />
+          <LevelCard stats={profile} myFrame={myFrame} myTitle={myTitle} />
         </div>
 
         {/* Stats */}

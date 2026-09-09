@@ -214,6 +214,10 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
   // موجّة 6.3 — صلاحيات العُريف
   const moderatorWarn = useMutation(api.chatAdvanced.moderatorWarn);
   const moderatorMute = useMutation(api.chatAdvanced.moderatorMute);
+  // موجّة 9.3 — تعيين/عزل العُرفاء من لوحة الإعدادات
+  const roomMembers = useQuery(api.chatAdvanced.getRoomMembers, { roomId: roomId as any });
+  const promoteToAdmin = useMutation(api.chatAdvanced.promoteToAdmin);
+  const demoteAdmin = useMutation(api.chatAdvanced.demoteAdmin);
   const [warnTarget, setWarnTarget] = useState<{ id: string; name: string } | null>(null);
   void warnTarget; void setWarnTarget; // محجوز لتوسيع حوار التحذير المخصص
   const searchMessages = useQuery(
@@ -695,11 +699,62 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
               {/* Admin Tools */}
               <div className="rounded-xl bg-muted/30 p-3">
                 <p className="text-xs font-bold text-muted-foreground mb-2">🛠️ أدوات الإدارة</p>
-                <p className="text-[10px] text-muted-foreground">اضغط على اسم عضو في الرسائل لإدارة صلاحياته</p>
                 {roomStats?.isModerator && (
-                  <p className="mt-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] font-semibold text-amber-700">
+                  <p className="mb-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] font-semibold text-amber-700">
                     ⭐ أنت عُريف هذه الغرفة — لديك أزرار تحذير ⚠️ وكتم 🔇 على رسائل الأعضاء.
                   </p>
+                )}
+                {/* موجّة 9.3 — إدارة العُرفاء (للمالك فقط) */}
+                {roomStats?.isOwner && roomMembers && roomMembers.length > 0 && (
+                  <div className="mt-1 space-y-1.5">
+                    <p className="text-[10px] font-bold text-muted-foreground">⭐ تعيين العُرفاء</p>
+                    {roomMembers.map((m: any) => (
+                      <div key={m._id} className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-1 text-xs font-medium">
+                          <span className="truncate">{m.name}</span>
+                          {m.isOwner && <Crown className="size-3 shrink-0 text-yellow-500" />}
+                        </span>
+                        {m.isOwner ? (
+                          <Badge className="shrink-0 rounded-full bg-yellow-500/15 text-[9px] text-yellow-700">مالك</Badge>
+                        ) : m.isAdmin ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 shrink-0 rounded-full px-2 text-[9px] text-rose-600"
+                            onClick={async () => {
+                              try {
+                                await demoteAdmin({ roomId: roomId as any, targetUserId: m._id });
+                                toast("تم عزل العُريف");
+                              } catch (err: any) {
+                                toast.error(err.message);
+                              }
+                            }}
+                          >
+                            عزل العُريفية
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 shrink-0 rounded-full px-2 text-[9px] text-amber-700"
+                            onClick={async () => {
+                              try {
+                                await promoteToAdmin({ roomId: roomId as any, targetUserId: m._id });
+                                toast.success("تم تعيين العُريف ⭐");
+                              } catch (err: any) {
+                                toast.error(err.message);
+                              }
+                            }}
+                          >
+                            ترقية عُريفاً
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!roomStats?.isOwner && (
+                  <p className="text-[10px] text-muted-foreground">اضغط على اسم عضو في الرسائل لإدارة صلاحياته</p>
                 )}
               </div>
               {/* Leave Room */}
