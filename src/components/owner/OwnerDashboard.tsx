@@ -32,6 +32,7 @@ import { CouncilHealthBoard } from "./CouncilHealthBoard";
 import { TransparencyBoard } from "./TransparencyBoard";
 import { ToxicityMonitor } from "./ToxicityMonitor";
 import { TournamentAdmin } from "./TournamentAdmin";
+import { ModeratorsBoard } from "./ModeratorsBoard";
 
 // ─── Mini Sparkline (pure CSS) ────────────────────────────────
 function MiniSparkline({
@@ -381,6 +382,9 @@ export function OwnerDashboard({
 
       {/* ── البطولات الأسبوعية (موجة 5) ── */}
       <TournamentAdmin />
+
+      {/* ── العُرفاء (موجة 6) ── */}
+      <ModeratorsBoard />
 
       {/* ── مركز الإعلانات المركزي (موجة 1.3) — واجهة سريعة من القيادة ── */}
       <AnnouncementCenter />

@@ -393,6 +393,133 @@ export const removeMember = mutation({
   },
 });
 
+// ── موجّة 6 — صلاحيات العُريف: تحذير/كتم داخل غرفته فقط مع تدقيق كامل ──
+
+/** هل المستخدم عريف هذه الغرفة؟ (مالك الغرفة أو مشرف) */
+function isRoomModerant(room: { ownerId: unknown; admins: unknown[] }, userId: unknown): boolean {
+  return room.ownerId === userId || room.admins.includes(userId as never);
+}
+
+/**
+ * تحذير عضو من العُريف — رسالة نظام في الغرفة + سجلّ قرار موحّد.
+ * العُريف لا يستطيع تحذير مالك الغرفة أو مشرف آخر أو نفسه.
+ */
+export const moderatorWarn = mutation({
+  args: {
+    roomId: v.id("chatRooms"),
+    targetUserId: v.string(),
+    reason: v.string(),
+  },
+  handler: async (ctx, { roomId, targetUserId, reason }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
+
+    const room = await ctx.db.get(roomId);
+    if (!room) throw new Error("الغرفة غير موجودة");
+    if (!isRoomModerant(room, userId)) throw new Error("العُريف فقط ينفّذ هذا الإجراء");
+
+    const targetId = ctx.db.normalizeId("users", targetUserId);
+    if (!targetId) throw new Error("معرف المستخدم غير صالح");
+    if (targetId === userId) throw new Error("لا يمكنك تحذير نفسك");
+    if (targetId === room.ownerId) throw new Error("لا يمكن تحذير مالك الغرفة");
+    if (!room.members.includes(targetId)) throw new Error("العضو ليس في الغرفة");
+
+    const moderator = await ctx.db.get(userId);
+    const target = await ctx.db.get(targetId);
+
+    await ctx.db.insert("chatMessages", {
+      roomId,
+      senderId: userId,
+      senderName: moderator?.name ?? "العُريف",
+      content: `⚠️ تحذير لـ ${target?.name ?? "عضو"} من العُريف: ${reason.slice(0, 200)}`,
+      type: "system",
+      reactions: [],
+      pinned: false,
+      deleted: false,
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("aiDecisionLog", {
+      system: "owner",
+      actorName: `عريف: ${moderator?.name ?? "مجهول"}`,
+      action: "room_moderator_warn",
+      targetId: targetId,
+      targetName: target?.name ?? "مجهول",
+      detail: `تحذير في غرفة «${room.name}»: ${reason.slice(0, 200)}`,
+      severity: "medium",
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * كتم عضو في الغرفة من العُريف — يمنع الإرسال حتى وقت محدد.
+ * يُخزن في mutedUntil للمستخدم مع سقف ساعة واحدة (سلطة محدودة للعُريف)،
+ * وتُسجّل العملية في سجلّ القرارات الموحّد ليراها المالك.
+ */
+export const moderatorMute = mutation({
+  args: {
+    roomId: v.id("chatRooms"),
+    targetUserId: v.string(),
+    minutes: v.optional(v.number()), // افتراضي 15 دقيقة، سقف 60
+    reason: v.string(),
+  },
+  handler: async (ctx, { roomId, targetUserId, minutes, reason }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
+
+    const room = await ctx.db.get(roomId);
+    if (!room) throw new Error("الغرفة غير موجودة");
+    if (!isRoomModerant(room, userId)) throw new Error("العُريف فقط ينفّذ هذا الإجراء");
+
+    const targetId = ctx.db.normalizeId("users", targetUserId);
+    if (!targetId) throw new Error("معرف المستخدم غير صالح");
+    if (targetId === userId) throw new Error("لا يمكنك كتم نفسك");
+    if (targetId === room.ownerId) throw new Error("لا يمكن كتم مالك الغرفة");
+    if (!room.members.includes(targetId)) throw new Error("العضو ليس في الغرفة");
+
+    const mins = Math.min(Math.max(minutes ?? 15, 5), 60); // سلطة العُريف محدودة: 5-60 دقيقة
+    const until = Date.now() + mins * 60 * 1000;
+
+    const target = await ctx.db.get(targetId);
+    // لا تمدد الكتم أكثر من الحد الأقصى الموجود
+    const existingUntil = target?.mutedUntil ?? 0;
+    const newUntil = Math.max(until, 0);
+    if (newUntil > existingUntil) {
+      await ctx.db.patch(targetId, { mutedUntil: newUntil });
+    }
+
+    const moderator = await ctx.db.get(userId);
+
+    await ctx.db.insert("chatMessages", {
+      roomId,
+      senderId: userId,
+      senderName: moderator?.name ?? "العُريف",
+      content: `🔇 تم كتم ${target?.name ?? "عضو"} لمدة ${mins} دقيقة — ${reason.slice(0, 150)}`,
+      type: "system",
+      reactions: [],
+      pinned: false,
+      deleted: false,
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("aiDecisionLog", {
+      system: "owner",
+      actorName: `عريف: ${moderator?.name ?? "مجهول"}`,
+      action: "room_moderator_mute",
+      targetId: targetId,
+      targetName: target?.name ?? "مجهول",
+      detail: `كتم ${mins} دقيقة في غرفة «${room.name}»: ${reason.slice(0, 150)}`,
+      severity: "medium",
+      createdAt: Date.now(),
+    });
+
+    return { success: true, minutes: mins };
+  },
+});
+
 export const promoteToAdmin = mutation({
   args: { roomId: v.id("chatRooms"), targetUserId: v.string() },
   handler: async (ctx, { roomId, targetUserId }) => {
