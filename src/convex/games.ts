@@ -1279,6 +1279,17 @@ export const finishGame = internalMutation({
       } catch {
         /* احتساب البطولة اختياري — لا يعطل تسجيل الجولة */
       }
+
+      // موجّة 7 — نقاط الولاء: كسب من إنهاء/فوز/سلسلة
+      try {
+        await ctx.runMutation(internal.loyalty.recordRoundLoyalty, {
+          userId: p.userId,
+          won,
+          dailyStreak: profile?.dailyStreak,
+        });
+      } catch {
+        /* نقاط الولاء اختيارية — لا تعطل تسجيل الجولة */
+      }
     }
   },
 });

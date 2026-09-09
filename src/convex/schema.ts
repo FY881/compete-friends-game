@@ -318,6 +318,39 @@ const schema = defineSchema(
       .index("by_tournament", ["tournamentId"])
       .index("by_tournament_user", ["tournamentId", "userId"]),
 
+    // ═══════════════════════════════════════════════════════════════════
+    // ║ موجّة 7 — نقاط الولاء + الإحالات ║
+    // ║ محفظة نقاط يكسبها اللاعب من اللعب اليومي والبطولات، وينفقها ║
+    // ║ على امتيازات تجميلية (إطارات/ألقاب/شارات). ║
+    // ═══════════════════════════════════════════════════════════════════
+    loyaltyWallets: defineTable({
+      userId: v.id("users"),
+      points: v.number(),
+      lifetimeEarned: v.number(),
+      // الامتيازات المملوكة (مفاتيح مثل "frame_gold" مع وقت الانتهاء)
+      perks: v.array(v.object({
+        key: v.string(),
+        expiresAt: v.optional(v.number()), // null = دائم
+      })),
+      updatedAt: v.number(),
+    }).index("by_user", ["userId"]),
+
+    // سجل حركات المحفظة (كسب/إنفاق) — شفافية كاملة
+    loyaltyLedger: defineTable({
+      userId: v.id("users"),
+      delta: v.number(), // موجب = كسب، سالب = إنفاق
+      reason: v.string(),
+      at: v.number(),
+    }).index("by_user", ["userId"]),
+
+    // الإحالات: كل لاعب له كود، ومن يسجل به يحصل الطرفان على نقاط
+    referralCodes: defineTable({
+      userId: v.id("users"),
+      code: v.string(), // قصير فريد مثل "ZAK-7K2F"
+      invites: v.number(), // عدد من سجّل به
+      createdAt: v.number(),
+    }).index("by_code", ["code"]).index("by_user", ["userId"]),
+
     // Live emoji reactions inside a game lobby — friends hype each other up.
     reactions: defineTable({
       gameId: v.id("games"),
