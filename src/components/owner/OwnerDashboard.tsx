@@ -32,6 +32,7 @@ import { CouncilHealthBoard } from "./CouncilHealthBoard";
 import { TransparencyBoard } from "./TransparencyBoard";
 import { ToxicityMonitor } from "./ToxicityMonitor";
 import { TournamentAdmin } from "./TournamentAdmin";
+import { WhatIfSimulator } from "./WhatIfSimulator";
 import { ModeratorsBoard } from "./ModeratorsBoard";
 
 // ─── Mini Sparkline (pure CSS) ────────────────────────────────
@@ -382,6 +383,9 @@ export function OwnerDashboard({
 
       {/* ── البطولات الأسبوعية (موجة 5) ── */}
       <TournamentAdmin />
+      <div className="mt-6">
+        <WhatIfSimulator />
+      </div>
 
       {/* ── العُرفاء (موجة 6) ── */}
       <ModeratorsBoard />
