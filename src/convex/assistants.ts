@@ -61,7 +61,7 @@ export const lifeTick = internalAction({
     if (!assistants || assistants.assistants.length === 0) return { ok: false };
 
     // اختر مساعداً نشطاً (طاقة > 25) — بدورٍ عادل
-    const alive = assistants.assistants.filter((a) => a.energy > 25);
+    const alive = assistants.assistants.filter((a: { energy: number }) => a.energy > 25);
     const pool = alive.length ? alive : assistants.assistants;
     const pick = pool[Math.floor(Math.random() * pool.length)];
     const mind = assistantById(pick.assistantId);
@@ -74,7 +74,7 @@ export const lifeTick = internalAction({
       const orders = await ctx.runQuery(internal.assistantsStore.getPendingOrdersFor, {
         assistantId: pick.assistantId,
       });
-      const high = orders.find((o) => o.priority === "high") ?? orders[0];
+      const high = orders.find((o: { priority: string }) => o.priority === "high") ?? orders[0];
       if (high) {
         orderId = high._id;
         orderText = `\n\nأمر عاجل من نائب المالك: «${high.task}» — نفّذه الآن فعلياً واذكر ما أنجزته بالضبط.`;
@@ -91,7 +91,7 @@ export const lifeTick = internalAction({
     const context = `أنت «${mind.name}» ${mind.emoji} — ${mind.title} في عالم المساعدين.
 منزلك: ${mind.home} — طاقتك: ${pick.energy}% — مزاجك: ${pick.mood} — سمعتك: ${pick.reputation} — مستواك: ${pick.level} — أنجزت ${pick.tasksCompleted} مهام.
 جهازك: ${pick.computer.installedTools.join("، ")} — تحميل المعالج ${pick.computer.cpuLoad}%.
-أحدث نشاط عالمي: ${recent.map((l) => `[${l.name}] ${l.detail}`).slice(0, 5).join(" | ") || "لا شيء بعد"}${orderText}
+أحدث نشاط عالمي: ${recent.map((l: { name: string; detail: string }) => `[${l.name}] ${l.detail}`).slice(0, 5).join(" | ") || "لا شيء بعد"}${orderText}
 تصرف الآن بحريتك: نفّذ فعلاً حقيقياً مناسباً لصلاحياتك.`;
 
     let reply: string;

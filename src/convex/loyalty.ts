@@ -90,23 +90,30 @@ export const getShop = query({
   },
 });
 
-/** توليد كود إحالة (internal — يستدعى من getMyReferral عند عدم وجوده). */
-export const ensureReferralCode = internalMutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) => {
+/** كود إحالة ثابت مشتق من معرف المستخدم (بلا كتابة في الاستعلام). */
+function referralCodeFor(userId: string): string {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) >>> 0;
+  return `ZAK-${h.toString(36).toUpperCase().padStart(6, "0").slice(-6)}`;
+}
+
+/** كود الإحالة الخاص بي (مشتق ثابتاً — لا يحتاج إنشاء مسبق). */
+export const getMyReferral = query({
+  args: {},
+  handler: async (ctx): Promise<{ code: string; invites: number } | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
     const existing = await ctx.db
       .query("referralCodes")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
-    if (existing) return existing;
-    const code = `ZAK-${Math.random().toString(36).slice(2, 6).toUpperCase()}${Math.floor(Math.random() * 10)}`;
-    const id = await ctx.db.insert("referralCodes", { userId, code, invites: 0, createdAt: Date.now() });
-    return await ctx.db.get(id);
+    if (existing) return { code: existing.code, invites: existing.invites };
+    return { code: referralCodeFor(String(userId)), invites: 0 };
   },
 });
 
-/** كود الإحالة الخاص بي (يُنشأ تلقائياً). */
-export const getMyReferral = query({
+/** يحفظ كود الإحالة المشتق في الجدول (تستدعيه الواجهة عند فتح المحفظة). */
+export const persistMyReferralCode = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -115,9 +122,16 @@ export const getMyReferral = query({
       .query("referralCodes")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
-    if (existing) return { code: existing.code, invites: existing.invites };
-    const created = await ctx.runMutation(internal.loyalty.ensureReferralCode, { userId });
-    return created ? { code: created.code, invites: created.invites } : null;
+    if (existing) return existing.code;
+    const code = referralCodeFor(String(userId));
+    // تفادي تعارض الكود (نادر جداً)
+    const clash = await ctx.db
+      .query("referralCodes")
+      .withIndex("by_code", (q) => q.eq("code", code))
+      .first();
+    if (clash) return clash.code;
+    await ctx.db.insert("referralCodes", { userId, code, invites: 0, createdAt: Date.now() });
+    return code;
   },
 });
 
@@ -231,7 +245,7 @@ export const applyReferral = mutation({
       .query("referralCodes")
       .withIndex("by_code", (q) => q.eq("code", normalized))
       .first();
-    if (!ref) throw new Error("كود الإحالة غير صحيح");
+    if (!ref) throw new Error("كود الإحالة غير صحيح — تأكد أن صديقك فتح صفحة المحفظة مرة واحدة على الأقل");
     if (ref.userId === userId) throw new Error("لا يمكنك استخدام كودك الخاص");
 
     // منع الاستعمال المزدوج: من استعمل كوداً من قبل؟ (ابحث في السجل)

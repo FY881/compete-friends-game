@@ -144,14 +144,18 @@ export const getRoundForTournament = internalQuery({
   handler: async (ctx, { historyId }) => {
     const h = await ctx.db.get(historyId);
     if (!h) return null;
-    const now = Date.now();
     const active = await ctx.db
       .query("tournaments")
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
     const tournament = active.find((t) => t.startsAt <= h.playedAt && h.playedAt < t.endsAt);
     if (!tournament) return null;
-    return { tournamentId: tournament._id, bestRounds: tournament.bestRoundsCount, userId: h.userId, userName: null as string | null, score: h.score };
+    return {
+      tournamentId: tournament._id,
+      bestRounds: tournament.bestRoundsCount,
+      userId: h.userId,
+      score: h.score,
+    };
   },
 });
 
@@ -191,18 +195,19 @@ export const recordRound = internalMutation({
     const data = await ctx.runQuery(internal.tournaments.getRoundForTournament, { historyId });
     if (!data) return; // لا بطولة نشطة تغطي وقت الجولة
 
-    const t = await ctx.db.get(data.tournamentId);
-    if (!t) return;
+    const tournamentId = data.tournamentId;
+    const tournament = await ctx.db.get(tournamentId);
+    if (!tournament) return;
 
     // تسجيل تلقائي عند أول جولة
     let entry = await ctx.runQuery(internal.tournaments.getUserEntry, {
-      tournamentId: t._id,
+      tournamentId,
       userId: data.userId,
     });
     if (!entry) {
       const me = await ctx.db.get(data.userId);
       const entryId = await ctx.db.insert("tournamentEntries", {
-        tournamentId: t._id,
+        tournamentId,
         userId: data.userId,
         userName: me?.name ?? "مجهول",
         totalScore: 0,
@@ -215,13 +220,14 @@ export const recordRound = internalMutation({
 
     // أعد حساب مجموع أفضل N جولات منذ بداية البطولة
     const scores = await ctx.runQuery(internal.tournaments.getBestRounds, {
-      tournamentId: t._id,
+      tournamentId,
       userId: data.userId,
-      from: t.startsAt,
+      from: tournament.startsAt,
     });
-    const best = scores.slice(0, t.bestRoundsCount);
+    const best = scores.slice(0, tournament.bestRoundsCount);
+    const total = best.reduce((a: number, b: number) => a + b, 0);
     await ctx.db.patch(entry._id, {
-      totalScore: best.reduce((a, b) => a + b, 0),
+      totalScore: total,
       roundsCounted: best.length,
     });
   },

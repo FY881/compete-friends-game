@@ -155,7 +155,7 @@ export const workTurn = internalAction({
     const context = await gatherSystemContext(ctx);
     const recentActivity = session.activity
       .slice(-8)
-      .map((a) => `[${a.type}] ${a.title}: ${a.detail}`)
+      .map((a: { type: string; title: string; detail: string }) => `[${a.type}] ${a.title}: ${a.detail}`)
       .join("\n");
 
     let reply: string;

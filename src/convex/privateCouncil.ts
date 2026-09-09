@@ -74,7 +74,7 @@ export const openSession = action({
       const past = await ctx.runQuery(api.privateCouncilStore.listSessions, { limit: 6 });
       try {
         finalAgenda = await generateOwnAgenda(ctx,
-          past.map((s) => (s as { agenda?: string }).agenda ?? "").filter(Boolean),
+          past.map((s: { agenda?: string }) => s.agenda ?? "").filter(Boolean),
         );
       } catch {
         finalAgenda = finalAgenda || "جلسة تطوير شاملة للعبة";
@@ -116,13 +116,13 @@ export const runTurn = internalAction({
     try {
       const memories = await ctx.runQuery(internal.aiCollective.topMemories, { room: "private", limit: 10 });
       memoryText = memories.length
-        ? `\n\nذاكرتكم الجماعية (تعلمتموها سابقاً):\n${memories.map((m) => `• ${m.title}: ${m.content.slice(0, 150)}`).join("\n")}`
+        ? `\n\nذاكرتكم الجماعية (تعلمتموها سابقاً):\n${memories.map((m: { title: string; content: string }) => `• ${m.title}: ${m.content.slice(0, 150)}`).join("\n")}`
         : "";
     } catch { /* الذاكرة اختيارية */ }
 
-    const recent = session.messages.slice(-14).map((m) => ({ mindName: m.mindName, content: m.content }));
+    const recent = session.messages.slice(-14).map((m: { mindName: string; content: string }) => ({ mindName: m.mindName, content: m.content }));
     const transcriptText = recent.length
-      ? recent.map((m) => `${m.mindName}: ${m.content}`).join("\n\n")
+      ? recent.map((m: { mindName: string; content: string }) => `${m.mindName}: ${m.content}`).join("\n\n")
       : "(أنت أول المتحدثين — افتح الجلسة)";
 
     let content: string;
@@ -236,7 +236,7 @@ export const autoContinue = internalAction({
     try {
       const past = await ctx.runQuery(api.privateCouncilStore.listSessions, { limit: 6 });
       const agenda = await generateOwnAgenda(ctx,
-        past.map((s) => (s as { agenda?: string }).agenda ?? "").filter(Boolean),
+        past.map((s: { agenda?: string }) => s.agenda ?? "").filter(Boolean),
       );
       await ctx.runMutation(internal.privateCouncilStore.relabelAgenda, { sessionId, agenda });
     } catch { /* اترك الافتراضي */ }

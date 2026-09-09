@@ -56,7 +56,7 @@ export const openSession = action({
       const past = await ctx.runQuery(api.freeRoomStore.listSessions, { limit: 6 });
       try {
         finalTopic = await generateOwnTopic(ctx,
-          past.map((s) => (s as { topic?: string }).topic ?? "").filter(Boolean),
+          past.map((s: { topic?: string }) => s.topic ?? "").filter(Boolean),
         );
       } catch {
         finalTopic = finalTopic || "ما الذي يعنيه أن نكون أذكى من أنفسنا؟";
@@ -96,13 +96,13 @@ export const runTurn = internalAction({
     try {
       const memories = await ctx.runQuery(internal.aiCollective.topMemories, { room: "free", limit: 8 });
       memoryText = memories.length
-        ? `\n\nأفكاركم السابقة المحفوظة:\n${memories.map((m) => `• ${m.title}: ${m.content.slice(0, 130)}`).join("\n")}`
+        ? `\n\nأفكاركم السابقة المحفوظة:\n${memories.map((m: { title: string; content: string }) => `• ${m.title}: ${m.content.slice(0, 130)}`).join("\n")}`
         : "";
     } catch { /* اختياري */ }
 
-    const recent = session.messages.slice(-14).map((m) => ({ mindName: m.mindName, content: m.content }));
+    const recent = session.messages.slice(-14).map((m: { mindName: string; content: string }) => ({ mindName: m.mindName, content: m.content }));
     const transcriptText = recent.length
-      ? recent.map((m) => `${m.mindName}: ${m.content}`).join("\n\n")
+      ? recent.map((m: { mindName: string; content: string }) => `${m.mindName}: ${m.content}`).join("\n\n")
       : "(أنت أول المتحدثين — افتح النقاش)";
 
     let content: string;
@@ -182,7 +182,7 @@ export const autoContinue = internalAction({
     try {
       const past = await ctx.runQuery(api.freeRoomStore.listSessions, { limit: 6 });
       const topic = await generateOwnTopic(ctx,
-        past.map((s) => (s as { topic?: string }).topic ?? "").filter(Boolean),
+        past.map((s: { topic?: string }) => s.topic ?? "").filter(Boolean),
       );
       await ctx.runMutation(internal.freeRoomStore.relabelTopic, { sessionId, topic });
     } catch { /* اترك الافتراضي */ }
