@@ -324,6 +324,33 @@ const schema = defineSchema(
     // ║ محفظة نقاط يكسبها اللاعب من اللعب اليومي والبطولات، وينفقها ║
     // ║ على امتيازات تجميلية (إطارات/ألقاب/شارات). ║
     // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+    // ║ موجّة 12 — العشائر وحروبها الأسبوعية ║
+    // ║ عشيرة حتى 20 عضواً باسم وشعار، تجمع نقاط الحرب من جولات أعضائها  ║
+    // ║ خلال أسبوع الحرب الحالي، مع دردشة داخلية ولوحة صدارة للعشائر.    ║
+    // ═══════════════════════════════════════════════════════════════════
+    clans: defineTable({
+      name: v.string(), // اسم فريد للعشيرة
+      emoji: v.string(), // شعار (إيموجي)
+      ownerId: v.id("users"),
+      members: v.array(v.id("users")), // حتى 20
+      pointsThisWeek: v.number(), // نقاط حرب الأسبوع الحالي
+      totalPoints: v.number(), // مجموع نقاط تاريخي
+      weeklyResetAt: v.number(), // متى أُعيد ضبط النقاط آخر مرة
+      createdAt: v.number(),
+    })
+      .index("by_name", ["name"])
+      .index("by_points", ["pointsThisWeek"]),
+
+    // رسائل دردشة العشيرة الداخلية
+    clanMessages: defineTable({
+      clanId: v.id("clans"),
+      senderId: v.id("users"),
+      senderName: v.string(),
+      content: v.string(),
+      createdAt: v.number(),
+    }).index("by_clan", ["clanId", "createdAt"]),
+
     loyaltyWallets: defineTable({
       userId: v.id("users"),
       points: v.number(),

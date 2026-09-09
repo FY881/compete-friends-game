@@ -1294,6 +1294,18 @@ export const finishGame = internalMutation({
       } catch {
         /* نقاط الولاء اختيارية — لا تعطل تسجيل الجولة */
       }
+
+      // موجّة 12 — حرب العشائر: أضف نقاط الجولة لعشيرة اللاعب
+      try {
+        await ctx.runMutation(internal.clans.recordWarRound, {
+          userId: p.userId,
+          won,
+          correctRatio: questionCount > 0 ? correctCount / questionCount : 0,
+          score: p.score,
+        });
+      } catch {
+        /* نقاط الحرب اختيارية — لا تعطل تسجيل الجولة */
+      }
     }
 
     // موجّة 11 — مبارزة حلبة: حدّث تصنيف ELO للطرفين (مرة واحدة للجولة)
@@ -1304,6 +1316,7 @@ export const finishGame = internalMutation({
         /* تحديث التصنيف اختياري — لا يعطل تسجيل الجولة */
       }
     }
+
   },
 });
 

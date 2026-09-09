@@ -9,6 +9,7 @@ import { downloadApk } from "@/lib/app-version";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { TournamentPanel } from "@/components/TournamentPanel";
 import { ArenaPanel } from "@/components/ArenaPanel";
+import { ClanPanel } from "@/components/ClanPanel";
 import { LoyaltyPanel } from "@/components/LoyaltyPanel";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
@@ -252,6 +253,7 @@ export default function Play() {
         <UpdateBanner />
         <TournamentPanel />
         <ArenaPanel />
+        <ClanPanel />
         <LoyaltyPanel />
       </div>
 

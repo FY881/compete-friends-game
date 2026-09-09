@@ -42,6 +42,15 @@ crons.interval(
   {},
 );
 
+// موجّة 12 — تاج العشائر الأسبوعي: كل ساعة يصفّر نقاط الحرب للعشائر
+// التي اكتمل أسبوعها ويسجّل التاج في سجلّ القرارات.
+crons.interval(
+  "clan-weekly-crown",
+  { minutes: 60 },
+  internal.clans.weeklyCrown,
+  {},
+);
+
 export default crons;
 
 
