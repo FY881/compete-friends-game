@@ -1327,11 +1327,20 @@ const schema = defineSchema(
       resolved: v.boolean(),
       resolvedBy: v.optional(v.string()), // auto | owner | unknown
       createdAt: v.number(),
+
+      // ── موجّة 14: صياد الأخطاء v5.0 «الحارس» — التشريح بالذكاء الاصطناعي ──
+      aiAnalysis: v.optional(v.string()), // تحليل السبب الجذري بالعربية
+      aiFixSuggestion: v.optional(v.string()), // الحل المقترح
+      aiCanAutoFix: v.optional(v.boolean()), // هل يمكن إصلاحه تلقائياً؟
+      aiAnalyzedAt: v.optional(v.number()), // وقت التشريح
+      aiVerdict: v.optional(v.string()), // pending | analyzed | failed
+      playerAction: v.optional(v.string()), // ماذا كان اللاعب يفعل لحظة الخطأ (v5.0)
     })
       .index("by_fingerprint", ["fingerprint"])
       .index("by_severity", ["severity"])
       .index("by_created", ["createdAt"])
-      .index("by_unresolved", ["resolved", "createdAt"]),
+      .index("by_unresolved", ["resolved", "createdAt"])
+      .index("by_verdict", ["aiVerdict"]),
 
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1347,6 +1356,7 @@ const schema = defineSchema(
       successRate: v.number(), // 0-1 — نسبة نجاح الإصلاح التلقائي
       active: v.boolean(),
       createdAt: v.number(),
+      avgHealMs: v.optional(v.number()), // v5.0: متوسط زمن الشفاء لهذا النمط
     })      .index("by_pattern", ["pattern"]),
 
 

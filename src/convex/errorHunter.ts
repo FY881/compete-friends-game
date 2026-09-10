@@ -8,7 +8,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action, internalMutation } from "./_generated/server";
 import { callLlm } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
 
@@ -69,6 +69,7 @@ export const logError = mutation({
     healStrategy: v.optional(v.string()),
     healResult: v.optional(v.string()),
     deviceInfo: v.optional(v.string()),
+    playerAction: v.optional(v.string()), // v5.0: ماذا كان اللاعب يفعل لحظة الخطأ
   },
   handler: async (ctx, args) => {
     const fp = fingerprint(args.message, args.component, args.route);
@@ -91,7 +92,7 @@ export const logError = mutation({
         healStrategy: args.healStrategy || existing.healStrategy,
         healResult: args.healResult || existing.healResult,
       });
-      return { id: existing._id, isNew: false };
+      return { id: existing._id, isNew: false, needsAutopsy: existing.aiVerdict === "pending" };
     }
 
     // سجل جديد
@@ -108,10 +109,12 @@ export const logError = mutation({
       healStrategy: args.healStrategy,
       healResult: args.healResult,
       deviceInfo: args.deviceInfo?.slice(0, 200),
+      playerAction: args.playerAction,
       count: 1,
       firstSeen: now,
       lastSeen: now,
       resolved: false,
+      aiVerdict: "pending",
       createdAt: now,
     });
 
@@ -127,7 +130,86 @@ export const logError = mutation({
       });
     }
 
-    return { id, isNew: true };
+    return { id, isNew: true, needsAutopsy: true };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════
+// 🧠 موجّة 14 — التشريح التلقائي (AI Autopsy)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * طفرة داخلية: احفظ حكم الذكاء الاصطناعي على خطأ وتعلّم النمط.
+ * تُستدعى من runAutopsy بعد تحليل LLM.
+ */
+export const saveAutopsyVerdict = internalMutation({
+  args: {
+    errorId: v.id("errorLogs"),
+    analysis: v.string(),
+    fixSuggestion: v.string(),
+    canAutoFix: v.boolean(),
+    actualSeverity: v.string(),
+  },
+  handler: async (ctx, { errorId, analysis, fixSuggestion, canAutoFix, actualSeverity }) => {
+    const err = await ctx.db.get(errorId);
+    if (!err) return;
+    await ctx.db.patch(errorId, {
+      aiAnalysis: analysis,
+      aiFixSuggestion: fixSuggestion,
+      aiCanAutoFix: canAutoFix,
+      aiAnalyzedAt: Date.now(),
+      aiVerdict: "analyzed",
+      // تصحيح الخطورة الفعلية إن قيّمها AI أعلى/أدنى
+      severity: (actualSeverity as "low" | "medium" | "high" | "critical") || err.severity,
+    });
+
+    // تعلّم النمط — المرة القادمة تُشخَّص فوراً بلا AI (المسار السريع)
+    const pattern = err.message.slice(0, 60);
+    const existing = await ctx.db
+      .query("errorPatterns")
+      .withIndex("by_pattern", (q) => q.eq("pattern", pattern))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        occurrences: existing.occurrences + 1,
+        lastOccurrence: Date.now(),
+        description: analysis.slice(0, 200),
+        autoFixAction: canAutoFix ? "reload" : "notify_owner",
+      });
+    } else {
+      await ctx.db.insert("errorPatterns", {
+        pattern,
+        category: err.category,
+        description: analysis.slice(0, 200),
+        autoFixAction: canAutoFix ? "reload" : "notify_owner",
+        occurrences: 1,
+        lastOccurrence: Date.now(),
+        successRate: 0.5,
+        active: true,
+        createdAt: Date.now(),
+      });
+    }
+
+    // سجل القرار الموحّد
+    await ctx.db.insert("aiDecisionLog", {
+      system: "owner",
+      actorName: "صياد الأخطاء v5 — الحارس",
+      action: "error_autopsy",
+      detail: `تشريح AI: ${analysis.slice(0, 120)}${canAutoFix ? " — قابل للإصلاح التلقائي" : ""}`,
+      targetId: String(errorId),
+      severity: actualSeverity === "critical" ? "high" : "low",
+      createdAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * طفرة داخلية: علّم خطأ بفشل التشريح (حتى لا يُعاد للمحاولة بلا نهاية).
+ */
+export const markAutopsyFailed = internalMutation({
+  args: { errorId: v.id("errorLogs") },
+  handler: async (ctx, { errorId }) => {
+    await ctx.db.patch(errorId, { aiVerdict: "failed", aiAnalyzedAt: Date.now() });
   },
 });
 
@@ -489,28 +571,40 @@ export const analyzeErrorsWithAI = action({
     const errorContext = errors
       .map(
         (e: any, i: number) =>
-          `[${i + 1}] ${e.severity.toUpperCase()}: ${e.message}\nCategory: ${e.category}\nCount: ${e.count}x\nComponent: ${e.component || "unknown"}\nRoute: ${e.route || "unknown"}\nStack: ${(e.stack || "").slice(0, 300)}`,
+          `[${i + 1}] ${e.severity.toUpperCase()}: ${e.message}\nCategory: ${e.category}\nCount: ${e.count}x\nComponent: ${e.component || "unknown"}\nRoute: ${e.route || "unknown"}\nPlayerAction: ${e.playerAction || "unknown"}\nStack: ${(e.stack || "").slice(0, 300)}`,
       )
       .join("\n\n");
 
     const prompt: string = `أنت محلل أخطاء محترف لتطبيق ألعاب عربي (حرب العقول).
 حلل الأخطاء التالية وقدم:
-1. تحليل سبب كل خطأ
+1. تحليل سبب كل خطأ (بالعربية، سطران كحد أقصى)
 2. مدى خطورته الفعلية
 3. هل يمكن إصلاحه تلقائياً أم يحتاج تدخل بشري
-4. الحل المقترح (إن أمكن)
+4. الحل المقترح (سطر واحد)
 
 الأخطاء:
 ${errorContext}
 
 أرجع النتيجة بصيغة JSON array فقط:
-[{"fingerprint":"...","analysis":"تحليل عربي","fixSuggestion":"حل مقترح","canAutoFix":true/false,"actualSeverity":"low|medium|high|critical"}]`;
+[{"id":"...","analysis":"تحليل عربي","fixSuggestion":"حل مقترح","canAutoFix":true/false,"actualSeverity":"low|medium|high|critical"}]
+
+حيث "id" هو معرف الخطأ المعطى في السياق (السطر يبدأ بـ id=<id>).`; 
+
+    // أضف المعرفات للسياق
+    const errorContextWithIds = errors
+      .map(
+        (e: any, i: number) =>
+          `id=${e._id}\n[${i + 1}] ${e.severity.toUpperCase()}: ${e.message}\nCategory: ${e.category}\nCount: ${e.count}x`,
+      )
+      .join("\n");
+
+    const finalPrompt = prompt.replace(errorContext, errorContextWithIds);
 
     try {
       // عبر callLlm — محرك النظامين الوحيد
       await ensureAiRuntime(ctx);
       const content: string = await callLlm(
-        [{ role: "user", content: prompt }],
+        [{ role: "user", content: finalPrompt }],
         2000,
         0.3,
         "Zaka Error Hunter",
@@ -520,12 +614,125 @@ ${errorContext}
       const jsonMatch = content.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         const analysis = JSON.parse(jsonMatch[0]);
-        return { success: true, analyzed: errors.length, analysis };
+        let saved = 0;
+        for (const a of analysis) {
+          if (!a.id) continue;
+          try {
+            await ctx.runMutation(apiMod.api.errorHunter.saveAutopsyVerdict, {
+              errorId: a.id,
+              analysis: String(a.analysis || "بلا تحليل").slice(0, 400),
+              fixSuggestion: String(a.fixSuggestion || "بلا حل").slice(0, 300),
+              canAutoFix: Boolean(a.canAutoFix),
+              actualSeverity: String(a.actualSeverity || "medium"),
+            });
+            saved++;
+          } catch {
+            await ctx.runMutation(apiMod.api.errorHunter.markAutopsyFailed, {
+              errorId: a.id,
+            });
+          }
+        }
+        return { success: true, analyzed: errors.length, saved };
       }
 
       return { success: true, analyzed: errors.length, rawAnalysis: content };
     } catch (err: any) {
       return { success: false, reason: err.message };
     }
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════
+// 📈 موجّة 14 — مؤشر صحة النظام (Sentinel Health Score)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * لوحة الحارس الحية: درجة صحة 0–100 + تفصيل كامل، تُحسب لحظياً
+ * من الأخطاء، معدل الشفاء، الأنماط المتعلمة، ومقاييس الأداء.
+ */
+export const getSentinelDashboard = query({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const hourAgo = now - 60 * 60 * 1000;
+    const dayAgo = now - 24 * 60 * 60 * 1000;
+
+    const errors = await ctx.db.query("errorLogs").collect();
+    const patterns = await ctx.db.query("errorPatterns").collect();
+    const perf = await ctx.db
+      .query("performanceMetrics")
+      .withIndex("by_time", (q) => q.gte("recordedAt", dayAgo))
+      .order("desc")
+      .take(200);
+
+    const last24h = errors.filter((e) => e.lastSeen > dayAgo);
+    const last1h = errors.filter((e) => e.lastSeen > hourAgo);
+    const unresolved = errors.filter((e) => !e.resolved);
+    const critical = errors.filter((e) => e.severity === "critical" && !e.resolved);
+    const autoHealed = errors.filter((e) => e.autoHealed);
+    const analyzed = errors.filter((e) => e.aiVerdict === "analyzed");
+    const pending = errors.filter((e) => e.aiVerdict === "pending" && !e.resolved);
+
+    // ── حساب درجة الصحة 0–100 ──
+    let score = 100;
+    score -= Math.min(30, last1h.length * 3); // أخطاء آخر ساعة
+    score -= Math.min(20, critical.length * 5); // الأخطاء الحرجة غير المحلولة
+    score -= Math.min(15, unresolved.length * 0.5); // التراكم غير المحلول
+    const healRate = errors.length > 0 ? autoHealed.length / errors.length : 1;
+    score += Math.round(healRate * 10) - 5; // مكافأة معدل الشفاء (±5)
+    const healthScore = Math.max(0, Math.min(100, Math.round(score)));
+    const status = healthScore >= 80 ? "healthy" : healthScore >= 50 ? "degraded" : "critical";
+
+    // متوسطات الأداء آخر 24 ساعة
+    const avg = (arr: number[]) =>
+      arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+    const avgFps = avg(perf.map((p) => p.fps ?? 0).filter((v) => v > 0));
+    const avgLatency = avg(perf.map((p) => p.networkLatencyMs ?? 0).filter((v) => v > 0));
+    const avgMemory = avg(perf.map((p) => p.memoryUsedMB ?? 0).filter((v) => v > 0));
+
+    // خط زمني بالساعة آخر 24 ساعة (لمخطط شرارة بسيط)
+    const hourly: number[] = [];
+    for (let i = 23; i >= 0; i--) {
+      const from = now - (i + 1) * 60 * 60 * 1000;
+      const to = now - i * 60 * 60 * 1000;
+      hourly.push(errors.filter((e) => e.lastSeen > from && e.lastSeen <= to).length);
+    }
+
+    return {
+      healthScore,
+      status,
+      stats: {
+        totalUniqueErrors: errors.length,
+        last1h: last1h.length,
+        last24h: last24h.length,
+        unresolved: unresolved.length,
+        critical: critical.length,
+        autoHealed: autoHealed.length,
+        healRate: Math.round(healRate * 100),
+        aiAnalyzed: analyzed.length,
+        aiPending: pending.length,
+      },
+      performance: { avgFps, avgLatency, avgMemory, samples: perf.length },
+      learnedPatterns: patterns.filter((p) => p.active).length,
+      topErrors: unresolved.sort((a, b) => b.count - a.count).slice(0, 8),
+      hourly,
+    };
+  },
+});
+
+/** أفعال المالك على خطأ: حل يدوياً أو تجاهل كإنذار كاذب. */
+export const ownerErrorAction = mutation({
+  args: {
+    errorId: v.id("errorLogs"),
+    action: v.union(v.literal("resolve"), v.literal("dismiss"), v.literal("reanalyze")),
+  },
+  handler: async (ctx, { errorId, action }) => {
+    if (action === "resolve") {
+      await ctx.db.patch(errorId, { resolved: true, resolvedBy: "owner" });
+    } else if (action === "dismiss") {
+      await ctx.db.patch(errorId, { resolved: true, resolvedBy: "owner_dismissed" });
+    } else {
+      await ctx.db.patch(errorId, { aiVerdict: "pending", aiAnalysis: undefined, aiFixSuggestion: undefined });
+    }
+    return { ok: true };
   },
 });
