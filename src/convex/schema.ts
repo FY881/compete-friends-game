@@ -387,6 +387,37 @@ const schema = defineSchema(
       .index("by_user", ["userId"])
       .index("by_rating", ["rating"]),
 
+    // ═════════════════════════════════════════════════════════════════════
+    // ║ موجّة 12 — مواسم الحلبة (Arena Seasons) ║
+    // ║ موسم تنافسي لكل 30 يوماً — تصنيف منفصل يبدأ من 1000، وترتيب ومكافآت ║
+    // ║ نهاية الموسم تُحتسب تلقائياً عند أول نشاط بعد انتهاء الموسم.        ║
+    // ═════════════════════════════════════════════════════════════════════
+    arenaSeasons: defineTable({
+      number: v.number(), // رقم الموسم (يزيد تلقائياً)
+      name: v.string(), // اسم عربي جذاب
+      startAt: v.number(),
+      endAt: v.number(), // startAt + 30 يوماً
+      status: v.union(
+        v.literal("active"),
+        v.literal("closed"), // انتهى وجرى توزيع المكافآت
+      ),
+    }).index("by_status", ["status"]),
+
+    arenaSeasonPlayers: defineTable({
+      seasonId: v.id("arenaSeasons"),
+      userId: v.id("users"),
+      rating: v.number(), // تصنيف الموسم (منفصل عن الدائم)
+      wins: v.number(),
+      losses: v.number(),
+      draws: v.number(),
+      bestRating: v.number(),
+      rewardClaimed: v.optional(v.boolean()),
+      rewardRank: v.optional(v.number()),
+      rewardTier: v.optional(v.string()),
+    })
+      .index("by_season_user", ["seasonId", "userId"])
+      .index("by_season_rating", ["seasonId", "rating"]),
+
     // الإحالات: كل لاعب له كود، ومن يسجل به يحصل الطرفان على نقاط
     referralCodes: defineTable({
       userId: v.id("users"),

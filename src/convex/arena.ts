@@ -28,6 +28,7 @@ import {
   type GameSettings,
 } from "./games";
 import { isStaffUser } from "./owner";
+import { internal } from "./_generated/api";
 
 // ── إعدادات الحلبة ──
 const START_RATING = 1000;
@@ -391,6 +392,14 @@ export const recordDuelResult = internalMutation({
       challengerScore: a.score,
       opponentScore: b.score,
       winnerId: scoreA === 1 ? a.userId : scoreB === 1 ? b.userId : undefined,
+    });
+
+    // موجّة 12: اسجّل النتيجة في موسم الحلبة النشط أيضاً
+    await ctx.runMutation(internal.arenaSeasons.applySeasonDuel, {
+      hostUserId: a.userId,
+      hostScore: scoreA,
+      guestUserId: b.userId,
+      guestScore: scoreB,
     });
 
     // سطر شفافية في سجلّ القرارات الموحّد
