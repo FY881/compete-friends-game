@@ -12,6 +12,7 @@
  */
 
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -227,17 +228,19 @@ export const recordRound = internalMutation({
     const data = await ctx.runQuery(internal.tournaments.getRoundForTournament, { historyId });
     if (!data) return; // لا بطولة نشطة تغطي وقت الجولة
 
-    const tournamentId = data.tournamentId;
+    const tournamentId = data.tournamentId as Id<"tournaments">;
+    const entryUserId = data.userId as Id<"users">;
+    const bestRounds = data.bestRounds as number;
     const tournament = await ctx.db.get(tournamentId);
-    if (!tournament) return;
+    if (!tournament || tournament.status !== "active") return;
 
     // تسجيل تلقائي عند أول جولة
     let entry = await ctx.runQuery(internal.tournaments.getUserEntry, {
       tournamentId,
-      userId: data.userId,
+      userId: entryUserId,
     });
     if (!entry) {
-      const me = await ctx.db.get(data.userId);
+      const me = await ctx.db.get(entryUserId);
       const entryId = await ctx.db.insert("tournamentEntries", {
         tournamentId,
         userId: data.userId,
@@ -253,10 +256,10 @@ export const recordRound = internalMutation({
     // أعد حساب مجموع أفضل N جولات منذ بداية البطولة
     const scores = await ctx.runQuery(internal.tournaments.getBestRounds, {
       tournamentId,
-      userId: data.userId,
+      userId: entryUserId,
       from: tournament.startsAt,
     });
-    const best = scores.slice(0, tournament.bestRoundsCount);
+    const best = scores.slice(0, bestRounds);
     const total = best.reduce((a: number, b: number) => a + b, 0);
     await ctx.db.patch(entry._id, {
       totalScore: total,

@@ -166,7 +166,8 @@ export const getMyRating = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    const r = await getOrCreateRating(ctx, userId, true);
+    // الاستعلامات للقراءة فقط: نعيد التصنيف الافتراضي إن لم يوجد صف بعد.
+    const r = await getOrCreateRating(ctx, userId, false);
     const now = Date.now();
     const queued = await ctx.db
       .query("duels")

@@ -20,6 +20,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { callLlm } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
 import { isStaffUser } from "./owner";
+import type { Id } from "./_generated/dataModel";
 
 // ── الاستعلامات (للاعبين) ─────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ export const latestTournamentSnapshot = internalQuery({
 
     const names: string[] = [];
     for (const [uid, score] of ranked) {
-      const u = await ctx.db.get(uid as any);
+      const u = await ctx.db.get(uid as Id<"users">);
       names.push(`${u?.name ?? "لاعب"}: ${score} نقطة`);
     }
     return {
@@ -148,7 +149,7 @@ export const generateCommentary = internalMutation({
 /** مدير التعليق — يُشغَّل بالـcron كل 30 دقيقة عند وجود بطولة نشطة. */
 export const manageCommentary = internalMutation({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ skipped?: boolean; ok?: boolean; text?: string; reason?: string }> => {
     // لا تبالغ: 6 تعليقات على الأكثر في الساعة
     const recent = await ctx.db
       .query("commentary")
