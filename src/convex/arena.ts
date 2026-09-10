@@ -53,16 +53,32 @@ export function tierOf(rating: number): Tier {
   return t;
 }
 
-/** جِب تصنيف اللاعب أو أنشئه عند أول دخول للحلبة. */
+/**
+ * جِب تصنيف اللاعب — داخل الاستعلامات (بدون كتابة!) نعيد افتراضياً 1000
+ * إن لم يكن له صف، وداخل الطفرات (المسار الكتابي `ensure=true`) ننشئه.
+ * (استعلامات Convex للقراءة فقط: استدعاء db.insert داخلها يرمي TypeError.)
+ */
 async function getOrCreateRating(
   ctx: { db: any },
   userId: Id<"users">,
+  ensure = false,
 ): Promise<DuelRating> {
   const existing = await ctx.db
     .query("arenaRatings")
     .withIndex("by_user", (q: any) => q.eq("userId", userId))
     .first();
   if (existing) return existing;
+  if (!ensure) {
+    return {
+      _id: "" as Id<"arenaRatings">,
+      userId,
+      rating: START_RATING,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      lastPlayedAt: 0,
+    };
+  }
   const id = await ctx.db.insert("arenaRatings", {
     userId,
     rating: START_RATING,
@@ -150,7 +166,7 @@ export const getMyRating = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    const r = await getOrCreateRating(ctx, userId);
+    const r = await getOrCreateRating(ctx, userId, true);
     const now = Date.now();
     const queued = await ctx.db
       .query("duels")

@@ -1530,6 +1530,15 @@ const schema = defineSchema(
       createdAt: v.number(),
     }).index("by_created", ["createdAt"]),
 
+    // ═══ المعلّق الذكي للبطولات ────────────────────────── ═══
+    commentary: defineTable({
+      text: v.string(),
+      mood: v.string(),
+      tournamentName: v.string(),
+      trigger: v.string(),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
     apiPromptTemplates: defineTable({
       name: v.string(),
       systemPrompt: v.string(),
