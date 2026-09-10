@@ -8,7 +8,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, action, internalMutation } from "./_generated/server";
+import { query, mutation, action, internalMutation, internalAction } from "./_generated/server";
 import { callLlm } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
 
@@ -555,6 +555,15 @@ export const cleanupOldErrors = mutation({
 // ═══════════════════════════════════════════════════════════════
 // التحليل بالـ AI — فحص عميق للأخطاء
 // ═══════════════════════════════════════════════════════════════
+
+/** نسخة داخلية — تُستدعى من cron «الحارس» كل 10 دقائق */
+export const analyzeErrorsWithAIInternal = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const apiMod: any = await import("./_generated/api");
+    return ctx.runAction(apiMod.api.errorHunter.analyzeErrorsWithAI, {});
+  },
+});
 
 export const analyzeErrorsWithAI = action({
   args: {},

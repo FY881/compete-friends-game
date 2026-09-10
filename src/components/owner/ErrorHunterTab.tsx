@@ -12,7 +12,7 @@
  * 6. تحليل AI للأخطاء المتكررة
  */
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -120,7 +120,7 @@ export function ErrorHunterTab() {
   // ── الإجراءات ──
   const resolveError = useMutation(api.errorHunter.resolveError);
   const cleanupOld = useMutation(api.errorHunter.cleanupOldErrors);
-  const analyzeWithAI = useMutation(api.errorHunter.analyzeErrorsWithAI as any);
+  const analyzeWithAI = useAction(api.errorHunter.analyzeErrorsWithAI as any);
 
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
 
