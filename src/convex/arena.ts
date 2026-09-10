@@ -157,6 +157,17 @@ async function createDuelGame(
   return code;
 }
 
+/** إنشاء غرفة مبارزة بين لاعبين محددين — تُستخدم من نظام التنافس المباشر (الثأرية). */
+export const createDuelRoom = internalMutation({
+  args: {
+    hostId: v.id("users"),
+    guestId: v.id("users"),
+  },
+  handler: async (ctx, { hostId, guestId }) => {
+    return createDuelGame(ctx, hostId, guestId);
+  },
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // الاستعلامات
 // ─────────────────────────────────────────────────────────────────────────

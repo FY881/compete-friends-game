@@ -1318,6 +1318,20 @@ export const finishGame = internalMutation({
       }
     }
 
+    // التنافس المباشر — حدّث إحصائيات «أنت ضد صديق» لكل زوج في الغرفة
+    try {
+      await ctx.runMutation(internal.rivalries.recordRivalryRound, {
+        gameCode: game.code,
+        results: sorted.map((p) => ({
+          userId: p.userId,
+          score: p.score,
+          won: p === sorted[0] && sorted[0].score > (sorted[1]?.score ?? -1),
+        })),
+      });
+    } catch {
+      /* إحصائيات التنافس اختيارية — لا تعطل تسجيل الجولة */
+    }
+
     // موجّة 11 — مبارزة حلبة: حدّث تصنيف ELO للطرفين (مرة واحدة للجولة)
     if (game.arenaDuel) {
       try {

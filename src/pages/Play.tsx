@@ -9,6 +9,7 @@ import { downloadApk } from "@/lib/app-version";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { TournamentPanel } from "@/components/TournamentPanel";
 import { ArenaPanel } from "@/components/ArenaPanel";
+import { RivalryPanel } from "@/components/RivalryPanel";
 import { ClanPanel } from "@/components/ClanPanel";
 import { SeasonPassPanel } from "@/components/SeasonPassPanel";
 import { LoyaltyPanel } from "@/components/LoyaltyPanel";
@@ -254,6 +255,7 @@ export default function Play() {
         <UpdateBanner />
         <TournamentPanel />
         <ArenaPanel />
+        <RivalryPanel />
         <ClanPanel />
         <SeasonPassPanel />
         <LoyaltyPanel />

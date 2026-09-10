@@ -798,6 +798,26 @@ const schema = defineSchema(
     // ═══════════════════════════════════════════════════════════════════════
     // ║ تحديات1v1 ║
     // ═══════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+    // ║ التنافس المباشر — أنت ضد صديق (Rivalries) ║
+    // ═══════════════════════════════════════════════════════════════════
+    // صف واحد لكل زوج لاعبين (مرتّب معجمياً aId < bId) يُحدَّث تلقائياً
+    // بعد كل جولة مشتركة: انتصارات، هزائم، تعادلات، آخر نتيجة.
+    rivalries: defineTable({
+      aId: v.id("users"),
+      bId: v.id("users"),
+      aWins: v.number(),
+      bWins: v.number(),
+      draws: v.number(),
+      totalGames: v.number(),
+      lastGameId: v.optional(v.id("games")),
+      lastWinnerId: v.optional(v.id("users")), // undefined = تعادل
+      lastPlayedAt: v.number(),
+    })
+      .index("by_pair", ["aId", "bId"])
+      .index("by_a", ["aId"])
+      .index("by_b", ["bId"]),
+
     duels: defineTable({
       challengerId: v.id("users"),
       challengerName: v.string(),
