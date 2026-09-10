@@ -40,8 +40,9 @@ export function tierForPoints(points: number): number {
 
 type DbCtx = { db: any };
 
-/** جِب/أنشئ تذكرة الموسم لللاعب في الموسم النشط (أو موسم افتراضي رقم 1). */
-async function getOrCreatePass(ctx: DbCtx, userId: Id<"users">, seasonNumber: number) {
+/** جِب تذكرة الموسم لللاعب — داخل الاستعلامات (بلا كتابة!) نعيد افتراضياً 0 نقطة،
+ * وداخل الطفرات ننشئ الصف. (استعلامات Convex للقراءة فقط: استدعاء db.insert داخلها يرمي TypeError.) */
+async function getOrCreatePass(ctx: DbCtx, userId: Id<"users">, seasonNumber: number, ensure = false) {
   const existing = await ctx.db
     .query("seasonPasses")
     .withIndex("by_user_season", (q: any) =>
@@ -49,6 +50,16 @@ async function getOrCreatePass(ctx: DbCtx, userId: Id<"users">, seasonNumber: nu
     )
     .first();
   if (existing) return existing;
+  if (!ensure) {
+    return {
+      _id: "" as Id<"seasonPasses">,
+      userId,
+      seasonNumber,
+      passPoints: 0,
+      claimedTiers: [] as number[],
+      seasonFrames: [] as string[],
+    };
+  }
   const id = await ctx.db.insert("seasonPasses", {
     userId,
     seasonNumber,
@@ -77,7 +88,21 @@ export const getMyPass = query({
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
     const seasonNumber = currentSeasonNumber();
-    const pass = await getOrCreatePass(ctx, userId, seasonNumber);
+    // الاستعلام للقراءة فقط — بلا إنشاء صف
+    const existing = await ctx.db
+      .query("seasonPasses")
+      .withIndex("by_user_season", (q: any) =>
+        q.eq("userId", userId).eq("seasonNumber", seasonNumber),
+      )
+      .first();
+    const pass = existing ?? {
+      _id: "" as Id<"seasonPasses">,
+      userId,
+      seasonNumber,
+      passPoints: 0,
+      claimedTiers: [] as number[],
+      seasonFrames: [] as string[],
+    };
 
     const currentTier = tierForPoints(pass.passPoints);
     const intoTier = pass.passPoints - currentTier * POINTS_PER_TIER;

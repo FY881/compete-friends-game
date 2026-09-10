@@ -38,22 +38,24 @@ export const EARN_RULES = {
 // المحفظة — استعلامات
 // ─────────────────────────────────────────────────────────────────────────
 
-async function getOrCreateWallet(ctx: any, userId: any) {
-  let w = await ctx.db
+async function getOrCreateWallet(ctx: any, userId: any, ensure = false) {
+  const w = await ctx.db
     .query("loyaltyWallets")
     .withIndex("by_user", (q: any) => q.eq("userId", userId))
     .first();
-  if (!w) {
-    const id = await ctx.db.insert("loyaltyWallets", {
-      userId,
-      points: 0,
-      lifetimeEarned: 0,
-      perks: [],
-      updatedAt: Date.now(),
-    });
-    w = await ctx.db.get(id);
+  if (w) return w;
+  if (!ensure) {
+    // استعلام للقراءة فقط — أعد محفظة افتراضية بلا كتابة
+    return { _id: "", userId, points: 0, lifetimeEarned: 0, perks: [], updatedAt: 0 };
   }
-  return w;
+  const id = await ctx.db.insert("loyaltyWallets", {
+    userId,
+    points: 0,
+    lifetimeEarned: 0,
+    perks: [],
+    updatedAt: Date.now(),
+  });
+  return await ctx.db.get(id);
 }
 
 /** محفظتي: الرصيد + الامتيازات المملوكة (عام لأي مسجّل). */
@@ -62,7 +64,7 @@ export const getMyWallet = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    const w = await getOrCreateWallet(ctx, userId);
+    const w = await getOrCreateWallet(ctx, userId, false);
     const now = Date.now();
     return {
       points: w.points,
@@ -78,7 +80,7 @@ export const getShop = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    const w = await getOrCreateWallet(ctx, userId);
+    const w = await getOrCreateWallet(ctx, userId, false);
     const now = Date.now();
     return PERK_CATALOG.map((p) => ({
       ...p,
