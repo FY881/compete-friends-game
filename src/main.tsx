@@ -178,7 +178,28 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     // مؤقت، فتصل إصلاحات التنزيل (منع اعتراض ملفات APK) لكل الأجهزة فوراً.
     navigator.serviceWorker
       .register("/sw.js", { updateViaCache: "none" })
-      .then(() => {
+      .then(async (reg: ServiceWorkerRegistration | undefined) => {
+        // 🔔 اشتراك Push الحقيقي: بعد تفعيل SW وطلب إذن الإشعارات،
+        // نحاول الاشتراك بقناة Push (يعمل مع أي خادم push لاحقاً).
+        if (reg && typeof Notification !== "undefined") {
+          if (Notification.permission === "default") {
+            // طلب الإذن عند أول تفاعل من المستخدم — بلا نوافذ مزعجة
+            const ask = () => {
+              Notification.requestPermission().catch(() => {});
+              window.removeEventListener("pointerdown", ask);
+            };
+            window.addEventListener("pointerdown", ask, { once: true });
+          }
+          if (Notification.permission === "granted" && "pushManager" in reg) {
+            const existing = await reg.pushManager.getSubscription().catch(() => undefined);
+            if (!existing) {
+              await reg.pushManager
+                .subscribe({ userVisibleOnly: true })
+                .catch(() => undefined);
+            }
+          }
+        }
+        // التحديث الفوري للنسخة: عند تفعيل Service Worker جديد، يُعاد تحميل
         // التحديث الفوري للنسخة: عند تفعيل Service Worker جديد، يُعاد تحميل
         // الصفحة تلقائياً بنسخة طازجة من الشبكة — فلا يبقى أحد عالقاً على
         // نسخة قديمة («قشرة» مخزنة) تسبب مشاكل التنزيل. محمي من التكرار

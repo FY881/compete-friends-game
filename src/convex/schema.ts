@@ -198,6 +198,17 @@ const schema = defineSchema(
       .index("by_clan", ["clanId"])
       .index("by_clan_key", ["clanId", "key"]),
 
+    // ═══ المهام اليومية — لوحة المهام الدوارة ═══
+    dailyQuests: defineTable({
+      userId: v.id("users"),
+      day: v.string(), // YYYY-MM-DD
+      kind: v.string(), // rounds | wins | perfect | score | streak | comeback
+      claimedAt: v.number(),
+    })
+      .index("by_user_day", ["userId", "day"])
+      .index("by_user_day_kind", ["userId", "day", "kind"])
+      .index("by_claimed", ["claimedAt"]),
+
     // ═══ المتجر 2.0 — التجميلات المملوكة ═══
     cosmetics: defineTable({
       userId: v.id("users"),

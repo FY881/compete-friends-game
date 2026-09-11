@@ -114,6 +114,15 @@ crons.interval(
   {},
 );
 
+// 🎯 تنظيف المهام اليومية القديمة — كل 24 ساعة
+// يحذف مطالبات المهام الأقدم من 7 أيام لإبقاء الجدول نظيفاً.
+crons.interval(
+  "daily-quests-cleanup",
+  { hours: 24 },
+  internal.quests.cleanupOldQuests,
+  {},
+);
+
 export default crons;
 
 
