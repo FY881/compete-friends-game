@@ -1,6 +1,6 @@
 import { ZakaLogo } from "@/components/ZakaLogo";
 import { OWNER_ROOM_ENABLED } from "@/lib/buildFlags";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { api } from "@/convex/_generated/api";
@@ -1231,9 +1231,51 @@ function AiCoachSection() {
 function NotificationsBell() {
   const notifications = useQuery(api.playerControl.getMyNotifications);
   const markRead = useMutation(api.playerControl.markNotificationRead);
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
   const unreadCount = notifications?.filter((n: any) => !n.read).length ?? 0;
+
+  // 🔔 جسر إشعارات المتصفح: أظهر إشعاراً أصلياً لكل إشعار جديد غير مقروء
+  const seenRef = useRef<Set<string>>(new Set());
+  const primedRef = useRef(false);
+  useEffect(() => {
+    if (!notifications) return;
+    if (!primedRef.current) {
+      // أول تحميل: علّم الموجود كـ«مُشاهد» دون إزعاج
+      for (const n of notifications) seenRef.current.add(String(n._id));
+      primedRef.current = true;
+      return;
+    }
+    for (const n of notifications) {
+      const id = String(n._id);
+      if (seenRef.current.has(id) || n.read) continue;
+      seenRef.current.add(id);
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        try {
+          const notif = new Notification(n.title, { body: n.body, tag: id });
+          notif.onclick = () => {
+            window.focus();
+            if (n.actionUrl) navigate(n.actionUrl);
+            notif.close();
+          };
+        } catch {
+          /* بعض المتصفحات تمنع ذلك خارج SW */
+        }
+      }
+    }
+  }, [notifications, navigate]);
+
+  // اطلب الإذن مرة واحدة عند التركيز الأول
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      const handler = () => {
+        Notification.requestPermission().catch(() => {});
+        window.removeEventListener("pointerdown", handler);
+      };
+      window.addEventListener("pointerdown", handler, { once: true });
+    }
+  }, []);
 
   // Color mapping: green=info, blue=system/update, orange=warning, red=ban, purple=needs review
   const TYPE_CONFIG: Record<string, { icon: string; color: string; bgColor: string; border: string }> = {

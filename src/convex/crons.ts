@@ -69,6 +69,15 @@ crons.interval(
   {},
 );
 
+// 🔔 تنبيه السلسلة اليومية المهددة — كل ساعة: ينبّه كل من لديه سلسلة
+// نشطة ولم يلعب اليوم (مرة واحدة يومياً) قبل انقطاعها في منتصف الليل.
+crons.interval(
+  "streak-risk-alerts",
+  { minutes: 60 },
+  internal.notify.streakRiskSweep,
+  {},
+);
+
 export default crons;
 
 

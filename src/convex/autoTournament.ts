@@ -116,6 +116,13 @@ export const manage = internalMutation({
       severity: "low",
     });
 
+    // 🔔 إشعار عام لكل اللاعبين بانطلاق البطولة
+    try {
+      await ctx.runMutation(internal.notify.tournamentStarted, { name });
+    } catch {
+      /* الإشعار اختياري */
+    }
+
     return { action: "created", name };
   },
 });

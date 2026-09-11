@@ -306,6 +306,16 @@ export const joinQueue = mutation({
         status: "active",
         gameCode: code,
       });
+      // 🔔 إشعار تحدٍّ فوري لمن دخل الطابور أولاً
+      try {
+        await ctx.runMutation(internal.notify.duelChallenge, {
+          opponentId: opponentEntry.challengerId,
+          challengerName: me?.name ?? "مجهول",
+          gameCode: code,
+        });
+      } catch {
+        /* الإشعار اختياري */
+      }
       return { matched: true as const, code };
     }
 
@@ -412,6 +422,23 @@ export const recordDuelResult = internalMutation({
       guestUserId: b.userId,
       guestScore: scoreB,
     });
+
+    // 🔔 إشعار نتيجة المبارزة للطرفين
+    try {
+      await ctx.runMutation(internal.notify.duelResult, {
+        playerAId: a.userId,
+        playerAName: a.name ?? "مجهول",
+        playerAScore: a.score,
+        playerANewRating: newA,
+        playerBId: b.userId,
+        playerBName: b.name ?? "مجهول",
+        playerBScore: b.score,
+        playerBNewRating: newB,
+        outcome: scoreA === 1 ? "a" : scoreB === 1 ? "b" : "draw",
+      });
+    } catch {
+      /* الإشعار اختياري */
+    }
 
     // سطر شفافية في سجلّ القرارات الموحّد
     const winnerName = scoreA === 1 ? a.name : scoreB === 1 ? b.name : null;

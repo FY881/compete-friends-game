@@ -663,6 +663,12 @@ const schema = defineSchema(
       savedAt: v.number(),
     }).index("by_user", ["userId"]).index("by_user_message", ["userId", "messageId"]),
 
+    // أعلام نظام بسيطة (صف واحد key/value) — لمنع تكرار المهام المجدولة
+    systemFlags: defineTable({
+      key: v.string(),
+      value: v.string(),
+    }).index("by_key", ["key"]),
+
     // ═══════════════════════════════════════════════════════════════════════
     // ║ الإشعارات الفورية ║
     // ═══════════════════════════════════════════════════════════════════════
