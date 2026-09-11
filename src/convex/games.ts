@@ -1318,6 +1318,18 @@ export const finishGame = internalMutation({
         /* نقاط الحرب اختيارية — لا تعطل تسجيل الجولة */
       }
 
+
+      // ⚔️ حروب العشائر 3.0 — نقاط المواجهة الأسبوعية ضد العشيرة الخصومة
+      try {
+        await ctx.runMutation(internal.clanWars.recordWarFaceoff, {
+          userId: p.userId,
+          won,
+          correctRatio: questionCount > 0 ? correctCount / questionCount : 0,
+          score: p.score,
+        });
+      } catch {
+        /* اختيارية — لا تعطل تسجيل الجولة */
+      }
       // موجّة 13 — تذكرة الموسم: نقاط التقدم من خبرة الجولة
       try {
         await ctx.runMutation(internal.seasonPass.recordPassRound, {

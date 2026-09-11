@@ -166,6 +166,38 @@ const schema = defineSchema(
       .index("by_user", ["userId"])
       .index("by_user_kind", ["userId", "kind"]),
 
+    // ═══ حروب العشائر — الموسم الرسمي ═══
+    clanWars: defineTable({
+      week: v.number(),
+      clanAId: v.id("clans"),
+      clanBId: v.id("clans"),
+      clanAName: v.string(),
+      clanBName: v.string(),
+      pointsA: v.number(),
+      pointsB: v.number(),
+      division: v.string(),
+      status: v.union(v.literal("active"), v.literal("settled")),
+      rewardPaid: v.boolean(),
+      createdAt: v.number(),
+      settledAt: v.optional(v.number()),
+    }).index("by_week", ["week"]),
+
+    clanTreasury: defineTable({
+      clanId: v.id("clans"),
+      coins: v.number(),
+      upgrades: v.array(v.string()),
+      updatedAt: v.number(),
+    }).index("by_clan", ["clanId"]),
+
+    clanUpgrades: defineTable({
+      clanId: v.id("clans"),
+      key: v.string(),
+      expiresAt: v.optional(v.number()),
+      boughtAt: v.number(),
+    })
+      .index("by_clan", ["clanId"])
+      .index("by_clan_key", ["clanId", "key"]),
+
     // ═══ المتجر 2.0 — التجميلات المملوكة ═══
     cosmetics: defineTable({
       userId: v.id("users"),
@@ -405,6 +437,7 @@ const schema = defineSchema(
       pointsThisWeek: v.number(), // نقاط حرب الأسبوع الحالي
       totalPoints: v.number(), // مجموع نقاط تاريخي
       weeklyResetAt: v.number(), // متى أُعيد ضبط النقاط آخر مرة
+      warDivision: v.optional(v.number()), // قسم الحرب 0=برونز 1=فضي 2=ذهبي 3=ماسي
       createdAt: v.number(),
     })
       .index("by_name", ["name"])
