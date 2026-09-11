@@ -13,6 +13,10 @@ import {
   Sparkles,
   Copy,
   Check,
+  History,
+  Box,
+  Rocket,
+  ShieldCheck,
 } from "lucide-react";
 
 /**
@@ -27,9 +31,12 @@ export function LoyaltyPanel() {
   const buyPerk = useMutation(api.loyalty.buyPerk);
   const applyReferral = useMutation(api.loyalty.applyReferral);
   const persistCode = useMutation(api.loyalty.persistMyReferralCode);
+  const boxStatus = useQuery(api.economy.getDailyBoxStatus);
+  const openBox = useMutation(api.economy.openDailyBox);
+  const boosts = useQuery(api.economy.getMyBoosts) ?? [];
 
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"shop" | "referral" | "history">("shop");
+  const [tab, setTab] = useState<"shop" | "box" | "referral" | "history">("shop");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [friendCode, setFriendCode] = useState("");
   const [copied, setCopied] = useState(false);
@@ -43,6 +50,18 @@ export function LoyaltyPanel() {
       toast.success(`مبارك! حصلت على ${r.name} ✨`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "تعذّر الشراء");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleOpenBox = async () => {
+    setBusyKey("box");
+    try {
+      const r = await openBox({});
+      toast.success(`${r.emoji} ${r.label}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذّر فتح الصندوق");
     } finally {
       setBusyKey(null);
     }
@@ -104,8 +123,9 @@ export function LoyaltyPanel() {
             {(
               [
                 ["shop", "المتجر", Gift],
+                ["box", "الصندوق الغامض", Sparkles],
                 ["referral", "أدعُ أصدقاءك", Users],
-                ["history", "سجلي", Sparkles],
+                ["history", "سجلي", History],
               ] as const
             ).map(([key, label, Icon]) => (
               <button
@@ -164,6 +184,56 @@ export function LoyaltyPanel() {
                     )}
                   </div>
                 ))
+              )}
+            </div>
+          )}
+
+          {/* Mystery box + active boosts */}
+          {tab === "box" && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-amber-500/30 bg-gradient-to-l from-amber-500/10 via-card to-amber-500/10 p-4 text-center">
+                <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-amber-500/15 text-3xl">
+                  {boxStatus?.canOpen ? "🎁" : "🔒"}
+                </div>
+                <p className="mt-2 text-xs font-black">الصندوق الغامض اليومي</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                  مكافأة عشوائية يومياً: نقاط ولاء، خبرة، معزز ×2، أو درع سلسلة 🛡️
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenBox}
+                  disabled={busyKey === "box" || !boxStatus?.canOpen || (boxStatus?.points ?? 0) < (boxStatus?.cost ?? 50)}
+                  className={cn(
+                    "mt-3 w-full rounded-xl px-4 py-2.5 text-xs font-black transition-all",
+                    boxStatus?.canOpen && (boxStatus?.points ?? 0) >= (boxStatus?.cost ?? 50)
+                      ? "bg-amber-500 text-white hover:bg-amber-600 active:scale-[0.98]"
+                      : "cursor-not-allowed bg-muted text-muted-foreground",
+                  )}
+                >
+                  {busyKey === "box" ? (
+                    <Loader2 className="mx-auto size-4 animate-spin" />
+                  ) : boxStatus?.canOpen ? (
+                    `افتح الصندوق (${boxStatus?.cost ?? 50} نقطة)`
+                  ) : (
+                    "فتحت صندوق اليوم — عد غداً! 🔒"
+                  )}
+                </button>
+              </div>
+              {boosts.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-bold text-muted-foreground">معززاتك النشطة</p>
+                  {boosts.map((b, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg bg-muted/20 px-3 py-2">
+                      {b.kind === "xp_x2" ? <Rocket className="size-4 text-violet-600" /> : <ShieldCheck className="size-4 text-emerald-600" />}
+                      <p className="flex-1 text-[11px] font-bold">
+                        {b.kind === "xp_x2" ? "معزز خبرة ×2" : "درع سلسلة"}
+                      </p>
+                      {b.kind === "xp_x2" && (
+                        <span className="text-[10px] font-black text-violet-600">{b.remainingRounds} جولات متبقية</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

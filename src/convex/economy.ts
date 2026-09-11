@@ -10,7 +10,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 
@@ -167,8 +167,8 @@ export const openDailyBox = mutation({
 // المعززات — استهلاك تلقائي من games.finishGame
 // ─────────────────────────────────────────────────────────────────────────
 
-/** هل لدى اللاعب معزز خبرة نشط؟ (يستهلك واحداً عند النجاح) */
-export const consumeXpBoost = mutation({
+/** هل لدى اللاعب معزز خبرة نشط؟ (يستهلك واحداً عند النجاح) — داخلي للاستدعاء من finishGame */
+export const consumeXpBoost = internalMutation({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
     const boost = await ctx.db
@@ -187,7 +187,7 @@ export const consumeXpBoost = mutation({
 });
 
 /** استخدم درع سلسلة — يُستدعى آلياً عند فوات يوم (من دورة الصيانة). */
-export const consumeStreakShield = mutation({
+export const consumeStreakShield = internalMutation({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
     const shield = await ctx.db
