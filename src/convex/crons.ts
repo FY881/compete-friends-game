@@ -78,6 +78,15 @@ crons.interval(
   {},
 );
 
+// 📦 مدير الحزم الموسمية — كل 6 ساعات: ينهي الحزم المنتهية ويُطلق الحزمة
+// التالية من التناوب الموسمي ويولّد أسئلتها بالذكاء الاصطناعي تلقائياً.
+crons.interval(
+  "question-packs-manager",
+  { hours: 6 },
+  internal.questionPacks.managePacks,
+  {},
+);
+
 export default crons;
 
 

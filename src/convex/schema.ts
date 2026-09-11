@@ -483,6 +483,20 @@ const schema = defineSchema(
       .index("by_status", ["status"])
       .index("by_category_status", ["category", "status"]),
 
+    // حزم الأسئلة الموسمية — أحداث محدودة الوقت بأسئلة AI مخصصة
+    questionPacks: defineTable({
+      slug: v.string(), // معرف فريد مثل "ramadan-2026"
+      name: v.string(),
+      description: v.optional(v.string()),
+      theme: v.string(), // موضوع الحزمة يوجه توليد AI (مثل "أسئلة رمضان")
+      status: v.union(v.literal("active"), v.literal("ended")),
+      startsAt: v.number(),
+      endsAt: v.number(),
+      createdAt: v.number(),
+    })
+      .index("by_slug", ["slug"])
+      .index("by_status", ["status"]),
+
     // أخطاء جافاسكريبت تلقائية من أجهزة اللاعبين (تُلتقط من المتصفح/التطبيق
     // وتصل هنا ليراجعها المالك — فلا يتكرر أي خطأ غامض دون أثر).
     clientErrors: defineTable({

@@ -11,6 +11,7 @@ import { TournamentPanel } from "@/components/TournamentPanel";
 import { ArenaPanel } from "@/components/ArenaPanel";
 import { RivalryPanel } from "@/components/RivalryPanel";
 import { LeaguePanel } from "@/components/LeaguePanel";
+import { ActivePackBanner } from "@/components/ActivePackBanner";
 import { ClanPanel } from "@/components/ClanPanel";
 import { SeasonPassPanel } from "@/components/SeasonPassPanel";
 import { LoyaltyPanel } from "@/components/LoyaltyPanel";
@@ -254,6 +255,7 @@ export default function Play() {
       {/* ── Update notice (server-driven version check) ────────── */}
       <div className="mx-auto max-w-6xl space-y-4 px-5 pt-5">
         <UpdateBanner />
+        <ActivePackBanner />
         <TournamentPanel />
         <ArenaPanel />
         <RivalryPanel />
