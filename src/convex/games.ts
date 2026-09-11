@@ -1316,6 +1316,16 @@ export const finishGame = internalMutation({
       } catch {
         /* نقاط التذكرة اختيارية — لا تعطل تسجيل الجولة */
       }
+
+      // الدوريات الخاصة — نقاط الجولة (الخبرة) لصدارة الأسبوع في كل دوريات اللاعب
+      try {
+        await ctx.runMutation(internal.leagues.recordLeagueRound, {
+          userId: p.userId,
+          points: xp,
+        });
+      } catch {
+        /* نقاط الدوري اختيارية — لا تعطل تسجيل الجولة */
+      }
     }
 
     // التنافس المباشر — حدّث إحصائيات «أنت ضد صديق» لكل زوج في الغرفة

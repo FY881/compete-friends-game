@@ -799,6 +799,29 @@ const schema = defineSchema(
     // ║ تحديات1v1 ║
     // ═══════════════════════════════════════════════════════════════════════
     // ═══════════════════════════════════════════════════════════════════
+    // ║ الدوريات الخاصة — مجموعات أصدقاء بصدارة أسبوعية ║
+    // ═══════════════════════════════════════════════════════════════════
+    leagues: defineTable({
+      name: v.string(),
+      code: v.string(), // رمز انضمام فريد
+      ownerId: v.id("users"),
+      tier: v.union(v.literal("bronze"), v.literal("silver"), v.literal("gold"), v.literal("diamond")),
+      weekKey: v.string(), // مفتاح الأسبوع الحالي (YYYY-Wnn)
+      createdAt: v.number(),
+    }).index("by_code", ["code"]),
+
+    // عضوية لاعب في دوري — النقاط الأسبوعية تُصفَّر آلياً كل أسبوع
+    leagueMembers: defineTable({
+      leagueId: v.id("leagues"),
+      userId: v.id("users"),
+      weeklyPoints: v.number(),
+      seasonPoints: v.number(), // تراكمي للموسم
+      joinedAt: v.number(),
+    })
+      .index("by_league", ["leagueId"])
+      .index("by_user", ["userId"]),
+
+    // ═══════════════════════════════════════════════════════════════════
     // ║ التنافس المباشر — أنت ضد صديق (Rivalries) ║
     // ═══════════════════════════════════════════════════════════════════
     // صف واحد لكل زوج لاعبين (مرتّب معجمياً aId < bId) يُحدَّث تلقائياً
