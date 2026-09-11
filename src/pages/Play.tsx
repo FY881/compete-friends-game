@@ -17,6 +17,7 @@ import { ClanPanel } from "@/components/ClanPanel";
 import { SeasonPassPanel } from "@/components/SeasonPassPanel";
 import { LoyaltyPanel } from "@/components/LoyaltyPanel";
 import { CosmeticShop } from "@/components/CosmeticShop";
+import { ClanWarPanel } from "@/components/ClanWarPanel";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -263,6 +264,7 @@ export default function Play() {
         <ArenaPanel />
         <RivalryPanel />
         <LeaguePanel />
+        <ClanWarPanel />
         <ClanPanel />
         <SeasonPassPanel />
         <LoyaltyPanel />

@@ -96,6 +96,24 @@ crons.interval(
   {},
 );
 
+// ⚔️ حروب العشائر 3.0 — المطابقة الأسبوعية: كل ساعة تقابل كل عشيرة بلا
+// مواجهة نشطة بخصم متقارب في النقاط.
+crons.interval(
+  "clan-wars-matchmake",
+  { minutes: 60 },
+  internal.clanWars.matchmakeWars,
+  {},
+);
+
+// ⚔️ تسوية الحروب الأسبوعية: كل ساعة تسوّي حروب الأسبوع المكتمل —
+// مكافأة الخزينة للفائز + ترقية/هبوط الأقسام.
+crons.interval(
+  "clan-wars-settle",
+  { minutes: 60 },
+  internal.clanWars.settleWars,
+  {},
+);
+
 export default crons;
 
 
