@@ -127,7 +127,8 @@ export const listDeputies = query({
 export const searchPlayers = query({
   args: { term: v.string() },
   handler: async (ctx, { term }) => {
-    await requireOwner(ctx);
+    const me = await requireOwner(ctx);
+    void me;
     const t = term.trim().toLowerCase();
     if (t.length < 2) return [];
     const users = await ctx.db.query("users").collect();
@@ -138,6 +139,18 @@ export const searchPlayers = query({
         return name.includes(t) || email.includes(t);
       })
       .slice(0, 8)
+      .map((u: any) => ({ userId: u._id as any, name: u.name ?? "لاعب", email: u.email ?? "" }));
+  },
+});
+
+/** قائمة جميع اللاعبين — لاختيار نائب جديد (المالك فقط) */
+export const listPlayers = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireOwner(ctx);
+    const users = await ctx.db.query("users").collect();
+    return users
+      .slice(0, 40)
       .map((u: any) => ({ userId: u._id as any, name: u.name ?? "لاعب", email: u.email ?? "" }));
   },
 });
@@ -426,7 +439,7 @@ export const getDeputyDashboard = query({
     const users = await ctx.db.query("users").collect();
     const games = await ctx.db.query("gameHistory").collect();
     const activeBans = await ctx.db.query("siteBans").collect();
-    const reports = await ctx.db.query("modLogs").collect().catch(() => []);
+    const reports = await ctx.db.query("reports").collect().catch(() => []);
 
     const gamesToday = games.filter((g: any) => (g.playedAt ?? g.at ?? 0) > dayAgo).length;
     const bannedNow = activeBans.filter(

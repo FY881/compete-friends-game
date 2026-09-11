@@ -128,6 +128,40 @@ const schema = defineSchema(
       createdAt: v.number(),
     }).index("by_created", ["createdAt"]),
 
+    // ═══ الإصدار 3.0 — أدوار الموقع: نائب المالك + سجل التدقيق + الممنوعات ═══
+    siteRoles: defineTable({
+      userId: v.id("users"),
+      role: v.union(v.literal("deputy_owner")),
+      active: v.boolean(),
+      appointedBy: v.id("users"),
+      appointedAt: v.number(),
+      revokedAt: v.optional(v.number()),
+    })
+      .index("by_user", ["userId"])
+      .index("by_role", ["role", "active"]),
+
+    auditLog: defineTable({
+      actorId: v.id("users"),
+      actorName: v.string(),
+      actorRole: v.union(v.literal("owner"), v.literal("deputy_owner")),
+      action: v.string(),
+      targetId: v.optional(v.id("users")),
+      detail: v.string(),
+      at: v.number(),
+    }).index("by_created", ["at"]),
+
+    siteBans: defineTable({
+      userId: v.id("users"),
+      kind: v.union(v.literal("play_ban"), v.literal("chat_mute")),
+      active: v.boolean(),
+      until: v.optional(v.number()),
+      reason: v.string(),
+      issuedBy: v.id("users"),
+      issuedAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_kind", ["userId", "kind"]),
+
     // Simple key/value store for owner-configurable settings.
     settings: defineTable({
       key: v.string(),
