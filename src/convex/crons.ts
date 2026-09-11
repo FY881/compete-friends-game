@@ -87,6 +87,15 @@ crons.interval(
   {},
 );
 
+// ⭐ أفضل لحظات الأسبوع — كل ساعة: عند اكتمال أسبوع يجمع أبرز 5 لحظات
+// من سجل الجولات ويرسلها تلقائياً إلى دردشة كل العشائر.
+crons.interval(
+  "weekly-highlights",
+  { minutes: 60 },
+  internal.highlights.computeWeeklyHighlights,
+  {},
+);
+
 export default crons;
 
 

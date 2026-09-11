@@ -271,6 +271,7 @@ const schema = defineSchema(
     gameHistory: defineTable({
       gameId: v.id("games"),
       userId: v.id("users"),
+      userName: v.optional(v.string()), // اسم اللاعب وقت الجولة (للملخصات)
       gameCode: v.string(),
       rank: v.number(),
       playerCount: v.number(),
@@ -286,7 +287,23 @@ const schema = defineSchema(
     })
       .index("by_user", ["userId"])
       .index("by_game", ["gameId"])
-      .index("by_user_game", ["userId", "gameId"]),
+      .index("by_user_game", ["userId", "gameId"])
+      .index("by_played", ["playedAt"]),
+
+    // ⭐ أفضل لحظات الأسبوع — ملخص آلي يُنشر في العشائر
+    highlights: defineTable({
+      weekKey: v.string(), // مثل "2026-W36"
+      moments: v.array(
+        v.object({
+          rank: v.number(),
+          kind: v.string(),
+          title: v.string(),
+          detail: v.string(),
+          playerName: v.string(),
+        }),
+      ),
+      createdAt: v.number(),
+    }).index("by_week", ["weekKey"]),
 
     // ═══════════════════════════════════════════════════════════════════
     // ║ موجّة 5 — البطولات الأسبوعية ║
@@ -433,6 +450,27 @@ const schema = defineSchema(
       emoji: v.string(), // one emoji (e.g. 🔥 😂 🎉)
       createdAt: v.number(),
     }).index("by_game", ["gameId"]),
+
+    // 👀 مشجعو المبارزات — شاهدوا الأصدقاء يتنافسون حياً
+    spectators: defineTable({
+      gameId: v.id("games"),
+      userId: v.id("users"),
+      name: v.string(),
+      joinedAt: v.number(),
+      lastHeartbeat: v.number(), // نبض الحضور — يُحسب «مشاهد الآن» خلال دقيقتين
+    })
+      .index("by_game", ["gameId"])
+      .index("by_game_user", ["gameId", "userId"]),
+
+    // دردشة مشجعي المبارزة (أحدث 50 رسالة تُحفظ)
+    spectatorMessages: defineTable({
+      gameId: v.id("games"),
+      senderId: v.id("users"),
+      senderName: v.string(),
+      content: v.string(),
+      isSpectator: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_game_time", ["gameId", "createdAt"]),
 
     // Automated reports of failed APK downloads, sent by the client so the
     // auto-admin sweep can diagnose & fix download issues without human help.

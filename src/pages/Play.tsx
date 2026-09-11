@@ -12,6 +12,7 @@ import { ArenaPanel } from "@/components/ArenaPanel";
 import { RivalryPanel } from "@/components/RivalryPanel";
 import { LeaguePanel } from "@/components/LeaguePanel";
 import { ActivePackBanner } from "@/components/ActivePackBanner";
+import { HighlightsCard } from "@/components/HighlightsCard";
 import { ClanPanel } from "@/components/ClanPanel";
 import { SeasonPassPanel } from "@/components/SeasonPassPanel";
 import { LoyaltyPanel } from "@/components/LoyaltyPanel";
@@ -256,6 +257,7 @@ export default function Play() {
       <div className="mx-auto max-w-6xl space-y-4 px-5 pt-5">
         <UpdateBanner />
         <ActivePackBanner />
+        <HighlightsCard />
         <TournamentPanel />
         <ArenaPanel />
         <RivalryPanel />

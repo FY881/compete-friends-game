@@ -1263,6 +1263,7 @@ export const finishGame = internalMutation({
       const historyId = await ctx.db.insert("gameHistory", {
         gameId,
         userId: p.userId,
+        userName: p.name,
         gameCode: game.code,
         rank,
         playerCount: sorted.length,

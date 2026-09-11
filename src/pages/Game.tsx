@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Lobby } from "@/components/game/Lobby";
 import { QuestionStage } from "@/components/game/QuestionStage";
 import { ResultsStage } from "@/components/game/ResultsStage";
+import { SpectatorStage } from "@/components/game/SpectatorStage";
 import { copyText } from "@/components/game/ui";
 import {
   Copy,
@@ -209,21 +210,11 @@ export default function Game() {
   }
 
   if (!me && data.game.status !== "waiting") {
+    // 👀 وضع المشجع: الغرفة جارية/منتهية وأنت لست لاعباً — شاهد بدل الرسالة المغلقة
     return (
       <RoomShell>
-        <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-          <span className="flex size-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-            <ShieldCheck className="size-8" />
-          </span>
-          <h1 className="mt-6 text-2xl font-bold">هذه الغرفة بدأت بالفعل</h1>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-            لم تكن من ضمن اللاعبين عندما انطلق التحدي. اطلب من صديق أن يرسل
-            لك رمز غرفة جديدة لم تبدأ بعد.
-          </p>
-          <Button className="mt-8 gap-2 rounded-xl" onClick={() => navigate("/play")}>
-            <Home className="size-4" />
-            إنشاء غرفة جديدة
-          </Button>
+        <div className="mx-auto max-w-5xl">
+          <SpectatorStage code={code} />
         </div>
       </RoomShell>
     );
