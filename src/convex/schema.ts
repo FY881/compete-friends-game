@@ -169,6 +169,45 @@ const schema = defineSchema(
       .index("by_user", ["userId"])
       .index("by_user_kind", ["userId", "kind"]),
 
+    // ═══ الحاكم الآلي AI — 50 مساعداً + طلبات الأعمال الخطيرة (المرحلة 7) ═══
+    // سجل الأعمال الذاتية الآمنة (تنفيذ حر بلا سؤال)
+    governorActions: defineTable({
+      agentName: v.string(),
+      agentDept: v.string(),
+      summary: v.string(),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // طلب عمل خطير من مساعد — لا يُنفَّذ حتى يوافق المالك
+    governorRequests: defineTable({
+      agentName: v.string(),
+      agentDept: v.string(),
+      kind: v.string(),
+      title: v.string(),
+      reasoning: v.string(),
+      status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+      createdAt: v.number(),
+      decidedAt: v.optional(v.number()),
+      decidedBy: v.optional(v.string()),
+    })
+      .index("by_status", ["status"])
+      .index("by_decided", ["decidedAt"]),
+
+    // دردشة النقاش بين المالك والمساعد حول طلب
+    governorChat: defineTable({
+      requestId: v.id("governorRequests"),
+      from: v.union(v.literal("agent"), v.literal("owner")),
+      agentName: v.optional(v.string()),
+      body: v.string(),
+      createdAt: v.number(),
+    }).index("by_request", ["requestId"]),
+
+    // مواضيع ممنوعة نهائياً بأمر المالك
+    governorBans: defineTable({
+      topic: v.string(),
+      createdAt: v.number(),
+    }).index("by_topic", ["topic"]),
+
     // ═══ حروب العشائر — الموسم الرسمي ═══
     clanWars: defineTable({
       week: v.number(),
