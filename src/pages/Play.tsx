@@ -16,6 +16,7 @@ import { HighlightsCard } from "@/components/HighlightsCard";
 import { ClanPanel } from "@/components/ClanPanel";
 import { SeasonPassPanel } from "@/components/SeasonPassPanel";
 import { LoyaltyPanel } from "@/components/LoyaltyPanel";
+import { CosmeticShop } from "@/components/CosmeticShop";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -265,6 +266,7 @@ export default function Play() {
         <ClanPanel />
         <SeasonPassPanel />
         <LoyaltyPanel />
+        <CosmeticShop />
       </div>
 
       {/* ── Header ─────────────────────────────────────────────── */}

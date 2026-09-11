@@ -65,6 +65,10 @@ const schema = defineSchema(
       reporterReputation: v.optional(v.number()),
       validReports: v.optional(v.number()),
       invalidReports: v.optional(v.number()),
+
+      // ── المتجر 2.0 — التجميلات المجهّزة ──
+      equippedTitle: v.optional(v.string()), // اللقب المجهّز (يظهر بجانب الاسم)
+      equippedFrame: v.optional(v.string()), // مفتاح الإطار المجهّز
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     // The site laws: essential rules, prohibitions and the punishment ladder.
@@ -161,6 +165,19 @@ const schema = defineSchema(
     })
       .index("by_user", ["userId"])
       .index("by_user_kind", ["userId", "kind"]),
+
+    // ═══ المتجر 2.0 — التجميلات المملوكة ═══
+    cosmetics: defineTable({
+      userId: v.id("users"),
+      key: v.string(),
+      kind: v.union(v.literal("avatar"), v.literal("frame"), v.literal("title")),
+      equipped: v.boolean(),
+      expiresAt: v.optional(v.number()),
+      acquiredAt: v.number(),
+      giftedBy: v.optional(v.id("users")),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_key", ["userId", "key"]),
 
     // Simple key/value store for owner-configurable settings.
     settings: defineTable({
