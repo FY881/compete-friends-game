@@ -201,6 +201,7 @@ async function pickQuestions(
   ctx: DbCtx,
   categories: string[],
   count: number,
+  hardRatioHint?: number,
 ): Promise<string[]> {
   const all = await getAllQuestions(ctx);
   const pool = all.filter(
@@ -214,7 +215,10 @@ async function pickQuestions(
   const medium = shuffle(pool.filter((q) => q.difficulty === "medium"));
   const hard = shuffle(pool.filter((q) => q.difficulty === "hard"));
 
-  const nHard = Math.min(hard.length, Math.max(1, Math.floor(count * 0.2)));
+  // ⚖️ تخصيص الصعوبة يُطبَّق في الطبقة الأعلى عبر معامل hardRatio — هنا الافتراضي 20%
+  const hardRatio = hardRatioHint ?? 0.2;
+
+  const nHard = Math.min(hard.length, Math.max(1, Math.floor(count * hardRatio)));
   const nMedium = Math.min(medium.length, count - nHard);
   const nEasy = Math.min(easy.length, count - nHard - nMedium);
 
@@ -435,10 +439,19 @@ export const createGame = mutation({
     );
 
     const code = await makeUniqueCode(ctx);
+    // ⚖️ تخصيص الصعوبة: نسبة الأسئلة الصعبة تتكيف مع مهارة المضيف
+    let hardHint: number | undefined;
+    try {
+      const skill = await ctx.runQuery(internal.fairPlay.getSkillLevel, { userId });
+      hardHint = Math.min(0.4, Math.max(0.1, skill * 0.5));
+    } catch {
+      /* الافتراضي 20% */
+    }
     const questionIds = await pickQuestions(
       ctx,
       safeSettings.categories,
       poolSizeFor(safeSettings),
+      hardHint,
     );
 
     const gameId = await ctx.db.insert("games", {
@@ -727,6 +740,17 @@ export const submitAnswer = mutation({
 
     const correct = optionIndex === question.correctIndex;
     const remainingRatio = Math.max(0, 1 - elapsed / timePerQuestion);
+
+    // ⚖️ الحكم الآلي — كشف الإجابات المستحيلة السرعة (لا يعطّل الإجابة)
+    try {
+      await ctx.runMutation(internal.fairPlay.checkImpossibleSpeed, {
+        userId,
+        elapsedMs: elapsed,
+        correct,
+      });
+    } catch {
+      /* اختياري — لا يعطل الإجابة */
+    }
 
     let points = 0;
     let streak = 0;
@@ -1291,6 +1315,15 @@ export const finishGame = internalMutation({
       // موجّة 5 — إن كانت جولة داخل نافذة بطولة نشطة، احتسبها تلقائياً
       try {
         await ctx.runMutation(internal.tournaments.recordRound, { historyId });
+      } catch {
+        /* احتساب البطولة اختياري */
+      }
+
+      // ⚖️ الحكم الآلي — كشف الدقة الكاملة المتكررة بعد كل جولة
+      try {
+        await ctx.runMutation(internal.fairPlay.checkPerfectRepeat, {
+          userId: p.userId,
+        });
       } catch {
         /* احتساب البطولة اختياري — لا يعطل تسجيل الجولة */
       }

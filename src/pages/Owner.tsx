@@ -110,6 +110,7 @@ import { PrivateCouncilTab } from "@/components/PrivateCouncilTab";
 import { MindHubTab } from "@/components/MindHubTab";
 import { ViceOwnerTab } from "@/components/ViceOwnerTab";
 import { DeputyCommandCenter } from "@/components/DeputyCommandCenter";
+import { FairPlayTab } from "@/components/FairPlayTab";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2234,6 +2235,7 @@ const NAV_GROUPS = [
     label: "الإدارة",
     items: [
       { id: "deputy", icon: ShieldCheck, label: "مركز نائب المالك 👑" },
+      { id: "fairplay", icon: Scale, label: "الحكم الآلي ⚖️" },
       { id: "users", icon: Users, label: "اللاعبون", badge: true },
       { id: "reports", icon: Flag, label: "البلاغات", badge: true },
       { id: "rules", icon: Scale, label: "القوانين" },
@@ -2350,6 +2352,8 @@ export default function Owner() {
         return <OwnerDashboard onNavigate={setActiveTab} />;
       case "deputy":
         return <DeputyCommandCenter />;
+      case "fairplay":
+        return <FairPlayTab />;
       case "users":
         return <AdvancedPlayersTab isOwner={access.isOwner} />;
       case "reports":

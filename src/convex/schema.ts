@@ -198,6 +198,19 @@ const schema = defineSchema(
       .index("by_clan", ["clanId"])
       .index("by_clan_key", ["clanId", "key"]),
 
+    // ═══ الحكم الآلي — سجل اللعب النظيف ═══
+    fairPlayLog: defineTable({
+      userId: v.id("users"),
+      userName: v.string(),
+      kind: v.union(v.literal("impossible_speed"), v.literal("perfect_repeat"), v.literal("pattern_anomaly")),
+      detail: v.string(),
+      gameCode: v.optional(v.string()),
+      resolved: v.boolean(),
+      at: v.number(),
+    })
+      .index("by_user_at", ["userId", "at"])
+      .index("by_at", ["at"]),
+
     // ═══ المهام اليومية — لوحة المهام الدوارة ═══
     dailyQuests: defineTable({
       userId: v.id("users"),
