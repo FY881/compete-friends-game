@@ -1328,6 +1328,16 @@ export const finishGame = internalMutation({
         /* احتساب البطولة اختياري — لا يعطل تسجيل الجولة */
       }
 
+      // 🏆 الهيبة — تحويل فائض الخبرة بعد المستوى 100 إلى نقاط هيبة
+      try {
+        await ctx.runMutation(internal.legacy.accruePrestige, {
+          userId: p.userId,
+          xpEarned: xp,
+        });
+      } catch {
+        /* اختياري — لا يعطل تسجيل الجولة */
+      }
+
       // موجّة 7 — نقاط الولاء: كسب من إنهاء/فوز/سلسلة
       try {
         await ctx.runMutation(internal.loyalty.recordRoundLoyalty, {

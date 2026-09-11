@@ -69,6 +69,9 @@ const schema = defineSchema(
       // ── المتجر 2.0 — التجميلات المجهّزة ──
       equippedTitle: v.optional(v.string()), // اللقب المجهّز (يظهر بجانب الاسم)
       equippedFrame: v.optional(v.string()), // مفتاح الإطار المجهّز
+
+      // ── الهيبة — نقاط ما بعد المستوى الأقصى ──
+      prestigePoints: v.optional(v.number()),
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     // The site laws: essential rules, prohibitions and the punishment ladder.
@@ -197,6 +200,16 @@ const schema = defineSchema(
     })
       .index("by_clan", ["clanId"])
       .index("by_clan_key", ["clanId", "key"]),
+
+    // ═══ الهيبة والإرث — قاعة المشاهدة ═══
+    hallOfFame: defineTable({
+      seasonKey: v.string(),
+      userId: v.id("users"),
+      userName: v.string(),
+      userEmoji: v.string(),
+      score: v.number(),
+      crownedAt: v.number(),
+    }).index("by_season", ["seasonKey"]),
 
     // ═══ الحكم الآلي — سجل اللعب النظيف ═══
     fairPlayLog: defineTable({

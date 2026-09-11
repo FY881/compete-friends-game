@@ -19,6 +19,7 @@ import { LoyaltyPanel } from "@/components/LoyaltyPanel";
 import { CosmeticShop } from "@/components/CosmeticShop";
 import { ClanWarPanel } from "@/components/ClanWarPanel";
 import { QuestsPanel } from "@/components/QuestsPanel";
+import { LegacyCard } from "@/components/LegacyCard";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -269,6 +270,7 @@ export default function Play() {
         <ClanPanel />
         <SeasonPassPanel />
         <QuestsPanel />
+        <LegacyCard />
         <LoyaltyPanel />
         <CosmeticShop />
       </div>
