@@ -1162,6 +1162,16 @@ export const finishGame = internalMutation({
         xp += XP_PERFECT_GAME;
       }
 
+      // 🚀 معزز الخبرة ×2 — يُستهلك جولة واحدة عند كل استخدام (مربع economy)
+      try {
+        const boosted = await ctx.runMutation(internal.economy.consumeXpBoost, {
+          userId: p.userId,
+        });
+        if (boosted) xp *= 2;
+      } catch {
+        /* المعزز اختياري — لا يعطل الاحتساب */
+      }
+
       const profile = await ctx.db
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", p.userId))

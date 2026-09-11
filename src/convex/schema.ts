@@ -388,6 +388,25 @@ const schema = defineSchema(
       at: v.number(),
     }).index("by_user", ["userId"]),
 
+    // 🎁 الصندوق الغامض اليومي — صف لكل فتح (يضمن حداً يومياً)
+    dailyBoxes: defineTable({
+      userId: v.id("users"),
+      day: v.string(), // مفتاح اليوم YYYY-MM-DD
+      rewardKind: v.string(), // loyalty | xp | xpBoost | streakShield
+      rewardLabel: v.string(),
+      openedAt: v.number(),
+    }).index("by_user_day", ["userId", "day"]),
+
+    // 🚀 المعززات النشطة — معزز خبرة ×2 (بجولات متبقية) أو درع سلسلة
+    boosts: defineTable({
+      userId: v.id("users"),
+      kind: v.union(v.literal("xp_x2"), v.literal("streak_shield")),
+      remainingRounds: v.number(),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_kind", ["userId", "kind"]),
+
     // ═══════════════════════════════════════════════════════════════════
     // ║ موجّة 11 — الحلبة العالمية: تصنيف ELO لكل لاعب ║
     // ║ صف واحد لكل لاعب — نقاط التصنيف، عدد الانتصارات/الهزائم،        ║
