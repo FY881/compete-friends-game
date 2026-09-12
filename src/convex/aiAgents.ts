@@ -15,7 +15,7 @@
  */
 
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -173,7 +173,14 @@ async function ensureRoster(ctx: any): Promise<number> {
 async function agentSpeaks(
   ctx: any,
   agent: any,
-  opts: { intent?: Intent; vars?: Record<string, string>; place?: string; recent?: string[] } = {},
+  opts: {
+    text?: string;
+    intent?: Intent;
+    vars?: Record<string, string>;
+    place?: string;
+    recent?: string[];
+    engine?: string;
+  } = {},
 ): Promise<string> {
   const recentIntents = Array.isArray(agent.recentIntents) ? agent.recentIntents : [];
   const intent = opts.intent ?? decideIntent({
@@ -194,14 +201,16 @@ async function agentSpeaks(
     .map((f: any) => f.text as string)
     .slice(0, 8);
 
-  const text = composeMessage({
-    persona: agent.persona as PersonaKey,
-    intent,
-    vars: opts.vars,
-    recent: opts.recent ?? saidRecently,
-    energy: agent.energy,
-    mood: agent.mood,
-  });
+  const text =
+    opts.text ??
+    composeMessage({
+      persona: agent.persona as PersonaKey,
+      intent,
+      vars: opts.vars,
+      recent: opts.recent ?? saidRecently,
+      energy: agent.energy,
+      mood: agent.mood,
+    });
 
   const now = Date.now();
   const roomId = await publicRoom(ctx);
@@ -222,7 +231,9 @@ async function agentSpeaks(
     agentName: agent.name,
     emoji: agent.emoji,
     kind: "chat",
-    place: opts.place ?? "ساحة العقول العامة",
+    place:
+      opts.place ??
+      (opts.engine === "gemini" ? "ساحة العقول العامة · صوت Gemini" : "ساحة العقول العامة"),
     text,
     createdAt: now,
   });
@@ -336,10 +347,9 @@ export const lifeTick = internalMutation({
       .slice(0, CHAT_PER_TICK);
     let spoken = 0;
     for (const agent of speakers) {
-      // يُخاطب وكيلاً حقيقياً بنداء صريح حتى لا تبقى المتغيّرات فارغة
-      const peer = active[Math.floor(Math.random() * active.length)]?.name;
-      const other = !peer || peer === agent.name ? "جميع الحاضرين" : peer;
-      await agentSpeaks(ctx, agent, { vars: { n: other, r: other } });
+      // الكلام يُولَّد في action منفصل: يجرّب Gemini المجاني أولاً، وإن لم
+      // يوجد مفتاح أو فشل النداء يرجع تلقائياً إلى العقل المدمج المجاني.
+      await ctx.scheduler.runAfter(0, internal.aiVoice.speakNow, { agentId: agent._id });
       spoken++;
     }
 
@@ -760,6 +770,63 @@ export const getLivingAgents = query({
             : 0,
       },
     };
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// جسر الصوت: تُستدعى من action (شبكة) ثم تُكتب في القاعدة من هنا
+// ─────────────────────────────────────────────────────────────────────────
+
+/** يجهّز كل ما يحتاجه مولّد الكلام: الشخصية، الذاكرة، ومن يُخاطب. */
+export const getVoiceContext = internalQuery({
+  args: { agentId: v.id("aiAgents") },
+  handler: async (ctx, { agentId }) => {
+    const agent = await ctx.db.get(agentId);
+    if (!agent || agent.retired) return null;
+
+    const feed = await ctx.db
+      .query("aiAgentFeed")
+      .withIndex("by_created", (q) => q.gt("createdAt", 0))
+      .order("desc")
+      .take(40);
+    const recent = feed
+      .filter((f) => f.agentId === agentId)
+      .map((f) => f.text)
+      .slice(0, 8);
+
+    const others = await ctx.db
+      .query("aiAgents")
+      .withIndex("by_active", (q) => q.eq("retired", false))
+      .collect();
+    const candidates = others.filter((a) => a._id !== agentId);
+    const peer =
+      candidates.length > 0
+        ? candidates[Math.floor(Math.random() * candidates.length)].name
+        : "جميع الحاضرين";
+
+    return {
+      name: agent.name,
+      persona: agent.persona,
+      personaLabel: agent.personaLabel,
+      dept: agent.dept,
+      role: agent.role,
+      traits: agent.traits,
+      energy: agent.energy,
+      mood: agent.mood,
+      level: agent.level,
+      peer,
+      recent,
+    };
+  },
+});
+
+/** يكتب الكلام فعلاً: رسالة حقيقية في الغرفة + نبض + تحديث حالة الوكيل. */
+export const postLine = internalMutation({
+  args: { agentId: v.id("aiAgents"), text: v.string(), engine: v.optional(v.string()) },
+  handler: async (ctx, { agentId, text, engine }) => {
+    const agent = await ctx.db.get(agentId);
+    if (!agent) return;
+    await agentSpeaks(ctx, agent, { text, engine });
   },
 });
 
