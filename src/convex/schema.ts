@@ -465,6 +465,60 @@ const schema = defineSchema(
     }).index("by_week", ["weekKey"]),
 
     // ═══════════════════════════════════════════════════════════════════
+    // ║ الإصدار 4.0 — أوضاع اللعب الجديدة (المرحلة 2) ║
+    // ║ جولة فردية مسجّلة على الخادم: تُصدر الأسئلة عند البدء وتُتحقق ║
+    // ║ الإجابات عند الإنهاء — فلا يمكن التلاعب بالنتيجة أو بالمكافأة. ║
+    // ║ blitz = تحدي البرق · survival = البقاء · bet = جولة الرهان ║
+    // ═══════════════════════════════════════════════════════════════════
+    modeRuns: defineTable({
+      userId: v.id("users"),
+      kind: v.union(v.literal("blitz"), v.literal("survival"), v.literal("bet")),
+      questionIds: v.array(v.string()),
+      stake: v.optional(v.number()),
+      status: v.union(v.literal("active"), v.literal("done")),
+      answers: v.array(
+        v.object({
+          questionId: v.string(),
+          selected: v.number(),
+          elapsedMs: v.number(),
+        }),
+      ),
+      score: v.number(),
+      correctCount: v.number(),
+      survived: v.number(),
+      payout: v.optional(v.number()),
+      startedAt: v.number(),
+      endsAt: v.number(),
+      finishedAt: v.optional(v.number()),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_kind", ["userId", "kind"])
+      .index("by_kind_score", ["kind", "score"]),
+
+    // ═══ سجل جولات الألعاب الرئيسية الخمس (لحساب الحد اليومي) ║
+    gameModePlays: defineTable({
+      userId: v.id("users"),
+      modeId: v.string(),
+      day: v.string(), // YYYY-MM-DD
+      at: v.number(),
+    })
+      .index("by_user_day", ["userId", "day"])
+      .index("by_user_mode_day", ["userId", "modeId", "day"]),
+
+    // ═══ معركة الزعيم اليومية — سؤال عنيد واحد لكل يوم ║
+    // ║ أول من يحله على مستوى الخادم ينال شارة أسطورية ومكافأة كبيرة. ║
+    bossFights: defineTable({
+      day: v.string(), // YYYY-MM-DD
+      userId: v.id("users"),
+      userName: v.string(),
+      correct: v.boolean(),
+      elapsedMs: v.number(),
+      at: v.number(),
+    })
+      .index("by_day", ["day"])
+      .index("by_user_day", ["userId", "day"]),
+
+    // ═══════════════════════════════════════════════════════════════════
     // ║ موجّة 5 — البطولات الأسبوعية ║
     // ║ بطولة تُنشئها الإدارة، يلعب اللاعبون جولات عادية ويُحسب لهم ║
     // ║ مجموع أفضل جولاتهم خلال نافذة البطولة تلقائياً من gameHistory. ║

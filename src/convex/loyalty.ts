@@ -177,6 +177,30 @@ export const awardPoints = internalMutation({
   },
 });
 
+/**
+ * إنفاق نقاط (تُستخدم للرهان) — ترفض العملية إن كانت النقاط غير كافية.
+ * تُستدعى من وحدات أخرى عبر ctx.runMutation حتى يبقى الخصم والدفع ذرّيين.
+ */
+export const spendPoints = internalMutation({
+  args: {
+    userId: v.id("users"),
+    amount: v.number(),
+    reason: v.string(),
+  },
+  handler: async (ctx, { userId, amount, reason }) => {
+    if (amount <= 0) return;
+    const w = await getOrCreateWallet(ctx, userId);
+    if (w.points < amount) {
+      throw new Error(`نقاط الولاء غير كافية — تحتاج ${amount} نقطة ولديك ${w.points}.`);
+    }
+    await ctx.db.patch(w._id, {
+      points: w.points - amount,
+      updatedAt: Date.now(),
+    });
+    await ctx.db.insert("loyaltyLedger", { userId, delta: -amount, reason, at: Date.now() });
+  },
+});
+
 /** تُستدعى من انتهاء الجولة في games.ts (مع نتيجة الجولة). */
 export const recordRoundLoyalty = internalMutation({
   args: { userId: v.id("users"), won: v.boolean(), dailyStreak: v.optional(v.number()) },

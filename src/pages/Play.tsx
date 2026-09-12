@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { downloadApk } from "@/lib/app-version";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { TournamentPanel } from "@/components/TournamentPanel";
+import { WorldChampionshipPanel } from "@/components/WorldChampionshipPanel";
+import { GameModesPanel } from "@/components/GameModesPanel";
 import { ArenaPanel } from "@/components/ArenaPanel";
 import { RivalryPanel } from "@/components/RivalryPanel";
 import { LeaguePanel } from "@/components/LeaguePanel";
@@ -263,6 +265,8 @@ export default function Play() {
         <ActivePackBanner />
         <HighlightsCard />
         <TournamentPanel />
+        <WorldChampionshipPanel />
+        <GameModesPanel />
         <ArenaPanel />
         <RivalryPanel />
         <LeaguePanel />
