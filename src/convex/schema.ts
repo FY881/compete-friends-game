@@ -469,6 +469,25 @@ const schema = defineSchema(
     // ║ بطولة تُنشئها الإدارة، يلعب اللاعبون جولات عادية ويُحسب لهم ║
     // ║ مجموع أفضل جولاتهم خلال نافذة البطولة تلقائياً من gameHistory. ║
     // ═══════════════════════════════════════════════════════════════════
+    // ═══ البطولة العالمية — أقواس إقصائية شهرية للفائزين الأسبوعيين ═══
+    worldChampionships: defineTable({
+      monthKey: v.string(), // YYYY-MM
+      name: v.string(),
+      status: v.union(v.literal("waiting"), v.literal("active"), v.literal("ended")),
+      qualifiers: v.array(v.id("users")),
+      bracket: v.array(v.object({
+        aId: v.id("users"),
+        bId: v.optional(v.id("users")),
+        aScore: v.optional(v.number()),
+        bScore: v.optional(v.number()),
+        winnerId: v.optional(v.id("users")),
+      })),
+      round: v.number(),
+      roundEndsAt: v.optional(v.number()),
+      championId: v.optional(v.id("users")),
+      createdAt: v.number(),
+    }).index("by_month", ["monthKey"]),
+
     tournaments: defineTable({
       name: v.string(),
       description: v.optional(v.string()),
