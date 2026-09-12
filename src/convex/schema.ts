@@ -495,6 +495,58 @@ const schema = defineSchema(
       .index("by_user_kind", ["userId", "kind"])
       .index("by_kind_score", ["kind", "score"]),
 
+    // ═══════════════════════════════════════════════════════════════════
+    // ║ الإصدار 4.0 — الوكلاء الأحياء (المرحلة 3) ║
+    // ║ 50 وكيلاً لكل منهم هوية لاعب حقيقية: يتحدثون في غرف الدردشة، ║
+    // ║ يلعبون جولات كاملة، يكسبون الخبرة ويتقدمون، ويُسجّلون في التاريخ. ║
+    // ║ المحرك الذي يمنحهم كلامهم وقراراتهم مدمج مجاناً بلا أي API خارجي. ║
+    // ═══════════════════════════════════════════════════════════════════
+    aiAgents: defineTable({
+      name: v.string(),
+      emoji: v.string(),
+      agentUserId: v.id("users"), // هوية لاعب حقيقية داخل اللعبة
+      persona: v.string(),
+      personaLabel: v.string(),
+      dept: v.string(),
+      role: v.string(),
+      traits: v.object({
+        aggression: v.number(),
+        humor: v.number(),
+        patience: v.number(),
+        pride: v.number(),
+      }),
+      level: v.number(),
+      xp: v.number(),
+      energy: v.number(), // 0-100
+      mood: v.string(),
+      gamesPlayed: v.number(),
+      wins: v.number(),
+      chatCount: v.number(),
+      bornAt: v.number(),
+      lastSpokeAt: v.optional(v.number()),
+      lastPlayedAt: v.optional(v.number()),
+      retired: v.boolean(),
+    })
+      .index("by_user", ["agentUserId"])
+      .index("by_active", ["retired"])
+      .index("by_name", ["name"]),
+
+    // نبض حياة الوكلاء — سجل حي يقرأه المالك من غرفة التحكم
+    aiAgentFeed: defineTable({
+      agentId: v.optional(v.id("aiAgents")),
+      agentName: v.string(),
+      emoji: v.string(),
+      kind: v.union(
+        v.literal("chat"),
+        v.literal("match"),
+        v.literal("birth"),
+        v.literal("action"),
+      ),
+      place: v.string(),
+      text: v.string(),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
     // ═══ سجل جولات الألعاب الرئيسية الخمس (لحساب الحد اليومي) ║
     gameModePlays: defineTable({
       userId: v.id("users"),

@@ -10,6 +10,7 @@ import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { TournamentPanel } from "@/components/TournamentPanel";
 import { WorldChampionshipPanel } from "@/components/WorldChampionshipPanel";
 import { GameModesPanel } from "@/components/GameModesPanel";
+import { LivingAgentsTab } from "@/components/LivingAgentsTab";
 import { ArenaPanel } from "@/components/ArenaPanel";
 import { RivalryPanel } from "@/components/RivalryPanel";
 import { LeaguePanel } from "@/components/LeaguePanel";
@@ -267,6 +268,7 @@ export default function Play() {
         <TournamentPanel />
         <WorldChampionshipPanel />
         <GameModesPanel />
+        <LivingAgentsTab />
         <ArenaPanel />
         <RivalryPanel />
         <LeaguePanel />
