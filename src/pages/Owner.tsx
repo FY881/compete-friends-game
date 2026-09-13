@@ -55,6 +55,7 @@ import {
   Library,
   MessagesSquare,
   Store,
+  CalendarClock,
   EyeOff,
   FileDown,
   Brain,
@@ -126,6 +127,7 @@ import { CommunityMonitor } from "@/components/CommunityMonitor";
 import { AppealsPanel } from "@/components/Appeals";
 import { EconomyWarRoom } from "@/components/EconomyWarRoom";
 import { AiHubTab } from "@/components/AiHubTab";
+import { EventsStudio } from "@/components/EventsStudio";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2251,6 +2253,7 @@ const NAV_GROUPS = [
       { id: "appeals", icon: Scale, label: "الاعتراضات 🛡️" },
       { id: "economywar", icon: Store, label: "غرفة الاقتصاد 🛒" },
       { id: "aihub", icon: BrainCircuit, label: "مركز الذكاء الموحد 🧠" },
+      { id: "events", icon: CalendarClock, label: "استوديو الأحداث 🗓️" },
     ],
   },
   {
@@ -2389,6 +2392,8 @@ export default function Owner() {
         return <EconomyWarRoom />;
       case "aihub":
         return <AiHubTab />;
+      case "events":
+        return <EventsStudio />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":

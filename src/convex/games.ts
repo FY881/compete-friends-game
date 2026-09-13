@@ -1349,6 +1349,21 @@ export const finishGame = internalMutation({
         /* نقاط الولاء اختيارية — لا تعطل تسجيل الجولة */
       }
 
+      // 🗓️ أثر الأحداث الحية — مضاعف الخبرة أثناء الحدث (قياس الأثر حقيقي)
+      try {
+        const ev = await ctx.runQuery(internal.liveEvents.getActiveMultiplier, {});
+        if (ev.multiplier > 1 && ev.eventId) {
+          const boostedXp = Math.round(xp * (ev.multiplier - 1));
+          if (boostedXp > 0 && profile) {
+            await ctx.db.patch(profile._id, { xp: profile.xp + boostedXp });
+          }
+          await ctx.runMutation(internal.liveEvents.recordEventRound, {
+            eventId: ev.eventId,
+            userId: p.userId,
+          });
+        }
+      } catch { /* الأحداث اختيارية */ }
+
       // 🔗 المكافآت التكيفية — تربط التقدم × العضوية × العشيرة × الهيبة فعلياً
       try {
         await ctx.runMutation(internal.adaptiveRewards.grantAdaptiveReward, {

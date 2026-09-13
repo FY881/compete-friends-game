@@ -26,6 +26,7 @@ import { LegacyCard } from "@/components/LegacyCard";
 import { MindsCouncil } from "@/components/MindsCouncil";
 import { AppealForm } from "@/components/Appeals";
 import { AdaptiveRewardCard } from "@/components/AdaptiveRewardCard";
+import { LiveEventBanner } from "@/components/EventsStudio";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -282,6 +283,7 @@ export default function Play() {
         <LegacyCard />
         <MindsCouncil />
         <AppealForm />
+        <LiveEventBanner />
         <AdaptiveRewardCard />
         <LoyaltyPanel />
         <CosmeticShop />

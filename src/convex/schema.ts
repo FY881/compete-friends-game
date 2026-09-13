@@ -304,6 +304,24 @@ const schema = defineSchema(
       .index("by_user_at", ["userId", "at"])
       .index("by_at", ["at"]),
 
+    // 🗓️ الأحداث الحية — يستدعيها المالك وتؤثر فعلياً على المكافآت
+    liveEvents: defineTable({
+      name: v.string(),
+      emoji: v.string(),
+      kind: v.union(v.literal("xp_boost"), v.literal("point_rush"), v.literal("loyalty_festival")),
+      multiplier: v.number(), // 1.5 - 3
+      active: v.boolean(),
+      startsAt: v.number(),
+      endsAt: v.number(),
+      createdBy: v.id("users"),
+      // قياس الأثر: إحصاءات قبل/أثناء الحدث
+      roundsDuring: v.optional(v.number()),
+      participantsDuring: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_active", ["active"])
+      .index("by_created", ["createdAt"]),
+
     // ═══ المهام اليومية — لوحة المهام الدوارة ═══
     dailyQuests: defineTable({
       userId: v.id("users"),
