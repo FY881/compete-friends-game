@@ -25,6 +25,7 @@ import { QuestsPanel } from "@/components/QuestsPanel";
 import { LegacyCard } from "@/components/LegacyCard";
 import { MindsCouncil } from "@/components/MindsCouncil";
 import { AppealForm } from "@/components/Appeals";
+import { AdaptiveRewardCard } from "@/components/AdaptiveRewardCard";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -281,6 +282,7 @@ export default function Play() {
         <LegacyCard />
         <MindsCouncil />
         <AppealForm />
+        <AdaptiveRewardCard />
         <LoyaltyPanel />
         <CosmeticShop />
       </div>

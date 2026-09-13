@@ -1349,6 +1349,17 @@ export const finishGame = internalMutation({
         /* نقاط الولاء اختيارية — لا تعطل تسجيل الجولة */
       }
 
+      // 🔗 المكافآت التكيفية — تربط التقدم × العضوية × العشيرة × الهيبة فعلياً
+      try {
+        await ctx.runMutation(internal.adaptiveRewards.grantAdaptiveReward, {
+          userId: p.userId,
+          won,
+          score: p.score,
+        });
+      } catch {
+        /* اختيارية — لا تعطل تسجيل الجولة */
+      }
+
       // موجّة 12 — حرب العشائر: أضف نقاط الجولة لعشيرة اللاعب
       try {
         await ctx.runMutation(internal.clans.recordWarRound, {
