@@ -108,7 +108,27 @@ export const analyzePerformance = query({
     else if (winRate < 50) nextGoal = "حسّن نسبة فوزك إلى 50%";
     else nextGoal = "حافظ على أدائك الممتاز وتحدى أصدقاءك";
 
+    // 🧠 سياق مركز الذكاء الموحد — المدرب يقرأ ما رصدته الوحدات الأخرى
+    let hubSignals: string[] = [];
+    try {
+      const hubEvents = await ctx.db
+        .query("aiHubEvents")
+        .withIndex("by_at", (q) => q.gte("at", Date.now() - 48 * 3600_000))
+        .order("desc")
+        .take(30);
+      hubSignals = hubEvents
+        .filter((e) => e.unit === "referee" || e.unit === "reports")
+        .slice(0, 3)
+        .map((e) => e.summary);
+    } catch {
+      hubSignals = [];
+    }
+    if (hubSignals.length > 0) {
+      suggestions.push("🔎 ملاحظة من منظومة الذكاء: " + hubSignals[0]);
+    }
+
     return {
+      hubSignals,
       level,
       totalGames,
       gamesWon,

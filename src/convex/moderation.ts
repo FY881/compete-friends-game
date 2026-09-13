@@ -204,6 +204,17 @@ export const recordAiReview = internalMutation({
       status: verdict.compliant ? "dismissed" : "reviewed",
     });
 
+    // 🧠 جسر مركز الذكاء الموحد: حكم محلل البلاغات يشارك السياق
+    try {
+      await ctx.runMutation(internal.aiHub.logEvent, {
+        unit: "reports",
+        kind: "decision",
+        severity: verdict.compliant ? "info" : verdict.severity === "high" ? "critical" : "warn",
+        summary: `رقيب العقول حكم على بلاغ ضد ${report.targetName}: ${verdict.compliant ? "مطابق" : `مخالفة (${verdict.severity})`} — ${verdict.reasoning.slice(0, 120)}`,
+      });
+    } catch {
+      // لا يعطّل التحليل أبداً
+    }
     await ctx.db.insert("moderationLogs", {
       actorType: "ai",
       actorName: "رقيب العقول",

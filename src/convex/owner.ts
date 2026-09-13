@@ -297,6 +297,18 @@ async function logModeration(
     gameCode?: string;
   },
 ): Promise<void> {
+  // 🧠 جسر مركز الذكاء الموحد: كل قرار إشرافي يُبثّ للسياق المشترك
+  try {
+    await ctx.runMutation(internal.aiHub.logEvent, {
+      unit: entry.actorType === "ai" ? "guardian" : "governor",
+      kind: "decision",
+      severity: entry.severity === "high" ? "critical" : entry.severity === "medium" ? "warn" : "info",
+      summary: `${entry.actorName}: ${entry.action} على ${entry.targetName} — ${entry.reason}`,
+      payload: entry.gameCode ? JSON.stringify({ gameCode: entry.gameCode }) : undefined,
+    });
+  } catch {
+    // المركز لا يعطّل الإشراف أبداً
+  }
   await ctx.db.insert("moderationLogs", {
     actorType: entry.actorType,
     actorName: entry.actorName,

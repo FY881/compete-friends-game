@@ -18,6 +18,7 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 import { isOwnerUser } from "./owner";
 import { isDeputyOwner } from "./siteRoles";
 
@@ -343,6 +344,22 @@ export const runCycle = internalMutation({
       createdAt: now,
     });
     executed++;
+
+    // 🧠 انعكاس أعمال الحاكم في مركز الذكاء الموحد (سياق مشترك)
+    const recentActions = await ctx.db
+      .query("governorActions")
+      .withIndex("by_created", (q) => q.gte("createdAt", now - 60 * 60 * 1000))
+      .order("desc")
+      .take(10);
+    for (const a of recentActions) {
+      const isEconomy = a.agentDept === "الاقتصاد";
+      await ctx.runMutation(internal.aiHub.logEvent, {
+        unit: isEconomy ? "health" : "governor",
+        kind: "observation",
+        severity: a.summary.includes("🚨") ? "warn" : "info",
+        summary: `${a.agentName}: ${a.summary}`,
+      });
+    }
 
     return { executed };
   },
