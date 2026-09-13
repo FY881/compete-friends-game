@@ -787,6 +787,47 @@ export const setPerkPrice = mutation({
   },
 });
 
+/** 🤖💰 تنبيهات الحاكم الآلي الاقتصادية — آخر تقارير قسم الاقتصاد + الطلبات المعلّقة */
+export const getGovernorEconomyFeed = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) return null;
+    const weekAgo = Date.now() - 7 * 86400_000;
+
+    const actions = await ctx.db
+      .query("governorActions")
+      .withIndex("by_created", (q: any) => q.gte("createdAt", weekAgo))
+      .order("desc")
+      .take(200);
+    const economyActions = actions
+      .filter((a: any) => a.agentDept === "الاقتصاد")
+      .slice(0, 15)
+      .map((a: any) => ({
+        id: String(a._id),
+        agentName: a.agentName as string,
+        summary: a.summary as string,
+        createdAt: a.createdAt as number,
+      }));
+
+    const requests = await ctx.db
+      .query("governorRequests")
+      .withIndex("by_status", (q: any) => q.eq("status", "pending"))
+      .collect();
+    const economyRequests = requests
+      .filter((r: any) => r.agentDept === "الاقتصاد")
+      .slice(0, 5)
+      .map((r: any) => ({
+        id: String(r._id),
+        title: r.title as string,
+        reasoning: r.reasoning as string,
+        createdAt: r.createdAt as number,
+      }));
+
+    return { economyActions, economyRequests };
+  },
+});
+
 export const getEconomyPulse = query({
   args: {},
   handler: async (ctx) => {

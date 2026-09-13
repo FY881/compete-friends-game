@@ -219,6 +219,88 @@ export const runCycle = internalMutation({
       executed++;
     }
 
+    // ═══ دورة الاقتصاد المتقدمة: كشف تضخم حقيقي من دفتر الولاء ═══
+    // يقيس نمو المعروض النقدي (صافي الكسب) ونسبة الإنفاق عبر آخر 24 ساعة،
+    // ويقارنها بالأسبوع السابق — تضخم حقيقي = نمو تسارعي + إنفاق منخفض.
+    // دفتر الولاء مفهرس بـ by_user فقط — نجمع عبر المستخدمين ثم نفلتر زمنياً
+    const ledgerUsers = await ctx.db.query("users").take(500);
+    const entries: { delta: number; at: number }[] = [];
+    for (const u of ledgerUsers) {
+      const rows = await ctx.db
+        .query("loyaltyLedger")
+        .withIndex("by_user", (q) => q.eq("userId", u._id))
+        .take(200);
+      for (const r of rows) {
+        if (r.at >= now - 14 * 86400_000) entries.push({ delta: r.delta, at: r.at });
+      }
+    }
+    const dayLedger = entries.filter((l) => l.at >= dayAgo);
+    const weekLedger = entries.filter((l) => l.at >= now - 7 * 86400_000);
+
+    const sum = (arr: { delta: number }[], dir: "in" | "out") =>
+      arr.filter((l) => (dir === "in" ? l.delta > 0 : l.delta < 0)).reduce((s, l) => s + Math.abs(l.delta), 0);
+
+    const dayIn = sum(dayLedger, "in"), dayOut = sum(dayLedger, "out");
+    const weekIn = sum(weekLedger, "in"), weekOut = sum(weekLedger, "out");
+    const dayNet = dayIn - dayOut;
+    const weekNet = weekIn - weekOut;
+    const outflowRatio = dayIn > 0 ? dayOut / dayIn : 0;
+
+    // مقارنة آخر 24 ساعة بمتوسط الأسبوع (تسارع)
+    const dayAvgWeek = weekNet / 7;
+    const acceleration = dayAvgWeek !== 0 ? dayNet / dayAvgWeek : dayNet > 0 ? 2 : 0;
+
+    const economyAlerts: string[] = [];
+    if (acceleration > 1.8 && dayNet > 0) {
+      economyAlerts.push(`تسارع كسب: صافي اليوم ${Math.round(dayNet)} يعادل ${acceleration.toFixed(1)}× متوسط الأسبوع`);
+    }
+    if (outflowRatio < 0.15 && dayIn > 500) {
+      economyAlerts.push(`معروض ينمو دون إنفاق: نسبة الإنفاق ${Math.round(outflowRatio * 100)}% فقط من الكسب`);
+    }
+    if (weekNet > 0 && dayIn > 0 && dayNet / Math.max(1, weekNet) > 0.4) {
+      economyAlerts.push(`تركّز نمو غير طبيعي: اليوم ينتج ${Math.round((dayNet / Math.max(1, weekNet)) * 100)}% من صافي الأسبوع`);
+    }
+
+    if (economyAlerts.length > 0) {
+      const agent = "خازن الدراهم";
+      await ctx.db.insert("governorActions", {
+        agentName: agent,
+        agentDept: "الاقتصاد",
+        summary: `🚨 تضخم حقيقي مرصود: ${economyAlerts.join(" · ")}`,
+        createdAt: now,
+      });
+      executed++;
+
+      // إن كان التضخم شديداً — طلب خطير (لا يغيّر شيئاً بنفسه)
+      if (acceleration > 2.5 && outflowRatio < 0.15) {
+        const existing = await ctx.db
+          .query("governorRequests")
+          .withIndex("by_status", (q) => q.eq("status", "pending"))
+          .collect();
+        const already = existing.some((r) => r.kind === "economy_overhaul" && now - r.createdAt < 24 * 3600_000);
+        if (!already) {
+          await ctx.db.insert("governorRequests", {
+            agentName: agent,
+            agentDept: "الاقتصاد",
+            kind: "economy_overhaul",
+            title: "🚨 تضخم نقدي تسارعي — تدخل مطلوب",
+            reasoning: `بيانات حقيقية من دفتر الولاء: ${economyAlerts.join(" · ")}. أقترح خفض مكافآت الصندوق 20% أو رفع أسعار المتجر مؤقتاً — انتظر موافقتك.`,
+            status: "pending",
+            createdAt: now,
+          });
+          executed++;
+        }
+      }
+    } else if (dayLedger.length >= 20) {
+      await ctx.db.insert("governorActions", {
+        agentName: "خازن الدراهم",
+        agentDept: "الاقتصاد",
+        summary: `الاقتصاد مستقر: صافي اليوم ${Math.round(dayNet)} · نسبة إنفاق ${Math.round(outflowRatio * 100)}%`,
+        createdAt: now,
+      });
+      executed++;
+    }
+
     // دورة العمليات: كتابة تقرير صحة
     const loyalty = await ctx.db.query("loyaltyLedger").take(50);
     if (loyalty.length >= 10) {

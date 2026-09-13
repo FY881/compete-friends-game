@@ -30,6 +30,7 @@ export function EconomyWarRoom() {
   const pulse = useQuery(api.commandDeck.getEconomyPulse, {});
   const audit = useQuery(api.commandDeck.getGiftAudit, {});
   const shop = useQuery(api.commandDeck.getShopAdmin, {});
+  const govFeed = useQuery(api.commandDeck.getGovernorEconomyFeed, {});
   const setPrice = useMutation(api.commandDeck.setPerkPrice);
 
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -84,6 +85,41 @@ export function EconomyWarRoom() {
           </Badge>
         )}
       </div>
+
+      {/* ═══ تنبيهات الحاكم الآلي — قسم الاقتصاد ═══ */}
+      {govFeed && (govFeed.economyActions.length > 0 || govFeed.economyRequests.length > 0) && (
+        <Card className="border-border/70 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              🤖 تقارير «خازن الدراهم» — الحاكم الآلي
+              {govFeed.economyRequests.length > 0 && (
+                <Badge className="ms-auto rounded-full bg-rose-500/15 text-rose-600">
+                  {govFeed.economyRequests.length} طلب تدخل معلّق
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {govFeed.economyRequests.map((r) => (
+              <div key={r.id} className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2.5">
+                <p className="text-xs font-bold text-rose-600">{r.title}</p>
+                <p className="mt-1 text-[11px] leading-relaxed">{r.reasoning}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">انتظر قرارك في تبويب الحاكم الآلي 🤖</p>
+              </div>
+            ))}
+            <div className="max-h-40 space-y-1 overflow-y-auto pe-1">
+              {govFeed.economyActions.map((a) => (
+                <div key={a.id} className={cn("flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px]",
+                  a.summary.includes("🚨") ? "border-amber-500/40 bg-amber-500/5" : "border-border/50 bg-muted/20")}>
+                  <span className="shrink-0 font-bold text-primary">{a.agentName}:</span>
+                  <span className="min-w-0 flex-1">{a.summary}</span>
+                  <span className="shrink-0 text-[9px] text-muted-foreground">{ar(a.createdAt)}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ═══ محرر المتجر الحي ═══ */}
       <Card className="border-border/70 shadow-sm">
