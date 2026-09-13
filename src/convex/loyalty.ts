@@ -284,23 +284,38 @@ export const buyPerk = mutation({
     const perk = PERK_CATALOG.find((p) => p.key === perkKey);
     if (!perk) throw new Error("الامتياز غير موجود");
 
+    // سعر المالك (تجاوز) إن وُجد
+    let effectiveCost: number = perk.cost;
+    const override = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "perkPriceOverrides"))
+      .first();
+    if (override) {
+      try {
+        const map = JSON.parse(override.value as string) as Record<string, number>;
+        if (typeof map[perkKey] === "number") effectiveCost = map[perkKey];
+      } catch {
+        // تجاوز تالف — استخدم السعر الأساسي
+      }
+    }
+
     const w = await getOrCreateWallet(ctx, userId);
     const now = Date.now();
     const active = w.perks.find(
       (o: { key: string; expiresAt?: number }) => o.key === perkKey && (!o.expiresAt || o.expiresAt > now),
     );
     if (active) throw new Error("تملك هذا الامتياز فعلاً");
-    if (w.points < perk.cost) throw new Error(`نقاطك غير كافية — تحتاج ${perk.cost - w.points} نقطة إضافية`);
+    if (w.points < effectiveCost) throw new Error(`نقاطك غير كافية — تحتاج ${effectiveCost - w.points} نقطة إضافية`);
 
     const expiresAt = perk.days ? now + perk.days * 24 * 60 * 60 * 1000 : undefined;
     await ctx.db.patch(w._id, {
-      points: w.points - perk.cost,
+      points: w.points - effectiveCost,
       perks: [...w.perks, { key: perkKey, expiresAt }],
       updatedAt: now,
     });
     await ctx.db.insert("loyaltyLedger", {
       userId,
-      delta: -perk.cost,
+      delta: -effectiveCost,
       reason: `شراء: ${perk.name}`,
       at: now,
     });

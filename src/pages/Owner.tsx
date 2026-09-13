@@ -54,6 +54,7 @@ import {
   Eraser,
   Library,
   MessagesSquare,
+  Store,
   EyeOff,
   FileDown,
   Brain,
@@ -123,6 +124,7 @@ import { OwnerBrief } from "@/components/OwnerBrief";
 import { ContentQuality } from "@/components/ContentQuality";
 import { CommunityMonitor } from "@/components/CommunityMonitor";
 import { AppealsPanel } from "@/components/Appeals";
+import { EconomyWarRoom } from "@/components/EconomyWarRoom";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2246,6 +2248,7 @@ const NAV_GROUPS = [
       { id: "contentquality", icon: Library, label: "جودة المحتوى 📚" },
       { id: "communitymonitor", icon: MessagesSquare, label: "مراقب المجتمع 💬" },
       { id: "appeals", icon: Scale, label: "الاعتراضات 🛡️" },
+      { id: "economywar", icon: Store, label: "غرفة الاقتصاد 🛒" },
     ],
   },
   {
@@ -2380,6 +2383,8 @@ export default function Owner() {
         return <CommunityMonitor />;
       case "appeals":
         return <AppealsPanel />;
+      case "economywar":
+        return <EconomyWarRoom />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { getCurrentUser } from "./users";
 import { levelFromXp } from "./gameConfig";
@@ -692,6 +692,98 @@ export const getCommunityMonitor = query({
         flagged24h: [...flagged.values()].reduce((a, b) => a + b, 0),
       },
     };
+  },
+});
+
+/**
+ * 🛒 غرفة عمليات الاقتصاد — تدقيق الهدايا + متجر حي:
+ *  - getGiftAudit : كل الهدايا (آخر 30 يوماً) قابلة للفلترة + إحصاءات الاستلام
+ *  - getShopAdmin : قائمة المتجر مع تأثير كل امتياز على الاقتصاد
+ *  - setPerkPrice : تغيير سعر امتياز فوراً (يُخزَّن كتجاوز في settings ويقرأه buyPerk)
+ */
+export const getGiftAudit = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) return null;
+    const monthAgo = Date.now() - 30 * 86400_000;
+
+    const gifts = await ctx.db.query("gifts").collect();
+    const recent = gifts
+      .filter((g: any) => g.createdAt >= monthAgo)
+      .sort((a: any, b: any) => b.createdAt - a.createdAt)
+      .slice(0, 60);
+
+    const claimed = recent.filter((g: any) => g.claimed).length;
+    const byType = new Map<string, number>();
+    for (const g of recent) {
+      const t = (g.giftType as string) || "أخرى";
+      byType.set(t, (byType.get(t) ?? 0) + 1);
+    }
+
+    return {
+      totals: { count: recent.length, claimed, claimRate: recent.length ? Math.round((claimed / recent.length) * 100) : 0 },
+      byType: [...byType.entries()].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count),
+      recent: recent.map((g: any) => ({
+        id: String(g._id),
+        senderName: g.senderName as string,
+        receiverName: g.receiverName as string,
+        giftType: g.giftType as string,
+        xpAmount: (g.xpAmount ?? null) as number | null,
+        claimed: g.claimed as boolean,
+        createdAt: g.createdAt as number,
+      })),
+    };
+  },
+});
+
+export const getShopAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) return null;
+    const { PERK_CATALOG } = await import("./loyalty");
+    const overrides = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q: any) => q.eq("key", "perkPriceOverrides"))
+      .first();
+    const map = overrides ? (JSON.parse(overrides.value as string) as Record<string, number>) : {};
+
+    return PERK_CATALOG.map((p) => {
+      const price = map[p.key] ?? p.cost;
+      return {
+        key: p.key,
+        name: p.name,
+        emoji: p.emoji,
+        baseCost: p.cost,
+        currentCost: price,
+        overridden: p.key in map,
+        days: p.days as number | null,
+        desc: p.desc as string,
+      };
+    });
+  },
+});
+
+export const setPerkPrice = mutation({
+  args: { perkKey: v.string(), cost: v.number() },
+  handler: async (ctx, { perkKey, cost }) => {
+    const me = await requireOwner(ctx);
+    if (!me) throw new Error("للمالك فقط");
+    if (cost < 0 || cost > 100000) throw new Error("سعر غير منطقي");
+
+    const overrides = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q: any) => q.eq("key", "perkPriceOverrides"))
+      .first();
+    const map = overrides ? (JSON.parse(overrides.value as string) as Record<string, number>) : {};
+    map[perkKey] = cost;
+    if (overrides) {
+      await ctx.db.patch(overrides._id, { value: JSON.stringify(map) });
+    } else {
+      await ctx.db.insert("settings", { key: "perkPriceOverrides", value: JSON.stringify(map) });
+    }
+    return { perkKey, cost };
   },
 });
 
