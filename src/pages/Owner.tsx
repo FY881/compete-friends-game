@@ -48,6 +48,7 @@ import {
   Bot,
   BrainCircuit,
   Check,
+  Inbox,
   Crown,
   Database,
   Eraser,
@@ -115,6 +116,7 @@ import { AiGovernorTab } from "@/components/AiGovernorTab";
 import { LivingAgentsTab } from "@/components/LivingAgentsTab";
 import { MindsControlRoom } from "@/components/MindsControlRoom";
 import { CommandDeck } from "@/components/CommandDeck";
+import { SmartInbox } from "@/components/SmartInbox";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2245,6 +2247,7 @@ const NAV_GROUPS = [
       { id: "minds", icon: BrainCircuit, label: "غرفة التحكم بالعقول 🧠" },
       { id: "users", icon: Users, label: "اللاعبون", badge: true },
       { id: "reports", icon: Flag, label: "البلاغات", badge: true },
+      { id: "smartinbox", icon: Inbox, label: "الصندوق الذكي 📥" },
       { id: "rules", icon: Scale, label: "القوانين" },
       { id: "memberships", icon: Crown, label: "العضويات" },
     ],
@@ -2371,6 +2374,8 @@ export default function Owner() {
         return <AdvancedPlayersTab isOwner={access.isOwner} />;
       case "reports":
         return <ReportsInbox />;
+      case "smartinbox":
+        return <SmartInbox />;
       case "rules":
         return <RulesTab />;
       case "memberships":

@@ -272,6 +272,110 @@ export const searchAuditTrail = query({
   },
 });
 
+/**
+ * 📥 صندوق البلاغات الذكي — ترقية قسم البلاغات
+ * درجة أولوية حقيقية لكل بلاغ مفتوح محسوبة من:
+ *  - خطورة حكم الذكاء الآلي (إن وُجد)
+ *  - سمعة المُبلِّغ (ثقة تاريخية)
+ *  - تاريخ البلاغات الموثّقة ضد نفس الهدف + سجل عقوباته
+ *  - قِدم البلاغ (الأقدم يطفو)
+ */
+export const getSmartInbox = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) return null;
+    const now = Date.now();
+
+    const open = await ctx.db
+      .query("reports")
+      .withIndex("by_status", (q: any) => q.eq("status", "open"))
+      .collect();
+
+    const reporters = await Promise.all(open.map((r: any) => ctx.db.get(r.reporterId)));
+    const history = await ctx.db.query("reports").collect();
+    const modLogs = await ctx.db
+      .query("moderationLogs")
+      .withIndex("by_created", (q: any) => q.gte("createdAt", now - 30 * 86400_000))
+      .take(1000);
+
+    const priorAgainst = new Map<string, number>();
+    for (const r of history) {
+      if (r.status === "reviewed") {
+        const k = String(r.targetId);
+        priorAgainst.set(k, (priorAgainst.get(k) ?? 0) + 1);
+      }
+    }
+    const punishedBefore = new Set(
+      modLogs
+        .filter((l: any) => l.action === "ban" || l.action === "mute" || l.action === "warn")
+        .map((l: any) => String(l.targetId)),
+    );
+
+    const items = open.map((r: any, i: number) => {
+      const reporter = reporters[i];
+      const reputation = (reporter as any)?.reporterReputation ?? 0;
+      const ageHours = Math.max(0, (now - r.createdAt) / 3600_000);
+
+      let score = 20;
+      const sev = r.aiVerdict?.severity;
+      if (sev === "high") score += 45;
+      else if (sev === "medium") score += 25;
+      else if (sev === "low") score += 10;
+      if (r.aiVerdict && !r.aiVerdict.compliant) score -= 20;
+      score += Math.max(-15, Math.min(15, reputation * 3));
+      score += Math.min(10, priorAgainst.get(String(r.targetId)) ?? 0);
+      if (punishedBefore.has(String(r.targetId))) score += 15;
+      score += Math.min(15, ageHours / 4);
+
+      let priority: "urgent" | "high" | "normal" | "low";
+      if (score >= 70) priority = "urgent";
+      else if (score >= 45) priority = "high";
+      else if (score >= 25) priority = "normal";
+      else priority = "low";
+
+      return {
+        id: r._id,
+        reporterName: r.reporterName as string,
+        reporterReputation: reputation,
+        targetId: String(r.targetId),
+        targetName: r.targetName as string,
+        targetPunishedBefore: punishedBefore.has(String(r.targetId)),
+        reason: r.reason as string,
+        details: (r.details ?? null) as string | null,
+        aiVerdict: r.aiVerdict
+          ? {
+              compliant: r.aiVerdict.compliant,
+              severity: r.aiVerdict.severity as string,
+              suggestedAction: r.aiVerdict.suggestedAction as string,
+              reasoning: r.aiVerdict.reasoning as string,
+            }
+          : null,
+        createdAt: r.createdAt as number,
+        ageHours: Math.round(ageHours),
+        score: Math.round(score),
+        priority,
+      };
+    });
+
+    items.sort((a: any, b: any) => b.score - a.score);
+
+    const byReason = new Map<string, number>();
+    for (const it of items) byReason.set(it.reason, (byReason.get(it.reason) ?? 0) + 1);
+    const reasons = [...byReason.entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    return {
+      items: items.slice(0, 50),
+      reasons,
+      urgent: items.filter((it: any) => it.priority === "urgent").length,
+      total: items.length,
+    };
+  },
+});
+
 export const getEconomyPulse = query({
   args: {},
   handler: async (ctx) => {
