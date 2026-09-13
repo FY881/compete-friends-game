@@ -376,6 +376,116 @@ export const getSmartInbox = query({
   },
 });
 
+/**
+ * 👤 ملف اللاعب الشامل — كل شيء عن لاعب واحد في استعلام واحد:
+ * الهوية والإحصاءات + خط العقوبات الزمني + تاريخ الاقتصاد + آخر الجولات +
+ * شارات سلوك محسوبة من بيانات حقيقية.
+ */
+export const getPlayerDossier = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const me = await requireOwner(ctx);
+    if (!me) return null;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .first();
+
+    // خط العقوبات: من سجلات الإشراف
+    const punishments = await ctx.db
+      .query("moderationLogs")
+      .withIndex("by_created", (q: any) => q.gte("createdAt", 0))
+      .order("desc")
+      .take(400);
+    const mine = punishments.filter((l: any) => String(l.targetId) === String(userId));
+
+    // تاريخ الاقتصاد: أحدث 30 حركة
+    const ledger = await ctx.db
+      .query("loyaltyLedger")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .take(100);
+    const ledgerRecent = [...ledger].sort((a: any, b: any) => b.at - a.at).slice(0, 30);
+
+    // آخر 15 جولة
+    const history = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .take(200);
+    const recentGames = [...history].sort((a: any, b: any) => b.playedAt - a.playedAt).slice(0, 15);
+
+    // شارات السلوك المحسوبة
+    const u = user as any;
+    const now = Date.now();
+    const bannedNow = !!u.bannedPermanent || (u.bannedUntil ?? 0) > now;
+    const mutedNow = (u.mutedUntil ?? 0) > now;
+    const winRate = profile && profile.gamesPlayed > 0 ? profile.gamesWon / profile.gamesPlayed : 0;
+    const avgScore =
+      history.length > 0
+        ? Math.round(history.reduce((s: number, g: any) => s + g.score, 0) / history.length)
+        : 0;
+    const accuracy =
+      history.length > 0
+        ? history.reduce((s: number, g: any) => s + g.correctCount, 0) /
+          Math.max(1, history.reduce((s: number, g: any) => s + g.questionCount, 0))
+        : 0;
+
+    const flags: { key: string; label: string; tone: "good" | "warn" | "bad" | "info" }[] = [];
+    if (u.cheatStrikes >= 2) flags.push({ key: "cheat", label: "مشتبه بالغش", tone: "bad" });
+    if (accuracy > 0.95 && (profile?.gamesPlayed ?? 0) >= 5) flags.push({ key: "suspicious", label: "دقة غير بشرية", tone: "warn" });
+    if (winRate >= 0.7 && (profile?.gamesPlayed ?? 0) >= 5) flags.push({ key: "star", label: "نجم صاعد", tone: "good" });
+    if ((profile?.gamesPlayed ?? 0) === 0) flags.push({ key: "dormant", label: "لم يلعب بعد", tone: "info" });
+    if ((u.warnings ?? 0) >= 3) flags.push({ key: "warned", label: "محذَّر متكرر", tone: "bad" });
+    if ((u.reporterReputation ?? 0) <= -2) flags.push({ key: "badreporter", label: "مُبلِّغ كيدي", tone: "warn" });
+    if ((u.prestigePoints ?? 0) >= 3) flags.push({ key: "prestige", label: "نخبة الهيبة", tone: "good" });
+
+    return {
+      identity: {
+        id: String(u._id),
+        name: u.name ?? "لاعب مجهول",
+        email: u.email ?? null,
+        image: u.image ?? null,
+        role: u.role ?? null,
+        reporterReputation: u.reporterReputation ?? 0,
+      },
+      stats: {
+        xp: profile?.xp ?? 0,
+        gamesPlayed: profile?.gamesPlayed ?? 0,
+        gamesWon: profile?.gamesWon ?? 0,
+        winRate: Math.round(winRate * 100),
+        avgScore,
+        accuracy: Math.round(accuracy * 100),
+        badges: profile?.badges.length ?? 0,
+        warnings: u.warnings ?? 0,
+        cheatStrikes: u.cheatStrikes ?? 0,
+        bannedNow,
+        mutedNow,
+      },
+      flags,
+      punishments: mine.map((l: any) => ({
+        at: l.createdAt as number,
+        action: l.action as string,
+        actor: l.actorName as string,
+        reason: l.reason as string,
+        severity: l.severity as string,
+      })),
+      ledger: ledgerRecent.map((l: any) => ({ at: l.at as number, delta: l.delta as number, reason: l.reason as string })),
+      recentGames: recentGames.map((g: any) => ({
+        playedAt: g.playedAt as number,
+        gameCode: g.gameCode as string,
+        rank: g.rank as number,
+        playerCount: g.playerCount as number,
+        score: g.score as number,
+        correct: g.correctCount as number,
+        questions: g.questionCount as number,
+        won: g.won as boolean,
+      })),
+    };
+  },
+});
+
 export const getEconomyPulse = query({
   args: {},
   handler: async (ctx) => {

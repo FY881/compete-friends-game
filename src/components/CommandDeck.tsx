@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,15 @@ import {
   Zap,
   Gauge,
   RefreshCw,
+  CheckSquare,
+  Square,
+  FileUser,
+  Timer,
+  ShieldCheck,
+  Ban,
+  Loader2,
 } from "lucide-react";
+import { PlayerDossier } from "@/components/PlayerDossier";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -83,6 +92,7 @@ function Stat({
 export function CommandDeck({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const overview = useQuery(api.commandDeck.getCommandOverview, {});
   const economy = useQuery(api.commandDeck.getEconomyPulse, {});
+  const bulkPunish = useMutation(api.owner.bulkPunish);
 
   // ── بحث اللاعبين المتقدم ──
   const [playerQuery, setPlayerQuery] = useState("");
@@ -94,6 +104,38 @@ export function CommandDeck({ onNavigate }: { onNavigate?: (tab: string) => void
     sort: sort as "level" | "games" | "warnings",
     limit: 25,
   });
+
+  // ── الإجراءات الجماعية ──
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [dossierId, setDossierId] = useState<string | null>(null);
+  const [dossierOpen, setDossierOpen] = useState(false);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const bulkAct = async (action: "warn" | "mute") => {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    try {
+      await bulkPunish({
+        userIds: [...selected] as never,
+        action,
+        reason: `إجراء جماعي من غرفة القيادة (${action})`,
+      });
+      toast.success(`تم تنفيذ ${action === "warn" ? "تحذير" : "كتم"} على ${selected.size} لاعباً.`);
+      setSelected(new Set());
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل الإجراء الجماعي.");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   // ── سجل التدقيق الذكي ──
   const [auditQuery, setAuditQuery] = useState("");
@@ -264,7 +306,25 @@ export function CommandDeck({ onNavigate }: { onNavigate?: (tab: string) => void
             <div className="divide-y divide-border/60 rounded-xl border border-border/60">
               {players.map((p) => (
                 <div key={p.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
-                  <span className="min-w-0 flex-1 truncate font-semibold">{p.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggle(String(p.id))}
+                    className="text-muted-foreground transition-colors hover:text-primary"
+                    title="اختيار للإجراء الجماعي"
+                  >
+                    {selected.has(String(p.id)) ? <CheckSquare className="size-4 text-primary" /> : <Square className="size-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDossierId(String(p.id)); setDossierOpen(true); }}
+                    className="flex items-center gap-1 rounded-lg p-1 text-primary transition-colors hover:bg-primary/10"
+                    title="فتح الملف الشامل"
+                  >
+                    <FileUser className="size-4" />
+                  </button>
+                  <span className="min-w-0 flex-1 cursor-pointer truncate font-semibold hover:text-primary" onClick={() => { setDossierId(String(p.id)); setDossierOpen(true); }}>
+                    {p.name}
+                  </span>
                   <Badge variant="outline" className="rounded-full text-[10px]">مستوى {p.level}</Badge>
                   <span className="text-[11px] text-muted-foreground">{p.gamesPlayed} جولة · {p.winRate}% فوز</span>
                   {p.warnings > 0 && <Badge variant="outline" className="rounded-full border-amber-500/40 text-[10px] text-amber-600">{p.warnings} تحذير</Badge>}
@@ -281,6 +341,19 @@ export function CommandDeck({ onNavigate }: { onNavigate?: (tab: string) => void
                   </Badge>
                 </div>
               ))}
+            </div>
+          )}
+          {/* شريط الإجراءات الجماعية */}
+          {selected.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5">
+              <span className="text-xs font-bold text-primary">{selected.size} لاعب مُحدَّد</span>
+              <Button size="sm" variant="outline" className="gap-1.5 rounded-xl text-xs" onClick={() => bulkAct("warn")} disabled={bulkBusy}>
+                {bulkBusy ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />} تحذير جماعي
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5 rounded-xl text-xs" onClick={() => bulkAct("mute")} disabled={bulkBusy}>
+                <Timer className="size-3.5" /> كتم جماعي
+              </Button>
+              <Button size="sm" variant="ghost" className="text-xs" onClick={() => setSelected(new Set())}>إلغاء التحديد</Button>
             </div>
           )}
         </CardContent>
@@ -357,6 +430,13 @@ export function CommandDeck({ onNavigate }: { onNavigate?: (tab: string) => void
           )}
         </CardContent>
       </Card>
+
+      {/* ═══ ملف اللاعب الشامل ═══ */}
+      <PlayerDossier
+        userId={dossierId}
+        open={dossierOpen}
+        onClose={() => setDossierOpen(false)}
+      />
     </div>
   );
 }
