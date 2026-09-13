@@ -828,6 +828,120 @@ export const getGovernorEconomyFeed = query({
   },
 });
 
+/**
+ * 💎 محرك اقتراحات المالك — «المستشار الذكي»
+ * يولّد فرصاً ومخاطر وأولويات تطوير حقيقية من بيانات اللعب والاقتصاد والمجتمع:
+ *  - كل اقتراح مبني على رقم فعلي (لا نصوص عامة)
+ *  - أولوية حسب الأثر المتوقع
+ *  - إجراء مقترح قابل للتنفيذ من غرفة المالك مباشرة
+ */
+export const getOwnerAdvisor = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) return null;
+    const now = Date.now();
+    const weekAgo = now - 7 * 86400_000;
+    const prevWeekAgo = now - 14 * 86400_000;
+
+    const [users, games, history, openReports] = await Promise.all([
+      ctx.db.query("users").collect(),
+      ctx.db.query("games").collect(),
+      ctx.db.query("gameHistory").withIndex("by_played", (q: any) => q.gte("playedAt", prevWeekAgo)).take(8000),
+      ctx.db.query("reports").withIndex("by_status", (q: any) => q.eq("status", "open")).collect(),
+    ]);
+
+    const weekRounds = history.filter((g: any) => g.playedAt >= weekAgo);
+    const prevWeekRounds = history.filter((g: any) => g.playedAt < weekAgo);
+    const growth = prevWeekRounds.length > 0
+      ? Math.round(((weekRounds.length - prevWeekRounds.length) / prevWeekRounds.length) * 100)
+      : weekRounds.length > 0 ? 100 : 0;
+
+    const activePlayers = new Set(weekRounds.map((g: any) => String(g.userId)));
+    const dormantPlayers = users.filter((u: any) => !activePlayers.has(String(u._id))).length;
+
+    type Advice = { id: string; type: "opportunity" | "risk" | "priority"; title: string; detail: string; action: string; tab: string; impact: "high" | "medium" | "low" };
+    const advice: Advice[] = [];
+
+    // ── المخاطر ──
+    if (openReports.length >= 5) {
+      advice.push({
+        id: "risk-reports",
+        type: "risk",
+        title: `${openReports.length} بلاغ مفتوح يهدد ثقة المجتمع`,
+        detail: "البلاغات المتراكمة تعني لاعبين يشعرون بالتجاهل — ثقتهم أسير الصعب واستعادتها مستحيلة تقريباً.",
+        action: "افتح الصندوق الذكي وحسم البلاغات بالأولوية العالية أولاً",
+        tab: "smartinbox",
+        impact: "high",
+      });
+    }
+    if (growth < -20) {
+      advice.push({
+        id: "risk-decline",
+        type: "risk",
+        title: `تراجع التفاعل ${growth}% هذا الأسبوع`,
+        detail: `الجولات هبطت من ${prevWeekRounds.length} إلى ${weekRounds.length}. اللعبة تفقد زخمها.`,
+        action: "أطلق حدثاً حياً بمضاعف خبرة لإعادة الإشعال فوراً",
+        tab: "events",
+        impact: "high",
+      });
+    }
+
+    // ── الفرص ──
+    if (dormantPlayers >= 3 && users.length >= 5) {
+      advice.push({
+        id: "opp-dormant",
+        type: "opportunity",
+        title: `${dormantPlayers} لاعباً نائماً هذا الأسبوع`,
+        detail: "لاعبون سجلوا ولم يلعبوا — أرخص نمو ممكن هو إعادة تفعيلهم (مكافأة عودة).",
+        action: "فعّل مكافآت العودة أو أرسل إشعاراً ذكياً لهم",
+        tab: "commanddeck",
+        impact: "medium",
+      });
+    }
+    if (growth >= 30) {
+      advice.push({
+        id: "opp-growth",
+        type: "opportunity",
+        title: `نمو قوي ${growth > 0 ? "+" : ""}${growth}% — اللحظة الذهبية`,
+        detail: "الزخم الحالي يضاعف أثر أي حدث أو موسم تطلقه الآن أكثر من أي وقت آخر.",
+        action: "أطلق حدثاً بمضاعف 2-3 خلال 24 ساعة القادمة",
+        tab: "events",
+        impact: "high",
+      });
+    }
+
+    // ── أولويات ──
+    if (weekRounds.length > 0 && weekRounds.length < 10) {
+      advice.push({
+        id: "priority-content",
+        type: "priority",
+        title: "عدد الجولات الأسبوعي منخفض — المحتوى يحتاج دفعة",
+        detail: "جولات أقل = بيانات أقل لكل أنظمة الذكاء = توصيات أضعف. حلقة تفاعل ذاتية.",
+        action: "راجع جودة الأسئلة وأطلق تحدياً في مجلس العقول",
+        tab: "contentquality",
+        impact: "medium",
+      });
+    }
+    if (advice.length === 0) {
+      advice.push({
+        id: "all-clear",
+        type: "opportunity",
+        title: "كل المؤشرات صحية — وقت التوسع",
+        detail: "لا مخاطر ظاهرة في البيانات. استثمر الهدوء في ميزات نمو جديدة.",
+        action: "راجع بريف المالك واختر أولوية التطوير القادمة",
+        tab: "commandbrief",
+        impact: "low",
+      });
+    }
+
+    const order = { high: 0, medium: 1, low: 2 };
+    advice.sort((a, b) => order[a.impact] - order[b.impact]);
+
+    return { advice, stats: { weekRounds: weekRounds.length, prevWeekRounds: prevWeekRounds.length, growth, activePlayers: activePlayers.size, dormantPlayers, openReports: openReports.length, users: users.length, games: games.length } };
+  },
+});
+
 export const getEconomyPulse = query({
   args: {},
   handler: async (ctx) => {

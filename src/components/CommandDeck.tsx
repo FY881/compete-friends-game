@@ -35,6 +35,10 @@ import {
   ShieldCheck,
   Ban,
   Loader2,
+  Lightbulb,
+  TrendingUp,
+  TriangleAlert,
+  Target,
 } from "lucide-react";
 import { PlayerDossier } from "@/components/PlayerDossier";
 
@@ -92,6 +96,7 @@ function Stat({
 export function CommandDeck({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const overview = useQuery(api.commandDeck.getCommandOverview, {});
   const economy = useQuery(api.commandDeck.getEconomyPulse, {});
+  const advisor = useQuery(api.commandDeck.getOwnerAdvisor, {});
   const bulkPunish = useMutation(api.owner.bulkPunish);
 
   // ── بحث اللاعبين المتقدم ──
@@ -180,6 +185,48 @@ export function CommandDeck({ onNavigate }: { onNavigate?: (tab: string) => void
           </Badge>
         )}
       </div>
+
+      {/* ═══ المستشار الذكي — اقتراحات مبنية على بيانات حقيقية ═══ */}
+      {advisor !== undefined && advisor !== null && advisor.advice.length > 0 && (
+        <Card className="border-primary/25 bg-gradient-to-l from-primary/5 to-transparent shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Lightbulb className="size-4 text-amber-500" /> المستشار الذكي
+              <Badge variant="outline" className="ms-auto rounded-full text-[10px]">
+                نمو الأسبوع: {advisor.stats.growth > 0 ? "+" : ""}{advisor.stats.growth}%
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {advisor.advice.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => onNavigate?.(a.tab)}
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-xl border p-3 text-start transition-all hover:scale-[1.01] hover:shadow-md",
+                  a.type === "risk" ? "border-rose-500/40 bg-rose-500/5"
+                  : a.type === "opportunity" ? "border-emerald-500/40 bg-emerald-500/5"
+                  : "border-amber-500/40 bg-amber-500/5",
+                )}
+              >
+                {a.type === "risk" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-rose-600" />
+                : a.type === "opportunity" ? <TrendingUp className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                : <Target className="mt-0.5 size-4 shrink-0 text-amber-600" />}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold">{a.title}</span>
+                  <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">{a.detail}</span>
+                  <span className="mt-1 block text-[11px] font-semibold text-primary">→ {a.action}</span>
+                </span>
+                <Badge variant="outline" className={cn("shrink-0 rounded-full text-[9px]",
+                  a.impact === "high" ? "border-rose-500/40 text-rose-600" : a.impact === "medium" ? "border-amber-500/40 text-amber-600" : "border-border text-muted-foreground")}>
+                  {a.impact === "high" ? "أثر عالٍ" : a.impact === "medium" ? "أثر متوسط" : "أثر منخفض"}
+                </Badge>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ═══ التنبيهات الذكية ═══ */}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
