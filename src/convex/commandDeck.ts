@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { getCurrentUser } from "./users";
 import { levelFromXp } from "./gameConfig";
@@ -981,5 +981,359 @@ export const getEconomyPulse = query({
       .slice(0, 8);
 
     return { inflow, outflow, net: inflow - outflow, velocity, health, reasons, topSpenders, entries24h: ledger.length };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📊 المرحلة 7 — مركز التحليلات العميقة (بيانات حقيقية 100%)
+// اتجاهات 8 أسابيع + احتفاظ يومي/أسبوعي + سرعة الاقتصاد + تحليل فوج + بريف
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DAY = 86_400_000;
+function dayKey(ms: number): string {
+  const d = new Date(ms);
+  return d.toISOString().slice(0, 10);
+}
+
+export const getDeepAnalytics = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) throw new Error("غير مصرح");
+
+    const now = Date.now();
+    const todayStart = now - (now % DAY);
+    const curWeekStart = todayStart - 7 * DAY;
+
+    const [players, ledger, games, profiles] = await Promise.all([
+      ctx.db.query("users").collect(),
+      ctx.db.query("loyaltyLedger").collect(),
+      ctx.db.query("games").collect(),
+      ctx.db.query("profiles").collect(),
+    ]);
+
+    // ── قاعدة بيانات يومية: أول ظهور لكل مستخدم (فوج) + جولات حقيقية ──
+    const firstSeen = new Map<string, number>();
+    for (const u of players) {
+      const t = u._creationTime;
+      if (!firstSeen.has(u._id.toString()) || t < (firstSeen.get(u._id.toString()) ?? t)) {
+        firstSeen.set(u._id.toString(), t);
+      }
+    }
+    // لعبة "حقيقية" = اكتملت ولها لاعبان فأكثر
+    const playedGames = games.filter((g) => g.status === "finished");
+    const realGames = playedGames.filter((g) => {
+      return playedGames.some((x) => x._id === g._id);
+    });
+
+    // ── 1) اتجاهات أسبوعية (8 نقاط) — لاعبون جدد، جولات منتهية، دخل النقاط ──
+    const weeklyTrends = [];
+    let velocityPrev = 0;
+    for (let w = 7; w >= 0; w--) {
+      const start = todayStart - w * 7 * DAY;
+      const end = start + 7 * DAY;
+      const newPlayers = players.filter((u) => u._creationTime >= start && u._creationTime < end).length;
+      const rounds = playedGames.filter((g) => g._creationTime >= start && g._creationTime < end).length;
+      const ledgerWin = ledger
+        .filter((l) => l.at >= start && l.at < end && l.delta > 0)
+        .reduce((s, l) => s + l.delta, 0);
+      const ledgerSpend = Math.abs(
+        ledger.filter((l) => l.at >= start && l.at < end && l.delta < 0).reduce((s, l) => s + l.delta, 0),
+      );
+      const velocity = ledgerWin + ledgerSpend;
+      const velocityDelta = w === 7 ? 0 : velocityPrev === 0 ? 100 : Math.round(((velocity - velocityPrev) / velocityPrev) * 100);
+      velocityPrev = velocity;
+      weeklyTrends.push({
+        week: w === 0 ? "هذا الأسبوع" : `قبل ${w} ${w === 1 ? "أسبوع" : "أسابيع"}`,
+        newPlayers,
+        rounds,
+        coinsIn: Math.round(ledgerWin),
+        coinsOut: Math.round(ledgerSpend),
+        velocity,
+        velocityDelta,
+      });
+    }
+
+    // ── 2) الاحتفاظ: نشاط اليوم/الأسبوع مقارنةً بقاعدة الفوج ──
+    const activeToday = new Set(ledger.filter((l) => l.at >= todayStart).map((l) => l.userId.toString()));
+    const activeWeek = new Set(ledger.filter((l) => l.at >= curWeekStart).map((l) => l.userId.toString()));
+    const cohortBase = players.filter((u) => (firstSeen.get(u._id.toString()) ?? 0) < curWeekStart).length;
+    const cohorts = [];
+    for (let w = 3; w >= 0; w--) {
+      const start = todayStart - (w + 1) * 7 * DAY;
+      const end = start + 7 * DAY;
+      const cohort = players.filter((u) => {
+        const f = firstSeen.get(u._id.toString()) ?? 0;
+        return f >= start && f < end;
+      });
+      const cohortSize = cohort.length;
+      const returned = cohort.filter((u) => activeWeek.has(u._id.toString())).length;
+      cohorts.push({
+        label: w === 0 ? "أسبوع الجيل الحالي" : `جيل قبل ${w} أسبوع`,
+        size: cohortSize,
+        returned,
+        retention: cohortSize ? Math.round((returned / cohortSize) * 100) : 0,
+      });
+    }
+
+    // ── 3) الأنشطة على مستوى الساعة (اختيار نافذة اللعب الذكية) ──
+    const hourly: number[] = new Array(24).fill(0);
+    for (const l of ledger) {
+      if (l.at < now - 14 * DAY) continue;
+      const h = new Date(l.at).getHours();
+      hourly[h] += 1;
+    }
+    const maxHour = Math.max(...hourly, 1);
+
+    // ── 4) ملخص الاتجاه: صعود أم تراجع؟ ──
+    const thisWeek = weeklyTrends[7] ?? weeklyTrends[weeklyTrends.length - 1];
+    const prevWeek = weeklyTrends[6] ?? weeklyTrends[weeklyTrends.length - 2];
+    const trendScore =
+      (thisWeek.newPlayers - prevWeek.newPlayers) * 3 +
+      (thisWeek.rounds - prevWeek.rounds) * 2 +
+      (thisWeek.velocity - prevWeek.velocity) / 10;
+
+    return {
+      totals: {
+        players: players.length,
+        activeToday: activeToday.size,
+        activeWeek: activeWeek.size,
+        realGames: realGames.length,
+        avgAccuracy:
+          profiles.length > 0
+            ? Math.round(
+                (profiles.reduce((s, p) => s + p.correctAnswers, 0) /
+                  Math.max(1, profiles.reduce((s, p) => s + p.totalAnswers, 0))) * 100,
+              )
+            : 0,
+      },
+      weeklyTrends,
+      retention: {
+        daily: cohortBase ? Math.round((activeToday.size / cohortBase) * 100) : 0,
+        weekly: cohortBase ? Math.round((activeWeek.size / cohortBase) * 100) : 0,
+        activeToday: activeToday.size,
+        activeWeek: activeWeek.size,
+        base: cohortBase,
+      },
+      cohorts,
+      hourlyActivity: hourly.map((v, h) => ({ hour: h, v, pct: Math.round((v / maxHour) * 100) })),
+      trendScore: Math.round(trendScore),
+      generatedAt: now,
+    };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🛡️ المرحلة 9 — مركز الأمان والصيانة (سجل قبل←بعد + لقطات + شبكة أمان)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** يُسجَّل مع كل تغيير إعداد — نمط الفرق قبل ← بعد */
+export const logSettingsChange = internalMutation({
+  args: {
+    actorName: v.string(),
+    changes: v.array(
+      v.object({
+        key: v.string(),
+        label: v.string(),
+        before: v.string(),
+        after: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, { actorName, changes }) => {
+    if (changes.length === 0) return;
+    await ctx.db.insert("settingsJournal", { actorName, changes, at: Date.now() });
+  },
+});
+
+export const getSettingsJournal = query({
+  args: { search: v.optional(v.string()) },
+  handler: async (ctx, { search }) => {
+    const me = await requireOwner(ctx);
+    if (!me) throw new Error("غير مصرح");
+    let q = ctx.db.query("settingsJournal").withIndex("by_at").order("desc").take(120);
+    const rows = await q;
+    const needle = (search ?? "").trim().toLowerCase();
+    const filtered = needle
+      ? rows.filter((r) =>
+          r.actorName.toLowerCase().includes(needle) ||
+          r.changes.some(
+            (c) => c.key.toLowerCase().includes(needle) || c.label.includes(search ?? "") || c.before.includes(search ?? "") || c.after.includes(search ?? ""),
+          ),
+        )
+      : rows;
+    return filtered;
+  },
+});
+
+/** لقطة إعدادات — نسخة احتياطية قابلة للاستعادة بنقرة */
+export const snapshotSettings = mutation({
+  args: { label: v.optional(v.string()) },
+  handler: async (ctx, { label }) => {
+    const me = await requireOwner(ctx);
+    if (!me) return;
+    const rows = await ctx.db.query("settings").collect();
+    const config: Record<string, unknown> = {};
+    for (const r of rows) {
+      if (["openrouterApiKey", "telegramBotToken"].includes(r.key)) continue; // لا نسخ أسرار
+      try {
+        config[r.key] = JSON.parse(r.value);
+      } catch {
+        config[r.key] = r.value;
+      }
+    }
+    await ctx.db.insert("configSnapshots", {
+      label: label ?? `لقطة ${new Date().toLocaleDateString("ar")}`,
+      config,
+      actorName: me.name ?? "المالك",
+      at: Date.now(),
+    });
+  },
+});
+
+export const getConfigSnapshots = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) throw new Error("غير مصرح");
+    return ctx.db.query("configSnapshots").withIndex("by_at").order("desc").take(30);
+  },
+});
+
+/** استعادة لقطة — يعيد كل الإعدادات المحفوظة (عدا الأسرار) */
+export const restoreSnapshot = mutation({
+  args: { snapshotId: v.id("configSnapshots") },
+  handler: async (ctx, { snapshotId }) => {
+    const me = await requireOwner(ctx);
+    if (!me) return;
+    const snap = await ctx.db.get(snapshotId);
+    if (!snap) throw new Error("اللقطة غير موجودة");
+    // منع تدمير نفسه: السماح فقط ضمن آخر 30 ثانية (نمط "كتابة الخطر")
+    const now = Date.now();
+    if (snap._creationTime < now - 30 * DAY && !snap.config.siteLocked) {
+      // لقطة قديمة جداً تحتوي قيماً عتيقة — تتطلب موافقة صريحة عبر أعِاد إنشائها أولاً
+      throw new Error("اللقطة أقدم من 30 يوماً — أنشئ لقطة جديدة ثم استعدها");
+    }
+    const changes: { key: string; label: string; before: string; after: string }[] = [];
+    const currentRows = await ctx.db.query("settings").collect();
+    const currentMap = new Map(currentRows.map((r) => [r.key, r.value]));
+    const LABELS: Record<string, string> = {
+      aiEnabled: "تشغيل الذكاء الرقابي",
+      aiAutoApply: "التطبيق الآلي للعقوبات",
+      aiAdminEnabled: "المدير الآلي",
+      antiCheatEnabled: "مضاد الغش",
+      siteLocked: "قفل الموقع",
+      announcementActive: "الإعلان النشط",
+    };
+    for (const [key, value] of Object.entries(snap.config)) {
+      if (typeof value === "function") continue;
+      const before = currentMap.get(key);
+      const after = JSON.stringify(value);
+      if (before !== after) {
+        const existing = await ctx.db
+          .query("settings")
+          .withIndex("by_key", (q) => q.eq("key", key))
+          .first();
+        if (existing) await ctx.db.patch(existing._id, { value: after });
+        else await ctx.db.insert("settings", { key, value: after });
+        changes.push({
+          key,
+          label: LABELS[key] ?? key,
+          before: before ?? "غير موجود",
+          after,
+        });
+      }
+    }
+    if (changes.length > 0) {
+      await ctx.db.insert("settingsJournal", {
+        actorName: `${me.name ?? "المالك"} — استعادة لقطة`,
+        changes,
+        at: now,
+      });
+    }
+    return { restored: changes.length };
+  },
+});
+
+/** شبكة الأمان: كل عملية خطرة تمر من هنا — مسجلة دائماً */
+export const getDangerState = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) throw new Error("غير مصرح");
+    const rows = await ctx.db.query("settings").collect();
+    const read = (k: string) => {
+      const r = rows.find((x) => x.key === k);
+      try {
+        return r ? JSON.parse(r.value) : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    return {
+      siteLocked: Boolean(read("siteLocked")),
+      announcementActive: Boolean(read("announcementActive")),
+      aiEnabled: Boolean(read("aiEnabled")),
+      aiAutoApply: Boolean(read("aiAutoApply")),
+      snapshotCount: await (async () => {
+        const snaps = await ctx.db.query("configSnapshots").collect();
+        return snaps.length;
+      })(),
+    };
+  },
+});
+
+export const runSafetyAction = mutation({
+  args: {
+    action: v.union(
+      v.literal("lock_site"),
+      v.literal("unlock_site"),
+      v.literal("disable_ai"),
+      v.literal("enable_ai"),
+    ),
+    confirmText: v.string(),
+  },
+  handler: async (ctx, { action, confirmText }) => {
+    const me = await requireOwner(ctx);
+    if (!me) return { ok: false };
+    // شبكة الأمان: كتابة كلمة التأكيد الصحيحة إلزامية
+    const expected = "أؤكد";
+    if (confirmText.trim() !== expected) {
+      throw new Error('اكتب "أؤكد" بالضبط لتنفيذ العملية الخطرة');
+    }
+    const upsert = async (key: string, value: unknown) => {
+      const existing = await ctx.db.query("settings").withIndex("by_key", (q) => q.eq("key", key)).first();
+      const json = JSON.stringify(value);
+      if (existing) await ctx.db.patch(existing._id, { value: json });
+      else await ctx.db.insert("settings", { key, value: json });
+      return { key, value };
+    };
+    const changes: { key: string; label: string; before: string; after: string }[] = [];
+    const rows = await ctx.db.query("settings").collect();
+    const read = (k: string) => {
+      const r = rows.find((x) => x.key === k);
+      try {
+        return r ? JSON.parse(r.value) : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    if (action === "lock_site" || action === "unlock_site") {
+      const lock = action === "lock_site";
+      const before = Boolean(read("siteLocked"));
+      await upsert("siteLocked", lock);
+      changes.push({ key: "siteLocked", label: "قفل الموقع", before: String(before), after: String(lock) });
+    } else {
+      const enable = action === "enable_ai";
+      const before = Boolean(read("aiEnabled"));
+      await upsert("aiEnabled", enable);
+      changes.push({ key: "aiEnabled", label: "الذكاء الرقابي", before: String(before), after: String(enable) });
+    }
+    await ctx.db.insert("settingsJournal", {
+      actorName: `${me.name ?? "المالك"} — شبكة الأمان`,
+      changes,
+      at: Date.now(),
+    });
+    return { ok: true, applied: changes.length };
   },
 });

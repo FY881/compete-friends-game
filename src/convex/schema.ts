@@ -2256,6 +2256,28 @@ const schema = defineSchema(
       severity: v.union(v.literal("info"), v.literal("warning"), v.literal("critical")),
       at: v.number(),
     }).index("by_created", ["at"]),
+
+    // 🛡️ سجل عمليات الإعدادات (نمط الفرق قبل ← بعد) — المرحلة 9
+    settingsJournal: defineTable({
+      actorName: v.string(),
+      changes: v.array(
+        v.object({
+          key: v.string(),
+          label: v.string(),
+          before: v.string(),
+          after: v.string(),
+        }),
+      ),
+      at: v.number(),
+    }).index("by_at", ["at"]),
+
+    // 💾 لقطات إعدادات قابلة للاستعادة — نسخ احتياطي بنقرة
+    configSnapshots: defineTable({
+      label: v.string(),
+      config: v.any(),
+      actorName: v.string(),
+      at: v.number(),
+    }).index("by_at", ["at"]),
   },
   {
     schemaValidation: false,

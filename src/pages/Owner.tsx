@@ -90,6 +90,7 @@ import {
   Zap,
   Focus,
   Lock,
+  TrendingUp,
 } from "lucide-react";
 // Menu + Focus imported above via separate import
 import { useNavigate } from "react-router";
@@ -128,6 +129,8 @@ import { AppealsPanel } from "@/components/Appeals";
 import { EconomyWarRoom } from "@/components/EconomyWarRoom";
 import { AiHubTab } from "@/components/AiHubTab";
 import { EventsStudio } from "@/components/EventsStudio";
+import { AnalyticsCenter } from "@/components/AnalyticsCenter";
+import { SecurityCenter } from "@/components/SecurityCenter";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2254,6 +2257,8 @@ const NAV_GROUPS = [
       { id: "economywar", icon: Store, label: "غرفة الاقتصاد 🛒" },
       { id: "aihub", icon: BrainCircuit, label: "مركز الذكاء الموحد 🧠" },
       { id: "events", icon: CalendarClock, label: "استوديو الأحداث 🗓️" },
+      { id: "analytics", icon: TrendingUp, label: "مركز التحليلات 📈" },
+      { id: "security", icon: ShieldCheck, label: "الأمان والصيانة 🛡️" },
     ],
   },
   {
@@ -2394,6 +2399,10 @@ export default function Owner() {
         return <AiHubTab />;
       case "events":
         return <EventsStudio />;
+      case "analytics":
+        return <AnalyticsCenter />;
+      case "security":
+        return <SecurityCenter />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":
