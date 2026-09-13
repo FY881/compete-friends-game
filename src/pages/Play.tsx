@@ -26,6 +26,7 @@ import { LegacyCard } from "@/components/LegacyCard";
 import { MindsCouncil } from "@/components/MindsCouncil";
 import { AppealForm } from "@/components/Appeals";
 import { AdaptiveRewardCard } from "@/components/AdaptiveRewardCard";
+import { SmartMatchCard } from "@/components/SmartMatchCard";
 import { LiveEventBanner } from "@/components/EventsStudio";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
@@ -280,6 +281,7 @@ export default function Play() {
         <ClanPanel />
         <SeasonPassPanel />
         <QuestsPanel />
+        <SmartMatchCard />
         <LegacyCard />
         <MindsCouncil />
         <AppealForm />

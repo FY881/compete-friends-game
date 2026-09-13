@@ -25,6 +25,7 @@ export const UNIT_CATALOG = [
   { unit: "questions", name: "مهندس الأسئلة", dept: "المحتوى", desc: "توليد ومراجعة جودة حزم الأسئلة" },
   { unit: "health", name: "مراقب الصحة", dept: "الصحة", desc: "صحة اللعبة والاقتصاد والمجتمع بشكل حي" },
   { unit: "recommender", name: "المُوصي الذكي", dept: "التوصيات", desc: "تحديات وأحداث مقترحة حسب نشاط اللاعبين" },
+  { unit: "personalizer", name: "مخصص التجربة", dept: "التخصيص", desc: "مطابقة ذكية وأسئلة ديناميكية حسب مهارة ونقاط ضعف كل لاعب" },
 ] as const;
 
 /** تسجيل حدث من أي وحدة (داخلي — تستدعيه الوحدات الأخرى) */
@@ -160,6 +161,19 @@ export const bridgeTick = internalMutation({
         kind: "alert",
         severity: unresolved >= 3 ? "critical" : "warn",
         summary: `${unresolved} حدث لعب نظيف غير محسوم خلال 24 ساعة`,
+      });
+      logged++;
+    }
+
+    // ── إشارة: ملفات نقاط الضعف → مخصص التجربة ──
+    const profilers = await ctx.db.query("categoryHistory").take(400);
+    const distinctPlayers = new Set(profilers.map((r) => r.userId.toString())).size;
+    if (distinctPlayers > 0) {
+      await ctx.runMutation(internal.aiHub.logEvent, {
+        unit: "personalizer",
+        kind: "observation",
+        severity: "info",
+        summary: `${distinctPlayers} لاعب لديهم ملف نقاط ضعف — الأسئلة الديناميكية والمطابقة الذكية نشطة`,
       });
       logged++;
     }

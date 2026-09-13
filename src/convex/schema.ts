@@ -508,6 +508,17 @@ const schema = defineSchema(
       .index("by_user_game", ["userId", "gameId"])
       .index("by_played", ["playedAt"]),
 
+    // 🎯 سجل إجابات الفئات — وقود الأسئلة الديناميكية والمطابقة الذكية (المرحلة 10)
+    categoryHistory: defineTable({
+      userId: v.id("users"),
+      category: v.string(),
+      correct: v.number(),
+      total: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_cat", ["userId", "category"]),
+
     // ⭐ أفضل لحظات الأسبوع — ملخص آلي يُنشر في العشائر
     highlights: defineTable({
       weekKey: v.string(), // مثل "2026-W36"
@@ -1073,6 +1084,7 @@ const schema = defineSchema(
         v.literal("rejected"), // مرفوضة — لا تدخل جولات جديدة
       ),
       createdAt: v.number(),
+      timesShown: v.optional(v.number()), // 🎯 المرحلة 10: عدّاد العرض لوزن الديناميكية
     })
       .index("by_qid", ["qid"])
       .index("by_status", ["status"])

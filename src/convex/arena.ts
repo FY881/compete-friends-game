@@ -110,7 +110,10 @@ type DuelRating = {
 type WriteCtx = { db: any };
 
 async function createDuelGame(
-  ctx: { db: any },
+  ctx: {
+    db: any;
+    runQuery: (functionReference: any, args?: any) => Promise<unknown>;
+  },
   hostId: Id<"users">,
   guestId: Id<"users">,
 ): Promise<string> {
@@ -121,10 +124,23 @@ async function createDuelGame(
     durationMinutes: DURATION_MODE_OFF,
   });
   const code = await makeUniqueCode(ctx);
+  // 🎯 المرحلة 10: صعوبة المبارزة تناسب متوسط مهارة اللاعبَين (10%–40% صعب)
+  let hardHint: number | undefined;
+  try {
+    const { getSkillLevel } = await import("./fairPlay");
+    const [s1, s2] = (await Promise.all([
+      ctx.runQuery(internal.fairPlay.getSkillLevel, { userId: hostId }),
+      ctx.runQuery(internal.fairPlay.getSkillLevel, { userId: guestId }),
+    ])) as [number, number];
+    hardHint = Math.min(0.4, Math.max(0.1, ((s1 + s2) / 2) * 0.5));
+  } catch {
+    /* الافتراضي 20% */
+  }
   const questionIds = await pickQuestions(
     ctx,
     settings.categories,
     poolSizeFor(settings),
+    hardHint,
   );
 
   const gameId = await ctx.db.insert("games", {
@@ -195,6 +211,7 @@ export const getMyRating = query({
       draws: r.draws,
       tier: tierOf(r.rating),
       inQueue,
+      queueDepth: queued.length, // 🎯 عدد المنتظرين الآن — المطابقة الذكية تعرض أقربهم
     };
   },
 });
@@ -296,8 +313,23 @@ export const joinQueue = mutation({
       return { matched: true as const, code: myActive.gameCode };
     }
 
-    // حاول التزاوج الفوري مع أول منتظر (ليس أنت)
-    const opponentEntry = waiting.find((d) => d.challengerId !== userId);
+    // 🎯 المطابقة الذكية: الأقرب تقييماً أولاً، ثم الأقدم انتظاراً (تراجع زمني آمن)
+    const myRating = await getOrCreateRating(ctx, userId, false);
+    const candidates = waiting.filter((d) => d.challengerId !== userId);
+    let opponentEntry: (typeof waiting)[number] | undefined;
+    if (candidates.length > 0) {
+      const scored: { entry: (typeof waiting)[number]; gap: number }[] = [];
+      for (const c of candidates) {
+        const cr = await getOrCreateRating(ctx, c.challengerId, false);
+        const waitMinutes = (now - c.createdAt) / 60_000;
+        // فجوة ELO تتناقش قيمتها مع طول الانتظار: بعد 5 دقائق يقبل أي خصم تقريباً
+        const tolerance = 100 + Math.min(500, waitMinutes * 100);
+        const gap = Math.abs(cr.rating - myRating.rating) - waitMinutes * 2;
+        scored.push({ entry: c, gap: Math.abs(cr.rating - myRating.rating) <= tolerance ? gap : 10_000 + gap });
+      }
+      scored.sort((a, b) => a.gap - b.gap);
+      opponentEntry = scored[0]?.entry;
+    }
     if (opponentEntry) {
       const code = await createDuelGame(ctx, opponentEntry.challengerId, userId);
       await ctx.db.patch(opponentEntry._id, {
@@ -315,6 +347,18 @@ export const joinQueue = mutation({
         });
       } catch {
         /* الإشعار اختياري */
+      }
+      // 🧠 تسجيل المطابقة الذكية في مركز الذكاء الموحد
+      try {
+        const oppR = await getOrCreateRating(ctx, opponentEntry.challengerId, false);
+        await ctx.runMutation(internal.aiHub.logEvent, {
+          unit: "personalizer",
+          kind: "match",
+          severity: "info",
+          summary: `مبارزة ذكية: فجوة ${Math.abs(oppR.rating - myRating.rating)} نقطة ELO بين الطرفين`,
+        });
+      } catch {
+        /* تسجيل المركز اختياري */
       }
       return { matched: true as const, code };
     }

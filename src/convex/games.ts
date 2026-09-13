@@ -334,6 +334,119 @@ function poolSizeFor(settings: GameSettings): number {
 /** Structural db accessor so the helper works from both queries and mutations. */
 type DbCtx = { db: QueryCtx["db"] | MutationCtx["db"] };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎯 المرحلة 10 — الأسئلة الديناميكية: تُبنى حسب اللاعب لا حسب الحظ
+//
+//  1. نقاط الضعف الحقيقية من categoryHistory (سجل إجابات الفئات الفعلي)
+//  2. وزن مضاعف للفئات الضعيفة (يعالجها المدرب أيضاً — سياق مشترك من المركز)
+//  3. صعوبة تتناسب مع مهارة اللاعب (من fairPlay.getSkillLevel) بدل قالب ثابت
+//  4. منع التكرار: يستبعد أسئلة آخر جولتين للاعب
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function pickAdaptiveQuestions(
+  ctx: DbCtx & { runQuery: (functionReference: any, args?: any) => Promise<unknown> },
+  userId: Id<"users">,
+  categories: string[],
+  count: number,
+): Promise<string[]> {
+  const all = await getAllQuestions(ctx);
+  const pool = all.filter(
+    (q) => categories.length === 0 || categories.includes(q.category),
+  );
+  if (pool.length === 0) throw new Error("لا توجد أسئلة في الفئات المختارة");
+
+  // ── 1) سجل الفئات الحقيقي للاعب ──
+  const catRows = await ctx.db
+    .query("categoryHistory")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  const acc = new Map<string, number>(); // category → accuracy 0..1
+  for (const row of catRows) {
+    if (row.total >= 5) acc.set(row.category, row.total > 0 ? row.correct / row.total : 0.5);
+  }
+
+  // ── 2) مهارة اللاعب العامة → نسبة الصعب المثالية (10%..40%) ──
+  let skill = 0.5;
+  try {
+    const { getSkillLevel } = await import("./fairPlay");
+    skill = (await ctx.runQuery(internal.fairPlay.getSkillLevel, { userId })) as number;
+  } catch {
+    /* الافتراضي متوسط */
+  }
+  const hardRatio = Math.min(0.4, Math.max(0.1, skill * 0.5));
+
+  // ── 3) منع التكرار: استبعاد أسئلة آخر جولتين ──
+  const recent = await ctx.db
+    .query("gameHistory")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(2);
+  const recentIds = new Set<string>();
+  for (const h of recent) {
+    const gp = await ctx.db
+      .query("games")
+      .withIndex("by_code", (q) => q.eq("code", h.gameCode))
+      .first();
+    if (gp) for (const qid of gp.questionIds) recentIds.add(qid);
+  }
+
+  // ── 4) الترجيح: الضعف ×2.2، القوة ×0.6، أسئلة جديدة غير مرئية تحصل على دفعة ──
+  const weighted: { q: Question; w: number }[] = [];
+  for (const q of pool) {
+    if (recentIds.has(q.id)) continue;
+    const a = acc.get(q.category);
+    let w = a === undefined ? 1.35 : a < 0.5 ? 2.2 - a : 1.2 - a * 0.6;
+    if (q.difficulty === "hard") w *= skill > 0.6 ? 1.4 : 0.8;
+    if (q.difficulty === "easy") w *= skill < 0.4 ? 1.3 : 0.7;
+    weighted.push({ q, w });
+  }
+  if (weighted.length === 0) {
+    // كل الأسئلة كانت في آخر جولتين — ارجع للمجموعة الكاملة
+    for (const q of pool) weighted.push({ q, w: 1 });
+  }
+
+  // ── 5) سحب مرجّح بدون تكرار حتى count ──
+  const picked: string[] = [];
+  const items = [...weighted];
+  while (picked.length < count && items.length > 0) {
+    const totalW = items.reduce((s, it) => s + it.w, 0);
+    let r = Math.random() * totalW;
+    let idx = 0;
+    for (let i = 0; i < items.length; i++) {
+      r -= items[i].w;
+      if (r <= 0) {
+        idx = i;
+        break;
+      }
+    }
+    picked.push(items[idx].q.id);
+    items.splice(idx, 1);
+  }
+
+  // العدّاد الإحصائي للأسئلة AI (يُغذي جودة المحتوى)
+  return picked;
+}
+
+// 🎯 واجهة اللاعب: ملف فئاته (قوة/ضعف) — يغذي بطاقة المطابقة الذكية
+export const getMyCategoryProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return [];
+    const rows = await ctx.db
+      .query("categoryHistory")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    return rows
+      .map((r) => ({
+        category: r.category,
+        accuracy: r.total > 0 ? Math.round((r.correct / r.total) * 100) : 0,
+        total: r.total,
+      }))
+      .sort((a, b) => a.accuracy - b.accuracy);
+  },
+});
+
 // موجّة 11 — واجهات مشتركة لتستخدمها وحدات الحلبة والإعادة
 export { pickQuestions, makeUniqueCode, sanitizeName, validateSettings, poolSizeFor, resolveQuestion };
 export type { DbCtx };
@@ -447,12 +560,18 @@ export const createGame = mutation({
     } catch {
       /* الافتراضي 20% */
     }
-    const questionIds = await pickQuestions(
-      ctx,
-      safeSettings.categories,
-      poolSizeFor(safeSettings),
-      hardHint,
-    );
+    // 🎯 الأسئلة الديناميكية: مبنية على نقاط ضعف المضيف ومستواه (تُسقط للقالب الثابت عند الخطأ)
+    let questionIds: string[];
+    try {
+      questionIds = await pickAdaptiveQuestions(ctx, userId, safeSettings.categories, poolSizeFor(safeSettings));
+    } catch {
+      questionIds = await pickQuestions(
+        ctx,
+        safeSettings.categories,
+        poolSizeFor(safeSettings),
+        hardHint,
+      );
+    }
 
     const gameId = await ctx.db.insert("games", {
       code,
@@ -1311,6 +1430,43 @@ export const finishGame = internalMutation({
         firstOfDay,
         playedAt: now,
       });
+
+      // 🎯 المرحلة 10 — سجل الفئات: أساس الأسئلة الديناميكية والمدرب
+      try {
+        const perCat = new Map<string, { c: number; t: number }>();
+        for (const a of p.answers) {
+          if (!a) continue;
+          const qd = await resolveQuestion(ctx, a.questionId);
+          if (!qd) continue;
+          const cur = perCat.get(qd.category) ?? { c: 0, t: 0 };
+          cur.t += 1;
+          if (a.correct) cur.c += 1;
+          perCat.set(qd.category, cur);
+        }
+        for (const [category, { c, t }] of perCat) {
+          const existing = await ctx.db
+            .query("categoryHistory")
+            .withIndex("by_user_cat", (q) => q.eq("userId", p.userId).eq("category", category))
+            .first();
+          if (existing) {
+            await ctx.db.patch(existing._id, {
+              correct: existing.correct + c,
+              total: existing.total + t,
+              updatedAt: now,
+            });
+          } else {
+            await ctx.db.insert("categoryHistory", {
+              userId: p.userId,
+              category,
+              correct: c,
+              total: t,
+              updatedAt: now,
+            });
+          }
+        }
+      } catch {
+        /* سجل الفئات اختياري — لا يعطل الجولة */
+      }
 
       // موجّة 5 — إن كانت جولة داخل نافذة بطولة نشطة، احتسبها تلقائياً
       try {
