@@ -2240,6 +2240,7 @@ const NAV_GROUPS = [
       { id: "deputy", icon: ShieldCheck, label: "مركز نائب المالك 👑" },
       { id: "fairplay", icon: Scale, label: "الحكم الآلي ⚖️" },
       { id: "governor", icon: Bot, label: "الحاكم الآلي 🤖" },
+      { id: "minds", icon: BrainCircuit, label: "غرفة التحكم بالعقول 🧠" },
       { id: "users", icon: Users, label: "اللاعبون", badge: true },
       { id: "reports", icon: Flag, label: "البلاغات", badge: true },
       { id: "rules", icon: Scale, label: "القوانين" },
@@ -2360,6 +2361,8 @@ export default function Owner() {
         return <FairPlayTab />;
       case "governor":
         return <AiGovernorTab />;
+      case "minds":
+        return <MindsControlRoom />;
       case "users":
         return <AdvancedPlayersTab isOwner={access.isOwner} />;
       case "reports":
