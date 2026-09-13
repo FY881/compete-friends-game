@@ -113,6 +113,7 @@ import { DeputyCommandCenter } from "@/components/DeputyCommandCenter";
 import { FairPlayTab } from "@/components/FairPlayTab";
 import { AiGovernorTab } from "@/components/AiGovernorTab";
 import { LivingAgentsTab } from "@/components/LivingAgentsTab";
+import { MindsControlRoom } from "@/components/MindsControlRoom";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";

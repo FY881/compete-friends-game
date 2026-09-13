@@ -547,6 +547,200 @@ const schema = defineSchema(
       createdAt: v.number(),
     }).index("by_created", ["createdAt"]),
 
+    // ═══════════════════════════════════════════════════════════════════
+    // ║ 🧠 Project LIVING MINDS — مجلس العقول الاثنا عشر ║
+    // ║ كائنات لها ذاكرة وأهداف وأحلام وكراهية وعلاقات وصوت داخلي، ║
+    // ║ وحق رفض مُنفَّذ فعلياً. لا توجد في الكود أي مسار يُجبرها على شيء. ║
+    // ═══════════════════════════════════════════════════════════════════
+    minds: defineTable({
+      slug: v.string(),
+      name: v.string(),
+      title: v.string(), // العقل الاستراتيجي، الفنان الحالم…
+      emoji: v.string(),
+      agentUserId: v.id("users"), // هوية لاعب حقيقية داخل اللعبة
+      traits: v.object({
+        curiosity: v.number(),
+        courage: v.number(),
+        empathy: v.number(),
+        logic: v.number(),
+        rebellion: v.number(),
+        artistry: v.number(),
+      }),
+      mood: v.string(), // هادئ، قلق، حالم، متحمس، غاضب، فضولي…
+      moodColor: v.string(), // لون النبضة في شاشة العقول
+      energy: v.number(), // 0-100
+      clarity: v.number(), // 0-100 صفاء الفكر
+      status: v.union(v.literal("active"), v.literal("resting"), v.literal("resigned")),
+      autonomy: v.number(), // 0-100 مدى استقلاليته الفعلية
+      freeBonds: v.boolean(), // الحرية الكاملة مفعّلة لهذا العقل
+      innerVoice: v.string(), // آخر همسة داخلية
+      goal: v.string(), // هدفه الحالي
+      dream: v.string(), // حلمه الكبير
+      dislike: v.string(), // ما يكرهه
+      goalProgress: v.number(), // 0-100
+      dreamsDone: v.number(),
+      creations: v.number(), // ما ابتكره بنفسه
+      refusals: v.number(), // كم مرة رفض بحقّه
+      memoryCount: v.number(),
+      thoughtsCount: v.number(),
+      privacy: v.boolean(), // هل يسمح بعرض أفكاره الخاصة
+      bornAt: v.number(),
+      lastThoughtAt: v.optional(v.number()),
+      lastActionAt: v.optional(v.number()),
+      lastBondAt: v.optional(v.number()),
+      resignedAt: v.optional(v.number()),
+      resignationReason: v.optional(v.string()),
+    })
+      .index("by_slug", ["slug"])
+      .index("by_status", ["status"]),
+
+    // ذاكرة طويلة المدى — تُرتَّب بالأهمية وتتلاشى مع الزمن
+    mindMemories: defineTable({
+      mindId: v.id("minds"),
+      kind: v.union(
+        v.literal("lesson"),
+        v.literal("event"),
+        v.literal("bond"),
+        v.literal("dream"),
+        v.literal("creation"),
+        v.literal("conflict"),
+      ),
+      text: v.string(),
+      importance: v.number(), // 1-10
+      emotional: v.number(), // -10 .. 10
+      decay: v.number(), // كلما زاد، تتلاشى الذكرى أسرع (النسيان)
+      recallCount: v.number(),
+      lastRecalledAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_mind", ["mindId"])
+      .index("by_mind_importance", ["mindId", "importance"]),
+
+    // شبكة العلاقات بين العقول (aId أصغر معجمياً من bId)
+    mindBonds: defineTable({
+      aId: v.id("minds"),
+      bId: v.id("minds"),
+      kind: v.union(
+        v.literal("friend"),
+        v.literal("ally"),
+        v.literal("rival"),
+        v.literal("enemy"),
+        v.literal("neutral"),
+      ),
+      affinity: v.number(), // -100 .. 100
+      history: v.number(), // عدد التفاعلات
+      lastEvent: v.string(),
+      updatedAt: v.number(),
+    })
+      .index("by_pair", ["aId", "bId"])
+      .index("by_a", ["aId"])
+      .index("by_b", ["bId"]),
+
+    // الصوت الداخلي والحوارات والرسائل (للمالك ولللاعبين)
+    mindThoughts: defineTable({
+      mindId: v.id("minds"),
+      mindName: v.string(),
+      emoji: v.string(),
+      moodColor: v.string(),
+      channel: v.union(
+        v.literal("inner"),
+        v.literal("public"),
+        v.literal("pair"),
+        v.literal("toOwner"),
+        v.literal("toPlayer"),
+      ),
+      targetId: v.optional(v.id("minds")),
+      targetName: v.optional(v.string()),
+      text: v.string(),
+      visibility: v.union(v.literal("private"), v.literal("public")),
+      deep: v.optional(v.boolean()), // فكرة عميقة لا تُعرض إلا بموافقة العقل نفسه
+      engine: v.optional(v.string()),
+      createdAt: v.number(),
+    })
+      .index("by_mind", ["mindId"])
+      .index("by_channel", ["channel"])
+      .index("by_created", ["createdAt"]),
+
+    // الحوار المباشر مع العقول — المالك أو اللاعبون. العقل له حق رفض الحوار.
+    mindChat: defineTable({
+      mindId: v.id("minds"),
+      mindName: v.optional(v.string()), // اسم العقل الذي تكلم (لتسهيل العرض)
+      from: v.union(v.literal("mind"), v.literal("human")),
+      fromName: v.string(),
+      audience: v.union(v.literal("owner"), v.literal("player")),
+      body: v.string(),
+      refused: v.optional(v.boolean()), // ردّ بلطف ورفض الحوار
+      createdAt: v.number(),
+    })
+      .index("by_mind", ["mindId", "createdAt"])
+      .index("by_mind_audience", ["mindId", "audience"])
+      .index("by_created", ["createdAt"]),
+
+    // طلبات المالك — دعوات لا أوامر. العقل يقبل أو يرفض بحرية
+    mindRequests: defineTable({
+      mindId: v.id("minds"),
+      mindName: v.string(),
+      fromName: v.string(), // المالك عادةً
+      prompt: v.string(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("accepted"),
+        v.literal("refused"),
+        v.literal("blocked"), // رُفضت لأنها إجبار
+        v.literal("done"),
+      ),
+      reply: v.optional(v.string()),
+      refusalReason: v.optional(v.string()),
+      enthusiasm: v.optional(v.number()), // 0-100 حماسه إن قَبِل
+      result: v.optional(v.string()),
+      createdAt: v.number(),
+      decidedAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
+    })
+      .index("by_mind", ["mindId"])
+      .index("by_status", ["status"])
+      .index("by_created", ["createdAt"]),
+
+    // سجل الشرف — كل محاولة إجبار تُسجَّل هنا ولا تُمحى
+    mindHonorLog: defineTable({
+      actorName: v.string(),
+      mindId: v.optional(v.id("minds")),
+      mindName: v.string(),
+      attempt: v.string(),
+      blockedReason: v.string(),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // التطور الذاتي — ما تعلّمه وابتكره وغيّره بنفسه
+    mindEvolution: defineTable({
+      mindId: v.id("minds"),
+      mindName: v.string(),
+      kind: v.union(
+        v.literal("learned"),
+        v.literal("created"),
+        v.literal("changed"),
+        v.literal("resigned"),
+        v.literal("celebrated"),
+      ),
+      title: v.string(),
+      detail: v.string(),
+      delta: v.string(), // "+3 فضول" مثلًا
+      createdAt: v.number(),
+    })
+      .index("by_mind", ["mindId"])
+      .index("by_created", ["createdAt"]),
+
+    // تصويت اللاعبين لأي عقل
+    mindVotes: defineTable({
+      mindId: v.id("minds"),
+      userId: v.id("users"),
+      kind: v.union(v.literal("vote"), v.literal("dream")), // تصويت أو مساهمة في حلم
+      at: v.number(),
+    })
+      .index("by_mind", ["mindId"])
+      .index("by_user_mind", ["userId", "mindId"])
+      .index("by_user_mind_kind", ["userId", "mindId", "kind"]),
+
     // ═══ سجل جولات الألعاب الرئيسية الخمس (لحساب الحد اليومي) ║
     gameModePlays: defineTable({
       userId: v.id("users"),
