@@ -2,6 +2,8 @@ export type Difficulty = "easy" | "medium" | "hard";
 
 export type Question = { id: string; category: string; difficulty: Difficulty; question: string; options: [string, string, string, string]; correctIndex: 0 | 1 | 2 | 3 }
 
+import { MEGA_PACK_1, MEGA_PACK_2 } from "./megaQuestions";
+
 export const EXTRA_QUESTIONS: Question[] = [
   // ── أسئلة إضافية جديدة (q321 – q542) ─────────────────────────────────
 
@@ -270,7 +272,7 @@ export const CATEGORIES = [
   "ملاحظة ودقة",
 ] as const;
 
-export const QUESTION_BANK: Question[] = [...EXTRA_QUESTIONS, // q321–q542 (إضافية موصولة بالبنك الرئيسي)
+export const QUESTION_BANK: Question[] = [...EXTRA_QUESTIONS, ...MEGA_PACK_1, ...MEGA_PACK_2, // q321–q542 (إضافية موصولة بالبنك الرئيسي)
   // ── عام ───────────────────────────────────────────────────────────────
   { id: "q01", category: "عام", difficulty: "easy", question: "ما هو أكبر محيط على وجه الأرض؟", options: ["المحيط الهادئ", "المحيط الأطلسي", "المحيط الهندي", "المحيط المتجمد الشمالي"], correctIndex: 0 },
   { id: "q02", category: "عام", difficulty: "easy", question: "كم عدد ألوان قوس قزح؟", options: ["ستة", "سبعة", "خمسة", "ثمانية"], correctIndex: 1 },
