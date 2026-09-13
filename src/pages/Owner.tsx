@@ -52,6 +52,7 @@ import {
   Crown,
   Database,
   Eraser,
+  Library,
   EyeOff,
   FileDown,
   Brain,
@@ -118,6 +119,7 @@ import { MindsControlRoom } from "@/components/MindsControlRoom";
 import { CommandDeck } from "@/components/CommandDeck";
 import { SmartInbox } from "@/components/SmartInbox";
 import { OwnerBrief } from "@/components/OwnerBrief";
+import { ContentQuality } from "@/components/ContentQuality";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2238,6 +2240,7 @@ const NAV_GROUPS = [
       { id: "dashboard", icon: Activity, label: "لوحة القيادة" },
       { id: "commanddeck", icon: Zap, label: "غرفة القيادة ⚡" },
       { id: "commandbrief", icon: BarChart3, label: "بريف المالك 📊" },
+      { id: "contentquality", icon: Library, label: "جودة المحتوى 📚" },
     ],
   },
   {
@@ -2366,6 +2369,8 @@ export default function Owner() {
         return <CommandDeck onNavigate={setActiveTab} />;
       case "commandbrief":
         return <OwnerBrief />;
+      case "contentquality":
+        return <ContentQuality />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":
