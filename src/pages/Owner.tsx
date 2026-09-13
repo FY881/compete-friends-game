@@ -53,6 +53,7 @@ import {
   Database,
   Eraser,
   Library,
+  MessagesSquare,
   EyeOff,
   FileDown,
   Brain,
@@ -120,6 +121,7 @@ import { CommandDeck } from "@/components/CommandDeck";
 import { SmartInbox } from "@/components/SmartInbox";
 import { OwnerBrief } from "@/components/OwnerBrief";
 import { ContentQuality } from "@/components/ContentQuality";
+import { CommunityMonitor } from "@/components/CommunityMonitor";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2241,6 +2243,7 @@ const NAV_GROUPS = [
       { id: "commanddeck", icon: Zap, label: "غرفة القيادة ⚡" },
       { id: "commandbrief", icon: BarChart3, label: "بريف المالك 📊" },
       { id: "contentquality", icon: Library, label: "جودة المحتوى 📚" },
+      { id: "communitymonitor", icon: MessagesSquare, label: "مراقب المجتمع 💬" },
     ],
   },
   {
@@ -2371,6 +2374,8 @@ export default function Owner() {
         return <OwnerBrief />;
       case "contentquality":
         return <ContentQuality />;
+      case "communitymonitor":
+        return <CommunityMonitor />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":

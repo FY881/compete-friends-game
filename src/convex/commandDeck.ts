@@ -624,6 +624,77 @@ export const getOwnerBrief = query({
   },
 });
 
+/**
+ * 💬 مراقب المجتمع الحي — سيطرة على غرف الدردشة:
+ *  - كل الغرف مع عدد الأعضاء ونشاط آخر 24 ساعة
+ *  - آخر الرسائل عبر كل الغرف مع حالة الإشراف الآلي (flagged/blocked)
+ *  - كشف الاشتباك: رسائل متعددة مُعلَّمة من نفس الغرفة = نقش ساخن
+ */
+export const getCommunityMonitor = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) return null;
+    const dayAgo = Date.now() - 86400_000;
+
+    const rooms = await ctx.db.query("chatRooms").collect();
+    const messages = await ctx.db
+      .query("chatMessages")
+      .withIndex("by_room", (q: any) => q.gte("createdAt", dayAgo))
+      .take(3000);
+
+    const byRoom = new Map<string, number>();
+    const flagged = new Map<string, number>();
+    for (const m of messages) {
+      const k = String(m.roomId);
+      byRoom.set(k, (byRoom.get(k) ?? 0) + 1);
+      if (m.moderationStatus === "flagged" || m.moderationStatus === "blocked") {
+        flagged.set(k, (flagged.get(k) ?? 0) + 1);
+      }
+    }
+
+    const roomRows = rooms
+      .map((r: any) => ({
+        id: String(r._id),
+        name: r.name as string,
+        type: r.type as string,
+        memberCount: (r.members?.length ?? 0) as number,
+        msgs24h: byRoom.get(String(r._id)) ?? 0,
+        flagged24h: flagged.get(String(r._id)) ?? 0,
+        archived: r.archived as boolean,
+        createdAt: r.createdAt as number,
+      }))
+      .sort((a: any, b: any) => b.msgs24h - a.msgs24h || b.memberCount - a.memberCount);
+
+    // آخر الرسائل المُعلَّمة أولاً ثم الأحدث
+    const recent = [...messages]
+      .sort((a: any, b: any) => b.createdAt - a.createdAt)
+      .slice(0, 60)
+      .map((m: any) => ({
+        id: String(m._id),
+        roomId: String(m.roomId),
+        roomName: rooms.find((r: any) => String(r._id) === String(m.roomId))?.name ?? "غرفة",
+        senderName: m.senderName as string,
+        content: m.content as string,
+        status: (m.moderationStatus ?? "passed") as string,
+        createdAt: m.createdAt as number,
+      }));
+
+    const hotRooms = roomRows.filter((r: any) => r.flagged24h >= 3).slice(0, 5);
+
+    return {
+      rooms: roomRows.slice(0, 30),
+      recent,
+      hotRooms,
+      totals: {
+        rooms: rooms.length,
+        msgs24h: messages.length,
+        flagged24h: [...flagged.values()].reduce((a, b) => a + b, 0),
+      },
+    };
+  },
+});
+
 export const getEconomyPulse = query({
   args: {},
   handler: async (ctx) => {
