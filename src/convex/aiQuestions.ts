@@ -480,3 +480,205 @@ export const getQueueStats = query({
 // 8. A/B variant generation (test alternatives)
 // 9. Localization (multi-language support)
 // 10. Accessibility (readability scoring)
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🛠️ المرحلة 11 — استوديو الأسئلة (أدوات المالك المتقدمة)
+//   إنشاء/تحرير يدوي + كشف تكرار حقيقي + جدولة نشر مستقبلي
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** كشف تكرار: تطبيع النص العربي ومقارنة تشابه بالجمل الثلاث الأولى */
+function normalizeAr(text: string): string {
+  return text
+    .replace(/[\u064B-\u065F\u0670]/g, "") // التشكيل
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function signatureOf(text: string): string {
+  const words = normalizeAr(text).split(" ").filter(Boolean);
+  return words.slice(0, 6).join(" ");
+}
+
+export const checkDuplicate = query({
+  args: { question: v.string() },
+  handler: async (ctx, { question }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return { matches: [] as { id: string; question: string; category: string; status: string }[] };
+    const me = await ctx.db.get(userId);
+    if (!isStaffUser(me)) return { matches: [] };
+    const sig = signatureOf(question);
+    if (sig.length < 8) return { matches: [] };
+    const rows = await ctx.db.query("aiQuestions").collect();
+    // + البنك الثابت
+    const bankMatches: { id: string; question: string; category: string; status: string }[] = [];
+    for (const q of QUESTION_BANK) {
+      if (signatureOf(q.question) === sig) {
+        bankMatches.push({ id: q.id, question: q.question, category: q.category, status: "bank" });
+      }
+    }
+    const aiMatches = rows
+      .filter((r) => signatureOf(r.question) === sig)
+      .map((r) => ({ id: r._id, question: r.question, category: r.category, status: r.status }));
+    return { matches: [...bankMatches.slice(0, 3), ...aiMatches.slice(0, 5)] };
+  },
+});
+
+/** إضافة سؤال يدوي من المالك — مع جدولة اختيارية للنشر */
+export const createManualQuestion = mutation({
+  args: {
+    category: v.string(),
+    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+    question: v.string(),
+    options: v.array(v.string()),
+    correctIndex: v.number(),
+    scheduledFor: v.optional(v.number()), // إن وُجد: يبقى pending حتى الموعد ثم يُعتمد آلياً
+  },
+  handler: async (ctx, { category, difficulty, question, options, correctIndex, scheduledFor }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
+    const me = await ctx.db.get(userId);
+    if (!me || !isStaffUser(me)) throw new Error("غير مصرح");
+    if (question.trim().length < 8) throw new Error("نص السؤال قصير جداً");
+    if (options.length !== 4 || new Set(options.map((o) => o.trim())).size !== 4) {
+      throw new Error("يجب إدخال 4 خيارات مختلفة");
+    }
+    if (correctIndex < 0 || correctIndex > 3) throw new Error("فهرس الإجابة غير صالح");
+    // كشف تكرار إلزامي قبل الحفظ
+    const sig = signatureOf(question);
+    const rows = await ctx.db.query("aiQuestions").collect();
+    const dupAi = rows.some((r) => signatureOf(r.question) === sig && r.status !== "rejected");
+    const dupBank = QUESTION_BANK.some((q) => signatureOf(q.question) === sig);
+    if (dupAi || dupBank) throw new Error("سؤال مكرر — غيّر الصياغة");
+
+    const qid = `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const id = await ctx.db.insert("aiQuestions", {
+      qid,
+      category,
+      difficulty,
+      question: question.trim(),
+      options: options.map((o) => o.trim()),
+      correctIndex,
+      status: "pending",
+      createdAt: Date.now(),
+      authorName: me.name ?? "المالك",
+      scheduledFor: scheduledFor ?? undefined,
+    });
+    await ctx.db.insert("aiDecisionLog", {
+      system: "questions",
+      actorName: me.name ?? "المالك",
+      action: "create_manual_question",
+      targetId: id,
+      targetName: question.slice(0, 40),
+      detail: scheduledFor ? `سؤال يدوي مجدول من فئة ${category}` : `سؤال يدوي من فئة ${category}`,
+      severity: "low",
+      createdAt: Date.now(),
+    });
+    return { id, qid };
+  },
+});
+
+/** تحرير سؤال معتمد/معلق — يسجل من عدّل وماذا */
+export const editQuestion = mutation({
+  args: {
+    id: v.id("aiQuestions"),
+    question: v.optional(v.string()),
+    options: v.optional(v.array(v.string())),
+    correctIndex: v.optional(v.number()),
+    category: v.optional(v.string()),
+    difficulty: v.optional(v.union(v.literal("easy"), v.literal("medium"), v.literal("hard"))),
+  },
+  handler: async (ctx, { id, question, options, correctIndex, category, difficulty }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
+    const me = await ctx.db.get(userId);
+    if (!me || !isStaffUser(me)) throw new Error("غير مصرح");
+    const row = await ctx.db.get(id);
+    if (!row) throw new Error("السؤال غير موجود");
+    const patch: Record<string, unknown> = { editedAt: Date.now(), editedBy: me.name ?? "المالك" };
+    if (question !== undefined) {
+      if (question.trim().length < 8) throw new Error("نص السؤال قصير جداً");
+      patch.question = question.trim();
+    }
+    if (options !== undefined) {
+      if (options.length !== 4 || new Set(options.map((o) => o.trim())).size !== 4) {
+        throw new Error("يجب إدخال 4 خيارات مختلفة");
+      }
+      patch.options = options.map((o) => o.trim());
+    }
+    if (correctIndex !== undefined) {
+      if (correctIndex < 0 || correctIndex > 3) throw new Error("فهرس الإجابة غير صالح");
+      patch.correctIndex = correctIndex;
+    }
+    if (category !== undefined) patch.category = category;
+    if (difficulty !== undefined) patch.difficulty = difficulty;
+    await ctx.db.patch(id, patch);
+    await ctx.db.insert("aiDecisionLog", {
+      system: "questions",
+      actorName: me.name ?? "المالك",
+      action: "edit_question",
+      targetId: id,
+      targetName: (question ?? row.question).slice(0, 40),
+      detail: `تحرير سؤال من فئة ${category ?? row.category}`,
+      severity: "low",
+      createdAt: Date.now(),
+    });
+    return true;
+  },
+});
+
+/** جدولة نشر سؤال معلق — يُعتمد آلياً في الموعد */
+export const scheduleQuestion = mutation({
+  args: { id: v.id("aiQuestions"), scheduledFor: v.number() },
+  handler: async (ctx, { id, scheduledFor }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
+    const me = await ctx.db.get(userId);
+    if (!me || !isStaffUser(me)) throw new Error("غير مصرح");
+    if (scheduledFor < Date.now()) throw new Error("الموعد يجب أن يكون مستقبلياً");
+    await ctx.db.patch(id, { scheduledFor });
+    await ctx.db.insert("aiDecisionLog", {
+      system: "questions",
+      actorName: me.name ?? "المالك",
+      action: "schedule_question",
+      targetId: id,
+      detail: `جدولة نشر في ${new Date(scheduledFor).toLocaleString("ar")}`,
+      severity: "low",
+      createdAt: Date.now(),
+    });
+    return true;
+  },
+});
+
+/** ⏰ منشئ النشر المجدول — يعتمد كل سؤال بلغ موعده (cron كل 5 دقائق) */
+export const publishScheduled = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const due = await ctx.db
+      .query("aiQuestions")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+    let published = 0;
+    for (const r of due) {
+      if (r.scheduledFor !== undefined && r.scheduledFor <= now) {
+        await ctx.db.patch(r._id, { status: "approved", scheduledFor: undefined });
+        await ctx.db.insert("aiDecisionLog", {
+          system: "questions",
+          actorName: "المنشئ المجدول",
+          action: "auto_publish",
+          targetId: r._id,
+          targetName: r.question.slice(0, 40),
+          detail: `نُشر آلياً حسب الجدولة من فئة ${r.category}`,
+          severity: "low",
+          createdAt: now,
+        });
+        published++;
+      }
+    }
+    return { published };
+  },
+});

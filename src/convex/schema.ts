@@ -1085,10 +1085,16 @@ const schema = defineSchema(
       ),
       createdAt: v.number(),
       timesShown: v.optional(v.number()), // 🎯 المرحلة 10: عدّاد العرض لوزن الديناميكية
+      // 🛠️ المرحلة 11 — استوديو الأسئلة: تحرير يدوي + نشر مجدول
+      authorName: v.optional(v.string()), // من أضاف السؤال يدوياً
+      scheduledFor: v.optional(v.number()), // يُعتمد آلياً في هذا التوقيت (النشر المجدول)
+      editedAt: v.optional(v.number()), // آخر تحرير يدوي
+      editedBy: v.optional(v.string()),
     })
       .index("by_qid", ["qid"])
       .index("by_status", ["status"])
-      .index("by_category_status", ["category", "status"]),
+      .index("by_category_status", ["category", "status"])
+      .index("by_sched", ["scheduledFor"]),
 
     // حزم الأسئلة الموسمية — أحداث محدودة الوقت بأسئلة AI مخصصة
     questionPacks: defineTable({

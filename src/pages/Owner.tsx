@@ -91,6 +91,7 @@ import {
   Focus,
   Lock,
   TrendingUp,
+  Wrench,
 } from "lucide-react";
 // Menu + Focus imported above via separate import
 import { useNavigate } from "react-router";
@@ -130,6 +131,7 @@ import { EconomyWarRoom } from "@/components/EconomyWarRoom";
 import { AiHubTab } from "@/components/AiHubTab";
 import { EventsStudio } from "@/components/EventsStudio";
 import { AnalyticsCenter } from "@/components/AnalyticsCenter";
+import { QuestionStudio } from "@/components/QuestionStudio";
 import { SecurityCenter } from "@/components/SecurityCenter";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
@@ -2257,6 +2259,7 @@ const NAV_GROUPS = [
       { id: "economywar", icon: Store, label: "غرفة الاقتصاد 🛒" },
       { id: "aihub", icon: BrainCircuit, label: "مركز الذكاء الموحد 🧠" },
       { id: "events", icon: CalendarClock, label: "استوديو الأحداث 🗓️" },
+      { id: "questionstudio", icon: Wrench, label: "استوديو الأسئلة 🛠️" },
       { id: "analytics", icon: TrendingUp, label: "مركز التحليلات 📈" },
       { id: "security", icon: ShieldCheck, label: "الأمان والصيانة 🛡️" },
     ],
@@ -2399,6 +2402,8 @@ export default function Owner() {
         return <AiHubTab />;
       case "events":
         return <EventsStudio />;
+      case "questionstudio":
+        return <QuestionStudio />;
       case "analytics":
         return <AnalyticsCenter />;
       case "security":

@@ -169,6 +169,15 @@ crons.interval(
   {},
 );
 
+// 🛠️ استوديو الأسئلة — النشر المجدول: كل 5 دقائق يعتمد آلياً كل سؤال
+// بلغ موعده المجدول من المالك (جدولة حزم مستقبلية بلا تدخل يدوي).
+crons.interval(
+  "question-scheduled-publish",
+  { minutes: 5 },
+  internal.aiQuestions.publishScheduled,
+  {},
+);
+
 export default crons;
 
 
