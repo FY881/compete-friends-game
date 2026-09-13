@@ -157,6 +157,22 @@ const schema = defineSchema(
       at: v.number(),
     }).index("by_created", ["at"]),
 
+    // 🛡️ الاعتراضات — اللاعب المعاقب يستطيع الاعتراض على العقوبة
+    appeals: defineTable({
+      userId: v.id("users"),
+      userName: v.string(),
+      punishmentType: v.union(v.literal("warn"), v.literal("mute"), v.literal("ban")),
+      punishmentReason: v.string(),
+      message: v.string(), // نص الاعتراض من اللاعب
+      status: v.union(v.literal("pending"), v.literal("upheld"), v.literal("overturned")),
+      decidedBy: v.optional(v.id("users")),
+      decisionNote: v.optional(v.string()),
+      createdAt: v.number(),
+      decidedAt: v.optional(v.number()),
+    })
+      .index("by_status", ["status"])
+      .index("by_user", ["userId"]),
+
     siteBans: defineTable({
       userId: v.id("users"),
       kind: v.union(v.literal("play_ban"), v.literal("chat_mute")),

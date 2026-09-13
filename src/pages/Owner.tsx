@@ -122,6 +122,7 @@ import { SmartInbox } from "@/components/SmartInbox";
 import { OwnerBrief } from "@/components/OwnerBrief";
 import { ContentQuality } from "@/components/ContentQuality";
 import { CommunityMonitor } from "@/components/CommunityMonitor";
+import { AppealsPanel } from "@/components/Appeals";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2244,6 +2245,7 @@ const NAV_GROUPS = [
       { id: "commandbrief", icon: BarChart3, label: "بريف المالك 📊" },
       { id: "contentquality", icon: Library, label: "جودة المحتوى 📚" },
       { id: "communitymonitor", icon: MessagesSquare, label: "مراقب المجتمع 💬" },
+      { id: "appeals", icon: Scale, label: "الاعتراضات 🛡️" },
     ],
   },
   {
@@ -2376,6 +2378,8 @@ export default function Owner() {
         return <ContentQuality />;
       case "communitymonitor":
         return <CommunityMonitor />;
+      case "appeals":
+        return <AppealsPanel />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":

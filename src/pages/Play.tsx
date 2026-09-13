@@ -24,6 +24,7 @@ import { ClanWarPanel } from "@/components/ClanWarPanel";
 import { QuestsPanel } from "@/components/QuestsPanel";
 import { LegacyCard } from "@/components/LegacyCard";
 import { MindsCouncil } from "@/components/MindsCouncil";
+import { AppealForm } from "@/components/Appeals";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -279,6 +280,7 @@ export default function Play() {
         <QuestsPanel />
         <LegacyCard />
         <MindsCouncil />
+        <AppealForm />
         <LoyaltyPanel />
         <CosmeticShop />
       </div>
