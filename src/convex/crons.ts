@@ -103,6 +103,13 @@ crons.interval(
   "ai-governor-cycle",
   { minutes: 20 },
   internal.aiGovernor.runCycle,
+);
+
+// 🧠 مركز الذكاء الموحد — جسر الإشارات بين الوحدات كل 15 دقيقة
+crons.interval(
+  "ai-hub-bridge",
+  { minutes: 15 },
+  internal.aiHub.bridgeTick,
   {},
 );
 

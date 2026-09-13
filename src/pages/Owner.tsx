@@ -125,6 +125,7 @@ import { ContentQuality } from "@/components/ContentQuality";
 import { CommunityMonitor } from "@/components/CommunityMonitor";
 import { AppealsPanel } from "@/components/Appeals";
 import { EconomyWarRoom } from "@/components/EconomyWarRoom";
+import { AiHubTab } from "@/components/AiHubTab";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2249,6 +2250,7 @@ const NAV_GROUPS = [
       { id: "communitymonitor", icon: MessagesSquare, label: "مراقب المجتمع 💬" },
       { id: "appeals", icon: Scale, label: "الاعتراضات 🛡️" },
       { id: "economywar", icon: Store, label: "غرفة الاقتصاد 🛒" },
+      { id: "aihub", icon: BrainCircuit, label: "مركز الذكاء الموحد 🧠" },
     ],
   },
   {
@@ -2385,6 +2387,8 @@ export default function Owner() {
         return <AppealsPanel />;
       case "economywar":
         return <EconomyWarRoom />;
+      case "aihub":
+        return <AiHubTab />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":

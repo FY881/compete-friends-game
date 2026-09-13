@@ -157,6 +157,31 @@ const schema = defineSchema(
       at: v.number(),
     }).index("by_created", ["at"]),
 
+    // ═══ مركز الذكاء الموحد (Unified AI Hub) ═══
+    // سجل مركزي: كل وحدة AI تسجّل قراراتها هنا — سياق مشترك لكل الوحدات
+    aiHubEvents: defineTable({
+      unit: v.string(), // معرّف الوحدة: coach, guardian, referee, governor, questions...
+      kind: v.string(), // نوع الحدث: decision, observation, alert, sync
+      severity: v.union(v.literal("info"), v.literal("warn"), v.literal("critical")),
+      summary: v.string(),
+      payload: v.optional(v.string()), // JSON اختياري للسياق
+      at: v.number(),
+    })
+      .index("by_unit_at", ["unit", "at"])
+      .index("by_at", ["at"]),
+
+    // ضبط حساسية/تفعيل كل وحدة من غرفة المالك
+    aiHubUnits: defineTable({
+      unit: v.string(), // معرّف فريد للوحدة
+      name: v.string(),
+      dept: v.string(), // القسم: شخصي، رقابي، بلاغات، توصيات، صحة، إدارة
+      desc: v.string(),
+      enabled: v.boolean(),
+      sensitivity: v.number(), // 1-10
+      lastEventAt: v.optional(v.number()),
+      eventCount: v.optional(v.number()),
+    }).index("by_unit", ["unit"]),
+
     // 🛡️ الاعتراضات — اللاعب المعاقب يستطيع الاعتراض على العقوبة
     appeals: defineTable({
       userId: v.id("users"),
