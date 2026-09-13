@@ -117,6 +117,7 @@ import { LivingAgentsTab } from "@/components/LivingAgentsTab";
 import { MindsControlRoom } from "@/components/MindsControlRoom";
 import { CommandDeck } from "@/components/CommandDeck";
 import { SmartInbox } from "@/components/SmartInbox";
+import { OwnerBrief } from "@/components/OwnerBrief";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2236,6 +2237,7 @@ const NAV_GROUPS = [
     items: [
       { id: "dashboard", icon: Activity, label: "لوحة القيادة" },
       { id: "commanddeck", icon: Zap, label: "غرفة القيادة ⚡" },
+      { id: "commandbrief", icon: BarChart3, label: "بريف المالك 📊" },
     ],
   },
   {
@@ -2362,6 +2364,8 @@ export default function Owner() {
         return <OwnerDashboard onNavigate={setActiveTab} />;
       case "commanddeck":
         return <CommandDeck onNavigate={setActiveTab} />;
+      case "commandbrief":
+        return <OwnerBrief />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":

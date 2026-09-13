@@ -486,6 +486,144 @@ export const getPlayerDossier = query({
   },
 });
 
+/**
+ * 📊 التحليلات العميقة — بريف المالك + اتجاهات 14 يوماً
+ * كل شيء محسوب من بيانات اللعب الحقيقية:
+ *  - سلاسل يومية: جولات، لاعبون نشطون، معدل دقة، تدفق نقاط
+ *  - احتفاظ مبسّط: لاعبون لعبوا اليوم ولعبوا أمس
+ *  - بريف المالك: أهم 5 أرقام + جملة تفسيرية لكل رقم
+ */
+export const getOwnerBrief = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireOwner(ctx);
+    if (!me) return null;
+    const now = Date.now();
+    const days: { day: string; label: string; ts: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(now - i * 86400_000);
+      days.push({ day: d.toISOString().slice(0, 10), label: `${d.getDate()}/${d.getMonth() + 1}`, ts: d.getTime() });
+    }
+    const dayStart = (ts: number) => {
+      const d = new Date(ts); d.setHours(0,0,0,0); return d.getTime();
+    };
+    const fourteenAgo = now - 14 * 86400_000;
+
+    const [history, ledger] = await Promise.all([
+      ctx.db.query("gameHistory").withIndex("by_played", (q: any) => q.gte("playedAt", fourteenAgo)).take(8000),
+      ctx.db.query("loyaltyLedger").withIndex("by_user", (q: any) => q.gte("at", fourteenAgo)).take(6000),
+    ]);
+
+    // سلاسل يومية
+    const rounds = days.map(() => 0);
+    const activePlayers = days.map(() => new Set<string>());
+    const correct = days.map(() => 0);
+    const questions = days.map(() => 0);
+    const todayStart = days[13].ts, yesterdayStart = days[12].ts;
+    const t0 = dayStart(days[13].ts);
+    const y0 = dayStart(days[12].ts);
+
+    for (const g of history) {
+      const gi = days.findIndex((d) => g.playedAt >= d.ts - (d.ts % 86400_000 === 0 ? 0 : 0) && new Date(g.playedAt).toISOString().slice(0,10) === d.day);
+      if (gi < 0) continue;
+      rounds[gi] += 1;
+      activePlayers[gi].add(String(g.userId));
+      correct[gi] += g.correctCount;
+      questions[gi] += g.questionCount;
+    }
+
+    // تدفق النقاط اليومي (صافي)
+    const netPoints = days.map(() => 0);
+    for (const l of ledger) {
+      const day = new Date(l.at).toISOString().slice(0, 10);
+      const gi = days.findIndex((d) => d.day === day);
+      if (gi >= 0) netPoints[gi] += l.delta;
+    }
+
+    // احتفاظ مبسّط: نشطوا أمس ومنهم من لعب اليوم
+    const todaySet = activePlayers[13], yesterdaySet = activePlayers[12];
+    let retained = 0;
+    for (const p of yesterdaySet) if (todaySet.has(p)) retained += 1;
+    const retention = yesterdaySet.size > 0 ? Math.round((retained / yesterdaySet.size) * 100) : null;
+
+    // آخر 7 أيام مقابل السبعة السابقة — نمو الجولات
+    const last7 = rounds.slice(7).reduce((a, b) => a + b, 0);
+    const prev7 = rounds.slice(0, 7).reduce((a, b) => a + b, 0);
+    const growth = prev7 === 0 ? (last7 > 0 ? 100 : 0) : Math.round(((last7 - prev7) / prev7) * 100);
+
+    const totalQ = questions.reduce((a, b) => a + b, 0);
+    const totalC = correct.reduce((a, b) => a + b, 0);
+    const accuracy = totalQ > 0 ? Math.round((totalC / totalQ) * 100) : null;
+
+    // 🔮 بريف المالك — أهم 5 أرقام مع تفسير
+    const brief = [
+      {
+        icon: "swords",
+        title: "جولات آخر 7 أيام",
+        value: last7,
+        insight:
+          growth > 10 ? `نمو قوي ${growth > 0 ? "+" : ""}${growth}% عن الأسبوع السابق — استمر على هذا المسار.`
+          : growth < -10 ? `تراجع ${growth}% — فكّر في حدث أو حدّة جديدة لإعادة الإشعال.`
+          : "مستقر — التفاعل ثابت.",
+        tone: growth >= 10 ? "good" : growth <= -10 ? "bad" : "info",
+      },
+      {
+        icon: "heart",
+        title: "احتفاظ يومي",
+        value: retention === null ? "—" : `${retention}%`,
+        insight:
+          retention === null ? "لا بيانات كافية أمس للحساب."
+          : retention >= 50 ? "ممتاز — أكثر من نصف لاعبي الأمس عادوا اليوم."
+          : retention >= 25 ? "معقول — المهام اليومية والصناديق ترفع هذا الرقم."
+          : "منخفض — عزّز أسباب العودة (مهام، مكافآت، إشعارات).",
+        tone: retention === null ? "info" : retention >= 50 ? "good" : retention >= 25 ? "warn" : "bad",
+      },
+      {
+        icon: "target",
+        title: "دقة اللاعبين",
+        value: accuracy === null ? "—" : `${accuracy}%`,
+        insight:
+          accuracy === null ? "لا جولات كافية بعد."
+          : accuracy >= 75 ? "الأسئلة قد تكون سهلة — ارفع الصعوبة لتحدي النخبة."
+          : accuracy >= 50 ? "توازن صحي بين التحدي والاستمتاع."
+          : "الأسئلة قاسية — وازن الحزم الصعبة بأسئلة متوسطة.",
+        tone: accuracy === null ? "info" : accuracy >= 75 ? "warn" : accuracy >= 50 ? "good" : "warn",
+      },
+      {
+        icon: "coins",
+        title: "صافي النقاط (14 يوم)",
+        value: netPoints.reduce((a, b) => a + b, 0),
+        insight:
+          netPoints.reduce((a, b) => a + b, 0) >= 0
+            ? "الاقتصاد ينمو — اللاعبون يكسبون أكثر مما ينفقون."
+            : "اللاعبون ينفقون بقوة — تأكد أن المتجر يمنح قيمة حقيقية.",
+        tone: netPoints.reduce((a, b) => a + b, 0) >= 0 ? "good" : "warn",
+      },
+      {
+        icon: "users",
+        title: "نشطون اليوم",
+        value: todaySet.size,
+        insight:
+          todaySet.size === 0 ? "لا أحد لعب اليوم — أرسل إشعار عودة."
+          : todaySet.size > yesterdaySet.size ? "أعلى من الأمس — النمو مستمر."
+          : "أقل من الأمس — راقب الاتجاه غداً.",
+        tone: todaySet.size > yesterdaySet.size ? "good" : todaySet.size === 0 ? "bad" : "info",
+      },
+    ];
+
+    return {
+      series: {
+        labels: days.map((d) => d.label),
+        rounds,
+        active: activePlayers.map((s) => s.size),
+        accuracy: questions.map((q, i) => (q > 0 ? Math.round((correct[i] / q) * 100) : null)),
+        netPoints,
+      },
+      brief,
+    };
+  },
+});
+
 export const getEconomyPulse = query({
   args: {},
   handler: async (ctx) => {
