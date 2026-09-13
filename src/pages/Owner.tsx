@@ -114,6 +114,7 @@ import { FairPlayTab } from "@/components/FairPlayTab";
 import { AiGovernorTab } from "@/components/AiGovernorTab";
 import { LivingAgentsTab } from "@/components/LivingAgentsTab";
 import { MindsControlRoom } from "@/components/MindsControlRoom";
+import { CommandDeck } from "@/components/CommandDeck";
 import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
@@ -2232,6 +2233,7 @@ const NAV_GROUPS = [
     label: "القيادة",
     items: [
       { id: "dashboard", icon: Activity, label: "لوحة القيادة" },
+      { id: "commanddeck", icon: Zap, label: "غرفة القيادة ⚡" },
     ],
   },
   {
@@ -2355,6 +2357,8 @@ export default function Owner() {
     switch (activeTab) {
       case "dashboard":
         return <OwnerDashboard onNavigate={setActiveTab} />;
+      case "commanddeck":
+        return <CommandDeck onNavigate={setActiveTab} />;
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":
