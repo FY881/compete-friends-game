@@ -228,6 +228,43 @@ export const bridgeTick = internalMutation({
       logged++;
     }
 
+    // ── إشارة: إنجازات شبه منتهية → المُوصي (دافعية شخصية حقيقية) ──
+    {
+      const allAch = await ctx.db.query("achievements").collect();
+      const ownedByUser = new Map<string, Set<string>>();
+      for (const a of allAch) {
+        if (!ownedByUser.has(a.userId)) ownedByUser.set(a.userId, new Set());
+        ownedByUser.get(a.userId)!.add(a.type);
+      }
+      let nearCount = 0;
+      for (const uid of activePlayers) {
+        const owned = ownedByUser.get(uid) ?? new Set<string>();
+        const profile = await ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", uid as any))
+          .unique();
+        if (!profile) continue;
+        const checks: [string, number, number][] = [
+          ["wins_10", profile.gamesWon ?? 0, 10],
+          ["games_50", profile.gamesPlayed ?? 0, 50],
+          ["streak_10", profile.bestStreak ?? 0, 10],
+          ["xp_5000", profile.xp ?? 0, 5000],
+        ];
+        for (const [type, cur, target] of checks) {
+          if (!owned.has(type) && cur >= target * 0.6) nearCount++;
+        }
+      }
+      if (nearCount > 0) {
+        await ctx.runMutation(internal.aiHub.logEvent, {
+          unit: "recommender",
+          kind: "observation",
+          severity: "info",
+          summary: `${nearCount} إنجازاً قريباً من الإنجاز لدى اللاعبين النشطين — توصيات دافعية جاهزة`,
+        });
+        logged++;
+      }
+    }
+
     // ── إشارة: أخطاء العملاء → الحاكم ──
     const errors = await ctx.db
       .query("errorLogs")
