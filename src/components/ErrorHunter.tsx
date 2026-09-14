@@ -21,10 +21,19 @@
  * 9. Service Worker Loop Protection
  * 10. Autonomous AI Repair (Convex backend)
  * 11. Master Reset — nuclear option when everything fails
+ * 12. v5.0: Breadcrumbs + offline queue + persistent incidents +
+ *     safe storage clearing (auth & settings ALWAYS survive)
  */
 
 import { Component, type ReactNode, type ErrorInfo } from "react";
 import { api } from "@/convex/_generated/api";
+import {
+  addBreadcrumb, getBreadcrumbs, installBreadcrumbListeners,
+  enqueueErrorReport, flushErrorQueue, pendingReportCount,
+  storeIncident, getStoredIncidents, type StoredIncident,
+  recordErrorForRate, currentErrorRate,
+  safeClearStorage, safeClearCaches, safeUnregisterServiceWorkers,
+} from "@/lib/errorHunterCore";
 
 // ═══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -51,9 +60,11 @@ interface State {
   consecutiveFailures: number;
   showDetails: boolean;
   showTimeline: boolean;
+  showPast: boolean;
   showBrain: boolean;
   errorId: string | null;
   incidentEvents: IncidentEvent[];
+  pastIncidents: StoredIncident[];
   deviceHealth: DeviceHealth;
 }
 
@@ -367,32 +378,26 @@ const RECOVERY_STRATEGIES: Record<string, Strategy> = {
     },
   },
   re_auth: {
-    name: "إعادة المصادقة",
+    name: "إعادة توصيل الجلسة",
     priority: 4,
+    // v5.0: لا نحذف التوكن أبداً — إعادة التحميل تجبر عميل Convex على
+    // إعادة مصادقة الجلسة من التوكن المحفوظ نفسه. المستخدم لا يخرج.
     execute: async () => {
       if (isInGameRoom()) return false;
       try {
-        localStorage.removeItem("convex-auth:refreshToken");
-        localStorage.removeItem("convex-auth:accessToken");
-        safeNavigate("/auth");
+        safeReload();
         return true;
       } catch { return false; }
     },
   },
   clear_storage: {
-    name: "مسح التخزين المحلي",
+    name: "تنظيف التخزين المحلي (الجلسة والإعدادات محفوظة)",
     priority: 4,
+    // v5.0: SAFE clearing — convex-auth + كل مفاتيح الإعدادات تُحفظ دائماً.
     execute: async () => {
       try {
-        const preserve = ["convex-auth"];
-        const saved: Record<string, string> = {};
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && preserve.some((p) => k.includes(p))) saved[k] = localStorage.getItem(k) || "";
-        }
-        localStorage.clear();
-        Object.entries(saved).forEach(([k, v]) => localStorage.setItem(k, v));
-        sessionStorage.clear();
+        const res = safeClearStorage();
+        addBreadcrumb("action", `تنظيف آمن للتخزين: ${res.cleared} مفتاحاً · ${res.preserved} محفوظ`);
         await sleep(300);
         safeReload();
         return true;
@@ -437,29 +442,12 @@ const RECOVERY_STRATEGIES: Record<string, Strategy> = {
     priority: 6,
     execute: async () => {
       try {
-        if ("caches" in window) {
-          const names = await caches.keys();
-          await Promise.all(names.map((n) => caches.delete(n)));
-        }
-        if (indexedDB?.databases) {
-          const dbs = await indexedDB.databases();
-          await Promise.all(dbs.map((db) =>
-            db.name ? new Promise<void>((res) => {
-              const req = indexedDB.deleteDatabase(db.name!);
-              req.onsuccess = () => res();
-              req.onerror = () => res();
-            }) : Promise.resolve()
-          ));
-        }
-        const preserve = ["convex-auth"];
-        const saved: Record<string, string> = {};
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && preserve.some((p) => k.includes(p))) saved[k] = localStorage.getItem(k) || "";
-        }
-        localStorage.clear();
-        Object.entries(saved).forEach(([k, v]) => localStorage.setItem(k, v));
-        sessionStorage.clear();
+        await safeClearCaches();
+        await safeUnregisterServiceWorkers();
+        // v5.0: لا نلمس IndexedDB الخاصة بالتطبيق (قد تحتوي بيانات لاعب)
+        // — فقط مسح تخزين آمن يحفظ الجلسة والإعدادات.
+        const res = safeClearStorage();
+        addBreadcrumb("action", `مسح شامل آمن: ${res.cleared} مفتاحاً · ${res.preserved} محفوظ`);
         await sleep(800);
         safeReload();
         return true;
@@ -549,6 +537,7 @@ function detectStorm(): { detected: boolean; count: number } {
   const now = Date.now();
   recentErrors = recentErrors.filter((t) => now - t < STORM_WINDOW);
   recentErrors.push(now);
+  recordErrorForRate(); // v5.0: التغذية الموحدة لمقياس معدل الأخطاء
   return { detected: recentErrors.length >= STORM_THRESHOLD, count: recentErrors.length };
 }
 
@@ -583,19 +572,43 @@ export async function reportErrorToHunter(
   error: Error | string,
   ctx?: { component?: string; route?: string; autoHealed?: boolean; strategy?: string },
 ) {
-  if (!convexClient) return;
+  recordErrorForRate();
+  const payload = {
+    message: (typeof error === "string" ? error : error.message).slice(0, 500),
+    stack: typeof error === "object" ? error.stack?.slice(0, 2000) : undefined,
+    component: ctx?.component,
+    route: ctx?.route || (typeof window !== "undefined" ? window.location.pathname : "/"),
+    url: typeof window !== "undefined" ? window.location.href : "",
+    autoHealed: ctx?.autoHealed || false,
+    healStrategy: ctx?.strategy,
+    deviceInfo: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 200) : "",
+    // v5.0: سياق حقيقي — ماذا كان اللاعب يفعل قبل الخطأ
+    playerAction: getBreadcrumbs().slice(-10).map((b) => `${b.type}:${b.message}`).join(" → "),
+  };
+
+  // v5.0: إن لم يكن العميل جاهزاً أو الشبكة مقطوعة → الطابور الدائم
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  if (!convexClient || offline) {
+    enqueueErrorReport(payload);
+    return;
+  }
   try {
-    await convexClient.mutation(api.errorHunter.logError, {
-      message: (typeof error === "string" ? error : error.message).slice(0, 500),
-      stack: typeof error === "object" ? error.stack?.slice(0, 2000) : undefined,
-      component: ctx?.component,
-      route: ctx?.route || (typeof window !== "undefined" ? window.location.pathname : "/"),
-      url: typeof window !== "undefined" ? window.location.href : "",
-      autoHealed: ctx?.autoHealed || false,
-      healStrategy: ctx?.strategy,
-      deviceInfo: navigator.userAgent.slice(0, 200),
-    });
-  } catch { /* Never crash the reporter */ }
+    await convexClient.mutation(api.errorHunter.logError, payload);
+  } catch {
+    // فشل الإرسال (شبكة/خادم) — يُحفظ في الطابور ولا يضيع أبداً
+    enqueueErrorReport(payload);
+  }
+}
+
+/** v5.0: إرسال التقارير المعلّقة عند عودة الاتصال — استدعِها بعد تهيئة العميل */
+export async function flushPendingErrorReports() {
+  if (!convexClient || pendingReportCount() === 0) return 0;
+  return flushErrorQueue(async (payload) => {
+    try {
+      await convexClient.mutation(api.errorHunter.logError, payload as any);
+      return true;
+    } catch { return false; }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -610,6 +623,11 @@ let fpsSamples: number[] = [];
 export function startPerformanceMonitor() {
   if (perfInterval) return;
   perfStopped = false;
+
+  // v5.0: تفعيل مسجّل السياق + تفريغ التقارير المعلّقة عند عودة الاتصال
+  installBreadcrumbListeners();
+  flushPendingErrorReports().catch(() => {});
+  window.addEventListener("online", () => { flushPendingErrorReports().catch(() => {}); });
 
   let lastFrameTime = performance.now();
   let frameCount = 0;
@@ -652,7 +670,7 @@ export function startPerformanceMonitor() {
 
       convexClient.mutation(api.errorHunter.updateSystemHealth, {
         activeUsers: 1,
-        errorRate: recentErrors.length,
+        errorRate: currentErrorRate(), // v5.0: نافذة متدحرجة 60 ثانية حقيقية
         avgFps,
         avgLatency: 0,
         diagnostics: JSON.stringify({
@@ -695,9 +713,11 @@ export class ErrorHunter extends Component<Props, State> {
       consecutiveFailures: 0,
       showDetails: false,
       showTimeline: false,
+      showPast: false,
       showBrain: false,
       errorId: null,
       incidentEvents: [],
+      pastIncidents: getStoredIncidents(), // v5.0: حوادث سابقة نجت من إعادة التحميل
       deviceHealth: collectHealth(),
     };
   }
@@ -776,20 +796,41 @@ export class ErrorHunter extends Component<Props, State> {
   }
 
   private reportError(error: Error, errorInfo: ErrorInfo, diagnosis: ErrorDiagnosis, autoHealed = false, strategy?: string) {
+    recordErrorForRate();
+    const payload = {
+      message: error.message.slice(0, 500),
+      stack: error.stack?.slice(0, 2000),
+      component: this.props.name || errorInfo.componentStack?.split("\n")?.[1]?.trim(),
+      route: typeof window !== "undefined" ? window.location.pathname : "/",
+      url: typeof window !== "undefined" ? window.location.href : "",
+      autoHealed,
+      healStrategy: strategy,
+      deviceInfo: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 200) : "",
+      playerAction: getBreadcrumbs().slice(-10).map((b) => `${b.type}:${b.message}`).join(" → "),
+    };
+
+    // v5.0: سجل الحادثة أولاً — يبقى حتى لو أعاد الإصلاح تحميل الصفحة
+    storeIncident({
+      at: Date.now(),
+      route: payload.route,
+      category: diagnosis.category,
+      message: error.message.slice(0, 200),
+      healed: autoHealed,
+      strategy,
+    });
+
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    if (!convexClient || offline) {
+      enqueueErrorReport(payload);
+      return;
+    }
     try {
-      convexClient?.mutation(api.errorHunter.logError, {
-        message: error.message.slice(0, 500),
-        stack: error.stack?.slice(0, 2000),
-        component: this.props.name || errorInfo.componentStack?.split("\n")?.[1]?.trim(),
-        route: typeof window !== "undefined" ? window.location.pathname : "/",
-        url: typeof window !== "undefined" ? window.location.href : "",
-        autoHealed,
-        healStrategy: strategy,
-        deviceInfo: navigator.userAgent.slice(0, 200),
-      }).then((result: any) => {
-        if (result?.id) this.setState({ errorId: result.id });
-      }).catch(() => {});
-    } catch { /* never crash */ }
+      convexClient.mutation(api.errorHunter.logError, payload)
+        .then((result: any) => {
+          if (result?.id) this.setState({ errorId: result.id });
+        })
+        .catch(() => { enqueueErrorReport(payload); });
+    } catch { enqueueErrorReport(payload); }
   }
 
   private async startRecovery(diagnosis: ErrorDiagnosis) {
@@ -896,24 +937,68 @@ export class ErrorHunter extends Component<Props, State> {
   private handleReload = () => { safeReload(); };
   private handleGoHome = () => { safeNavigate("/play"); };
   private handleMasterReset = () => {
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-      if ("caches" in window) {
-        caches.keys().then((n) => Promise.all(n.map((k) => caches.delete(k))));
-      }
-      if (navigator.serviceWorker?.controller) {
-        navigator.serviceWorker.getRegistrations().then((regs) =>
-          Promise.all(regs.map((r) => r.unregister()))
-        );
-      }
-    } catch { /* ok */ }
-    setTimeout(() => { window.location.replace("/?_reset=" + Date.now()); }, 500);
+    // v5.0: SAFE master reset — يجدد كاش التطبيق والـ SW فقط.
+    // الجلسة (convex-auth) والإعدادات والتفضيلات تنجو دائماً —
+    // لا حاجة لتسجيل دخول من جديد أبداً.
+    (async () => {
+      try {
+        await safeClearCaches();
+        await safeUnregisterServiceWorkers();
+        safeClearStorage();
+      } catch { /* ok */ }
+      setTimeout(() => { window.location.replace("/?_reset=" + Date.now()); }, 500);
+    })();
   };
 
   // ═══════════════════════════════════════════════════════════════════
   // RENDER — ZERO EXTERNAL DEPENDENCIES (pure HTML/CSS)
   // ═══════════════════════════════════════════════════════════════════
+
+  renderTimeline = () => {
+    const { incidentEvents } = this.state;
+    const past = this.state.pastIncidents ?? [];
+    return (
+      <>
+        {incidentEvents.length > 0 && (
+          <div style={sectionStyle}>
+            <button type="button" onClick={() => this.setState((s) => ({ showTimeline: !s.showTimeline }))} style={toggleBtnStyle}>
+              <span>📋 سجل الاسترداد ({incidentEvents.length} خطوات)</span>
+              <span>{this.state.showTimeline ? "▲" : "▼"}</span>
+            </button>
+            {this.state.showTimeline && (
+              <div style={{ marginTop: 8 }}>
+                {incidentEvents.map((e, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 11, padding: "3px 0", color: "#94a3b8" }}>
+                    <span>{e.type === "recovery_result" ? (e.message.includes("نجح") ? "✅" : "❌") : e.type === "system_action" ? "⚙️" : "⏳"}</span>
+                    <span style={{ flex: 1 }}>{e.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {past.length > 0 && (
+          <div style={sectionStyle}>
+            <button type="button" onClick={() => this.setState((s) => ({ showPast: !s.showPast }))} style={toggleBtnStyle}>
+              <span>🗂 حوادث سابقة في هذه الجلسة ({past.length}) — نجت من إعادة التحميل</span>
+              <span>{this.state.showPast ? "▲" : "▼"}</span>
+            </button>
+            {this.state.showPast && past.slice(-5).reverse().map((p, i) => (
+              <div key={i} style={{ display: "flex", gap: 8, fontSize: 11, padding: "3px 0", color: "#64748b" }}>
+                <span>{p.healed ? "✅" : "⚠️"}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 10, width: 64 }}>
+                  {new Date(p.at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  [{p.category}] {p.message}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  };
 
   render() {
     if (!this.state.hasError) return this.props.children;
