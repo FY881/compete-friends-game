@@ -1520,6 +1520,15 @@ export const finishGame = internalMutation({
         }
       } catch { /* الأحداث اختيارية */ }
 
+      // 🏆 خزانة الإنجازات — تقييم آلي بعد كل جولة (مكافآت + إشعارات نادرة)
+      try {
+        await ctx.runMutation(internal.achievementsEngine.evaluateAchievements, {
+          userId: p.userId,
+        });
+      } catch {
+        /* الإنجازات اختيارية — لا تعطل تسجيل الجولة */
+      }
+
       // 🔗 المكافآت التكيفية — تربط التقدم × العضوية × العشيرة × الهيبة فعلياً
       try {
         await ctx.runMutation(internal.adaptiveRewards.grantAdaptiveReward, {

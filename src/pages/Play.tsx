@@ -28,6 +28,7 @@ import { AppealForm } from "@/components/Appeals";
 import { AdaptiveRewardCard } from "@/components/AdaptiveRewardCard";
 import { SmartMatchCard } from "@/components/SmartMatchCard";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { TrophyCase } from "@/components/TrophyCase";
 import { LiveEventBanner } from "@/components/EventsStudio";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
@@ -289,6 +290,7 @@ export default function Play() {
         <LiveEventBanner />
         <AdaptiveRewardCard />
         <NotificationCenter />
+        <TrophyCase />
         <LoyaltyPanel />
         <CosmeticShop />
       </div>
