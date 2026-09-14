@@ -33,6 +33,7 @@ import {
   storeIncident, getStoredIncidents, type StoredIncident,
   recordErrorForRate, currentErrorRate,
   safeClearStorage, safeClearCaches, safeUnregisterServiceWorkers,
+  guardReload, markHealPendingVerify, confirmHealIfStable, invalidatePendingVerify,
 } from "@/lib/errorHunterCore";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -298,7 +299,10 @@ function isInOwnerPanel(): boolean {
   } catch { return false; }
 }
 
-/** Safe reload — NEVER reloads during gameplay or in the owner panel */
+/** Safe reload — NEVER reloads during gameplay or in the owner panel.
+ *  v6.0 SHADOW MODE: يُخضع لأخذ إعادة التحميل — حلقة الإعادات اللانهائية
+ *  تُكسَر بصمت (لا يتم تحديث الصفحة مرة أخرى) فيرى اللاعب شاشة خطأ ثابتة
+ *  بدلاً من وميض لا نهائي. */
 function safeReload(): void {
   if (isInGameRoom()) {
     console.warn("[ErrorHunter] SKIP reload — user is in active game");
@@ -308,8 +312,20 @@ function safeReload(): void {
     console.warn("[ErrorHunter] SKIP reload — user is in owner panel");
     return;
   }
+  const g = guardReload();
+  if (!g.allowed) {
+    console.error("[ErrorHunter] SHADOW: حلقة إعادة تحميل مكتشفة — تم كسرها بصمت (v6.0)");
+    addBreadcrumb("action", "الوضع الشبحي: كسر حلقة إعادة التحميل — لن تُعاد الصفحة مجدداً");
+    // إشارة داخلية للحالة: لا تسمح بمزيد من الاستراتيجيات القائمة على الإعادة
+    reloadLoopBroken = true;
+    return;
+  }
   window.location.reload();
 }
+
+/** v6.0: يُضبط عند كسر حلقة الإعادة — يمنع استراتيجيات reload اللاحقة */
+let reloadLoopBroken = false;
+export function isReloadLoopBroken(): boolean { return reloadLoopBroken; }
 
 function safeNavigate(path: string): void {
   if (isInGameRoom()) {
@@ -637,6 +653,28 @@ export function startPerformanceMonitor() {
   flushPendingErrorReports().catch(() => {});
   window.addEventListener("online", () => { flushPendingErrorReports().catch(() => {}); });
 
+  // ═══ v6.0 — محرك الإعادة للتحقق ═══
+  // إذا عدنا من إعادة تحميل إصلاح، انتظر 8 ثوانٍ: بقاء التطبيق مستقراً
+  // بلا أخطاء جديدة = إصلاح مُثبَت. انهيار جديد = الإصلاح لم يثبت.
+  setTimeout(() => {
+    const { seed, stableAfterMs } = confirmHealIfStable();
+    if (seed && convexClient) {
+      convexClient.mutation(api.errorHunter.verifyHeal, {
+        seed, passed: true, stableAfterMs,
+      }).catch(() => {});
+      addBreadcrumb("action", `✅ تحقق الإصلاح: مستقر ${Math.round(stableAfterMs / 1000)} ثانية — الإصلاح مثبت`);
+    }
+  }, 8500);
+  // إذا انهار التطبيق مجدداً بعد إصلاح معلّق → ألغِ التحقق (يتعلم الصياد)
+  window.addEventListener("error", () => {
+    const seed = invalidatePendingVerify();
+    if (seed && convexClient) {
+      convexClient.mutation(api.errorHunter.verifyHeal, {
+        seed, passed: false, stableAfterMs: 0,
+      }).catch(() => {});
+    }
+  }, { once: false });
+
   let lastFrameTime = performance.now();
   let frameCount = 0;
 
@@ -903,6 +941,14 @@ export class ErrorHunter extends Component<Props, State> {
             new Error(`[HEALED] ${diagnosis.displayName}`),
             { componentStack: "" }, diagnosis, true, strategy.key,
           );
+          // v6.0: إذا كانت الاستراتيجية ستعيد تحميل الصفحة، علّم الإصلاح
+          // بانتظار التحقق — إن بقي التطبيق مستقراً 8 ثوانٍ بعد العودة،
+          // يُعلَن الإصلاح كمُثبَت فعلياً (verify_pass) على الخادم.
+          const willReload = strategy.key === "reload_page" || strategy.key === "nuclear_reload"
+            || strategy.key === "clear_all_cache";
+          if (willReload) {
+            markHealPendingVerify(`${diagnosis.category}:${diagnosis.displayName}`);
+          }
           this.setState({ healingResult: "success", consecutiveFailures: 0, circuitState: "closed" });
           return;
         }

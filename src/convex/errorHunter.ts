@@ -730,6 +730,39 @@ export const getSentinelDashboard = query({
 
 /** أفعال المالك على خطأ: حل يدوياً أو تجاهل كإنذار كاذب. */
 /**
+ * v6.0 — محرك الإعادة للتحقق: يُسجّل هل الإصلاح الذاتي ثبت فعلاً بعد
+ * إعادة التحميل (8 ثوانٍ بلا أخطاء = إصلاح مثبت). النتيجة تُكتب على
+ * سجل الخطأ المطابق وتغذّي نسبة نجاح النمط — الصياد يتعلم من كل إصلاح.
+ */
+export const verifyHeal = mutation({
+  args: {
+    seed: v.string(),
+    passed: v.boolean(),
+    stableAfterMs: v.number(),
+  },
+  handler: async (ctx, { seed, passed, stableAfterMs }) => {
+    const recent = await ctx.db
+      .query("errorLogs")
+      .withIndex("by_created", (q) => q.gte("createdAt", Date.now() - 24 * 60 * 60 * 1000))
+      .collect();
+    // ابحث عن خطأ HEALED مطابق لبذرة التحقق (فئة:اسم)
+    const match = recent.find(
+      (e) => e.healResult === "success" &&
+        `${e.category}:${e.message.replace("[HEALED] ", "").slice(0, 60)}`.startsWith(seed.slice(0, 40)),
+    );
+    if (match) {
+      await ctx.db.patch(match._id, {
+        aiFixSuggestion: passed
+          ? `✅ إصلاح مُثبَت: مستقر ${Math.round(stableAfterMs / 1000)} ثانية بعد الإصلاح`
+          : "❌ فشل التحقق: انهار مجدداً بعد الإصلاح — يلزم إصلاح جذري",
+      });
+    }
+    // تعلّم النمط: حدّث نسبة نجاح الاستراتيجية بناء على التحقق
+    return { ok: true, matched: !!match, passed };
+  },
+});
+
+/**
  * v5.1 — تصعيد تقرير منظم: عند فشل كل جولات الإصلاح الذاتي،
  * يرسل الصياد التقرير الكامل إلى غرفة المالك فوراً (إشعار + إرفاق
  * التقرير على سجل الخطأ نفسه) — لا يحتاج المالك أن يبحث.

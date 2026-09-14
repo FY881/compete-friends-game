@@ -272,7 +272,89 @@ export function getStoredIncidents(): StoredIncident[] {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 5) ACCURATE ERROR RATE — rolling 60s window
+// 6) SHADOW MODE — reload-loop breaker + verified-heal ledger (v6.0)
+// ═══════════════════════════════════════════════════════════════════════
+
+const SHADOW_KEY = "mindclash.shadow";
+const VERIFY_KEY = "mindclash.verify";
+
+export interface ShadowState {
+  // عدّاد إعادة التحميل خلال نافذة قصيرة — يكشف حلقة الإعادة اللانهائية
+  reloadStamps: number[];
+  // آخر بذرة إصلاح تمت مطاردتها — لربطها بحالة الجلسة الجديدة بعد الإعادة
+  lastHealSeed: string | null;
+  // هل الإصلاح الأخير بانتظار التحقق؟ (تعيّن صحيح بعد العودة من إعادة التحميل)
+  pendingVerify: string | null;
+}
+
+function readShadow(): ShadowState {
+  try {
+    const s = JSON.parse(localStorage.getItem(SHADOW_KEY) || "null");
+    if (s && Array.isArray(s.reloadStamps)) return s as ShadowState;
+  } catch { /* */ }
+  return { reloadStamps: [], lastHealSeed: null, pendingVerify: null };
+}
+
+function writeShadow(s: ShadowState) {
+  try { localStorage.setItem(SHADOW_KEY, JSON.stringify({
+    ...s,
+    reloadStamps: s.reloadStamps.slice(-10),
+  })); } catch { /* quota */ }
+}
+
+/**
+ * يُستدعى قبل أي إعادة تحميل: يُسجّل الطابع الزمني، ويكشف حلقة الإعادة.
+ * يعيد false إذا كنا داخل حلقة (أكثر من 3 إعادات خلال 30 ثانية) —
+ * فيمنع الصياد من إعادة التحميل مجدداً (الوضع الشبحي: بلا اهتزاز للاعب).
+ */
+export function guardReload(): { allowed: boolean; loopDetected: boolean } {
+  const s = readShadow();
+  const now = Date.now();
+  s.reloadStamps = s.reloadStamps.filter((t) => now - t < 30_000);
+  s.reloadStamps.push(now);
+  const loop = s.reloadStamps.length > 3;
+  writeShadow(s);
+  return { allowed: !loop, loopDetected: loop };
+}
+
+/** يُستدعى عند نجاح إصلاح سيُتبع بإعادة تحميل — يعلّمه بانتظار التحقق */
+export function markHealPendingVerify(healSeed: string) {
+  const s = readShadow();
+  s.pendingVerify = healSeed;
+  writeShadow(s);
+}
+
+/**
+ * يُستدعى بعد عودة التطبيق من إعادة تحميل الإصلاح: إن مرّت 8 ثوانٍ
+ * بلا خطأ جديد — الإصلاح مُثبت. يعيد seed إذا كان التحقق ناجحاً.
+ */
+export function confirmHealIfStable(): { seed: string | null; stableAfterMs: number } {
+  const s = readShadow();
+  if (!s.pendingVerify) return { seed: null, stableAfterMs: 0 };
+  const started = s.reloadStamps[s.reloadStamps.length - 1] ?? Date.now();
+  const stableMs = Date.now() - started;
+  if (stableMs >= 8000) {
+    const seed = s.pendingVerify;
+    s.pendingVerify = null;
+    writeShadow(s);
+    return { seed, stableAfterMs: stableMs };
+  }
+  return { seed: null, stableAfterMs: stableMs };
+}
+
+/** يعلم أن الإصلاح لم يثبت (انهار مرة أخرى بعد الإصلاح) — للتعلم */
+export function invalidatePendingVerify(): string | null {
+  const s = readShadow();
+  const seed = s.pendingVerify;
+  if (seed) {
+    s.pendingVerify = null;
+    writeShadow(s);
+  }
+  return seed;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 7) ACCURATE ERROR RATE — rolling 60s window
 // ═══════════════════════════════════════════════════════════════════════
 
 const RATE_WINDOW = 60_000;
