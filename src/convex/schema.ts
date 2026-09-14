@@ -2303,6 +2303,24 @@ const schema = defineSchema(
       browserPush: v.boolean(),
     }).index("by_user", ["userId"]),
 
+    // 🩸 v6.0 المرحلة 2 — الجرّاح الذكي: رقع جيميناي القابلة للتطبيق بنقرة
+    aiPatches: defineTable({
+      errorId: v.optional(v.id("errorLogs")),
+      fingerprint: v.optional(v.string()),
+      title: v.string(),          // وصف عربي موجز للرقعة
+      targetFile: v.string(),     // الملف المستهدف المقترح
+      change: v.string(),         // شرح التغيير المطلوب
+      code: v.string(),           // الكود المقترح (رقعة)
+      severity: v.string(),
+      status: v.string(),         // pending | applied | dismissed
+      generatedAt: v.number(),
+      decidedAt: v.optional(v.number()),
+      decidedBy: v.optional(v.string()),
+      appliedAt: v.optional(v.number()),
+      result: v.optional(v.string()),
+    }).index("by_status", ["status", "generatedAt"])
+      .index("by_error", ["errorId"]),
+
     // 🎯 المرحلة 15 — التحديات الشخصية
     personalChallenges: defineTable({
       userId: v.id("users"),

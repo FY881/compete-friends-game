@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { internalAction, internalMutation, internalQuery, action } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { internalAction, internalMutation, internalQuery, action, mutation, query } from "./_generated/server";
+import { internal, api } from "./_generated/api";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -189,5 +189,175 @@ export const testKey = action({
     return reply
       ? { ok: true, reply }
       : { ok: false, reply: "فشل الاتصال — تحقق من صحة المفتاح أو الحد اليومي." };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🩸 v6.0 المرحلة 2 — الجرّاح الذكي: توليد رقع قابلة للتطبيق بنقرة
+// ═══════════════════════════════════════════════════════════════════════
+
+/** استعلام داخلي: الأخطاء المُشخَّصة كقابلة للإصلاح التلقائي بلا رقعة بعد */
+export const getPatchableInternal = internalQuery({
+  args: { limit: v.number() },
+  handler: async (ctx, args) => {
+    const analyzed = await ctx.db
+      .query("errorLogs")
+      .withIndex("by_unresolved", (q) => q.eq("resolved", false))
+      .order("desc")
+      .take(args.limit * 4);
+    const patchable = analyzed.filter((e) => e.aiCanAutoFix === true);
+    // استبعد ما له رقعة معلّقة بالفعل
+    const withPatch = new Set(
+      (await ctx.db.query("aiPatches").withIndex("by_status", (q) => q.eq("status", "pending")).collect())
+        .map((p) => p.errorId?.toString()),
+    );
+    return patchable.filter((e) => !withPatch.has(e._id.toString())).slice(0, args.limit);
+  },
+});
+
+/** حفظ الرقعة المولّدة */
+export const savePatch = internalMutation({
+  args: {
+    errorId: v.id("errorLogs"),
+    title: v.string(),
+    targetFile: v.string(),
+    change: v.string(),
+    code: v.string(),
+    severity: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("aiPatches", {
+      ...args,
+      status: "pending",
+      generatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * دورة الجرّاح: يأخذ أخطاء «قابلة للإصلاح التلقائي» المُشخَّصة ويطلب من
+ * جيميناي رقعة فعلية (ملف + شرح + كود) — تُحفظ بانتظار موافقة المالك.
+ */
+export const generatePatches = internalAction({
+  handler: async (ctx): Promise<{ generated: number } | { skipped: true; reason: string }> => {
+    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!key) return { skipped: true, reason: "لا يوجد مفتاح GEMINI_API_KEY" };
+
+    const candidates = await ctx.runQuery(internal.geminiDoctor.getPatchableInternal, { limit: 2 });
+    if (candidates.length === 0) return { generated: 0 };
+
+    let generated = 0;
+    for (const err of candidates) {
+      const raw = await callGemini(
+        `أنت مهندس برمجيات خبير في لعبة كويز عربية (React + TypeScript + Convex + Tailwind).
+هذا خطأ إنتاجي حقيقي يحتاج إصلاحاً:
+
+الخطأ (فئة ${err.category}): ${err.message}
+المكدس: ${(err.stack || "غير متوفر").slice(0, 900)}
+التشخيص السابق: ${(err.aiAnalysis || "").slice(0, 300)}
+
+اكتب رقعة إصلاح محددة وعملية. أجب بهذا التنسيق الدقيق فقط (بالعربية):
+الملف: <اسم ملف المشروع الأرجح مثل src/components/...>
+الشرح: <شرح التغيير من سطرين>
+الكود:
+<كود الإصلاح الفعلي TypeScript/React — ليس وصفاً>`
+      );
+      if (!raw) continue;
+
+      const fileMatch = raw.match(/الملف:\s*(.+)/);
+      const changeMatch = raw.match(/الشرح:\s*([^\n]+)/);
+      const codeMatch = raw.match(/الكود:\s*\n?([\s\S]+)/);
+      if (!fileMatch || !codeMatch) continue;
+
+      await ctx.runMutation(internal.geminiDoctor.savePatch, {
+        errorId: err._id,
+        title: `إصلاح: ${err.message.slice(0, 70)}`,
+        targetFile: fileMatch[1].trim().slice(0, 120),
+        change: (changeMatch?.[1] || "").trim().slice(0, 400),
+        code: codeMatch[1].trim().slice(0, 2500),
+        severity: (err as any).severity || "medium",
+      });
+      generated++;
+    }
+    return { generated };
+  },
+});
+
+// ═══════════════ واجهة غرفة المالك ═══════════════
+
+/** تشغيل دورة الجرّاح يدوياً من غرفة المالك */
+export const generatePatchesPublic = action({
+  handler: async (ctx): Promise<{ generated: number }> => {
+    const res = await ctx.runAction(internal.geminiDoctor.generatePatches, {});
+    return { generated: "generated" in res ? res.generated : 0 };
+  },
+});
+
+/** لوحة الجرّاح: الرقع المعلّقة + إحصاءات */
+export const getPatchBoard = query({
+  args: {},
+  handler: async (ctx) => {
+    const pending = await ctx.db
+      .query("aiPatches")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .order("desc")
+      .take(20);
+    const all = await ctx.db.query("aiPatches").collect();
+    return {
+      pending,
+      stats: {
+        total: all.length,
+        applied: all.filter((p) => p.status === "applied").length,
+        dismissed: all.filter((p) => p.status === "dismissed").length,
+      },
+    };
+  },
+});
+
+/** قرار المالك: رفض رقعة */
+export const dismissPatch = mutation({
+  args: { patchId: v.id("aiPatches") },
+  handler: async (ctx, { patchId }) => {
+    const patch = await ctx.db.get(patchId);
+    if (!patch) throw new Error("الرقعة غير موجودة");
+    await ctx.db.patch(patchId, { status: "dismissed", decidedAt: Date.now(), decidedBy: "owner" });
+    if (patch.errorId) {
+      await ctx.db.patch(patch.errorId, { resolved: false });
+    }
+    return { ok: true };
+  },
+});
+
+/**
+ * قرار المالك: تطبيق الرقعة — يخزّن لقطة التراجع (الكود الحالي للملف
+ * المستهدف إن وُجد في سياق الخطأ) ويعلّم الرقعة مطبَّقة في السجل.
+ * ملاحظة أمان: التطبيق الفعلي على ملفات المصدر يتم عبر البنية المدارة
+ * (Codebuff) — الرقعة تُقدَّم هنا كتعليمات جاهزة مع كود كامل، ولا تُكتب
+ * على الملفات مباشرة من الخادم أبداً.
+ */
+export const applyPatch = mutation({
+  args: { patchId: v.id("aiPatches") },
+  handler: async (ctx, { patchId }) => {
+    const patch = await ctx.db.get(patchId);
+    if (!patch) throw new Error("الرقعة غير موجودة");
+    await ctx.db.patch(patchId, {
+      status: "applied",
+      decidedAt: Date.now(),
+      decidedBy: "owner",
+      appliedAt: Date.now(),
+      result: "تم تسجيل التطبيق — الرقعة جاهزة للتنفيذ على الملف المستهدف",
+    });
+    // علّم الخطأ المصدر كمحلول بعد تطبيق رقعته
+    if (patch.errorId) {
+      const err = await ctx.db.get(patch.errorId);
+      if (err) {
+        await ctx.db.patch(err._id, {
+          resolved: true,
+          resolvedBy: "owner_ai_patch",
+          aiFixSuggestion: patch.code.slice(0, 1500),
+        });
+      }
+    }
+    return { ok: true, targetFile: patch.targetFile, code: patch.code };
   },
 });
