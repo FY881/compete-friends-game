@@ -14,7 +14,34 @@ import {
   Sparkles,
   Wrench,
   BrainCircuit,
+  Activity,
+  ShieldCheck,
+  TrendingUp,
+  FileText,
 } from "lucide-react";
+
+const sevLabel: Record<string, string> = {
+  critical: "حرج",
+  high: "عالٍ",
+  medium: "متوسط",
+  low: "منخفض",
+};
+
+const sevColor: Record<string, string> = {
+  critical: "text-rose-600",
+  high: "text-orange-600",
+  medium: "text-amber-600",
+  low: "text-muted-foreground",
+};
+
+function timeAgo(ts: number) {
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1) return "الآن";
+  if (m < 60) return `قبل ${m} د`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `قبل ${h} سا`;
+  return `قبل ${Math.round(h / 24)} يوم`;
+}
 
 /**
  * 🩸 غرفة الجراحة — الجرّاح الذكي (v6.0، المرحلة 2)
@@ -26,8 +53,25 @@ export function AiSurgeonPanel() {
   const generate = useAction(api.geminiDoctor.generatePatchesPublic);
   const apply = useMutation(api.geminiDoctor.applyPatch);
   const dismiss = useMutation(api.geminiDoctor.dismissPatch);
+  const healthReport = useAction(api.geminiDoctor.dailyHealthReport);
+  const dashboard = useQuery(api.errorHunter.getSentinelDashboard);
+  const impactRanked = useQuery(api.errorHunter.getImpactRankedErrors);
   const [busy, setBusy] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [report, setReport] = useState<string | null>(null);
+
+  const runHealthReport = async () => {
+    setBusy("report");
+    try {
+      const res = await healthReport({});
+      setReport(res);
+      toast.success("📋 تقرير الصحة اليومي جاهز");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذّر توليد التقرير");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const runGenerate = async () => {
     setBusy("generate");
@@ -103,6 +147,109 @@ export function AiSurgeonPanel() {
           </Button>
         </div>
       </div>
+
+      {/* ── غرفة القيادة الحية: صحة النظام + مؤشرات الأداء ── */}
+      {dashboard && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="shadow-sm">
+            <CardContent className="flex items-center gap-3 py-4">
+              <span className={
+                "flex size-10 items-center justify-center rounded-xl " +
+                (dashboard.status === "healthy"
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : dashboard.status === "degraded"
+                    ? "bg-amber-500/10 text-amber-600"
+                    : "bg-rose-500/10 text-rose-600")
+              }>
+                <ShieldCheck className="size-5" />
+              </span>
+              <div>
+                <p className="text-lg font-bold leading-none">
+                  {dashboard.healthScore}
+                  <span className="text-xs font-normal text-muted-foreground"> /100</span>
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">درجة الصحة — {dashboard.status}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardContent className="flex items-center gap-3 py-4">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                <Check className="size-5" />
+              </span>
+              <div>
+                <p className="text-lg font-bold leading-none">{dashboard.stats.healRate}%</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">نسبة الشفاء الذاتي ({dashboard.stats.autoHealed})</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardContent className="flex items-center gap-3 py-4">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600">
+                <Activity className="size-5" />
+              </span>
+              <div>
+                <p className="text-lg font-bold leading-none">{Math.round(dashboard.performance.avgFps)}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">متوسط FPS ({dashboard.performance.samples} عينة)</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardContent className="flex items-center gap-3 py-4">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+                <BrainCircuit className="size-5" />
+              </span>
+              <div>
+                <p className="text-lg font-bold leading-none">{dashboard.stats.aiAnalyzed}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">أخطاء شخّصها جيميناي</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={runHealthReport} disabled={busy === "report"} variant="outline" className="gap-1.5 rounded-xl" size="sm">
+          {busy === "report" ? <Loader2 className="size-3.5 animate-spin" /> : <FileText className="size-3.5" />}
+          تقرير الصحة اليومي (جيميناي)
+        </Button>
+      </div>
+      {report && (
+        <Card className="border-primary/30 bg-primary/[0.03] shadow-sm">
+          <CardContent className="py-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-primary">
+              <FileText className="size-3.5" /> تقرير آخر 24 ساعة
+            </p>
+            <p className="whitespace-pre-wrap text-xs leading-relaxed">{report}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── الأخطاء مرتّبة حسب تأثير اللاعب الحقيقي ── */}
+      {impactRanked && impactRanked.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <TrendingUp className="size-4 text-primary" />
+              الأعلى تأثيراً على اللاعبين (آخر 200 خطأ غير محلول)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {impactRanked.slice(0, 8).map((e) => (
+              <div key={e._id} className="flex items-center gap-2 rounded-lg border border-border/60 px-2.5 py-1.5">
+                <Badge variant="outline" className={"rounded-full text-[10px] " + (sevColor[e.severity] ?? "")}>
+                  {sevLabel[e.severity] ?? e.severity}
+                </Badge>
+                <span className="min-w-0 flex-1 truncate text-xs" dir="auto">{e.message}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo(e.lastSeen)}</span>
+                <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                  {e.impact}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {!board ? (
         <div className="flex justify-center py-12">
