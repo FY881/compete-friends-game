@@ -728,9 +728,8 @@ export const getSentinelDashboard = query({
   },
 });
 
-/** أفعال المالك على خطأ: حل يدوياً أو تجاهل كإنذار كاذب. */
 /**
- * v6.0 — محرك الإعادة للتحقق: يُسجّل هل الإصلاح الذاتي ثبت فعلاً بعد
+ * v6.0 المرحلة 1 — محرك الإعادة للتحقق: بعد كل إصلاح ذاتي، الصياد يعيد
  * إعادة التحميل (8 ثوانٍ بلا أخطاء = إصلاح مثبت). النتيجة تُكتب على
  * سجل الخطأ المطابق وتغذّي نسبة نجاح النمط — الصياد يتعلم من كل إصلاح.
  */
@@ -820,5 +819,125 @@ export const ownerErrorAction = mutation({
       await ctx.db.patch(errorId, { aiVerdict: "pending", aiAnalysis: undefined, aiFixSuggestion: undefined });
     }
     return { ok: true };
+  },
+});
+
+/**
+ * v6.0 المرحلة 3 — متنبئ الشذوذ: يحلل اتجاهات مقاييس الأداء الحقيقية
+ * (ذاكرة متزايدة، تراجع FPS، بطء استجابة، ميول أخطاء صاعدة) ويطلق
+ * علاجاً وقائياً + إشعاراً للمالك قبل أن تتحول الأعراض إلى أعطال.
+ */
+export const detectAnomalies = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const win = now - 60 * 60 * 1000; // آخر ساعة
+    const perf = await ctx.db
+      .query("performanceMetrics")
+      .withIndex("by_time", (q) => q.gte("recordedAt", win))
+      .collect();
+    const anomalies: Array<{ kind: string; detail: string; severity: string }> = [];
+
+    if (perf.length >= 10) {
+      // قسّم إلى نصفين: مقارنة الاتجاه (الأحدث مقابل الأقدم)
+      const sorted = [...perf].sort((a, b) => a.recordedAt - b.recordedAt);
+      const half = Math.floor(sorted.length / 2);
+      const avg = (arr: typeof sorted, f: (m: typeof sorted[number]) => number | undefined) => {
+        const vals = arr.map(f).filter((x): x is number => typeof x === "number" && isFinite(x));
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      };
+      const older = sorted.slice(0, half);
+      const newer = sorted.slice(half);
+
+      const memOld = avg(older, (m) => m.memoryUsedMB);
+      const memNew = avg(newer, (m) => m.memoryUsedMB);
+      if (memOld !== null && memNew !== null && memNew > memOld * 1.35 && memNew - memOld > 60) {
+        anomalies.push({ kind: "memory_growth", detail: `نمو ذاكرة +${Math.round(memNew - memOld)}MB خلال آخر نصف ساعة (${Math.round(memOld)}→${Math.round(memNew)}MB) — احتمال تسريب`, severity: "warning" });
+      }
+      const fpsOld = avg(older, (m) => m.fps);
+      const fpsNew = avg(newer, (m) => m.fps);
+      if (fpsOld !== null && fpsNew !== null && fpsOld >= 40 && fpsNew < fpsOld * 0.75) {
+        anomalies.push({ kind: "fps_decay", detail: `تراجع FPS من ${Math.round(fpsOld)} إلى ${Math.round(fpsNew)} — تدهور أداء حقيقي`, severity: "warning" });
+      }
+      const latOld = avg(older, (m) => m.networkLatencyMs);
+      const latNew = avg(newer, (m) => m.networkLatencyMs);
+      if (latOld !== null && latNew !== null && latNew > 2500 && latNew > latOld * 1.8) {
+        anomalies.push({ kind: "latency_spike", detail: `زمن استجابة ارتفع من ${Math.round(latOld)}ms إلى ${Math.round(latNew)}ms`, severity: "warning" });
+      }
+    }
+
+    // ميل معدل الأخطاء: قارن آخر 30 دقيقة بالـ 30 قبلهما
+    const errWin = now - 30 * 60 * 1000;
+    const errs = await ctx.db
+      .query("errorLogs")
+      .withIndex("by_created", (q) => q.gte("createdAt", errWin * 2))
+      .collect();
+    const recentHalf = errs.filter((e) => e.createdAt >= errWin).reduce((a, e) => a + e.count, 0);
+    const olderHalf = errs.filter((e) => e.createdAt < errWin).reduce((a, e) => a + e.count, 0);
+    if (recentHalf >= 6 && recentHalf > olderHalf * 2) {
+      anomalies.push({ kind: "error_surge", detail: `معدل الأخطاء تضاعف: ${olderHalf} → ${recentHalf} خلال 30 دقيقة`, severity: "critical" });
+    }
+
+    // العلاج الوقائي + إشعار
+    for (const a of anomalies) {
+      if (a.kind === "memory_growth" || a.kind === "error_surge") {
+        // تسجيل شفاء وقائي في سجل النظام
+        const health = await ctx.db.query("systemHealth").withIndex("by_key", (q) => q.eq("key", "current")).first();
+        if (health) {
+          await ctx.db.patch(health._id, { lastAutoFix: now });
+        }
+      }
+      await ctx.db.insert("notifications", {
+        userId: "__all__",
+        title: `🩺 تنبؤ قبل العطل: ${a.kind}`,
+        body: a.detail,
+        type: a.severity === "critical" ? "system" : "warning",
+        read: false,
+        createdAt: now,
+      });
+    }
+
+    return { anomalies, checked: perf.length, at: now };
+  },
+});
+
+/**
+ * v6.0 المرحلة 3 — درجة تأثير اللاعب: لكل خطأ غير محلول، درجة حقيقية
+ * من (عدد اللاعبين المتأثرين × التكرار × الخطورة × الحداثة) — ترتيب
+ * غرفة المالك حسب الأثر الحقيقي لا العدد فقط.
+ */
+export const getImpactRankedErrors = query({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const errors = await ctx.db
+      .query("errorLogs")
+      .withIndex("by_unresolved", (q) => q.eq("resolved", false))
+      .order("desc")
+      .take(200);
+
+    const sevWeight = { critical: 4, high: 2.5, medium: 1.2, low: 0.5 } as Record<string, number>;
+    return errors
+      .map((e) => {
+        const recencyHours = Math.max(0.1, (now - e.lastSeen) / 3600000);
+        const recencyFactor = 1 / (1 + recencyHours / 6); // يخفت مع الزمن
+        const severity = sevWeight[e.severity] ?? 1;
+        const healedPenalty = e.autoHealed && e.healResult === "success" ? 0.3 : 1;
+        const impact = Math.round(e.count * severity * recencyFactor * healedPenalty * 10) / 10;
+        return {
+          _id: e._id,
+          message: e.message.slice(0, 140),
+          category: e.category,
+          severity: e.severity,
+          count: e.count,
+          lastSeen: e.lastSeen,
+          autoHealed: e.autoHealed,
+          aiVerdict: e.aiVerdict ?? null,
+          playerAction: e.playerAction ?? null,
+          impact,
+        };
+      })
+      .sort((a, b) => b.impact - a.impact)
+      .slice(0, 30);
   },
 });

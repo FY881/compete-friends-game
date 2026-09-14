@@ -227,3 +227,12 @@ export default crons;
 
 // The actual sweep function is runSweepNow in autoAdmin.ts
 // by the owner from the Owner room UI.
+
+// 🩺 v6.0 «المفترس» — متنبئ الشذوذ: كل 15 دقيقة يحلل اتجاهات الأداء
+// (ذاكرة، FPS، استجابة، ميول أخطاء) ويطلق تنبؤات قبل العطل لغرفة المالك.
+crons.interval(
+  "anomaly-predictor",
+  { minutes: 15 },
+  internal.errorHunter.detectAnomalies,
+  {},
+);
