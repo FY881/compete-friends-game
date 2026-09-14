@@ -729,6 +729,50 @@ export const getSentinelDashboard = query({
 });
 
 /** أفعال المالك على خطأ: حل يدوياً أو تجاهل كإنذار كاذب. */
+/**
+ * v5.1 — تصعيد تقرير منظم: عند فشل كل جولات الإصلاح الذاتي،
+ * يرسل الصياد التقرير الكامل إلى غرفة المالك فوراً (إشعار + إرفاق
+ * التقرير على سجل الخطأ نفسه) — لا يحتاج المالك أن يبحث.
+ */
+export const escalateErrorReport = mutation({
+  args: {
+    message: v.string(),
+    report: v.string(),
+    route: v.optional(v.string()),
+    repairPasses: v.optional(v.number()),
+  },
+  handler: async (ctx, { message, report, route, repairPasses }) => {
+    const now = Date.now();
+
+    // اربط التقرير بسجل الخطأ المطابق إن وُجد (حتى يظهر في لوحة الصياد)
+    const unresolved = await ctx.db
+      .query("errorLogs")
+      .withIndex("by_unresolved", (q) => q.eq("resolved", false))
+      .order("desc")
+      .take(60);
+    const match = unresolved.find((e) => message.slice(0, 100) === e.message.slice(0, 100));
+    if (match) {
+      await ctx.db.patch(match._id, {
+        aiFixSuggestion: report.slice(0, 1800),
+        healResult: "escalated",
+        route: route ?? match.route,
+      });
+    }
+
+    // إشعار فوري لغرفة المالك بالتقرير المنظم
+    await ctx.db.insert("notifications", {
+      userId: "__all__",
+      title: `📋 تقرير خطأ لم يُصلَح تلقائياً${repairPasses ? ` (${repairPasses} جولات مطاردة)` : ""}`,
+      body: report.slice(0, 900),
+      type: "warning",
+      read: false,
+      createdAt: now,
+    });
+
+    return { ok: true, matched: !!match };
+  },
+});
+
 export const ownerErrorAction = mutation({
   args: {
     errorId: v.id("errorLogs"),

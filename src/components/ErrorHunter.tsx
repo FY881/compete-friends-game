@@ -606,6 +606,13 @@ export async function flushPendingErrorReports() {
   if (!convexClient || pendingReportCount() === 0) return 0;
   return flushErrorQueue(async (payload) => {
     try {
+      // v5.1: التقارير المُصعَّدة تُوجَّه لمسارها الصحيح
+      if (payload && (payload as any).__escalated) {
+        const { __escalated, ...escalation } = payload as any;
+        void __escalated;
+        await convexClient.mutation(api.errorHunter.escalateErrorReport, escalation as any);
+        return true;
+      }
       await convexClient.mutation(api.errorHunter.logError, payload as any);
       return true;
     } catch { return false; }
@@ -954,7 +961,9 @@ export class ErrorHunter extends Component<Props, State> {
 
   private scheduleAutoRetry = () => {
     if (this.autoRetryPasses >= this.MAX_AUTO_PASSES) {
-      this.addTimeline("system_action", `استُنفدت ${this.MAX_AUTO_PASSES} جولات مطاردة ذاتية — التقرير جاهز للنسخ`);
+      this.addTimeline("system_action", `استُنفدت ${this.MAX_AUTO_PASSES} جولات مطاردة ذاتية — يُصعَّد التقرير لغرفة المالك`);
+      // v5.1: الاستسلام → إرسال التقرير المنظم تلقائياً للمالك (لا حاجة لزر)
+      this.escalateToOwner();
       return;
     }
     this.autoRetryPasses++;
@@ -964,30 +973,58 @@ export class ErrorHunter extends Component<Props, State> {
       const d = this.state.error ? diagnoseAdvanced(this.state.error) : null;
       if (d) this.startRecovery(d);
     }, delayMs);
-  };
-
-  // ═══ v5.1 — نسخ تقرير منظم للمطوّر ═══
-  private handleCopyReport = () => {
+  };  // ═══ v5.1 — بناء التقرير المنظم (نفس محتوى زر النسخ) ═══
+  private buildStructuredReport = (): string => {
     const { error, incidentEvents, deviceHealth } = this.state;
     const d = error ? diagnoseAdvanced(error) : null;
     const attempts = this.autoRetryPasses;
-    const report = [
+    return [
       "═══ 🐛 تقرير خطأ — حرب العقول (صياد الأخطاء v5.1) ═══",
       `🕐 الوقت: ${new Date().toLocaleString("ar-SA")}`,
       `📍 المسار: ${typeof window !== "undefined" ? window.location.pathname : "?"}`,
       `🏷 الفئة: ${d?.category || "unknown"} · الخطورة: ${d?.severity || "unknown"} · الثقة: ${Math.round((d?.confidence || 0) * 100)}%`,
       "",
-      `❌ الخطأ: ${error?.message || "غير معروف"}`,
-      "",
+      `❌ الخطأ: ${error?.message || "غير معروف"}`,      "",
       error?.stack ? `📚 المكدس:\n${error.stack.slice(0, 1200)}` : "📚 المكدس: غير متوفر",
       "",
       this.state.errorInfo?.componentStack ? `🧩 شجرة المكونات:\n${this.state.errorInfo.componentStack.slice(0, 800)}` : "",
       `🔗 سلسلة السبب: ${this.state.rootCauseChain.map((n) => n.component).join(" → ") || "—"}`,
       `🧠 التشخيص: ${d?.rootCause || "—"}`,
-      `💡 الحل المقترح محلياً: ${d?.estimatedImpact || "—"}`,      `🔁 جولات الإصلاح التلقائي: ${attempts}/${this.MAX_AUTO_PASSES} — ${this.state.healingResult === "success" ? "نجحت" : "فشلت جميعها"}`,
+      `🔁 جولات الإصلاح التلقائي: ${attempts}/${this.MAX_AUTO_PASSES} — ${this.state.healingResult === "success" ? "نجحت" : "فشلت جميعها"}`,
       `💾 الجهاز: RAM ${deviceHealth.memoryMB}MB · DOM ${deviceHealth.domNodes} · شبكة ${deviceHealth.networkType} · FPS ${deviceHealth.fps} · ${deviceHealth.uptime}s`,
       incidentEvents.length > 0 ? `⏱ التسلسل:\n${incidentEvents.map((e) => `- [${new Date(e.timestamp).toLocaleTimeString("ar-SA")}] ${e.type}: ${e.message}`).join("\n").slice(0, 1000)}` : "",
     ].filter(Boolean).join("\n");
+  };
+
+  // ═══ v5.1 — تصعيد التقرير تلقائياً لغرفة المالك (مضاد للتكرار) ═══
+  private escalatedFor: string | null = null;
+
+  private escalateToOwner = () => {
+    const { error } = this.state;
+    if (!error || !convexClient) return;
+    const key = error.message.slice(0, 120);
+    if (this.escalatedFor === key) return; // مرة واحدة لكل خطأ فريد
+    this.escalatedFor = key;
+    const report = this.buildStructuredReport();
+    convexClient
+      .mutation(api.errorHunter.escalateErrorReport, {
+        message: error.message.slice(0, 500),
+        report,
+        route: typeof window !== "undefined" ? window.location.pathname : undefined,
+        repairPasses: this.autoRetryPasses,
+      })
+      .catch(() => {
+        // الشبكة مقطوعة؟ لا يضيع — يُنضم للطابور الدائم.
+        enqueueErrorReport({ __escalated: true, message: error.message.slice(0, 500), report });
+      });
+  };
+
+  // ═══ v5.1 — نسخ تقرير منظم للمطوّر ═══
+  private handleCopyReport = () => {
+    const report = this.buildStructuredReport();
+    // النسخ يرسل أيضاً لغرفة المالك (طُلب صراحةً من المالك)
+    this.escalatedFor = null;
+    this.escalateToOwner();
 
     const done = () => this.setState({ copied: true });
     if (navigator.clipboard?.writeText) {
