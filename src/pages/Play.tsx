@@ -27,6 +27,7 @@ import { MindsCouncil } from "@/components/MindsCouncil";
 import { AppealForm } from "@/components/Appeals";
 import { AdaptiveRewardCard } from "@/components/AdaptiveRewardCard";
 import { SmartMatchCard } from "@/components/SmartMatchCard";
+import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
 import { LiveEventBanner } from "@/components/EventsStudio";
@@ -284,6 +285,7 @@ export default function Play() {
         <SeasonPassPanel />
         <QuestsPanel />
         <SmartMatchCard />
+        <PersonalChallenges />
         <LegacyCard />
         <MindsCouncil />
         <AppealForm />

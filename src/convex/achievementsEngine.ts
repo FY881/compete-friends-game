@@ -278,6 +278,11 @@ async function computeMetricsPublic(ctx: any, userId: any): Promise<Metrics> {
   return await computeMetrics(ctx, userId);
 }
 
+/** نسخة مُصدَّرة للمقاييس — تستخدمها وحدات أخرى (مثل التحديات الشخصية) */
+export async function computeMetricsFor(ctx: any, userId: any): Promise<Metrics> {
+  return await computeMetrics(ctx, userId);
+}
+
 /** توصيات «إنجاز شبه منتهي» — تُستدعى من وحدة المُوصي في مركز الذكاء */
 export const getNearCompletions = query({
   handler: async (ctx) => {

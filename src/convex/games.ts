@@ -1529,6 +1529,15 @@ export const finishGame = internalMutation({
         /* الإنجازات اختيارية — لا تعطل تسجيل الجولة */
       }
 
+      // 🎯 التحديات الشخصية — تحديث تقدم تحديات اللاعب بعد كل جولة
+      try {
+        await ctx.runMutation(internal.personalChallenges.tickFromGame, {
+          userId: p.userId,
+        });
+      } catch {
+        /* التحديات اختيارية — لا تعطل تسجيل الجولة */
+      }
+
       // 🔗 المكافآت التكيفية — تربط التقدم × العضوية × العشيرة × الهيبة فعلياً
       try {
         await ctx.runMutation(internal.adaptiveRewards.grantAdaptiveReward, {
