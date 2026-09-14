@@ -27,6 +27,7 @@ export const UNIT_CATALOG = [
   { unit: "recommender", name: "المُوصي الذكي", dept: "التوصيات", desc: "تحديات وأحداث مقترحة حسب نشاط اللاعبين" },
   { unit: "personalizer", name: "مخصص التجربة", dept: "التخصيص", desc: "مطابقة ذكية وأسئلة ديناميكية حسب مهارة ونقاط ضعف كل لاعب" },
   { unit: "notifier", name: "وسيط الإشعارات", dept: "التخصيص", desc: "إشعارات ذكية تحترم تفضيلات كل لاعب وساعات الهدوء وتصنف الأولوية" },
+  { unit: "doctor", name: "طبيب Gemini", dept: "الصحة", desc: "تشخيص الأخطاء بالذكاء الاصطناعي: سبب جذري بالعربية + حل + قابلية إصلاح تلقائي" },
 ] as const;
 
 /** تسجيل حدث من أي وحدة (داخلي — تستدعيه الوحدات الأخرى) */
@@ -276,6 +277,18 @@ export const bridgeTick = internalMutation({
         kind: "alert",
         severity: errors.length > 20 ? "critical" : "warn",
         summary: `${errors.length} خطأ عميل خلال 24 ساعة — صياد الأخطاء مطلوب`,
+      });
+      logged++;
+    }
+
+    // ── إشارة: طبيب Gemini — عدد الأخطاء المُشخَّصة بالذكاء الاصطناعي ──
+    const diagnosed = errors.filter((e) => e.aiVerdict === "analyzed").length;
+    if (diagnosed > 0) {
+      await ctx.runMutation(internal.aiHub.logEvent, {
+        unit: "doctor",
+        kind: "observation",
+        severity: "info",
+        summary: `${diagnosed} خطأ مشخّص بالذكاء الاصطناعي خلال 24 ساعة — تشخيص عربي مكتوب على السجلات`,
       });
       logged++;
     }

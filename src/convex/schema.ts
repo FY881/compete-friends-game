@@ -2302,6 +2302,23 @@ const schema = defineSchema(
       quietHours: v.optional(v.object({ from: v.number(), to: v.number() })),
       browserPush: v.boolean(),
     }).index("by_user", ["userId"]),
+
+    // 🎯 المرحلة 15 — التحديات الشخصية
+    personalChallenges: defineTable({
+      userId: v.id("users"),
+      kind: v.string(),
+      refId: v.string(),
+      title: v.string(),
+      description: v.string(),
+      reward: v.number(),
+      target: v.number(),
+      current: v.number(),
+      status: v.string(),
+      createdAt: v.number(),
+      claimedAt: v.optional(v.number()),
+      lastTickAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
+    }).index("by_user", ["userId"]),
   },
   {
     schemaValidation: false,
