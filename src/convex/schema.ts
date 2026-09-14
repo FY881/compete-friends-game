@@ -1268,7 +1268,10 @@ const schema = defineSchema(
       )),
       moderationReason: v.optional(v.string()),
       createdAt: v.number(),
-    }).index("by_room", ["roomId"]).index("by_sender", ["senderId"]),
+    })
+      .index("by_room", ["roomId"])
+      .index("by_sender", ["senderId"])
+      .index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
     // ║ مؤشرات الكتابة (حية) ║

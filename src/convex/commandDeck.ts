@@ -634,13 +634,13 @@ export const getCommunityMonitor = query({
   args: {},
   handler: async (ctx) => {
     const me = await requireOwner(ctx);
-    if (!me) return null;
+    if (!me) return { rooms: [], hotRooms: [], recent: [], totals: { rooms: 0, msgs24h: 0, flagged24h: 0 }, unauthorized: true };
     const dayAgo = Date.now() - 86400_000;
 
     const rooms = await ctx.db.query("chatRooms").collect();
     const messages = await ctx.db
       .query("chatMessages")
-      .withIndex("by_room", (q: any) => q.gte("createdAt", dayAgo))
+      .withIndex("by_created", (q: any) => q.gte("createdAt", dayAgo))
       .take(3000);
 
     const byRoom = new Map<string, number>();
