@@ -178,6 +178,15 @@ crons.interval(
   {},
 );
 
+// 🩺 طبيب Gemini — كل 10 دقائق: يشخّص الأخطاء غير المحلولة بالذكاء
+// الاصطناعي (سبب جذري بالعربية + حل + خطورة + قابلية إصلاح تلقائي)
+// ويكتب التشخيص على سجل الخطأ نفسه في غرفة المالك.
+crons.interval(
+  "gemini-doctor-cycle",
+  { minutes: 10 },
+  internal.geminiDoctor.diagnoseUnanalyzed,
+);
+
 export default crons;
 
 

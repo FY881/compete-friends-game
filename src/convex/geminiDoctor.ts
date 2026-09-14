@@ -17,7 +17,7 @@ import { internal } from "./_generated/api";
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-const MODEL = "gemini-2.0-flash";
+const MODEL = "gemini-3.6-flash";
 
 function buildDiagnosisPrompt(message: string, stack?: string, playerAction?: string, category?: string): string {
   return `أنت طبيب أخطاء خبير في تطبيق لعبة كويز عربية (React + Convex). حلّل هذا الخطأ وأجب بالعربية فقط، بهذا التنسيق الدقيق:
