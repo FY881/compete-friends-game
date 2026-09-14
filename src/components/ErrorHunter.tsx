@@ -59,6 +59,7 @@ interface State {
   circuitState: "closed" | "open" | "half-open";
   consecutiveFailures: number;
   showDetails: boolean;
+  copied?: boolean;
   showTimeline: boolean;
   showPast: boolean;
   showBrain: boolean;
@@ -918,6 +919,12 @@ export class ErrorHunter extends Component<Props, State> {
     this.addTimeline("system_action",
       newState === "open" ? "Circuit Breaker فُتح" : `فشلت المحاولات (${newFailures}/${CIRCUIT_THRESHOLD})`
     );
+
+    // v5.1: فشل ≠ استسلام — أطلق جولة مطاردة ذاتية متصاعدة.
+    // قاطع الدائرة المفتوح وحده يوقف المطارِدة (حماية من العاصفة).
+    if (newState !== "open") {
+      this.scheduleAutoRetry();
+    }
   }
 
   private updateStep(index: number, status: RecoveryStep["status"], message: string) {
@@ -936,6 +943,73 @@ export class ErrorHunter extends Component<Props, State> {
 
   private handleReload = () => { safeReload(); };
   private handleGoHome = () => { safeNavigate("/play"); };
+
+  // ═══ v5.1 — القنّاص: مطاردة ذاتية متصاعدة ═══
+  // عند فشل جولة الإصلاح، يعيد الصياد الهجوم تلقائياً حتى 3 جولات
+  // متصاعدة (مع فاصل قصير يسمح للشبكة/الذاكرة بالتعافي) قبل أن يستسلم
+  // ويعرض زر نسخ التقرير.
+  private readonly MAX_AUTO_PASSES = 3;
+
+  private autoRetryPasses = 0;
+
+  private scheduleAutoRetry = () => {
+    if (this.autoRetryPasses >= this.MAX_AUTO_PASSES) {
+      this.addTimeline("system_action", `استُنفدت ${this.MAX_AUTO_PASSES} جولات مطاردة ذاتية — التقرير جاهز للنسخ`);
+      return;
+    }
+    this.autoRetryPasses++;
+    const delayMs = 1200 * this.autoRetryPasses; // تصاعد التأخير
+    this.addTimeline("recovery_start", `⚔️ جولة مطاردة ${this.autoRetryPasses}/${this.MAX_AUTO_PASSES} بعد ${Math.round(delayMs / 1000)} ثانية`);
+    setTimeout(() => {
+      const d = this.state.error ? diagnoseAdvanced(this.state.error) : null;
+      if (d) this.startRecovery(d);
+    }, delayMs);
+  };
+
+  // ═══ v5.1 — نسخ تقرير منظم للمطوّر ═══
+  private handleCopyReport = () => {
+    const { error, incidentEvents, deviceHealth } = this.state;
+    const d = error ? diagnoseAdvanced(error) : null;
+    const attempts = this.autoRetryPasses;
+    const report = [
+      "═══ 🐛 تقرير خطأ — حرب العقول (صياد الأخطاء v5.1) ═══",
+      `🕐 الوقت: ${new Date().toLocaleString("ar-SA")}`,
+      `📍 المسار: ${typeof window !== "undefined" ? window.location.pathname : "?"}`,
+      `🏷 الفئة: ${d?.category || "unknown"} · الخطورة: ${d?.severity || "unknown"} · الثقة: ${Math.round((d?.confidence || 0) * 100)}%`,
+      "",
+      `❌ الخطأ: ${error?.message || "غير معروف"}`,
+      "",
+      error?.stack ? `📚 المكدس:\n${error.stack.slice(0, 1200)}` : "📚 المكدس: غير متوفر",
+      "",
+      this.state.errorInfo?.componentStack ? `🧩 شجرة المكونات:\n${this.state.errorInfo.componentStack.slice(0, 800)}` : "",
+      `🔗 سلسلة السبب: ${this.state.rootCauseChain.map((n) => n.component).join(" → ") || "—"}`,
+      `🧠 التشخيص: ${d?.rootCause || "—"}`,
+      `💡 الحل المقترح محلياً: ${d?.estimatedImpact || "—"}`,      `🔁 جولات الإصلاح التلقائي: ${attempts}/${this.MAX_AUTO_PASSES} — ${this.state.healingResult === "success" ? "نجحت" : "فشلت جميعها"}`,
+      `💾 الجهاز: RAM ${deviceHealth.memoryMB}MB · DOM ${deviceHealth.domNodes} · شبكة ${deviceHealth.networkType} · FPS ${deviceHealth.fps} · ${deviceHealth.uptime}s`,
+      incidentEvents.length > 0 ? `⏱ التسلسل:\n${incidentEvents.map((e) => `- [${new Date(e.timestamp).toLocaleTimeString("ar-SA")}] ${e.type}: ${e.message}`).join("\n").slice(0, 1000)}` : "",
+    ].filter(Boolean).join("\n");
+
+    const done = () => this.setState({ copied: true });
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(report).then(done).catch(() => this.fallbackCopy(report, done));
+    } else {
+      this.fallbackCopy(report, done);
+    }
+  };
+
+  private fallbackCopy(text: string, done: () => void) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      done();
+    } catch { /* best effort */ }
+  }
   private handleMasterReset = () => {
     // v5.0: SAFE master reset — يجدد كاش التطبيق والـ SW فقط.
     // الجلسة (convex-auth) والإعدادات والتفضيلات تنجو دائماً —
@@ -1188,6 +1262,9 @@ export class ErrorHunter extends Component<Props, State> {
             <button type="button" onClick={this.handleReload} style={primaryBtnStyle}>
               🔄 إعادة التحميل
             </button>
+            <button type="button" onClick={this.handleCopyReport} style={{ ...secondaryBtnStyle, color: "#60a5fa", borderColor: "rgba(59,130,246,0.3)" }}>
+              {this.state.copied ? "✅ تم نسخ التقرير" : "📋 نسخ تقرير المشكلة"}
+            </button>
             <button type="button" onClick={this.handleGoHome} style={secondaryBtnStyle}>
               🏠 الرئيسية
             </button>
@@ -1195,6 +1272,11 @@ export class ErrorHunter extends Component<Props, State> {
               ⚠️ إعادة تعيين شاملة
             </button>
           </div>
+          {this.state.copied && (
+            <p style={{ marginTop: 8, fontSize: 11, color: "#10b981", textAlign: "center" }}>
+              ✅ تم نسخ التقرير المنظم — الصقه لأي مطوّر أو في دردشة الدعم وسيُحل فوراً
+            </p>
+          )}
 
           {/* Technical details */}
           <div style={{ marginTop: 16 }}>
