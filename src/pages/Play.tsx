@@ -27,6 +27,7 @@ import { MindsCouncil } from "@/components/MindsCouncil";
 import { AppealForm } from "@/components/Appeals";
 import { AdaptiveRewardCard } from "@/components/AdaptiveRewardCard";
 import { SmartMatchCard } from "@/components/SmartMatchCard";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import { LiveEventBanner } from "@/components/EventsStudio";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { Progress } from "@/components/ui/progress";
@@ -287,6 +288,7 @@ export default function Play() {
         <AppealForm />
         <LiveEventBanner />
         <AdaptiveRewardCard />
+        <NotificationCenter />
         <LoyaltyPanel />
         <CosmeticShop />
       </div>

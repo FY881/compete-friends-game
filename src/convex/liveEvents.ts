@@ -108,6 +108,15 @@ export const createEvent = mutation({
       createdAt: now,
     });
 
+    // 🔔 إشعار حي لكل اللاعبين عبر مركز الإشعارات الذكي
+    try {
+      await ctx.runMutation(internal.smartNotifications.liveEventStarted, {
+        eventName: name.trim(),
+        multiplier,
+        endsAt: now + durationHours * 3600_000,
+      });
+    } catch { /* الإشعارات اختيارية */ }
+
     // 🧠 سجّل في مركز الذكاء الموحد
     try {
       await ctx.runMutation(internal.aiHub.logEvent, {

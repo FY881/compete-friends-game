@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
@@ -152,6 +153,15 @@ export const decideAppeal = mutation({
         }
       }
     }
+
+    // 🔔 بلّغ اللاعب بنتيجة اعتراضه
+    try {
+      await ctx.runMutation(internal.smartNotifications.appealResolved, {
+        userId: appeal.userId,
+        approved: decision === "overturned",
+        note,
+      });
+    } catch { /* الإشعارات اختيارية */ }
 
     return { decision };
   },

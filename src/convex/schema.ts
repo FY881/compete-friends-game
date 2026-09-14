@@ -2296,6 +2296,12 @@ const schema = defineSchema(
       actorName: v.string(),
       at: v.number(),
     }).index("by_at", ["at"]),
+    notificationPrefs: defineTable({
+      userId: v.id("users"),
+      enabled: v.any(),
+      quietHours: v.optional(v.object({ from: v.number(), to: v.number() })),
+      browserPush: v.boolean(),
+    }).index("by_user", ["userId"]),
   },
   {
     schemaValidation: false,
