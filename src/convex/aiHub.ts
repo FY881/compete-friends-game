@@ -183,17 +183,13 @@ export const bridgeTick = internalMutation({
     // ── إشارة: صحة الاقتصاد → مراقب الصحة + الحاكم ──
     const users = await ctx.db.query("users").take(500);
     let inflow = 0, outflow = 0;
-    for (const u of users) {
-      const rows = await ctx.db
-        .query("loyaltyLedger")
-        .withIndex("by_user", (q) => q.eq("userId", u._id))
-        .take(100);
-      for (const r of rows) {
-        if (r.at >= dayAgo) {
-          if (r.delta > 0) inflow += r.delta;
-          else outflow += -r.delta;
-        }
-      }
+    const dayRows = await ctx.db
+      .query("loyaltyLedger")
+      .withIndex("by_at", (q) => q.gte("at", dayAgo))
+      .take(8000);
+    for (const r of dayRows) {
+      if (r.delta > 0) inflow += r.delta;
+      else outflow += -r.delta;
     }
     const net = inflow - outflow;
     if (inflow + outflow > 0) {

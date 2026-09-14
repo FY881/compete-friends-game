@@ -224,17 +224,12 @@ export const runCycle = internalMutation({
     // يقيس نمو المعروض النقدي (صافي الكسب) ونسبة الإنفاق عبر آخر 24 ساعة،
     // ويقارنها بالأسبوع السابق — تضخم حقيقي = نمو تسارعي + إنفاق منخفض.
     // دفتر الولاء مفهرس بـ by_user فقط — نجمع عبر المستخدمين ثم نفلتر زمنياً
-    const ledgerUsers = await ctx.db.query("users").take(500);
-    const entries: { delta: number; at: number }[] = [];
-    for (const u of ledgerUsers) {
-      const rows = await ctx.db
-        .query("loyaltyLedger")
-        .withIndex("by_user", (q) => q.eq("userId", u._id))
-        .take(200);
-      for (const r of rows) {
-        if (r.at >= now - 14 * 86400_000) entries.push({ delta: r.delta, at: r.at });
-      }
-    }
+    // v6: الفهرس by_at متاح الآن — مسح مباشر بالزمن بدل حلقة على المستخدمين
+    const rows = await ctx.db
+      .query("loyaltyLedger")
+      .withIndex("by_at", (q) => q.gte("at", now - 14 * 86400_000))
+      .take(8000);
+    const entries: { delta: number; at: number }[] = rows.map((r) => ({ delta: r.delta, at: r.at }));
     const dayLedger = entries.filter((l) => l.at >= dayAgo);
     const weekLedger = entries.filter((l) => l.at >= now - 7 * 86400_000);
 

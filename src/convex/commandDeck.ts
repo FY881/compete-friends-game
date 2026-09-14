@@ -65,7 +65,7 @@ export const getCommandOverview = query({
           .withIndex("by_created", (q: any) => q.gte("at", dayAgo))
           .order("desc")
           .take(200),
-        ctx.db.query("loyaltyLedger").withIndex("by_user", (q: any) => q.gte("at", dayAgo)).take(2000),
+        ctx.db.query("loyaltyLedger").withIndex("by_at", (q: any) => q.gte("at", dayAgo)).take(2000),
       ]);
 
     const banned = users.filter((u: Doc<"users">) => u.bannedPermanent || (u.bannedUntil ?? 0) > now).length;
@@ -511,7 +511,7 @@ export const getOwnerBrief = query({
 
     const [history, ledger] = await Promise.all([
       ctx.db.query("gameHistory").withIndex("by_played", (q: any) => q.gte("playedAt", fourteenAgo)).take(8000),
-      ctx.db.query("loyaltyLedger").withIndex("by_user", (q: any) => q.gte("at", fourteenAgo)).take(6000),
+      ctx.db.query("loyaltyLedger").withIndex("by_at", (q: any) => q.gte("at", fourteenAgo)).take(6000),
     ]);
 
     // سلاسل يومية
@@ -946,11 +946,11 @@ export const getEconomyPulse = query({
   args: {},
   handler: async (ctx) => {
     const me = await requireOwner(ctx);
-    if (!me) return null;
+    if (!me) return { inflow: 0, outflow: 0, net: 0, velocity: 0, health: 100, reasons: [], topSpenders: [], entries24h: 0, unauthorized: true };
     const dayAgo = Date.now() - 24 * 3600_000;
     const ledger = await ctx.db
       .query("loyaltyLedger")
-      .withIndex("by_user", (q: any) => q.gte("at", dayAgo))
+      .withIndex("by_at", (q: any) => q.gte("at", dayAgo))
       .take(3000);
 
     let inflow = 0, outflow = 0;

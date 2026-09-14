@@ -935,7 +935,9 @@ const schema = defineSchema(
       delta: v.number(), // موجب = كسب، سالب = إنفاق
       reason: v.string(),
       at: v.number(),
-    }).index("by_user", ["userId"]),
+    })
+      .index("by_user", ["userId"])
+      .index("by_at", ["at"]),
 
     // 🎁 الصندوق الغامض اليومي — صف لكل فتح (يضمن حداً يومياً)
     dailyBoxes: defineTable({

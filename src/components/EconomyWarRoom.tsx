@@ -59,7 +59,7 @@ export function EconomyWarRoom() {
     }
   };
 
-  const health = pulse?.health ?? null;
+  const health = pulse?.unauthorized ? null : (pulse?.health ?? null);
 
   return (
     <div dir="rtl" className="space-y-5">
