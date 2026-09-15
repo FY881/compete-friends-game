@@ -2016,6 +2016,10 @@ const schema = defineSchema(
       aiAnalyzedAt: v.optional(v.number()), // وقت التشريح
       aiVerdict: v.optional(v.string()), // pending | analyzed | failed
       playerAction: v.optional(v.string()), // ماذا كان اللاعب يفعل لحظة الخطأ (v5.0)
+      // ── v7.0 Phase A: أدلة الشبكة + الكونسول + العنقود الدلالي ──
+      netBreadcrumbs: v.optional(v.string()), // JSON: آخر الطلبات الفاشلة (endpoint/status/latency/retries)
+      consoleContext: v.optional(v.string()), // JSON: آخر console.error + unhandledrejection
+      clusterId: v.optional(v.id("aiErrorClusters")),
     })
       .index("by_fingerprint", ["fingerprint"])
       .index("by_severity", ["severity"])
@@ -2027,6 +2031,27 @@ const schema = defineSchema(
     // ═══════════════════════════════════════════════════════════════════════
     // ║ صياد الأخطاء — أنماط الأخطاء المُتعلّمة ║
     // ═══════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+    // ║ صياد الأخطاء v7.0 — عناقيد الأخطاء الدلالية (AI Fingerprint Clusters) ║
+    // ═══════════════════════════════════════════════════════════════════
+    aiErrorClusters: defineTable({
+      title: v.string(), // اسم عربي موجز للعائلة (من Gemini)
+      rootCauseFamily: v.string(), // عائلة السبب الجذري (فهرسة/شبكة/منطق...)
+      memberCount: v.number(), // عدد الأخطاء الأعضاء
+      sampleMessage: v.string(), // مثال تمثيلي
+      aiVerdict: v.string(), // triaged | untriaged
+      severity: v.string(), // low | medium | high | critical
+      autoFixable: v.optional(v.boolean()),
+      fixSummary: v.optional(v.string()), // الحل الموحد المقترح
+      regressionOf: v.optional(v.id("aiErrorClusters")), // للانتكاسات: العنقود الأصلي
+      regressionCount: v.optional(v.number()), // كم مرة عاد بعد "الإصلاح"
+      lastResolvedAt: v.optional(v.number()), // آخر مرة أُغلقت فيها الحادثة
+      firstSeen: v.number(),
+      lastSeen: v.number(),
+      createdAt: v.number(),
+    }).index("by_verdict", ["aiVerdict"])
+      .index("by_lastSeen", ["lastSeen"]),
+
     errorPatterns: defineTable({
       pattern: v.string(), // نمط الخطأ (regex-friendly)
       category: v.string(),

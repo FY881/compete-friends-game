@@ -170,6 +170,37 @@ export function installBreadcrumbListeners() {
     const r = e.reason;
     addBreadcrumb("console", `rejection: ${r instanceof Error ? r.message : String(r).slice(0, 100)}`);
   });
+
+  // ═══ v7.0 APEX — المهمة 4: معترض الكونسول ═══
+  // console.error الصامتة لا تصل لحدود React — نلتقطها كأدلة.
+  const origConsoleError = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    try {
+      const msg = args.map((a) => (a instanceof Error ? a.message : typeof a === "string" ? a : "")).filter(Boolean).join(" | ").slice(0, 160);
+      if (msg) addBreadcrumb("console", `console.error: ${msg}`);
+    } catch { /* */ }
+    origConsoleError(...args);
+  };
+
+  // ═══ v7.0 APEX — المهمة 5: أدلة إخفاقات الشبكة ═══
+  // نلف fetch: الطلبات الفاشلة (حالة غير ok أو خطأ شبكة) تُسجَّل
+  // كأدلة غنية (نقطة النهاية/الحالة/الزمن/المحاولة) تظهر في التقرير.
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async (...fetchArgs: Parameters<typeof fetch>) => {
+    const start = Date.now();
+    const input = fetchArgs[0];
+    const endpoint = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+    try {
+      const res = await origFetch(...fetchArgs);
+      if (!res.ok) {
+        addBreadcrumb("network", `فشل ${endpoint.slice(-60)} → ${res.status} (${Date.now() - start}ms)`);
+      }
+      return res;
+    } catch (fetchErr) {
+      addBreadcrumb("network", `خطأ شبكة ${endpoint.slice(-60)} (${Date.now() - start}ms): ${fetchErr instanceof Error ? fetchErr.message : "—"}`);
+      throw fetchErr;
+    }
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════

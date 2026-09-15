@@ -187,6 +187,14 @@ crons.interval(
   internal.geminiDoctor.diagnoseUnanalyzed,
 );
 
+// 🧠 صياد الأخطاء v7.0 «APEX» — كل 15 دقيقة: تجميع الأخطاء الجديدة دلالياً
+// عبر Gemini (عناقيد) + كشف الانتكاسات تلقائياً + ربط الأخطاء بعناقيدها.
+crons.interval(
+  "apex-cluster-cycle",
+  { minutes: 15 },
+  internal.geminiApex.clusterUntriaged,
+);
+
 export default crons;
 
 
