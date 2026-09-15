@@ -1312,6 +1312,37 @@ const schema = defineSchema(
       generatedAt: v.number(),
     }).index("by_day", ["day"]),
 
+    // ═══ «العرش» المرحلة ب — مسجل القرارات الموثّق ═══
+    crownDecisions: defineTable({
+      title: v.string(),
+      why: v.string(), // لماذا اتُّخذ القرار
+      expected: v.string(), // ماذا توقع المالك أن يحدث
+      beforeSnapshot: v.object({
+        rounds7d: v.number(),
+        users: v.number(),
+        openReports: v.number(),
+      }),
+      measured: v.boolean(),
+      measuredAt: v.optional(v.number()),
+      afterSnapshot: v.optional(v.object({
+        rounds7d: v.number(),
+        users: v.number(),
+        openReports: v.number(),
+      })),
+      verdict: v.optional(v.string()), // خلاصة المقارنة بالعربية
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
+    // ═══ «العرش» المرحلة ب — سجل الإذاعات المستهدفة ═══
+    crownBroadcasts: defineTable({
+      title: v.string(),
+      body: v.string(),
+      audience: v.string(), // all | tier:gold | user:<id>
+      audienceLabel: v.string(),
+      delivered: v.number(),
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
     // أعلام نظام بسيطة (صف واحد key/value) — لمنع تكرار المهام المجدولة
     systemFlags: defineTable({
       key: v.string(),

@@ -14,6 +14,22 @@ crons.interval(
   {},
 );
 
+// 👑 «العرش» — كل 10 دقائق: فتح الأقفال الطارئة المنتهية آلياً
+crons.interval(
+  "crown-expire-locks",
+  { minutes: 10 },
+  internal.crownDeck.expireLocks,
+  {},
+);
+
+// 👑 «العرش» — كل 6 ساعات: قياس أثر القرارات الموثّقة التي مضى عليها أسبوع
+crons.interval(
+  "crown-measure-decisions",
+  { hours: 6 },
+  internal.crownDeck.measureDecision,
+  {},
+);
+
 // مزامنة ملف APK في تخزين Convex الدائم: يحمّل الملف من المرآة الموثّقة
 // ويتحقق من الحجم والبصمة ثم يخزّنه — فيبقى التنزيل متاحاً ببايتات سليمة
 // حتى لو تعطل خادم الملفات الثابت أو انتهت صلاحية المرآة المؤقتة.

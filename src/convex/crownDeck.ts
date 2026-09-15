@@ -1,6 +1,9 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal, api } from "./_generated/api";
+import { getCurrentUser } from "./users";
+import { isOwnerUser } from "./owner";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -41,18 +44,15 @@ async function callGemini(prompt: string, maxTokens = 700): Promise<string | nul
 }
 
 async function isOwner(ctx: any): Promise<boolean> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) return false;
-  const user = await ctx.db
-    .query("users")
-    .withIndex("email" as any, (q: any) => q.eq("email", identity.email))
-    .unique();
-  if (!user) return false;
-  const role = await ctx.db
-    .query("siteRoles")
-    .withIndex("by_user" as any, (q: any) => q.eq("userId", user._id))
-    .unique();
-  return role?.role === "owner";
+  const me = await getCurrentUser(ctx);
+  return isOwnerUser(me);
+}
+
+/** يُعيد بيانات المالك الحالي أو null — للاستخدام في الـ mutations */
+async function getCurrentOwnerUser(ctx: any) {
+  const me = await getCurrentUser(ctx);
+  if (!me || !isOwnerUser(me)) return null;
+  return me;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -346,5 +346,370 @@ export const getRiskRadar = query({
     }
 
     return { at: now, signals };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 6️⃣ لوحة اللاعبين الاستقصائية — ملف أي لاعب بنظرة واحدة (تعزيز الدوسييه)
+// يضيف طبقة «صحته التقنية» من صياد الأخطاء + تدخلات AI + ملخصاً تنفيذياً
+// ═══════════════════════════════════════════════════════════════════════
+
+export const getInvestigativePanel = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    if (!(await isOwner(ctx))) return null;
+    const now = Date.now();
+    const weekAgo = now - 7 * 86_400_000;
+
+    const [user, profile, errors, rounds, punishments] = await Promise.all([
+      ctx.db.get(userId),
+      ctx.db.query("profiles").withIndex("by_user" as any, (q: any) => q.eq("userId", userId)).unique(),
+      ctx.db.query("clientErrors").withIndex("by_last" as any, (q: any) => q.gte("lastSeen", weekAgo)).collect(),
+      ctx.db.query("gameHistory").withIndex("by_user" as any, (q: any) => q.eq("userId", userId)).take(300),
+      ctx.db.query("moderationLogs").withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0)).order("desc").take(300),
+    ]);
+    if (!user) return null;
+
+    const myRounds = rounds.filter((r: any) => String(r.userId) === String(userId));
+    const myPunishments = punishments.filter((l: any) => String(l.targetId) === String(userId)).slice(0, 10);
+
+    // الأخطاء التي واجهها هذا اللاعب تحديداً (مطابقة المسار مع مساراته الأخيرة)
+    const techIssues = errors
+      .filter((e: any) => e.route && myRounds.length > 0)
+      .slice(0, 5)
+      .map((e: any) => ({ message: e.message, count: e.count, lastSeen: e.lastSeen }));
+
+    const roundsWeek = myRounds.filter((r: any) => r.playedAt >= weekAgo).length;
+    const roundsPrevWeek = myRounds.filter((r: any) => r.playedAt < weekAgo && r.playedAt >= now - 14 * 86_400_000).length;
+    const trend = roundsPrevWeek === 0 ? (roundsWeek > 0 ? 100 : 0) : Math.round(((roundsWeek - roundsPrevWeek) / roundsPrevWeek) * 100);
+
+    return {
+      identity: { id: String(user._id), name: user.name ?? "لاعب مجهول", email: user.email ?? null, image: user.image ?? null },
+      profile: {
+        xp: profile?.xp ?? 0,
+        gamesPlayed: profile?.gamesPlayed ?? 0,
+        gamesWon: profile?.gamesWon ?? 0,
+        warnings: (user as any).warnings ?? 0,
+        cheatStrikes: (user as any).cheatStrikes ?? 0,
+        bannedUntil: (user as any).bannedUntil ?? null,
+        bannedPermanent: !!(user as any).bannedPermanent,
+        mutedUntil: (user as any).mutedUntil ?? null,
+      },
+      activity: { roundsWeek, roundsPrevWeek, trendPct: trend, lastRoundAt: myRounds.length > 0 ? Math.max(...myRounds.map((r: any) => r.playedAt)) : null },
+      techIssues,
+      punishments: myPunishments.map((l: any) => ({ at: l.createdAt, action: l.action, reason: l.reason })),
+    };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 7️⃣ مسجل القرارات الموثّق — قرار + توقع → قياس أثر حقيقي بعد أسبوع
+// ═══════════════════════════════════════════════════════════════════════
+
+export const logDecision = mutation({
+  args: {
+    title: v.string(),
+    why: v.string(),
+    expected: v.string(),
+  },
+  handler: async (ctx, { title, why, expected }) => {
+    const me = await getCurrentOwnerUser(ctx);
+    if (!me) throw new Error("غير مصرح — للمالك فقط");
+    const now = Date.now();
+    const weekAgo = now - 7 * 86_400_000;
+
+    const [rounds7d, users] = await Promise.all([
+      ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", weekAgo)).collect(),
+      ctx.db.query("users").collect(),
+    ]);
+    const openReports = await ctx.db
+      .query("reports").withIndex("by_status" as any, (q: any) => q.eq("status", "open")).collect();
+
+    await ctx.db.insert("crownDecisions", {
+      title: title.trim().slice(0, 160),
+      why: why.trim().slice(0, 400),
+      expected: expected.trim().slice(0, 400),
+      beforeSnapshot: {
+        rounds7d: rounds7d.length,
+        users: users.length,
+        openReports: openReports.length,
+      },
+      measured: false,
+      createdAt: now,
+    });
+    return { ok: true };
+  },
+});
+
+/** قياس الأثر: يُستدعى آلياً بعد 7 أيام عبر cron، أو يدوياً من الغرفة */
+export const measureDecision = internalMutation({
+  args: { decisionId: v.optional(v.id("crownDecisions")) },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const weekAgo = now - 7 * 86_400_000;
+
+    const targets = args.decisionId
+      ? [await ctx.db.get(args.decisionId)]
+      : (await ctx.db.query("crownDecisions").withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0)).order("desc").take(100))
+          .filter((d: any) => d && !d.measured && now - d.createdAt >= 6.5 * 86_400_000);
+
+    let measured = 0;
+    for (const d of targets) {
+      if (!d) continue;
+      const [rounds7d, users] = await Promise.all([
+        ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", weekAgo)).collect(),
+        ctx.db.query("users").collect(),
+      ]);
+      const openReports = await ctx.db
+        .query("reports").withIndex("by_status" as any, (q: any) => q.eq("status", "open")).collect();
+      const after = { rounds7d: rounds7d.length, users: users.length, openReports: openReports.length };
+      const b = d.beforeSnapshot;
+      const roundsDelta = after.rounds7d - b.rounds7d;
+      const reportsDelta = after.openReports - b.openReports;
+      const verdict =
+        `النشاط ${roundsDelta >= 0 ? "+" : ""}${roundsDelta} جولة · البلاغات ${reportsDelta >= 0 ? "+" : ""}${reportsDelta} · ` +
+        (roundsDelta > 0 && reportsDelta <= 0 ? "الأثر إيجابي واضح ✅" : roundsDelta < 0 && reportsDelta > 0 ? "الأثر سلبي — راجع القرار ⚠️" : "أثر متوازن — راقب أسبوعاً إضافياً") as string;
+      await ctx.db.patch(d._id, { measured: true, measuredAt: now, afterSnapshot: after, verdict });
+      measured++;
+    }
+    return { measured };
+  },
+});
+
+export const getDecisionLedger = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    const rows = await ctx.db
+      .query("crownDecisions")
+      .withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0))
+      .order("desc")
+      .take(30);
+    return rows;
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 8️⃣ وحدة الإذاعة المستهدفة — إشعارات حقيقية لطبقات محددة + سجل توصيل
+// ═══════════════════════════════════════════════════════════════════════
+
+export const broadcast = mutation({
+  args: {
+    title: v.string(),
+    body: v.string(),
+    audience: v.union(
+      v.literal("all"),
+      v.literal("tier:bronze"), v.literal("tier:silver"), v.literal("tier:gold"),
+      v.literal("tier:diamond"), v.literal("tier:exclusive"),
+      v.literal("active"), // لعب خلال آخر 7 أيام
+      v.literal("dormant"), // لم يلعب خلال آخر 14 يوماً
+      v.literal("user"),
+    ),
+    targetUserId: v.optional(v.id("users")),
+    kind: v.union(v.literal("info"), v.literal("update"), v.literal("system")),
+  },
+  handler: async (ctx, { title, body, audience, targetUserId, kind }) => {
+    const me = await getCurrentOwnerUser(ctx);
+    if (!me) throw new Error("غير مصرح — للمالك فقط");
+    const now = Date.now();
+
+    const row = (name: string, userId: string | "__all__") => ({
+      userId: userId as any,
+      title: title.trim().slice(0, 100),
+      body: body.trim().slice(0, 500),
+      type: kind,
+      read: false,
+      createdAt: now,
+    });
+
+    let delivered = 0;
+    let audienceLabel = "الجميع";
+
+    if (audience === "user") {
+      if (!targetUserId) throw new Error("حدد اللاعب المستهدف");
+      await ctx.db.insert("notifications", row("", targetUserId));
+      delivered = 1;
+      const u = await ctx.db.get(targetUserId);
+      audienceLabel = u?.name ?? "لاعب محدد";
+    } else if (audience === "all") {
+      await ctx.db.insert("notifications", row("", "__all__"));
+      delivered = 1; // إشعار عام واحد يصل للجميع
+    } else if (audience === "active" || audience === "dormant") {
+      const cutoff = audience === "active" ? now - 7 * 86_400_000 : now - 14 * 86_400_000;
+      const users = await ctx.db.query("users").collect();
+      const rounds = await ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", cutoff)).collect();
+      const active = new Set(rounds.map((r: any) => String(r.userId)));
+      for (const u of users) {
+        const isActive = active.has(String(u._id));
+        if (audience === "active" && !isActive) continue;
+        if (audience === "dormant" && isActive) continue;
+        await ctx.db.insert("notifications", row("", u._id));
+        delivered++;
+      }
+      audienceLabel = audience === "active" ? "النشطون آخر 7 أيام" : "النائمون +14 يوماً";
+    } else {
+      // tier:xxx
+      const tier = audience.split(":")[1];
+      const ms = await ctx.db.query("memberships").withIndex("by_tier" as any, (q: any) => q.eq("tier", tier)).collect();
+      for (const m of ms) {
+        await ctx.db.insert("notifications", row("", m.userId));
+        delivered++;
+      }
+      audienceLabel = `عضوية ${tier}`;
+    }
+
+    await ctx.db.insert("crownBroadcasts", {
+      title: title.trim().slice(0, 100),
+      body: body.trim().slice(0, 500),
+      audience,
+      audienceLabel,
+      delivered,
+      createdAt: now,
+    });
+    return { delivered, audienceLabel };
+  },
+});
+
+export const getBroadcastLog = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    return ctx.db
+      .query("crownBroadcasts")
+      .withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0))
+      .order("desc")
+      .take(20);
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 9️⃣ قفل الطوارئ الشامل — تجميد نظام محدد بفتح تلقائي مجدول
+// ═══════════════════════════════════════════════════════════════════════
+
+export const getEmergencyLocks = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    const [site, arenaLock, chatLock, economyLock] = await Promise.all([
+      ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", "siteLocked")).first(),
+      ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", "crownLockArena")).first(),
+      ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", "crownLockChat")).first(),
+      ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", "crownLockEconomy")).first(),
+    ]);
+    const read = (row: any) => {
+      if (!row) return { locked: false, until: null as number | null, reason: "" };
+      try {
+        const v = JSON.parse(row.value as string);
+        const expired = v.until && v.until < Date.now();
+        return { locked: !expired && !!v.locked, until: v.until ?? null, reason: v.reason ?? "" };
+      } catch {
+        return { locked: false, until: null as number | null, reason: "" };
+      }
+    };
+    return {
+      site: read(site),
+      arena: read(arenaLock),
+      chat: read(chatLock),
+      economy: read(economyLock),
+    };
+  },
+});
+
+async function setLockKV(ctx: any, key: string, locked: boolean, durationHours: number | null, reason: string) {
+  const value = JSON.stringify({
+    locked,
+    until: durationHours ? Date.now() + durationHours * 3600_000 : null,
+    reason: reason.slice(0, 200),
+  });
+  const existing = await ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", key)).first();
+  if (existing) await ctx.db.patch(existing._id, { value });
+  else await ctx.db.insert("settings", { key, value });
+}
+
+export const setEmergencyLock = mutation({
+  args: {
+    system: v.union(v.literal("arena"), v.literal("chat"), v.literal("economy"), v.literal("site")),
+    locked: v.boolean(),
+    durationHours: v.optional(v.number()), // null/absent = يدوي
+    reason: v.string(),
+  },
+  handler: async (ctx, { system, locked, durationHours, reason }) => {
+    const me = await getCurrentOwnerUser(ctx);
+    if (!me) throw new Error("غير مصرح — للمالك فقط");
+    if (system === "site") {
+      // يمر عبر نظام siteLocked الرسمي
+      const value = JSON.stringify(locked);
+      const existing = await ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", "siteLocked")).first();
+      if (existing) await ctx.db.patch(existing._id, { value });
+      else await ctx.db.insert("settings", { key: "siteLocked", value });
+    } else {
+      await setLockKV(ctx, `crownLock${system.charAt(0).toUpperCase()}${system.slice(1)}`, locked, durationHours ?? null, reason);
+    }
+    await ctx.db.insert("auditLog", {
+      actorId: me._id,
+      actorName: me.name ?? "الملك",
+      actorRole: "owner" as const,
+      action: locked ? "emergency_lock" : "emergency_unlock",
+      detail: `${system}: ${reason}${durationHours ? ` (فتح تلقائي بعد ${durationHours} ساعة)` : ""}`.slice(0, 300),
+      at: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
+/** فتح تلقائي للأقفال المنتهية — cron كل 10 دقائق */
+export const expireLocks = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let opened = 0;
+    for (const key of ["crownLockArena", "crownLockChat", "crownLockEconomy"]) {
+      const row = await ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", key)).first();
+      if (!row) continue;
+      try {
+        const v = JSON.parse(row.value as string);
+        if (v.locked && v.until && v.until < now) {
+          await ctx.db.patch(row._id, { value: JSON.stringify({ locked: false, until: null, reason: v.reason }) });
+          opened++;
+        }
+      } catch { /* skip */ }
+    }
+    return { opened };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🔟 مصرفي المملكة AI — تحليل اقتصادي بـ Gemini من تدفق حقيقي
+// ═══════════════════════════════════════════════════════════════════════
+
+export const askRoyalBanker = action({
+  args: { question: v.string() },
+  handler: async (ctx, { question }) => {
+    const pulse = await ctx.runQuery(api.crownDeck.getPulse360, {});
+    if (!pulse) return { answer: null as string | null, reason: "غير مصرح" };
+
+    const eco = await ctx.runQuery(api.commandDeck.getEconomyPulse, {});
+    if (!eco || eco.unauthorized) return { answer: null as string | null, reason: "غير مصرح" };
+
+    const evidence = JSON.stringify(
+      {
+        تدفق_24س: { داخلي: eco.inflow, خارجي: eco.outflow, صافي: eco.net, صحة: eco.health },
+        أكبر_أسباب_الحركة: eco.reasons.slice(0, 5),
+        أكبر_منفقين: eco.topSpenders.slice(0, 5).map((s: any) => `${s.name}: ${s.spent}`),
+        النشاط: pulse.totals,
+      },
+      null,
+      1,
+    );
+    const raw = await callGemini(
+      `أنت «مصرفي المملكة» — محلل اقتصادي للعبة «حرب العقول». أجب بالعربية بالاعتماد حصرياً على هذه البيانات الحية:
+
+${evidence}
+
+سؤال المالك: ${question.trim().slice(0, 300)}
+
+إن رصدت تضخماً أو انكماشاً قل ذلك صراحة مع الأرقام، واختم بتوصية واضحة (من 3 إلى 7 أسطر).`,
+      600,
+    );
+    return { answer: raw as string | null, reason: raw ? null : "لا يوجد مفتاح GEMINI_API_KEY" };
   },
 });
