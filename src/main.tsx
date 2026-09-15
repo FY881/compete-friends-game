@@ -153,20 +153,36 @@ startPerformanceMonitor();
 
 // Global capture: any uncaught error or rejected promise anywhere in the app
 // lands in the error hunter (deduped) so no failure stays invisible.
+// v7.2: third-party noise (platform toolbar snapshot libs like html2canvas-pro
+// loaded from CDNs) must never take down the session — classify + contain.
+const THIRD_PARTY_NOISE = /html2canvas|snapdom|vly-toolbar|daytonaproxy|cdn\.jsdelivr/i;
+function isThirdPartyNoise(message: string, stack?: string) {
+  const combined = `${message} ${stack ?? ""}`;
+  return THIRD_PARTY_NOISE.test(combined);
+}
+
 window.addEventListener("error", (event) => {
-  reportRuntimeError(
-    event.message || "Uncaught error",
-    event.error instanceof Error ? event.error.stack : undefined,
-  );
-});
+  const message = event.message || "Uncaught error";
+  const stack = event.error instanceof Error ? event.error.stack : undefined;
+  if (isThirdPartyNoise(message, stack) || THIRD_PARTY_NOISE.test(event.filename ?? "")) {
+    // سجّل كأثر فقط — لا تكسر الجلسة ولا تعرض شاشة خطأ لخطأ ليس من كودنا
+    console.warn("[ErrorHunter v7.2] third-party noise contained:", message.slice(0, 120));
+    return;
+  }
+  reportRuntimeError(message, stack);
+}, true);
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason;
+  const msg = reason instanceof Error ? reason.message : typeof reason === "string" ? reason : "Unhandled promise rejection";
+  const stack = reason instanceof Error ? reason.stack : undefined;
+  if (isThirdPartyNoise(msg, stack)) {
+    console.warn("[ErrorHunter v7.2] third-party rejection contained:", msg.slice(0, 120));
+    return;
+  }
   if (reason instanceof Error) {
     reportRuntimeError(reason.message, reason.stack);
   } else {
-    reportRuntimeError(
-      typeof reason === "string" && reason ? reason : "Unhandled promise rejection",
-    );
+    reportRuntimeError(msg);
   }
 });
 
