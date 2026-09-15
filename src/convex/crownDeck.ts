@@ -713,3 +713,452 @@ ${evidence}
     return { answer: raw as string | null, reason: raw ? null : "لا يوجد مفتاح GEMINI_API_KEY" };
   },
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// 1️⃣1️⃣ غرفة اجتماعات العقول — وحدات AI تناقش وتصوّت (Gemini من بيانات حية)
+// ═══════════════════════════════════════════════════════════════════════
+
+const COUNCIL_UNITS = [
+  { unit: "referee", name: "الحكم الآلي" },
+  { unit: "governor", name: "الحاكم الآلي" },
+  { unit: "guardian", name: "الحارس الرقابي" },
+  { unit: "health", name: "مراقب الصحة" },
+  { unit: "questions", name: "مهندس الأسئلة" },
+  { unit: "recommender", name: "المُوصي الذكي" },
+];
+
+export const runCouncilSession = action({
+  args: { topic: v.string() },
+  handler: async (ctx, { topic }) => {
+    const pulse = await ctx.runQuery(api.crownDeck.getPulse360, {});
+    if (!pulse) return { session: null, reason: "غير مصرح" };
+
+    const evidence = JSON.stringify(
+      { الأنظمة: pulse.systems, الإجماليات: pulse.totals, التنبيهات: pulse.alerts },
+      null,
+      1,
+    );
+    const raw = await callGemini(
+      `أنت منسّق «مجلس العقول» للعبة «حرب العقول». الموضوع: ${topic.trim().slice(0, 200)}
+
+البيانات الحية:
+${evidence}
+
+كل عضو من الأعضاء الستة يتكلم ببيت واحد (20-40 كلمة) من وجهة نظره، ثم يصوّت (نعم/لا/امتناع) على مناقشة هذا الموضوع الآن، ويُقدَّم التوصية النهائية.
+
+أجب بهذا التنسيق الدقيق بالضبط، سطر لكل عضو:
+الحكم الآلي | <كلامه> | نعم
+الحاكم الآلي | <كلامه> | نعم
+الحارس الرقابي | <كلامه> | لا
+مراقب الصحة | <كلامه> | امتناع
+مهندس الأسئلة | <كلامه> | نعم
+المُوصي الذكي | <كلامه> | نعم
+التوصية: <توصية واحدة واضحة من سطرين>`,
+      900,
+    );
+    if (!raw) return { session: null, reason: "لا يوجد مفتاح GEMINI_API_KEY" };
+
+    const speeches: { unit: string; unitName: string; stance: string; vote: string }[] = [];
+    let recommendation = "";
+    let yes = 0, no = 0;
+    for (const line of raw.split("\n")) {
+      const m = line.match(/^(.+?)\s*\|\s*(.+?)\s*\|\s*(نعم|لا|امتناع)$/);
+      if (m) {
+        const unitName = m[1].trim();
+        const found = COUNCIL_UNITS.find((u) => u.name === unitName);
+        const vote = m[3].trim();
+        if (vote === "نعم") yes++;
+        else if (vote === "لا") no++;
+        speeches.push({ unit: found?.unit ?? "unknown", unitName, stance: m[2].trim().slice(0, 300), vote });
+      }
+      const rec = line.match(/^التوصية:\s*(.+)$/);
+      if (rec) recommendation = rec[1].trim().slice(0, 400);
+    }
+    if (speeches.length === 0) return { session: null, reason: "تعذّر تحليل رد المجلس" };
+
+    const id = await ctx.runMutation(internal.crownDeck.saveCouncilSession, {
+      topic: topic.trim().slice(0, 160),
+      speeches,
+      recommendation: recommendation || "—",
+      yesVotes: yes,
+      noVotes: no,
+    });
+    return { session: { id, topic, speeches, recommendation, yesVotes: yes, noVotes: no }, reason: null };
+  },
+});
+
+export const saveCouncilSession = internalMutation({
+  args: {
+    topic: v.string(),
+    speeches: v.array(v.object({ unit: v.string(), unitName: v.string(), stance: v.string(), vote: v.string() })),
+    recommendation: v.string(),
+    yesVotes: v.number(),
+    noVotes: v.number(),
+  },
+  handler: async (ctx, a) =>
+    ctx.db.insert("crownCouncilSessions", { ...a, status: "closed", createdAt: Date.now() }),
+});
+
+export const getCouncilHistory = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    return ctx.db
+      .query("crownCouncilSessions")
+      .withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0))
+      .order("desc")
+      .take(15);
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 1️⃣2️⃣ سجل الذكاء الموحد — بحث وفلترة عبر كل قرارات كل الأنظمة
+// ═══════════════════════════════════════════════════════════════════════
+
+export const searchIntelligenceLog = query({
+  args: {
+    system: v.optional(v.string()), // فلتر النظام
+    severity: v.optional(v.string()), // فلتر الخطورة
+    text: v.optional(v.string()), // بحث نصي في التفاصيل
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { system, severity, text, limit }) => {
+    if (!(await isOwner(ctx))) return null;
+    const rows = await ctx.db
+      .query("aiDecisionLog")
+      .withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0))
+      .order("desc")
+      .take(400);
+    const needle = text?.trim().toLowerCase() ?? "";
+    const filtered = rows.filter((r: any) => {
+      if (system && system !== "all" && r.system !== system) return false;
+      if (severity && severity !== "all" && r.severity !== severity) return false;
+      if (needle && !(`${r.detail} ${r.action} ${r.targetName ?? ""}`.toLowerCase().includes(needle))) return false;
+      return true;
+    });
+    return filtered.slice(0, limit ?? 60);
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 1️⃣3️⃣ محلل السلوك الجمعي — أنماط جماعية حقيقية من بيانات اللاعبين
+// ═══════════════════════════════════════════════════════════════════════
+
+export const getCollectiveBehavior = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    const now = Date.now();
+    const patterns: { title: string; detail: string; severity: "info" | "warn" }[] = [];
+
+    // 1) أين ينسحب الجدد؟ (سلسلة الجولات الأولى)
+    const history = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_played" as any, (q: any) => q.gte("playedAt", now - 30 * 86_400_000))
+      .take(4000);
+    const byUser = new Map<string, number[]>();
+    for (const h of history) {
+      const arr = byUser.get(String(h.userId)) ?? [];
+      arr.push(h.playedAt);
+      byUser.set(String(h.userId), arr);
+    }
+    let quitAfter2 = 0, quitAfter5 = 0, newPlayers = 0;
+    for (const [, times] of byUser) {
+      if (times.length < 8) {
+        newPlayers++;
+        if (times.length <= 2) quitAfter2++;
+        else if (times.length <= 5) quitAfter5++;
+      }
+    }
+    if (newPlayers >= 5) {
+      patterns.push({
+        title: "نقطة الانسحاب الجماعي",
+        detail: `${quitAfter2} من ${newPlayers} لاعبين متأخرين توقفوا عند جولتين أو أقل، و${quitAfter5} توقفوا عند 5. إذا كانت النسبة عالية فالمسار الأول يحتاج تسهيلاً أو مكافأة.`,
+        severity: quitAfter2 > newPlayers / 2 ? "warn" : "info",
+      });
+    }
+
+    // 2) ذروات اللعب — أفضل ساعة للإطلاق
+    const hourBuckets = new Array(24).fill(0) as number[];
+    for (const h of history) hourBuckets[new Date(h.playedAt).getHours()]++;
+    const bestHour = hourBuckets.indexOf(Math.max(...hourBuckets));
+    const quietHour = hourBuckets.indexOf(Math.min(...hourBuckets));
+    if (history.length >= 20) {
+      patterns.push({
+        title: "ذروة النشاط اليومية",
+        detail: `أعلى نشاط الساعة ${bestHour}:00 وأهدأ ساعة ${quietHour}:00 — أطلق الأحداث قبل الذروة بنصف ساعة لالتقاط أكبر جمهور.`,
+        severity: "info",
+      });
+    }
+
+    // 3) فجوة الفوز — هل اللعبة صعبة أكثر من اللازم؟
+    const recent = history.slice(0, 500);
+    if (recent.length >= 30) {
+      const winRate = recent.filter((h: any) => h.won).length / recent.length;
+      if (winRate < 0.15) {
+        patterns.push({
+          title: "فجوة الفوز ضيقة جداً",
+          detail: `نسبة الفوز العامة ${(winRate * 100).toFixed(0)}% فقط — اللاعبون يفقدون الدافع عندما يكون الفوز شبه مستحيل. راجع توزيع الصعوبة.`,
+          severity: "warn",
+        });
+      } else if (winRate > 0.6) {
+        patterns.push({
+          title: "الفوز سهل أكثر من اللازم",
+          detail: `نسبة الفوز ${(winRate * 100).toFixed(0)}% — التحدي ضعيف. ارفع تنويع الأسئلة الصعبة للحفاظ على الإثارة.`,
+          severity: "info",
+        });
+      }
+    }
+
+    return { at: now, patterns, sampleSize: history.length };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 1️⃣4️⃣ مختبر الأحداث AI — أفكار مبنية على نشاط حقيقي + قياس أثر المنتهية
+// ═══════════════════════════════════════════════════════════════════════
+
+export const getEventLab = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    const now = Date.now();
+
+    // الأحداث المنتهية مع أثرها المقاس فعلياً
+    const events = await ctx.db
+      .query("liveEvents")
+      .withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0))
+      .order("desc")
+      .take(10);
+    const ended = events
+      .filter((e: any) => !e.active)
+      .map((e: any) => ({
+        name: e.name,
+        multiplier: e.multiplier,
+        roundsDuring: e.roundsDuring ?? 0,
+        participantsDuring: e.participantsDuring ?? 0,
+        durationH: Math.max(1, Math.round(((e.endsAt ?? e.createdAt) - e.startsAt) / 3600_000)),
+      }));
+
+    return { ended, activeCount: events.filter((e: any) => e.active).length, at: now };
+  },
+});
+
+export const brainstormEvents = action({
+  args: {},
+  handler: async (ctx) => {
+    const pulse = await ctx.runQuery(api.crownDeck.getPulse360, {});
+    if (!pulse) return { ideas: null, reason: "غير مصرح" };
+    const lab = await ctx.runQuery(api.crownDeck.getEventLab, {});
+    if (!lab) return { ideas: null, reason: "غير مصرح" };
+
+    const evidence = JSON.stringify({
+      النشاط: pulse.totals,
+      أحداث_سابقة: lab.ended.slice(0, 5),
+    }, null, 1);
+    const raw = await callGemini(
+      `أنت مختبر أحداث لعبة «حرب العقول». اقترح 3 أفكار أحداث مبنية على البيانات الحية، بالعربية، بهذا التنسيق:
+
+فكرة 1: <الاسم>
+النوع: <xp_boost أو point_rush أو loyalty_festival> | المضاعف: <1.5-3> | المدة: <ساعات>
+السبب: <لماذا هذه الفكرة الآن بناءً على البيانات>
+
+فكرة 2: ...
+فكرة 3: ...
+
+البيانات:
+${evidence}`, 700);
+    return { ideas: raw, reason: raw ? null : "لا يوجد مفتاح GEMINI_API_KEY" };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 1️⃣5️⃣ مترجم الشكاوى الذكي — تلخيص وتصنيف البلاغات والاعتراضات آلياً
+// ═══════════════════════════════════════════════════════════════════════
+
+export const getComplaintDigest = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    const [openReports, pendingAppeals] = await Promise.all([
+      ctx.db.query("reports").withIndex("by_status" as any, (q: any) => q.eq("status", "open")).collect(),
+      ctx.db.query("appeals").withIndex("by_status" as any, (q: any) => q.eq("status", "pending")).collect(),
+    ]);
+    return {
+      reports: openReports.slice(0, 25).map((r: any) => ({
+        id: String(r._id),
+        reason: r.reason,
+        details: r.details ?? "",
+        reporter: r.reporterName,
+        target: r.targetName,
+        createdAt: r.createdAt,
+      })),
+      appeals: pendingAppeals.slice(0, 15).map((a: any) => ({
+        id: String(a._id),
+        message: a.message,
+        punishmentType: a.punishmentType,
+        userName: a.userName,
+        createdAt: a.createdAt,
+      })),
+    };
+  },
+});
+
+export const summarizeComplaints = action({
+  args: {},
+  handler: async (ctx) => {
+    const digest = await ctx.runQuery(api.crownDeck.getComplaintDigest, {});
+    if (!digest) return { summary: null, reason: "غير مصرح" };
+    const raw = await callGemini(
+      `أنت مترجم شكاوى لعبة «حرب العقول». لخّص هذه البلاغات والاعتراضات بالعربية في تقرير تنفيذي قصير:
+
+البلاغات المفتوحة:
+${JSON.stringify(digest.reports.slice(0, 15), null, 1)}
+
+الاعتراضات المعلقة:
+${JSON.stringify(digest.appeals.slice(0, 10), null, 1)}
+
+اكتب بالضبط بهذا التنسيق:
+الخلاصة: <سطران عن الحالة العامة>
+الأولوية 1: <أهم بلاغ/اعتراض + لماذا>
+الأولوية 2: <التالي>
+الأولوية 3: <التالي>
+نمط متكرر: <شكوى تتكرر إن وُجدت، أو «لا يوجد نمط واضح»>`, 600);
+    return { summary: raw, reason: raw ? null : "لا يوجد مفتاح GEMINI_API_KEY أو لا شكاوى" };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🏁 المرحلة د — القيادة والشفافية (المهام 16-20)
+// ═══════════════════════════════════════════════════════════════════════
+
+// 1️⃣6️⃣ مسجّل الرحلات — إعادة تشغيل حادثة خطوة بخطوة من آثارها الموثّقة
+export const getIncidentReplay = query({
+  args: { route: v.optional(v.string()) },
+  handler: async (ctx, { route }) => {
+    if (!(await isOwner(ctx))) return null;
+    const rows = await ctx.db
+      .query("errorLogs")
+      .withIndex("by_created" as any, (q: any) => q.gte("at", 0))
+      .order("desc")
+      .take(60);
+    const filtered = route && route !== "all"
+      ? rows.filter((r: any) => r.route === route)
+      : rows;
+    // تجميع حوادث متتالية بالمسار + الزمن
+    const timeline = filtered.slice(0, 25).map((r: any) => ({
+      id: String(r._id),
+      at: r.at,
+      route: r.route ?? "—",
+      message: String(r.message ?? "").slice(0, 160),
+      playerAction: String(r.playerAction ?? "").slice(0, 300), // آثار breadcrumbs
+      autoHealed: !!r.autoHealed,
+      strategy: r.healStrategy ?? null,
+    }));
+    return { timeline, total: filtered.length };
+  },
+});
+
+// 1️⃣7️⃣ الدرج الذاتي للجراحة — يدمج APEX مع أقفال الطوارئ النشطة
+export const getSurgerySelfRank = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    const apex = await ctx.runQuery(api.errorHunterApex.getApexRankedQueue, {});
+    if (!apex) return null;
+    const locks = await ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", "siteLocked")).first();
+    const siteLocked = locks?.value === "true" || locks?.value === "1";
+    return { queue: apex, siteLocked };
+  },
+});
+
+// 1️⃣8️⃣ مخططات الاتجاهات الأسبوعية — أرقام حقيقية 7 أيام + استنتاج مكتوب
+export const getWeeklyTrends = query({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await isOwner(ctx))) return null;
+    const now = Date.now();
+    const weekAgo = now - 7 * 86_400_000;
+    const [rounds, errors, broadcasts] = await Promise.all([
+      ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", weekAgo)).collect(),
+      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("at", weekAgo)).collect(),
+      ctx.db.query("crownBroadcasts").withIndex("by_created" as any, (q: any) => q.gte("createdAt", weekAgo)).collect(),
+    ]);
+    const days: { day: string; rounds: number; errors: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const start = now - i * 86_400_000;
+      const key = new Date(start).toISOString().slice(0, 10);
+      days.push({
+        day: key,
+        rounds: rounds.filter((r: any) => new Date(r.playedAt).toISOString().slice(0, 10) === key).length,
+        errors: errors.filter((e: any) => new Date(e.at).toISOString().slice(0, 10) === key).length,
+      });
+    }
+    const halfRounds = [days.slice(0, 4), days.slice(3)].map((w) => w.reduce((s, d) => s + d.rounds, 0));
+    const direction = halfRounds[0] === 0 ? (halfRounds[1] > 0 ? "نمو" : "ثابت") : halfRounds[1] > halfRounds[0] * 1.15 ? "نمو" : halfRounds[1] < halfRounds[0] * 0.85 ? "تراجع" : "ثابت";
+    return {
+      days,
+      totalRounds: rounds.length,
+      totalErrors: errors.length,
+      broadcasts: broadcasts.length,
+      direction,
+      insight:
+        direction === "نمو"
+          ? `النشاط ينمو (+${Math.round(((halfRounds[1] - halfRounds[0]) / Math.max(1, halfRounds[0])) * 100)}% بين نصفي الأسبوع) — حافظ الزخم بحدث قصير.`
+          : direction === "تراجع"
+            ? `النشاط يتراجع (${Math.round(((halfRounds[1] - halfRounds[0]) / Math.max(1, halfRounds[0])) * 100)}%) — أطلق حدثاً أو إذاعة للنائمين الآن.`
+            : "النشاط مستقر — لحظة مناسبة لتجربة تغيير محسوب عبر محاكي القرارات.",
+    };
+  },
+});
+
+// 1️⃣9️⃣ حوادث ← مهام — تحويل تقرير إلى بطاقة مهمة منظمة في aiDecisionLog
+export const incidentToTask = mutation({
+  args: { errorId: v.id("errorLogs") },
+  handler: async (ctx, { errorId }) => {
+    const me = await getCurrentOwnerUser(ctx);
+    if (!me) throw new Error("غير مصرح — للمالك فقط");
+    const err = await ctx.db.get(errorId);
+    if (!err) throw new Error("الحادثة غير موجودة");
+    await ctx.db.insert("aiDecisionLog", {
+      system: "owner",
+      actorName: me.name ?? "الملك",
+      action: "incident_task_created",
+      targetId: String(errorId),
+      detail: `🛠️ مهمة إصلاح: ${String(err.message).slice(0, 150)} — المسار: ${err.route ?? "—"}${err.rootCause ? ` · السبب: ${String(err.rootCause).slice(0, 120)}` : ""}${err.suggestedFix ? ` · الإصلاح: ${String(err.suggestedFix).slice(0, 150)}` : ""}`.slice(0, 480),
+      severity: (err.severity as any) === "critical" ? "high" : "medium",
+      createdAt: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
+// 2️⃣0️⃣ الذاكرة الخالدة — لقطة أسبوعية من كل شيء تُؤرشف دائماً (لا تُمس أبدًا)
+export const captureImmortalSnapshot = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const weekAgo = now - 7 * 86_400_000;
+    const [users, rounds, errors, decisions, broadcasts, sessions] = await Promise.all([
+      ctx.db.query("users").collect(),
+      ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", weekAgo)).collect(),
+      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("at", weekAgo)).collect(),
+      ctx.db.query("crownDecisions").withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0)).order("desc").take(50),
+      ctx.db.query("crownBroadcasts").withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0)).order("desc").take(50),
+      ctx.db.query("crownCouncilSessions").withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0)).order("desc").take(20),
+    ]);
+    const key = `crown_immortal_${new Date(now).toISOString().slice(0, 10)}`;
+    const existing = await ctx.db.query("systemFlags").withIndex("by_key" as any, (q: any) => q.eq("key", key)).first();
+    if (existing) return { skipped: true };
+    const snapshot = {
+      users: users.length,
+      rounds7d: rounds.length,
+      errors7d: errors.length,
+      decisions: decisions.map((d: any) => d.title),
+      broadcasts: broadcasts.map((b: any) => `${b.title} → ${b.audienceLabel} (${b.delivered})`),
+      councilTopics: sessions.map((s: any) => s.topic),
+      at: now,
+    };
+    await ctx.db.insert("systemFlags", { key, value: JSON.stringify(snapshot) });
+    return { captured: true };
+  },
+});

@@ -195,9 +195,9 @@ export const aiDailyWarReport = action({
 البيانات:
 - أخطاء 24س: ${snapshot.totalErrors} (حرجة: ${snapshot.critical}) — محلولة: ${snapshot.resolved} — شُفيت ذاتياً: ${snapshot.autoHealed}
 - عناقيد نشطة: ${snapshot.clusters.length}
-${snapshot.clusters.slice(0, 5).map((c) => `  · ${c.title} (${c.memberCount} خطأ، خطورة ${c.severity}${c.isRegression ? " — انتكاسة!" : ""})`).join("\n")}
+${snapshot.clusters.slice(0, 5).map((c: any) => `  · ${c.title} (${c.memberCount} خطأ، خطورة ${c.severity}${c.isRegression ? " — انتكاسة!" : ""})`).join("\n")}
 - أعلى الأخطاء تأثيراً:
-${snapshot.topImpact.map((e) => `  · [${e.severity}] ${e.message.slice(0, 90)} (تأثير ${e.impact})`).join("\n")}
+${snapshot.topImpact.map((e: any) => `  · [${e.severity}] ${e.message.slice(0, 90)} (تأثير ${e.impact})`).join("\n")}
 - معدل الشفاء الذاتي: ${snapshot.healRate}%`,
       700,
     );

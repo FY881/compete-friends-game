@@ -165,7 +165,7 @@ export const dailyHealthReport = action({
 
     const summary = errors
       .map(
-        (e) =>
+        (e: any) =>
           `[${e.severity}] (${e.category}) ${e.message} — تكرار ${e.count}x — ${e.resolved ? "محلول" : "غير محلول"}`,
       )
       .join("\n")

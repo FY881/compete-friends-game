@@ -1343,6 +1343,23 @@ const schema = defineSchema(
       createdAt: v.number(),
     }).index("by_created", ["createdAt"]),
 
+    // ═══ «العرش» المرحلة ج — غرفة اجتماعات العقول ═══
+    // كل دورة: وحدات AI تتناقش في صحة اللعبة وتصوّت على توصية واحدة
+    crownCouncilSessions: defineTable({
+      topic: v.string(),
+      speeches: v.array(v.object({
+        unit: v.string(),
+        unitName: v.string(),
+        stance: v.string(), // مقتطف كلام الوحدة بالعربية
+        vote: v.string(), // yes | no | abstain
+      })),
+      recommendation: v.string(), // التوصية النهائية
+      yesVotes: v.number(),
+      noVotes: v.number(),
+      status: v.string(), // open | closed
+      createdAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
     // أعلام نظام بسيطة (صف واحد key/value) — لمنع تكرار المهام المجدولة
     systemFlags: defineTable({
       key: v.string(),
