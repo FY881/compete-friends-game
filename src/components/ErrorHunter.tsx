@@ -35,7 +35,7 @@ import {
   addBreadcrumb, getBreadcrumbs, installBreadcrumbListeners,
   enqueueErrorReport, flushErrorQueue, pendingReportCount,
   storeIncident, getStoredIncidents, type StoredIncident,
-  recordErrorForRate, currentErrorRate,
+  recordErrorForRate, currentErrorRate, startZombieWatch,
   safeClearStorage, safeClearCaches, safeUnregisterServiceWorkers,
   guardReload, markHealPendingVerify, confirmHealIfStable, invalidatePendingVerify,
 } from "@/lib/errorHunterCore";
@@ -703,6 +703,19 @@ export function startPerformanceMonitor() {
   // v5.0: تفعيل مسجّل السياق + تفريغ التقارير المعلّقة عند عودة الاتصال
   installBreadcrumbListeners();
   flushPendingErrorReports().catch(() => {});
+
+  // ═══ v7.0 APEX — المهمة 9: حارس الفشل الصامت ═══
+  // حالة زومبي (صمت 45s والصفحة مرئية) = حادثة فورية لغرفة المالك.
+  startZombieWatch((v) => {
+    addBreadcrumb("action", `🧟 حارس الفشل الصامت: ${v.reason}`);
+    if (convexClient) {
+      convexClient.mutation(api.errorHunter.logError, {
+        message: `حالة زومبي: ${v.reason}`,
+        autoHealed: false,
+        route: typeof window !== "undefined" ? window.location.pathname : undefined,
+      }).catch(() => {});
+    }
+  });
   window.addEventListener("online", () => { flushPendingErrorReports().catch(() => {}); });
 
   // ═══ v6.0 — محرك الإعادة للتحقق ═══
