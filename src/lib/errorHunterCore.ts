@@ -408,3 +408,81 @@ export function currentErrorRate(): number {
 export function pruneOldErrorStamps() {
   currentErrorRate();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// v7.0 APEX — المهمة 9: حارس الفشل الصامت (كشف الزومبي)
+// ═══════════════════════════════════════════════════════════════════════
+// حالات «الموت الصامت»: التطبيق حي تقنياً لكن بلا نبض — لا نقرة تُسجَّل،
+// لا رسالة شبكة، شاشة مجمّدة أو لودر لا نهائي. الصياد يرصدها ويُطلق
+// حادثة zombie_state بدل انتظار استثناء لن يأتي.
+
+let zombieWatchStarted = false;
+let lastActivityAt = Date.now();
+let lastNetworkAt = Date.now();
+
+/** يسجَّل أي نبض حياة: نقرة، رسالة شبكة ناجحة، تفاعل لوحة مفاتيح */
+export function touchPlayerActivity() {
+  lastActivityAt = Date.now();
+}
+export function touchNetworkActivity() {
+  lastNetworkAt = Date.now();
+  lastActivityAt = Date.now();
+}
+
+export type ZombieVerdict = {
+  zombie: boolean;
+  frozenMs: number; // مدة الصمت
+  reason: string | null;
+};
+
+/**
+ * فحص دوري (يستدعيه مؤقّت الصياد كل 30 ثانية):
+ * إن صمت النشاط + الشبكة معاً أكثر من 45 ثانية بينما الصفحة مرئية
+ * — حالة زومبي محتملة (اشتراك ميت / واجهة مجمّدة).
+ */
+export function checkZombieState(): ZombieVerdict {
+  if (typeof document === "undefined") return { zombie: false, frozenMs: 0, reason: null };
+  if (document.visibilityState !== "visible") {
+    // الصفحة في الخلفية — الصمت طبيعي، أعد ضبط المؤقتات
+    lastActivityAt = Date.now();
+    lastNetworkAt = Date.now();
+    return { zombie: false, frozenMs: 0, reason: null };
+  }
+  const frozenMs = Date.now() - Math.max(lastActivityAt, lastNetworkAt);
+  if (frozenMs > 45_000) {
+    return {
+      zombie: true,
+      frozenMs,
+      reason: `صمت كامل ${Math.round(frozenMs / 1000)}s والصفحة مرئية — اشتراك ميت أو واجهة مجمّدة (لا نقرات ولا شبكة)`,
+    };
+  }
+  return { zombie: false, frozenMs, reason: null };
+}
+
+/** يُركَّب مرة واحدة: مستمعو النبض + مؤقّت الفحص يستدعي callback عند الزومبي */
+export function startZombieWatch(onZombie: (v: ZombieVerdict) => void) {
+  if (zombieWatchStarted || typeof window === "undefined") return;
+  zombieWatchStarted = true;
+
+  window.addEventListener("pointerdown", touchPlayerActivity, { passive: true });
+  window.addEventListener("keydown", touchPlayerActivity, { passive: true });
+  window.addEventListener("scroll", touchPlayerActivity, { passive: true });
+
+  // نبض شبكة ناجح = أي fetch منجح (مثبت في installBreadcrumbListeners عبر الغلاف)
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async (...args: Parameters<typeof fetch>) => {
+    const res = await origFetch(...args);
+    if (res.ok) touchNetworkActivity();
+    return res;
+  };
+
+  setInterval(() => {
+    const v = checkZombieState();
+    if (v.zombie) {
+      // أعد الضبط كي لا تتكرر الحادثة كل 30 ثانية بلا داعٍ
+      lastActivityAt = Date.now();
+      lastNetworkAt = Date.now();
+      onZombie(v);
+    }
+  }, 30_000);
+}
