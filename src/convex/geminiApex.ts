@@ -260,7 +260,7 @@ export const clusterUntriaged = internalAction({
     if (errors.length === 0) return { clustered: 0, regressions: 0 };
 
     const clusters = await ctx.runQuery(internal.geminiApex.listClustersInternal, { limit: 30 });
-    const knownFamilies = clusters.map((c) => c.rootCauseFamily).join("، ") || "لا شيء بعد";
+    const knownFamilies = clusters.map((c: any) => c.rootCauseFamily).join("، ") || "لا شيء بعد";
 
     let clustered = 0;
     let regressions = 0;

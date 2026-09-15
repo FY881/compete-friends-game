@@ -321,8 +321,8 @@ export const askAboutErrors = action({
 السؤال: ${q}
 
 الأدلة (آخر 7 أيام):
-عناقيد: ${evidence.clusters.map((c) => `${c.title}(${c.memberCount} خطأ، ${c.severity}${c.isRegression ? "، انتكاسة" : ""})`).join(" · ") || "لا شيء"}
-أعلى الأخطاء تأثيراً: ${evidence.topImpact.map((e) => `[${e.severity}] ${e.message.slice(0, 80)}`).join(" · ") || "لا شيء"}
+عناقيد: ${evidence.clusters.map((c: any) => `${c.title}(${c.memberCount} خطأ، ${c.severity}${c.isRegression ? "، انتكاسة" : ""})`).join(" · ") || "لا شيء"}
+أعلى الأخطاء تأثيراً: ${evidence.topImpact.map((e: any) => `[${e.severity}] ${e.message.slice(0, 80)}`).join(" · ") || "لا شيء"}
 إحصاءات: إجمالي ${evidence.totalErrors} خطأ، شُفي ذاتياً ${evidence.autoHealed}، محلول ${evidence.resolved}.`,
       500,
     );

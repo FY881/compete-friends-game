@@ -729,7 +729,7 @@ const COUNCIL_UNITS = [
 
 export const runCouncilSession = action({
   args: { topic: v.string() },
-  handler: async (ctx, { topic }) => {
+  handler: async (ctx, { topic }): Promise<{ session: any; reason: string | null }> => {
     const pulse = await ctx.runQuery(api.crownDeck.getPulse360, {});
     if (!pulse) return { session: null, reason: "غير مصرح" };
 
@@ -1062,7 +1062,7 @@ export const getIncidentReplay = query({
 // 1️⃣7️⃣ الدرج الذاتي للجراحة — يدمج APEX مع أقفال الطوارئ النشطة
 export const getSurgerySelfRank = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ queue: any; siteLocked: boolean } | null> => {
     if (!(await isOwner(ctx))) return null;
     const apex = await ctx.runQuery(api.errorHunterApex.getApexRankedQueue, {});
     if (!apex) return null;
@@ -1125,7 +1125,7 @@ export const incidentToTask = mutation({
       actorName: me.name ?? "الملك",
       action: "incident_task_created",
       targetId: String(errorId),
-      detail: `🛠️ مهمة إصلاح: ${String(err.message).slice(0, 150)} — المسار: ${err.route ?? "—"}${err.rootCause ? ` · السبب: ${String(err.rootCause).slice(0, 120)}` : ""}${err.suggestedFix ? ` · الإصلاح: ${String(err.suggestedFix).slice(0, 150)}` : ""}`.slice(0, 480),
+      detail: `🛠️ مهمة إصلاح: ${String(err.message).slice(0, 150)} — المسار: ${err.route ?? "—"}${err.aiAnalysis ? ` · السبب: ${String(err.aiAnalysis).slice(0, 120)}` : ""}${err.aiFixSuggestion ? ` · الإصلاح: ${String(err.aiFixSuggestion).slice(0, 150)}` : ""}`.slice(0, 480),
       severity: (err.severity as any) === "critical" ? "high" : "medium",
       createdAt: Date.now(),
     });
