@@ -139,6 +139,7 @@ import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
 import { AiSurgeonPanel } from "@/components/AiSurgeonPanel";
 import { ApexPanel } from "@/components/ApexPanel";
 import { Stethoscope, Crosshair } from "lucide-react";
+import { CrownDeckPanel } from "@/components/owner/CrownDeckPanel";
 import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
 import MasterAIDashboard from "@/components/owner/MasterAIDashboard";
 import { LawEnforcementTab } from "@/components/owner/LawEnforcementTab";
@@ -2255,6 +2256,7 @@ const NAV_GROUPS = [
     items: [
       { id: "dashboard", icon: Activity, label: "لوحة القيادة" },
       { id: "commanddeck", icon: Zap, label: "غرفة القيادة ⚡" },
+      { id: "crown", icon: Crown, label: "العرش 👑" },
       { id: "commandbrief", icon: BarChart3, label: "بريف المالك 📊" },
       { id: "contentquality", icon: Library, label: "جودة المحتوى 📚" },
       { id: "communitymonitor", icon: MessagesSquare, label: "مراقب المجتمع 💬" },
@@ -2380,7 +2382,7 @@ export default function Owner() {
       if (item.id === "aiupgrade" && !access.isOwner) return false;
       if (item.id === "freechat" && !access.isOwner) return false;
       if (item.id === "problems" && !access.isOwner) return false;
-      if ((item.id === "errorhunter" || item.id === "aisurgeon" || item.id === "apex") && !access.isOwner) return false;
+      if ((item.id === "errorhunter" || item.id === "aisurgeon" || item.id === "apex" || item.id === "crown") && !access.isOwner) return false;
       if (item.id === "downloads" && !access.isOwner) return false;
       if (item.id === "settings" && !access.isOwner) return false;
       return true;
@@ -2393,6 +2395,8 @@ export default function Owner() {
         return <OwnerDashboard onNavigate={setActiveTab} />;
       case "commanddeck":
         return <CommandDeck onNavigate={setActiveTab} />;
+      case "crown":
+        return <CrownDeckPanel />;
       case "commandbrief":
         return <OwnerBrief />;
       case "contentquality":

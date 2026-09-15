@@ -1295,6 +1295,23 @@ const schema = defineSchema(
       savedAt: v.number(),
     }).index("by_user", ["userId"]).index("by_user_message", ["userId", "messageId"]),
 
+    // ═══ غرفة المالك v5.0 «العرش» — أرشيف الصحة اليومية ═══
+    crownDailyHealth: defineTable({
+      day: v.string(), // YYYY-MM-DD
+      score: v.number(), // 0-100
+      verdict: v.string(),
+      reasons: v.array(v.string()),
+      totals: v.object({
+        users: v.number(),
+        rounds24h: v.number(),
+        openReports: v.number(),
+        errors24h: v.number(),
+        criticalErrors24h: v.number(),
+        chatMsgs24h: v.number(),
+      }),
+      generatedAt: v.number(),
+    }).index("by_day", ["day"]),
+
     // أعلام نظام بسيطة (صف واحد key/value) — لمنع تكرار المهام المجدولة
     systemFlags: defineTable({
       key: v.string(),
