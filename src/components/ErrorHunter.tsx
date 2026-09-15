@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * 🛡️ BULLETPROOF ERROR HUNTER v4.0
+ * 🛡️ ERROR HUNTER v6.1 "SURGEON"
  * ═══════════════════════════════════════════════════════════════════════
  *
  * DESIGN PRINCIPLE: The error UI must NEVER crash.
@@ -23,6 +23,10 @@
  * 11. Master Reset — nuclear option when everything fails
  * 12. v5.0: Breadcrumbs + offline queue + persistent incidents +
  *     safe storage clearing (auth & settings ALWAYS survive)
+ * 13. v6.1 SERVER-ERROR SURGERY: server errors from Convex get their real
+ *     file+line extracted from the message and classified as "server_code"
+ *     (index errors, dynamic import, db.insert misuse…) — no more fake
+ *     "old cache chunk" diagnosis. Reload loops are broken by category.
  */
 
 import { Component, type ReactNode, type ErrorInfo } from "react";
@@ -118,6 +122,54 @@ function diagnoseAdvanced(error: Error): ErrorDiagnosis {
   const stack = error.stack || "";
   const name = error.name || "";
   const combined = `${name} ${msg} ${stack}`;
+
+  // ═══ v6.1 — SERVER-ERROR SURGERY ═══
+  // Convex server errors carry the truth INSIDE the message (file:line +
+  // the real error class). Classify them honestly instead of guessing.
+  const isServerError = /\[CONVEX [QM]\(|Uncaught Error.*at handler|Server Error/i.test(combined);
+  if (isServerError) {
+    // استخراج الملف والسطر الحقيقي من نص الخادم: (../src/convex/x.ts:958:28)
+    const locMatch = /\((?:\.\.\/)?src\/convex\/([\w./-]+\.ts):(\d+)(?::(\d+))?\)/.exec(combined);
+    const serverFile = locMatch ? `src/convex/${locMatch[1]}` : null;
+    const serverLine = locMatch ? Number(locMatch[2]) : null;
+    const firstLine = msg.split("\n").find((l) => l.trim()) || msg;
+
+    let serverKind = "خلل في دالة الخادم";
+    let honestCause = firstLine.slice(0, 220);
+    let fixHint = "الإصلاح يتطلب تعديل كود الخادم — التقرير المُصعَّد يحمل الملف والسطر بدقة";
+
+    if (/Index.*not found|doesn't index this field|index range/i.test(combined)) {
+      serverKind = "خطأ فهرسة قاعدة البيانات";
+      honestCause = "استعلام يستخدم مقارنة مدى على حقل غير مُفهرس (by_user/by_room…) — يحتاج فهرس جديد في schema.ts";
+      fixHint = "إضافة .index() للمخطط وتحويل الاستعلام إليه";
+    } else if (/dynamic module import unsupported/i.test(combined)) {
+      serverKind = "استيراد ديناميكي غير مدعوم";
+      honestCause = "await import() داخل دالة Convex — غير مدعوم في بيئة الخادم؛ يحتاج استيراداً ثابتاً";
+      fixHint = "تحويل await import إلى import ثابت أعلى الملف";
+    } else if (/\.db\.insert is not a function|\.db\.patch is not a function|not a function.*handler/i.test(combined)) {
+      serverKind = "استخدام API خاطئ في الخادم";
+      honestCause = "استدعاء db.insert في سياق query (يُسمح فيه القراءة فقط) أو دالة غير موجودة";
+      fixHint = "تحويل الدالة إلى mutation أو استخدام ctx.runMutation";
+    } else if (/Could not find function/i.test(combined)) {
+      serverKind = "دالة مفقودة";
+      honestCause = "الواجهة تستدعي دالة غير منشورة على الخادم (نشر قديم أو اسم خاطئ)";
+      fixHint = "إعادة نشر Convex أو تصحيح اسم الدالة";
+    }
+
+    return {
+      category: "server_code", severity: "critical",
+      displayName: `🩺 خطأ خادم حقيقي — ${serverKind}`,
+      description: serverFile
+        ? `الخلل في ${serverFile}${serverLine ? ` سطر ${serverLine}` : ""} — تشخيص مستخرج من نص الخادم نفسه.`
+        : "خطأ من خادم Convex — التفاصيل داخل نص الرسالة.",
+      rootCause: `${honestCause} → الإصلاح: ${fixHint}`,
+      confidence: 0.97,
+      estimatedImpact: "وظيفة لا تعمل حتى يُصلح الكود",
+      // ⚠️ الصدق: إعادة التحميل لن تُصلح كود خادم — لا نضيع وقت اللاعب
+      // بجولات reload عابثة. نعرض التقرير فوراً مع تصعيد تلقائي.
+      recoveryStrategies: ["wait_and_retry"],
+    };
+  }
 
   if (/Rendered more hooks|hooks.*changed.*order/i.test(combined)) {
     return {
@@ -622,7 +674,7 @@ export async function flushPendingErrorReports() {
   if (!convexClient || pendingReportCount() === 0) return 0;
   return flushErrorQueue(async (payload) => {
     try {
-      // v5.1: التقارير المُصعَّدة تُوجَّه لمسارها الصحيح
+      // v6.1: التقارير المُصعَّدة تُوجَّه لمسارها الصحيح
       if (payload && (payload as any).__escalated) {
         const { __escalated, ...escalation } = payload as any;
         void __escalated;
@@ -814,7 +866,19 @@ export class ErrorHunter extends Component<Props, State> {
     // Step 5: Report
     this.reportError(error, errorInfo, diagnosis);
 
-    // Step 6: Recovery
+    // Step 6: Recovery — v6.1 الصدق: أخطاء كود الخادم لا تُصلَح بإعادة
+    // التحميل. لا نُدخل اللاعب في مسرحية إصلاح فاشلة — نصعّد فوراً للتقرير.
+    if (diagnosis.category === "server_code") {
+      this.setState({
+        healing: false,
+        healingResult: "failed",
+        healingMessage: "خطأ في كود الخادم — الإصلاح يتطلب تعديل الكود لا إعادة تحميل",
+      });
+      this.addTimeline("system_action", "🩺 v6.1: كشف خطأ خادم — تخطي الإصلاح الوهمي والتصعيد المباشر بالملف والسطر");
+      this.autoRetryPasses = this.MAX_AUTO_PASSES; // استنفاد فوري → يصعّد التقرير
+      this.escalateToOwner();
+      return;
+    }
     this.startRecovery(diagnosis);
   }
 
@@ -973,7 +1037,7 @@ export class ErrorHunter extends Component<Props, State> {
       newState === "open" ? "Circuit Breaker فُتح" : `فشلت المحاولات (${newFailures}/${CIRCUIT_THRESHOLD})`
     );
 
-    // v5.1: فشل ≠ استسلام — أطلق جولة مطاردة ذاتية متصاعدة.
+    // v6.1: فشل ≠ استسلام — أطلق جولة مطاردة ذاتية متصاعدة.
     // قاطع الدائرة المفتوح وحده يوقف المطارِدة (حماية من العاصفة).
     if (newState !== "open") {
       this.scheduleAutoRetry();
@@ -997,7 +1061,7 @@ export class ErrorHunter extends Component<Props, State> {
   private handleReload = () => { safeReload(); };
   private handleGoHome = () => { safeNavigate("/play"); };
 
-  // ═══ v5.1 — القنّاص: مطاردة ذاتية متصاعدة ═══
+  // ═══ v6.1 — القنّاص: مطاردة ذاتية متصاعدة ═══
   // عند فشل جولة الإصلاح، يعيد الصياد الهجوم تلقائياً حتى 3 جولات
   // متصاعدة (مع فاصل قصير يسمح للشبكة/الذاكرة بالتعافي) قبل أن يستسلم
   // ويعرض زر نسخ التقرير.
@@ -1008,7 +1072,7 @@ export class ErrorHunter extends Component<Props, State> {
   private scheduleAutoRetry = () => {
     if (this.autoRetryPasses >= this.MAX_AUTO_PASSES) {
       this.addTimeline("system_action", `استُنفدت ${this.MAX_AUTO_PASSES} جولات مطاردة ذاتية — يُصعَّد التقرير لغرفة المالك`);
-      // v5.1: الاستسلام → إرسال التقرير المنظم تلقائياً للمالك (لا حاجة لزر)
+      // v6.1: الاستسلام → إرسال التقرير المنظم تلقائياً للمالك (لا حاجة لزر)
       this.escalateToOwner();
       return;
     }
@@ -1019,13 +1083,15 @@ export class ErrorHunter extends Component<Props, State> {
       const d = this.state.error ? diagnoseAdvanced(this.state.error) : null;
       if (d) this.startRecovery(d);
     }, delayMs);
-  };  // ═══ v5.1 — بناء التقرير المنظم (نفس محتوى زر النسخ) ═══
+  };
+
+  // ═══ v6.1 — بناء التقرير المنظم (نفس محتوى زر النسخ) ═══
   private buildStructuredReport = (): string => {
     const { error, incidentEvents, deviceHealth } = this.state;
     const d = error ? diagnoseAdvanced(error) : null;
     const attempts = this.autoRetryPasses;
     return [
-      "═══ 🐛 تقرير خطأ — حرب العقول (صياد الأخطاء v5.1) ═══",
+      "═══ 🐛 تقرير خطأ — حرب العقول (صياد الأخطاء v6.1) ═══",
       `🕐 الوقت: ${new Date().toLocaleString("ar-SA")}`,
       `📍 المسار: ${typeof window !== "undefined" ? window.location.pathname : "?"}`,
       `🏷 الفئة: ${d?.category || "unknown"} · الخطورة: ${d?.severity || "unknown"} · الثقة: ${Math.round((d?.confidence || 0) * 100)}%`,
@@ -1042,7 +1108,7 @@ export class ErrorHunter extends Component<Props, State> {
     ].filter(Boolean).join("\n");
   };
 
-  // ═══ v5.1 — تصعيد التقرير تلقائياً لغرفة المالك (مضاد للتكرار) ═══
+  // ═══ v6.1 — تصعيد التقرير تلقائياً لغرفة المالك (مضاد للتكرار) ═══
   private escalatedFor: string | null = null;
 
   private escalateToOwner = () => {
@@ -1065,7 +1131,7 @@ export class ErrorHunter extends Component<Props, State> {
       });
   };
 
-  // ═══ v5.1 — نسخ تقرير منظم للمطوّر ═══
+  // ═══ v6.1 — نسخ تقرير منظم للمطوّر ═══
   private handleCopyReport = () => {
     const report = this.buildStructuredReport();
     // النسخ يرسل أيضاً لغرفة المالك (طُلب صراحةً من المالك)
