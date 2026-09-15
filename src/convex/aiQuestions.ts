@@ -379,7 +379,8 @@ export const countByCategory = query({
     for (const r of rows) {
       counts[r.category] = (counts[r.category] ?? 0) + 1;
     }
-    return counts;
+    // مفاتيح الفئات عربية — لا تُسلسَل ككائن؛ نعيدها مصفوفة
+    return Object.entries(counts).map(([category, count]) => ({ category, count }));
   },
 });
 
@@ -463,7 +464,8 @@ export const getQueueStats = query({
       approved: rows.filter((r) => r.status === "approved").length,
       rejected: rows.filter((r) => r.status === "rejected").length,
       weak,
-      perCategory: counts,
+      // Convex لا يدعم مفاتيح كائنات غير ASCII (أسماء الفئات عربية) — نحوّلها لمصفوفة
+      perCategory: Object.entries(counts).map(([category, count]) => ({ category, count })),
     };
   },
 });
