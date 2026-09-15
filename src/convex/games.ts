@@ -368,7 +368,6 @@ export async function pickAdaptiveQuestions(
   // ── 2) مهارة اللاعب العامة → نسبة الصعب المثالية (10%..40%) ──
   let skill = 0.5;
   try {
-    const { getSkillLevel } = await import("./fairPlay");
     skill = (await ctx.runQuery(internal.fairPlay.getSkillLevel, { userId })) as number;
   } catch {
     /* الافتراضي متوسط */

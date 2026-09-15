@@ -11,6 +11,7 @@
  */
 
 import { v } from "convex/values";
+import { isDeputyOwner } from "./siteRoles";
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
@@ -183,7 +184,6 @@ export const resolveFairPlayEvent = mutation({
     const isOwner = user?.email?.toLowerCase() === "omw70op@gmail.com";
     if (!isOwner) {
       // النائب؟
-      const { isDeputyOwner } = await import("./siteRoles");
       if (!(await isDeputyOwner(ctx, userId))) throw new Error("غير مصرح — للمالك والنائب فقط");
     }
     await ctx.db.patch(eventId, { resolved: true });

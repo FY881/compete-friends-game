@@ -127,7 +127,6 @@ async function createDuelGame(
   // 🎯 المرحلة 10: صعوبة المبارزة تناسب متوسط مهارة اللاعبَين (10%–40% صعب)
   let hardHint: number | undefined;
   try {
-    const { getSkillLevel } = await import("./fairPlay");
     const [s1, s2] = (await Promise.all([
       ctx.runQuery(internal.fairPlay.getSkillLevel, { userId: hostId }),
       ctx.runQuery(internal.fairPlay.getSkillLevel, { userId: guestId }),

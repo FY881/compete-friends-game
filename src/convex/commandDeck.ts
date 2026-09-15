@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { getCurrentUser } from "./users";
+import { PERK_CATALOG } from "./loyalty";
 import { levelFromXp } from "./gameConfig";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -170,7 +171,7 @@ export const searchPlayers = query({
   handler: async (ctx, args) => {
     const me = await requireOwner(ctx);
     if (!me) return null;
-    const { levelFromXp: levelOf } = await import("./gameConfig");
+    const levelOf = levelFromXp;
     const q = (args.search ?? "").trim().toLowerCase();
     const users = await ctx.db.query("users").take(500);
     const rows: any[] = [];
@@ -741,8 +742,7 @@ export const getShopAdmin = query({
   args: {},
   handler: async (ctx) => {
     const me = await requireOwner(ctx);
-    if (!me) return null;
-    const { PERK_CATALOG } = await import("./loyalty");
+    if (!me) return { unauthorized: true, items: [] };
     const overrides = await ctx.db
       .query("settings")
       .withIndex("by_key", (q: any) => q.eq("key", "perkPriceOverrides"))

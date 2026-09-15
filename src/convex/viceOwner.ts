@@ -5,7 +5,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { callLlm, markDeputyOnline } from "./aiConfig";
-import { recallFor, maybeRemember, extractSelfGrade } from "./aiUpgradeKit";
+import { recallFor, maybeRemember, extractSelfGrade, rememberFor } from "./aiUpgradeKit";
 import { ensureAiRuntime } from "./apiCore";
 
 // نائب المالك يعمل عبر محرك النظامين حصراً (مفتاح+رابط / مفتاح فقط) —
@@ -187,7 +187,6 @@ export const workTurn = internalAction({
     await maybeRemember(ctx, "viceOwner", reply);
     if (gradedReply.selfGrade !== undefined && gradedReply.selfGrade <= 5) {
       try {
-        const { rememberFor } = await import("./aiUpgradeKit");
         await rememberFor(
           ctx,
           "viceOwner",

@@ -129,8 +129,10 @@ export function EconomyWarRoom() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {shop === undefined || shop === null ? (
+          {shop === undefined ? (
             <p className="py-6 text-center text-xs text-muted-foreground">جارٍ التحميل…</p>
+          ) : shop === null || !Array.isArray(shop) || shop.length === 0 ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">لا صلاحية أو لا عناصر.</p>
           ) : (
             <div className="space-y-2">
               {shop.map((p) => (
