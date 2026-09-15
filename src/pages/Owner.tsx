@@ -137,7 +137,8 @@ import { ApiHubTab } from "@/components/ApiHubTab";
 import { ProblemsTab } from "@/components/ProblemsTab";
 import { ErrorHunterTab } from "@/components/owner/ErrorHunterTab";
 import { AiSurgeonPanel } from "@/components/AiSurgeonPanel";
-import { Stethoscope } from "lucide-react";
+import { ApexPanel } from "@/components/ApexPanel";
+import { Stethoscope, Crosshair } from "lucide-react";
 import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
 import MasterAIDashboard from "@/components/owner/MasterAIDashboard";
 import { LawEnforcementTab } from "@/components/owner/LawEnforcementTab";
@@ -2298,6 +2299,7 @@ const NAV_GROUPS = [
       { id: "problems", icon: Bug, label: "المشاكل" },
       { id: "errorhunter", icon: ShieldCheck, label: "صياد الأخطاء" },
       { id: "aisurgeon", icon: Stethoscope, label: "غرفة الجراحة" },
+      { id: "apex", icon: Crosshair, label: "APEX v7" },
     ],
   },
   {
@@ -2378,7 +2380,7 @@ export default function Owner() {
       if (item.id === "aiupgrade" && !access.isOwner) return false;
       if (item.id === "freechat" && !access.isOwner) return false;
       if (item.id === "problems" && !access.isOwner) return false;
-      if ((item.id === "errorhunter" || item.id === "aisurgeon") && !access.isOwner) return false;
+      if ((item.id === "errorhunter" || item.id === "aisurgeon" || item.id === "apex") && !access.isOwner) return false;
       if (item.id === "downloads" && !access.isOwner) return false;
       if (item.id === "settings" && !access.isOwner) return false;
       return true;
@@ -2461,6 +2463,8 @@ export default function Owner() {
         return <ErrorHunterTab />;
       case "aisurgeon":
         return <AiSurgeonPanel />;
+      case "apex":
+        return <ApexPanel />;
       case "games":
         return <GamesTab />;
       case "chatrooms":
