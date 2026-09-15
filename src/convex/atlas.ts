@@ -885,12 +885,19 @@ export const contentAdminData = query({
       ? ((JSON.parse(disabledRow.value) as any).disabledQuestions ?? [])
       : [];
 
-    const byCategory: Record<string, number> = {};
-    const byDifficulty: Record<string, number> = {};
-    for (const q of QUESTION_BANK) {
-      byCategory[q.category] = (byCategory[q.category] ?? 0) + 1;
-      byDifficulty[q.difficulty] = (byDifficulty[q.difficulty] ?? 0) + 1;
-    }
+    // مفاتيح الفئات عربية (غير ASCII) — Convex يرفضها كحقول كائن؛ نحوّلها مصفوفات
+    const byCategory = Object.entries(
+      QUESTION_BANK.reduce<Record<string, number>>((acc, q) => {
+        acc[q.category] = (acc[q.category] ?? 0) + 1;
+        return acc;
+      }, {}),
+    ).map(([category, count]) => ({ category, count }));
+    const byDifficulty = Object.entries(
+      QUESTION_BANK.reduce<Record<string, number>>((acc, q) => {
+        acc[q.difficulty] = (acc[q.difficulty] ?? 0) + 1;
+        return acc;
+      }, {}),
+    ).map(([difficulty, count]) => ({ difficulty, count }));
 
     const qualityFlags = QUESTION_BANK.filter(
       (q) =>
@@ -1014,11 +1021,14 @@ export const reportsAdminData = query({
       .order("desc")
       .take(50);
     const all = await ctx.db.query("reports").collect();
-    const byReason: Record<string, number> = {};
-    for (const r of all) {
-      const key = r.reason.slice(0, 24);
-      byReason[key] = (byReason[key] ?? 0) + 1;
-    }
+    // أسباب البلاغات نصوص عربية — مفاتيح الكائنات غير ASCII يرفضها Convex؛ مصفوفة بدلاً منها
+    const byReason = Object.entries(
+      all.reduce<Record<string, number>>((acc, r) => {
+        const key = r.reason.slice(0, 24);
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      }, {}),
+    ).map(([reason, count]) => ({ reason, count }));
     const resolved = all.filter((r) => r.status !== "open");
     const highSeverityOpen = open.filter(
       (r) => (r.aiVerdict?.severity ?? "low") === "high",

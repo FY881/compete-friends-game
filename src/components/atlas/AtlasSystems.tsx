@@ -426,13 +426,13 @@ export function ContentSystem() {
 
   if (data === undefined) return <Loading />;
   if (data === null) return <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">لا صلاحية.</div>;
-  const maxCat = Math.max(1, ...Object.values(data.byCategory));
+  const maxCat = Math.max(1, ...data.byCategory.map((c) => c.count));
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="إجمالي الأسئلة" value={atlasCompact(data.total)} accent={ATLAS_COLORS.royal} />
-        <StatCard label="التصنيفات" value={Object.keys(data.byCategory).length} accent={ATLAS_COLORS.emerald} />
+        <StatCard label="التصنيفات" value={data.byCategory.length} accent={ATLAS_COLORS.emerald} />
         <StatCard label="معطّلة" value={data.disabledCount} accent={ATLAS_COLORS.crimson} />
         <StatCard label="أعلام جودة" value={data.qualityFlags.length} accent={ATLAS_COLORS.amber} />
       </div>
@@ -440,22 +440,22 @@ export function ContentSystem() {
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="توزيع التصنيفات والصعوبة (q2/q6/q8)" icon={BookOpen} accent={ATLAS_COLORS.emerald}>
           <div className="space-y-2">
-            {Object.entries(data.byCategory).sort((a, b) => b[1] - a[1]).map(([cat, n]) => (
-              <div key={cat}>
+            {data.byCategory.slice().sort((a, b) => b.count - a.count).map((c) => (
+              <div key={c.category}>
                 <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-300">{cat}</span>
-                  <span className="tabular-nums text-slate-500">{n}</span>
+                  <span className="text-slate-300">{c.category}</span>
+                  <span className="tabular-nums text-slate-500">{c.count}</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-800">
                   <div className="h-full rounded-full transition-all"
-                    style={{ width: `${(n / maxCat) * 100}%`, background: `linear-gradient(90deg, ${ATLAS_COLORS.royal}, ${ATLAS_COLORS.cyan})` }} />
+                    style={{ width: `${(c.count / maxCat) * 100}%`, background: `linear-gradient(90deg, ${ATLAS_COLORS.royal}, ${ATLAS_COLORS.cyan})` }} />
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-4 grid grid-cols-4 gap-2">
-            {Object.entries(data.byDifficulty).map(([d, n]) => (
-              <StatCard key={d} label={d} value={n} accent={ATLAS_COLORS.slate} />
+            {data.byDifficulty.map((d) => (
+              <StatCard key={d.difficulty} label={d.difficulty} value={d.count} accent={ATLAS_COLORS.slate} />
             ))}
           </div>
         </Panel>
@@ -557,7 +557,7 @@ export function ReportsSystem() {
 
   if (data === undefined) return <Loading />;
   if (data === null) return <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">لا صلاحية.</div>;
-  const maxReason = Math.max(1, ...Object.values(data.stats.byReason));
+  const maxReason = Math.max(1, ...data.stats.byReason.map((r) => r.count));
 
   return (
     <div className="space-y-5">
@@ -614,18 +614,18 @@ export function ReportsSystem() {
 
         <Panel title="اتجاهات البلاغات — أكثر الأسباب (a6)" icon={BarChart3} accent={ATLAS_COLORS.amber}>
           <div className="space-y-2">
-            {Object.entries(data.stats.byReason).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([reason, n]) => (
-              <div key={reason}>
+            {data.stats.byReason.slice().sort((a, b) => b.count - a.count).slice(0, 8).map((r) => (
+              <div key={r.reason}>
                 <div className="mb-1 flex justify-between gap-2 text-xs">
-                  <span className="truncate text-slate-300">{reason}</span>
-                  <span className="tabular-nums text-slate-500">{n}</span>
+                  <span className="truncate text-slate-300">{r.reason}</span>
+                  <span className="tabular-nums text-slate-500">{r.count}</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                  <div className="h-full rounded-full" style={{ width: `${(n / maxReason) * 100}%`, background: `linear-gradient(90deg, ${ATLAS_COLORS.crimson}, ${ATLAS_COLORS.amber})` }} />
+                  <div className="h-full rounded-full" style={{ width: `${(r.count / maxReason) * 100}%`, background: `linear-gradient(90deg, ${ATLAS_COLORS.crimson}, ${ATLAS_COLORS.amber})` }} />
                 </div>
               </div>
             ))}
-            {Object.keys(data.stats.byReason).length === 0 && (
+            {data.stats.byReason.length === 0 && (
               <div className="py-8 text-center text-sm text-slate-500">لا بيانات بعد</div>
             )}
           </div>
