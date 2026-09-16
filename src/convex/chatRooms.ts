@@ -7,6 +7,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { assertSystemOpen } from "./systemLocks";
 import {
   isDuplicateSpam,
   maxMatchSeverity,
@@ -172,6 +173,8 @@ export const sendMessage = mutation({
   handler: async (ctx, { roomId, content, replyTo }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
+    // 🔒 قفل الدردشة بقرار المالك يمنع أي رسالة جديدة فعلياً
+    await assertSystemOpen(ctx, "chat");
 
     const room = await ctx.db.get(roomId);
     if (!room) throw new Error("الغرفة غير موجودة");

@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { downloadApk } from "@/lib/app-version";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { SystemLockBanner } from "@/components/SystemLockBanner";
 import { TournamentPanel } from "@/components/TournamentPanel";
 import { WorldChampionshipPanel } from "@/components/WorldChampionshipPanel";
 import { GameModesPanel } from "@/components/GameModesPanel";
@@ -267,6 +268,7 @@ export default function Play() {
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
       <AnnouncementBanner />
+      <SystemLockBanner />
 
       {/* ── Update notice (server-driven version check) ────────── */}
       <div className="mx-auto max-w-6xl space-y-4 px-5 pt-5">

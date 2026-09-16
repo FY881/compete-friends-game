@@ -14,6 +14,7 @@ import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { assertSystemOpen } from "./systemLocks";
 import {
   ANSWER_MS,
   DURATION_MODE_OFF,
@@ -280,6 +281,8 @@ export const joinQueue = mutation({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
+    // 🔒 قفل الساحة بقرار المالك يوقف الطابور فعلياً
+    await assertSystemOpen(ctx, "arena");
 
     const me = await ctx.db.get(userId);
     const now = Date.now();

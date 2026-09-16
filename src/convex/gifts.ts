@@ -5,6 +5,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { assertSystemOpen } from "./systemLocks";
 
 // ═══════════════════════════════════════════════════════════════
 // ║ إرسال هدية ║
@@ -18,6 +19,8 @@ export const sendGift = mutation({
   handler: async (ctx, { receiverId, giftType, message }) => {
     const senderId = await getAuthUserId(ctx);
     if (!senderId) throw new Error("يجب تسجيل الدخول أولاً");
+    // 🔒 قفل الاقتصاد بقرار المالك يمنع إرسال الهدايا فعلياً
+    await assertSystemOpen(ctx, "economy");
     if (senderId === receiverId) throw new Error("لا يمكنك إرسال هدية لنفسك");
 
     const sender = await ctx.db.get(senderId);

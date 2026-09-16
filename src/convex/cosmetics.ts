@@ -13,6 +13,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { assertSystemOpen } from "./systemLocks";
 
 type CosmeticKind = "avatar" | "frame" | "title";
 
@@ -125,6 +126,8 @@ export const buyCosmetic = mutation({
   handler: async (ctx, { key }) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
+    // 🔒 قفل الاقتصاد بقرار المالك يمنع أي شراء فعلي من المتجر
+    await assertSystemOpen(ctx, "economy");
     const item = [...COSMETIC_CATALOG, ...LIMITED_DROPS].find((i) => i.key === key);
     if (!item) throw new Error("العنصر غير موجود");
 

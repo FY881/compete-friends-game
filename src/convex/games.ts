@@ -2,6 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { assertSystemOpen } from "./systemLocks";
 import {
   internalMutation,
   mutation,
@@ -278,6 +279,9 @@ async function makeUniqueCode(ctx: DbCtx): Promise<string> {
 
 /** Throw unless the signed-in user is allowed to play (not banned). */
 async function assertNotBanned(ctx: MutationCtx, userId: Id<"users">): Promise<void> {
+  // 🔒 قرار الطوارئ من غرفة المالك يُنفَّذ فعلياً: قفل الساحة يمنع
+  // أي إنشاء تحدي أو انضمام أو إجابة — لا زر بلا أثر.
+  await assertSystemOpen(ctx, "arena");
   const user = await ctx.db.get(userId);
   if (!user) return;
   const { banned, reason } = isUserBanned(user);

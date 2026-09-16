@@ -9,6 +9,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { assertSystemOpen } from "./systemLocks";
 
 // ═══════════════════════════════════════════════════════════════════════
 // ① تعريفات العناصر الأساسية
@@ -479,6 +480,8 @@ export const purchaseItem = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
 
+    // 🔒 قفل الاقتصاد بقرار المالك يمنع أي شراء من المتجر فعلياً
+    await assertSystemOpen(ctx, "economy");
     const item = ALL_ITEMS.find((i) => i.id === itemId);
     if (!item) throw new Error("العنصر غير موجود");
 
@@ -533,6 +536,8 @@ export const purchaseBundle = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
 
+    // 🔒 قفل الاقتصاد بقرار المالك يمنع شراء الحزم فعلياً
+    await assertSystemOpen(ctx, "economy");
     const bundle = STORE_BUNDLES.find((b) => b.id === bundleId);
     if (!bundle) throw new Error("الحزمة غير موجودة");
 
