@@ -313,7 +313,7 @@ export const getRiskRadar = query({
       });
     }
 
-    const errorsLast24 = errors48.filter((e: any) => e.at >= now - 24 * 3600_000).length;
+    const errorsLast24 = errors48.filter((e: any) => e.createdAt >= now - 24 * 3600_000).length;
     const errorsPrev24 = errors48.length - errorsLast24;
     if (errorsPrev24 >= 3 && errorsLast24 > errorsPrev24 * 1.8) {
       signals.push({
@@ -1091,7 +1091,7 @@ export const getWeeklyTrends = query({
       days.push({
         day: key,
         rounds: rounds.filter((r: any) => new Date(r.playedAt).toISOString().slice(0, 10) === key).length,
-        errors: errors.filter((e: any) => new Date(e.at).toISOString().slice(0, 10) === key).length,
+        errors: errors.filter((e: any) => new Date(e.createdAt).toISOString().slice(0, 10) === key).length,
       });
     }
     const halfRounds = [days.slice(0, 4), days.slice(3)].map((w) => w.reduce((s, d) => s + d.rounds, 0));
