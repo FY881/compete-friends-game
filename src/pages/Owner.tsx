@@ -141,6 +141,7 @@ import { ApexPanel } from "@/components/ApexPanel";
 import { Stethoscope, Crosshair } from "lucide-react";
 import { CrownDeckPanel } from "@/components/owner/CrownDeckPanel";
 import { SovereignPanel } from "@/components/owner/SovereignPanel";
+import { SovereignPulseCard } from "@/components/owner/SovereignPanel";
 import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
 import MasterAIDashboard from "@/components/owner/MasterAIDashboard";
 import { LawEnforcementTab } from "@/components/owner/LawEnforcementTab";
@@ -2394,7 +2395,12 @@ export default function Owner() {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <OwnerDashboard onNavigate={setActiveTab} />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard />
+            <OwnerDashboard onNavigate={setActiveTab} />
+          </div>
+        );
       case "commanddeck":
         return <CommandDeck onNavigate={setActiveTab} />;
       case "crown":
@@ -2408,37 +2414,87 @@ export default function Owner() {
       case "communitymonitor":
         return <CommunityMonitor />;
       case "appeals":
-        return <AppealsPanel />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <AppealsPanel />
+          </div>
+        );
       case "economywar":
-        return <EconomyWarRoom />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <EconomyWarRoom />
+          </div>
+        );
       case "aihub":
-        return <AiHubTab />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <AiHubTab />
+          </div>
+        );
       case "events":
-        return <EventsStudio />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <EventsStudio />
+          </div>
+        );
       case "questionstudio":
-        return <QuestionStudio />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <QuestionStudio />
+          </div>
+        );
       case "analytics":
         return <AnalyticsCenter />;
       case "security":
-        return <SecurityCenter />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <SecurityCenter />
+          </div>
+        );
       case "deputy":
         return <DeputyCommandCenter />;
       case "fairplay":
-        return <FairPlayTab />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <FairPlayTab />
+          </div>
+        );
       case "governor":
-        return <AiGovernorTab />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <AiGovernorTab />
+          </div>
+        );
       case "minds":
         return <MindsControlRoom />;
       case "users":
         return <AdvancedPlayersTab isOwner={access.isOwner} />;
       case "reports":
-        return <ReportsInbox />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <ReportsInbox />
+          </div>
+        );
       case "smartinbox":
         return <SmartInbox />;
       case "rules":
         return <RulesTab />;
       case "memberships":
-        return <MembershipAdmin />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <MembershipAdmin />
+          </div>
+        );
       case "ai":
         return settings ? <AiTab settings={settings} /> : <Loader2 className="mx-auto my-12 size-6 animate-spin" />;
       case "lawenforcement":
@@ -2468,7 +2524,12 @@ export default function Owner() {
       case "problems":
         return <ProblemsTab />;
       case "errorhunter":
-        return <ErrorHunterTab />;
+        return (
+          <div className="space-y-4">
+            <SovereignPulseCard compact />
+            <ErrorHunterTab />
+          </div>
+        );
       case "aisurgeon":
         return <AiSurgeonPanel />;
       case "apex":

@@ -1,12 +1,45 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Crown, Gavel, ScrollText, Loader2, Landmark, TrendingUp, Undo2 } from "lucide-react";
+import { Crown, Gavel, ScrollText, Loader2, Landmark, TrendingUp, Undo2, ShieldCheck } from "lucide-react";
+
+/**
+ * 🛡️ نبضة الحاكم — شريط حي يُعرض أعلى كل تبويب رئيسي في غرفة المالك:
+ * يذكّر أن الحاكم السيادي يراقب وينفّذ باستقلال، ويعرض آخر قراراته.
+ */
+export function SovereignPulseCard({ compact = false }: { compact?: boolean }) {
+  const status = useQuery(api.sovereignGovernor.getSovereignStatus, {});
+  const edicts = useQuery(api.sovereignGovernor.getEdicts, {});
+  const latest = edicts?.[0];
+  if (!status) return null;
+  return (
+    <div className={cn(
+      "flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/30 bg-gradient-to-l from-amber-950/25 via-transparent to-transparent px-4 py-3",
+      compact && "py-2.5",
+    )} dir="rtl">
+      <ShieldCheck className="h-5 w-5 shrink-0 text-amber-400" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-amber-200">
+          الحاكم السيادي يراقب وينفّذ — {status.stats.activeEdicts} مرسوماً نشطاً · {status.stats.totalPenalties - status.stats.vetoed} عقوبة نافذة
+        </p>
+        {latest && !compact && (
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">آخر قرار موقّع: {latest.title} — {latest.body.slice(0, 110)}…</p>
+        )}
+      </div>
+      {!compact && (
+        <Button size="sm" variant="outline" className="border-amber-500/40 text-amber-200" onClick={() => window.dispatchEvent(new CustomEvent("owner-navigate", { detail: "sovereign" }))}>
+          فتح سجل السيادة
+        </Button>
+      )}
+    </div>
+  );
+}
 
 /**
  * 👑 لوحة الحاكم السيادي — عرض علني لكتاب قوانينه وعقوباته ومراسيمه.
