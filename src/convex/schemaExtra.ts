@@ -44,6 +44,17 @@ export const premiumTables = {
     .index("by_user", ["userId"])
     .index("by_deliver", ["deliverAfter"]),
 
+  // ═══ سجل إنفاق المتجر — يجعل أرصدة coins/gems قابلة للإنفاق فعلاً ═══
+  // (قبل هذا الجدول كانت الأسعار معروضة ولا تُخصم من أي رصيد أبداً)
+  storeLedger: defineTable({
+    userId: v.id("users"),
+    currency: v.string(), // coins | gems
+    amount: v.number(), // موجب = خصم
+    reason: v.string(),
+    itemId: v.optional(v.string()),
+    at: v.number(),
+  }).index("by_user", ["userId"]),
+
   // ═══ التخصيص العميق للملف الشخصي ═══
   profileCustomization: defineTable({
     userId: v.id("users"),

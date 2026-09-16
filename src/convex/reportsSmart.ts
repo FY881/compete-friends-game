@@ -11,6 +11,114 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { callLlm, getOpenRouterKey } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
+import { internal } from "./_generated/api";
+
+// ═══════════════════════════════════════════════════════════════════════
+// ①-ب محرك الفرز الفوري — قواعد حقيقية لا تخمين
+// ═══════════════════════════════════════════════════════════════════════
+
+type TriageLevel = "low" | "medium" | "high" | "critical";
+
+function levelFromPriority(p: number): TriageLevel {
+  if (p >= 80) return "critical";
+  if (p >= 60) return "high";
+  if (p >= 35) return "medium";
+  return "low";
+}
+
+function daysAgo(ts: number): number {
+  return Math.round((Date.now() - ts) / 86400_000);
+}
+
+/**
+ * ❖ الفرز الفوري: يقرأ تاريخ الطرفين الفعلي من قاعدة البيانات ويُنتج
+ * درجة أولوية قابلة للتفسير + إشارات عربية مكتوبة — كل رقم له مصدر.
+ */
+async function triageReport(
+  ctx: any,
+  args: {
+    reporterId: any;
+    targetId: any;
+    targetName: string;
+    severity: string;
+    details?: string;
+  },
+) {
+  const SEVERITY_BASE: Record<string, number> = { low: 20, medium: 40, high: 62, critical: 78 };
+  let priority = SEVERITY_BASE[args.severity] ?? 40;
+  const signals: string[] = [`تصنيف البلاغ (${args.severity}) يمنح أساس ${priority}`];
+
+  // ── 1) سجل المُبلَّغ عنه الفعلي ──
+  const allReports = await ctx.db
+    .query("reports")
+    .withIndex("by_created")
+    .collect();
+  const againstTarget = allReports.filter((r: any) => r.targetId === args.targetId);
+  const priorReports = Math.max(0, againstTarget.length - 1); // الأحدث هو البلاغ الحالي
+
+  if (priorReports > 0) {
+    const bump = Math.min(24, priorReports * 6);
+    priority += bump;
+    signals.push(`${priorReports} بلاغ سابق على نفس اللاعب (+${bump})`);
+  }
+
+  // ── 2) تكرار سريع خلال 72 ساعة = نمط لا حادثة ──
+  const recentSameTarget = againstTarget.filter(
+    (r: any) => Date.now() - (r.createdAt ?? 0) <= 72 * 3600_000,
+  ).length;
+  if (recentSameTarget >= 3) {
+    priority += 12;
+    signals.push(`${recentSameTarget} بلاغات خلال 72 ساعة — نمط متكرر (+12)`);
+  }
+
+  // ── 3) العقوبات السابقة الفعلية ──
+  const modLogs = await ctx.db.query("moderationLogs").withIndex("by_created").collect();
+  const targetActions = modLogs.filter(
+    (l: any) =>
+      l.targetId === args.targetId && ["warn", "mute", "ban", "cheat"].includes(l.action),
+  );
+  const priorActions = targetActions.length;
+  if (priorActions > 0) {
+    const bump = Math.min(18, priorActions * 5);
+    priority += bump;
+    const last = targetActions[targetActions.length - 1];
+    signals.push(`${priorActions} إجراء تأديبي سابق (+${bump})، آخرها «${last?.action}» قبل ${daysAgo(last?.createdAt ?? Date.now())} يوم`);
+  }
+
+  // ── 4) مصداقية المُبلِّغ: بلاغاته المُبطَلة — حماية من الإساءة ──
+  const mine = allReports.filter((r: any) => r.reporterId === args.reporterId);
+  const dismissed = mine.filter((r: any) => r.status === "dismissed").length;
+  const falseReporter = mine.length >= 3 && dismissed / mine.length >= 0.6;
+  if (falseReporter) {
+    const cut = Math.min(25, dismissed * 5);
+    priority -= cut;
+    signals.push(`مُبلِّغ ببلاغات مُبطَلة ${dismissed} من ${mine.length} (−${cut})`);
+  }
+
+  // ── 5) تفاصيل مكتوبة = بلاغ جاد، ولا تفاصيل = غالباً سريع ──
+  const detailLen = (args.details ?? "").trim().length;
+  if (detailLen >= 40) {
+    priority += 6;
+    signals.push(`بلاغ موثّق بتفاصيل (${detailLen} حرف) (+6)`);
+  } else if (detailLen === 0) {
+    priority -= 6;
+    signals.push("بلا تفاصيل توضيحية (−6)");
+  }
+
+  priority = Math.max(0, Math.min(100, Math.round(priority)));
+  const level = levelFromPriority(priority);
+
+  return {
+    priority,
+    level,
+    priorReports,
+    priorActions,
+    repeatOffender: priorReports >= 2 || priorActions >= 2,
+    falseReporter,
+    signals: signals.join(" · "),
+    triagedAt: Date.now(),
+  };
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // ① تصنيفات البلاغات
@@ -83,6 +191,15 @@ export const submitReport = mutation({
     const targetId = ctx.db.normalizeId("users", args.targetUserId);
     if (!targetId) throw new Error("المستخدم المُبلَّغ عنه غير موجود");
 
+    // ⚖️ فرز فوري حقيقي قبل أن يراه أي مشرف — يقرأ سجل الطرفين الفعلي
+    const triage = await triageReport(ctx, {
+      reporterId: userId,
+      targetId,
+      targetName: args.targetName,
+      severity,
+      details: args.details,
+    });
+
     const reportId = await ctx.db.insert("reports", {
       reporterId: userId,
       reporterName: reporter?.name ?? "مجهول",
@@ -92,10 +209,71 @@ export const submitReport = mutation({
       details: args.details,
       status: "open",
       aiVerdict: undefined,
+      triage,
       createdAt: Date.now(),
     });
 
-    return { reportId, severity };
+    // 🔗 إشارة إلى مركز الذكاء الموحد — الوحدة الرقابية ترى الفرز لحظياً
+    await ctx.runMutation(internal.aiHub.logEvent, {
+      unit: "referee",
+      kind: "observation",
+      severity: triage.level === "critical" || triage.level === "high" ? "warn" : "info",
+      summary: `بلاغ جديد بأولوية ${triage.priority}/100 (${triage.level}) على «${args.targetName}» — ${triage.signals}`,
+      payload: JSON.stringify({
+        reportId,
+        priority: triage.priority,
+        level: triage.level,
+        repeatOffender: triage.repeatOffender,
+        falseReporter: triage.falseReporter,
+      }),
+    });
+
+    return { reportId, severity, triage };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// ②-ب صندوق وارد ذكي — مرتّب بالأولوية الفعلية لا بترتيب الوصول
+// ═══════════════════════════════════════════════════════════════════
+export const getTriageQueue = query({
+  args: {
+    level: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { level, limit }) => {
+    const open = await ctx.db
+      .query("reports")
+      .withIndex("by_status", (q) => q.eq("status", "open"))
+      .collect();
+
+    // البلاغات القديمة بلا فرز تُحسب بأولوية متوسطة (تسقط في المنتصف تلقائياً)
+    const rows = open.map((r) => ({
+      _id: r._id,
+      targetName: r.targetName,
+      reporterName: r.reporterName,
+      reason: r.reason,
+      createdAt: r.createdAt,
+      priority: r.triage?.priority ?? 40,
+      level: r.triage?.level ?? ("medium" as const),
+      signals: r.triage?.signals ?? "بلاغ قديم سابق لمحرك الفرز",
+      repeatOffender: r.triage?.repeatOffender ?? false,
+      falseReporter: r.triage?.falseReporter ?? false,
+      priorReports: r.triage?.priorReports ?? 0,
+      priorActions: r.triage?.priorActions ?? 0,
+    }));
+
+    const filtered = level && level !== "all" ? rows.filter((r) => r.level === level) : rows;
+    filtered.sort((a, b) => b.priority - a.priority || a.createdAt - b.createdAt);
+
+    const counts = {
+      critical: rows.filter((r) => r.level === "critical").length,
+      high: rows.filter((r) => r.level === "high").length,
+      medium: rows.filter((r) => r.level === "medium").length,
+      low: rows.filter((r) => r.level === "low").length,
+      total: rows.length,
+    };
+
+    return { counts, rows: filtered.slice(0, limit ?? 40) };
   },
 });
 

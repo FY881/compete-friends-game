@@ -59,14 +59,17 @@ function ItemCard({
   onPurchase,
   purchasing,
 }: {
-  item: { id: string; category: string; name: string; icon: string; price: number; rarity: string; description: string };
+  item: { id: string; category: string; name: string; icon: string; price: number; rarity: string; description: string; finalPrice?: number; discountPct?: number; priceReasons?: string[] };
   owned: boolean;
   userCoins: number;
   onPurchase: (id: string) => void;
   purchasing: string | null;
 }) {
   const rarity = RARITY_CONFIG[item.rarity] ?? RARITY_CONFIG.common;
-  const canAfford = userCoins >= item.price;
+  // 💰 السعر المعروض هو نفسه الذي يُخصم على الخادم بنفس العوامل
+  const price = item.finalPrice ?? item.price;
+  const discountPct = item.discountPct ?? 0;
+  const canAfford = userCoins >= price;
 
   return (
     <motion.div
@@ -96,6 +99,15 @@ function ItemCard({
               <Badge variant="outline" className="text-[9px] gap-1 text-green-400 bg-green-500/10">
                 <Check className="size-2.5" />
                 مملوك
+              </Badge>
+            )}
+            {!owned && discountPct > 0 && (
+              <Badge
+                variant="outline"
+                className="text-[9px] gap-1 text-emerald-400 bg-emerald-500/10"
+                title={(item.priceReasons ?? []).join(" · ")}
+              >
+                −{discountPct}%
               </Badge>
             )}
           </div>
@@ -131,12 +143,15 @@ function ItemCard({
                 ) : canAfford ? (
                   <>
                     <Coins className="size-3 ml-1" />
-                    {item.price} عملة
+                    {price} عملة
+                    {discountPct > 0 && (
+                      <span className="mr-1 text-[9px] text-muted-foreground line-through">{item.price}</span>
+                    )}
                   </>
                 ) : (
                   <>
                     <Lock className="size-3 ml-1" />
-                    {item.price} عملة
+                    {price} عملة
                   </>
                 )}
               </Button>

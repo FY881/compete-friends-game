@@ -121,6 +121,24 @@ const schema = defineSchema(
           reasoning: v.string(),
         }),
       ),
+      // ⚖️ فرز فوري حقيقي يُحسب لحظة الإرسال (قبل أي تدخل بشري)
+      triage: v.optional(
+        v.object({
+          priority: v.number(), // 0..100
+          level: v.union(
+            v.literal("low"),
+            v.literal("medium"),
+            v.literal("high"),
+            v.literal("critical"),
+          ),
+          priorReports: v.number(),
+          priorActions: v.number(),
+          repeatOffender: v.boolean(),
+          falseReporter: v.boolean(),
+          signals: v.string(),
+          triagedAt: v.number(),
+        }),
+      ),
       createdAt: v.number(),
     })
       .index("by_status", ["status"])

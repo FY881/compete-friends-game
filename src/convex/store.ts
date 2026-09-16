@@ -10,6 +10,16 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { assertSystemOpen } from "./systemLocks";
+import { levelFromXp } from "./gameConfig";
+import {
+  assertLevel,
+  assertTier,
+  chargeCurrency,
+  computePricing,
+  getBalancesFor,
+  memberTier,
+  type Currency,
+} from "./pricingEngine";
 
 // ═══════════════════════════════════════════════════════════════════════
 // ① تعريفات العناصر الأساسية
@@ -333,7 +343,7 @@ export const getStoreItems = query({
     category: v.optional(v.string()),
     sortBy: v.optional(v.string()),
   },
-  handler: async (_ctx, { section, search, rarity, category, sortBy }) => {
+  handler: async (ctx, { section, search, rarity, category, sortBy }) => {
     let items = [...ALL_ITEMS];
 
     // Filter by section
@@ -380,7 +390,22 @@ export const getStoreItems = query({
       items.sort((a, b) => (order[b.rarity] ?? 0) - (order[a.rarity] ?? 0));
     }
 
-    return items;
+    // 💰 سعر حقيقي لكل لاعب: تُحسب عوامل الخصم مرة واحدة (عضوية + نشاط)
+    // ثم تُطبَّق على كل عنصر — فلا يُعرض سعر ويُخصم غيره عند الشراء.
+    const uid = await getAuthUserId(ctx);
+    if (!uid) return items.map((i) => ({ ...i, finalPrice: i.price, discountPct: 0, priceReasons: [] as string[] }));
+
+    const pricing = await computePricing(ctx, uid, 1000);
+    const pct = pricing.totalPct;
+    return items.map((i) => {
+      const discount = Math.round((i.price * pct) / 100);
+      return {
+        ...i,
+        finalPrice: Math.max(1, i.price - discount),
+        discountPct: pct,
+        priceReasons: pricing.reasons,
+      };
+    });
   },
 });
 
@@ -448,7 +473,19 @@ export const getBalances = query({
       .collect();
     const gems = achievements.filter((a) => a.rarity === "legendary").length * 50 + achievements.filter((a) => a.rarity === "epic").length * 20;
 
-    return { coins, gems, seasonTokens: 0 };
+    // 🔗 الربط الحقيقي: الرصيد = المكتسب − المنفَق فعلياً (سجل storeLedger)
+    const real = await getBalancesFor(ctx, userId);
+    void coins;
+    void gems;
+    return {
+      coins: real.coinsAvailable,
+      gems: real.gemsAvailable,
+      coinsEarned: real.coinsEarned,
+      coinsSpent: real.coinsSpent,
+      gemsEarned: real.gemsEarned,
+      gemsSpent: real.gemsSpent,
+      seasonTokens: 0,
+    };
   },
 });
 
@@ -515,6 +552,25 @@ export const purchaseItem = mutation({
       }
     }
 
+    // 🎓 بوابة المستوى — تُنفَّذ فعلاً (بعض العناصر تشترط مستوى 20 أو 50)
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    assertLevel(item.requiredLevel, profile ? levelFromXp(profile.xp) : 1, item.nameAr);
+
+    // 💰 الدفع الحقيقي: السعر الفعلي بالخصومات ثم خصم من رصيد حقيقي
+    // (نفس دالة computePricing التي تعرض السعر — فلا يدفع اللاعب غير ما رآه)
+    const pricing = await computePricing(ctx, userId, item.price);
+    const charged = await chargeCurrency(
+      ctx,
+      userId,
+      item.currency as Currency,
+      pricing.finalPrice,
+      `شراء ${item.nameAr}`,
+      item.id,
+    );
+
     // Record purchase
     await ctx.db.insert("ownerActions", {
       action: "store_purchase",
@@ -525,7 +581,16 @@ export const purchaseItem = mutation({
       createdAt: Date.now(),
     });
 
-    return { success: true, item: item.nameAr, rarity: item.rarity };
+    return {
+      success: true,
+      item: item.nameAr,
+      rarity: item.rarity,
+      paid: charged.charged,
+      basePrice: pricing.basePrice,
+      discount: pricing.discount,
+      reasons: pricing.reasons,
+      remaining: charged.remaining,
+    };
   },
 });
 
@@ -541,7 +606,12 @@ export const purchaseBundle = mutation({
     const bundle = STORE_BUNDLES.find((b) => b.id === bundleId);
     if (!bundle) throw new Error("الحزمة غير موجودة");
 
-    // Check ownership
+    // 💎 بوابة العضوية — الحزم تشترط رتبة فعلية غير منتهية
+    const tier = await memberTier(ctx, userId);
+    assertTier((bundle as { requiredTier?: string }).requiredTier, tier, bundle.name);
+
+    // ✅ التحقق من الملكية **قبل** أي خصم مالي.
+    // (كان الخصم يسبق هذا الفحص فيسحب الرصيد ثم يرمي خطأً — خسارة صافية للاعب)
     const existing = await ctx.db
       .query("ownerActions")
       .filter((q) =>
@@ -554,6 +624,17 @@ export const purchaseBundle = mutation({
       .first();
 
     if (existing) throw new Error("لقد اشتريت هذه الحزمة بالفعل");
+
+    // 💰 الدفع الحقيقي لسعر الحزمة بالخصومات (بعد التحقق من الملكية وبوابة العضوية)
+    const bundlePricing = await computePricing(ctx, userId, bundle.bundlePrice);
+    const bundlePaid = await chargeCurrency(
+      ctx,
+      userId,
+      "coins",
+      bundlePricing.finalPrice,
+      `شراء حزمة ${bundle.name}`,
+      bundle.id,
+    );
 
     // Record purchase
     await ctx.db.insert("ownerActions", {
@@ -577,7 +658,16 @@ export const purchaseBundle = mutation({
       });
     }
 
-    return { success: true, bundle: bundle.name, itemCount: bundle.items.length };
+    return {
+      success: true,
+      bundle: bundle.name,
+      itemCount: bundle.items.length,
+      basePrice: bundlePricing.basePrice,
+      discount: bundlePricing.discount,
+      reasons: bundlePricing.reasons,
+      paid: bundlePaid.charged,
+      remaining: bundlePaid.remaining,
+    };
   },
 });
 
