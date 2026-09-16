@@ -260,3 +260,12 @@ crons.interval(
   internal.errorHunter.detectAnomalies,
   {},
 );
+
+// 🧹 مركز الذكاء الموحد — صيانة الذاكرة كل 6 ساعات: تقليم الأحداث القديمة
+// والحفاظ على سقف آمن، فيبقى السجل الموحد سريعاً مهما طال التشغيل.
+crons.interval(
+  "ai-hub-memory-prune",
+  { hours: 6 },
+  internal.aiHub.pruneHubEvents,
+  {},
+);

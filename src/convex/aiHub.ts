@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 
@@ -52,6 +52,81 @@ export const logEvent = internalMutation({
   },
 });
 
+/** معرّف سجل المفتاح الرئيسي للمركز (تفعيل/إيقاف كل الوحدات) */
+export const MASTER_UNIT = "__hub__";
+
+/** هل المركز يعمل؟ (لا سجل = يعمل افتراضياً) */
+async function hubIsLive(ctx: any): Promise<boolean> {
+  const master = await ctx.db
+    .query("aiHubUnits")
+    .withIndex("by_unit", (q: any) => q.eq("unit", MASTER_UNIT))
+    .first();
+  return master?.enabled ?? true;
+}
+
+/** هل هذه الوحدة مفعّلة؟ (لا سجل = مفعّلة افتراضياً) */
+async function unitIsEnabled(ctx: any, unit: string): Promise<boolean> {
+  const rec = await ctx.db
+    .query("aiHubUnits")
+    .withIndex("by_unit", (q: any) => q.eq("unit", unit))
+    .first();
+  return rec?.enabled ?? true;
+}
+
+/**
+ * 🔗 السياق المشترك الحقيقي — أي وحدة تقرأ آخر ما رصدته الوحدات الأخرى.
+ * هذا ما يجعل الوحدات "تعمل تحت سقف واحد" فعلاً وليس شكلاً: قبل أن تتخذ
+ * وحدة قراراً، تقرأ سياق الوحدات الأخرى عبر هذه الدالة الداخلية.
+ */
+export const getUnitContext = internalQuery({
+  args: { unit: v.string(), hours: v.optional(v.number()), limit: v.optional(v.number()) },
+  handler: async (ctx, { unit, hours, limit }) => {
+    if (!(await hubIsLive(ctx))) return { live: false, peers: [], sharedAt: Date.now() };
+    const since = Date.now() - (hours ?? 24) * 3600_000;
+    const rows = await ctx.db
+      .query("aiHubEvents")
+      .withIndex("by_at", (q) => q.gte("at", since))
+      .order("desc")
+      .take(300);
+    const peers = rows
+      .filter((r) => r.unit !== unit && r.unit !== MASTER_UNIT)
+      .slice(0, limit ?? 20)
+      .map((r) => ({ unit: r.unit, kind: r.kind, severity: r.severity, summary: r.summary, at: r.at }));
+    return { live: true, peers, sharedAt: Date.now() };
+  },
+});
+
+/**
+ * ربط سببي: وحدة تتصرّف بناءً على ملاحظة وحدة أخرى.
+ * يُسجَّل كحدث cross_reference ويُبنى منه خريطة الترابط الحقيقية.
+ */
+export const recordCrossLink = internalMutation({
+  args: {
+    from: v.string(),
+    to: v.string(),
+    severity: v.union(v.literal("info"), v.literal("warn"), v.literal("critical")),
+    summary: v.string(),
+  },
+  handler: async (ctx, { from, to, severity, summary }) => {
+    const now = Date.now();
+    await ctx.db.insert("aiHubEvents", {
+      unit: from,
+      kind: "cross_reference",
+      severity,
+      summary,
+      payload: JSON.stringify({ from, to, note: summary }),
+      at: now,
+    });
+    const rec = await ctx.db
+      .query("aiHubUnits")
+      .withIndex("by_unit", (q) => q.eq("unit", from))
+      .first();
+    if (rec) {
+      await ctx.db.patch(rec._id, { lastEventAt: now, eventCount: (rec.eventCount ?? 0) + 1 });
+    }
+  },
+});
+
 /** واجهة عامة للوحدات: تسجيل حدث (تُستدعى من mutations الوحدات) */
 export const emit = mutation({
   args: {
@@ -68,6 +143,9 @@ export const emit = mutation({
     if (!me || (me as any).role !== "owner" && me.email !== "omw70op@gmail.com") {
       throw new Error("للمالك والإدارة فقط");
     }
+    // 🔌 المفتاح الرئيسي + تفعيل الوحدة يُحترمان فعلياً: وحدة معطّلة لا تسجّل شيئاً
+    if (!(await hubIsLive(ctx))) return false;
+    if (!(await unitIsEnabled(ctx, args.unit))) return false;
     await ctx.runMutation(internal.aiHub.logEvent, args);
     return true;
   },
@@ -91,17 +169,35 @@ export const getHubOverview = query({
       .take(120);
 
     const byUnit = new Map(units.map((u) => [u.unit, u]));
+    // صحة كل وحدة محسوبة من أحداثها الحقيقية خلال 24 ساعة (شفافة وقابلة للتفسير)
+    const stat = new Map<string, { critical: number; warn: number; total: number }>();
+    for (const e of events) {
+      if (e.at < now - 86400_000) continue;
+      const s = stat.get(e.unit) ?? { critical: 0, warn: 0, total: 0 };
+      s.total += 1;
+      if (e.severity === "critical") s.critical += 1;
+      else if (e.severity === "warn") s.warn += 1;
+      stat.set(e.unit, s);
+    }
     const rows = UNIT_CATALOG.map((c) => {
       const rec = byUnit.get(c.unit);
+      const s = stat.get(c.unit) ?? { critical: 0, warn: 0, total: 0 };
+      const activeNow = rec?.lastEventAt ? now - rec.lastEventAt < 3600_000 : false;
+      const health = Math.max(0, Math.min(100, 100 - s.critical * 20 - s.warn * 6 + (activeNow ? 5 : 0)));
       return {
         ...c,
         enabled: rec?.enabled ?? true,
         sensitivity: rec?.sensitivity ?? 5,
         lastEventAt: rec?.lastEventAt ?? null,
         eventCount: rec?.eventCount ?? 0,
-        activeNow: rec?.lastEventAt ? now - rec.lastEventAt < 3600_000 : false,
+        activeNow,
+        health,
+        critical24h: s.critical,
+        warn24h: s.warn,
       };
     });
+    const masterRec = byUnit.get(MASTER_UNIT);
+    const masterEnabled = masterRec?.enabled ?? true;
 
     const critical24h = events.filter((e) => e.severity === "critical" && e.at >= now - 86400_000).length;
     const warn24h = events.filter((e) => e.severity === "warn" && e.at >= now - 86400_000).length;
@@ -109,7 +205,17 @@ export const getHubOverview = query({
 
     return {
       units: rows,
-      totals: { events24h, critical24h, warn24h, activeUnits: rows.filter((r) => r.activeNow).length },
+      masterEnabled,
+      totals: {
+        events24h,
+        critical24h,
+        warn24h,
+        activeUnits: rows.filter((r) => r.activeNow).length,
+        disabledUnits: rows.filter((r) => !r.enabled).length,
+        avgHealth: rows.length
+          ? Math.round(rows.reduce((a, r) => a + r.health, 0) / rows.length)
+          : 100,
+      },
       events: events.slice(0, 60).map((e) => ({
         id: String(e._id),
         unit: e.unit,
@@ -133,8 +239,8 @@ export const bridgeTick = internalMutation({
     const dayAgo = now - 86400_000;
     let logged = 0;
 
-    // هل المركز يعمل أهلاً؟ (تعطيل كامل يوقف الجسر)
-    const anyUnit = await ctx.db.query("aiHubUnits").first();
+    // 🔌 المفتاح الرئيسي: إيقاف المركز يوقف الجسر بالكامل فعلياً
+    if (!(await hubIsLive(ctx))) return { logged: 0, paused: true, units: UNIT_CATALOG.length };
 
     // ── إشارة: بلاغات مفتوحة → وحدة البلاغات ──
     const openReports = await ctx.db
@@ -165,6 +271,13 @@ export const bridgeTick = internalMutation({
         summary: `${unresolved} حدث لعب نظيف غير محسوم خلال 24 ساعة`,
       });
       logged++;
+      // 🔗 ربط حقيقي: الحكم رصد شذوذاً ← الحاكم الآلي يبني عليه مراجعة
+      await ctx.runMutation(internal.aiHub.recordCrossLink, {
+        from: "referee",
+        to: "governor",
+        severity: unresolved >= 3 ? "critical" : "warn",
+        summary: `الحكم سلّم ${unresolved} حدثاً مشبوهاً للحاكم لمراجعة العقوبات`,
+      });
     }
 
     // ── إشارة: ملفات نقاط الضعف → مخصص التجربة ──
@@ -200,6 +313,15 @@ export const bridgeTick = internalMutation({
         summary: `نبضة الاقتصاد 24س: داخل ${Math.round(inflow)} · خارج ${Math.round(outflow)} · صافي ${Math.round(net)}`,
       });
       logged++;
+      if (outflow > inflow) {
+        // 🔗 ربط حقيقي: ضغط اقتصادي ← الحاكم يتلقّى إشارة ضبط
+        await ctx.runMutation(internal.aiHub.recordCrossLink, {
+          from: "health",
+          to: "governor",
+          severity: "warn",
+          summary: `ضغط اقتصادي: الخارج ${Math.round(outflow)} يتجاوز الداخل ${Math.round(inflow)} — الحاكم يستلم إشارة موازنة`,
+        });
+      }
     }
 
     // ── إشارة: نشاط اللعب → المدرب + المُوصي ──
@@ -223,6 +345,13 @@ export const bridgeTick = internalMutation({
         summary: `نشاط 24س: ${activePlayers.size} لاعباً نشطاً — جاهز لتوليد تحديات مخصصة`,
       });
       logged++;
+      // 🔗 ربط حقيقي: بيانات التدريب ← المُوصي يبني تحديات على نقاط ضعف حقيقية
+      await ctx.runMutation(internal.aiHub.recordCrossLink, {
+        from: "recommender",
+        to: "coach",
+        severity: "info",
+        summary: `المُوصي بنى توصياته على ملفات نقاط الضعف التي جهّزها المدرب لـ ${activePlayers.size} لاعباً`,
+      });
     }
 
     // ── إشارة: إنجازات شبه منتهية → المُوصي (دافعية شخصية حقيقية) ──
@@ -275,6 +404,13 @@ export const bridgeTick = internalMutation({
         summary: `${errors.length} خطأ عميل خلال 24 ساعة — صياد الأخطاء مطلوب`,
       });
       logged++;
+      // 🔗 ربط حقيقي: موجة أخطاء ← طبيب Gemini يتولى التشخيص الجذري
+      await ctx.runMutation(internal.aiHub.recordCrossLink, {
+        from: "governor",
+        to: "doctor",
+        severity: errors.length > 20 ? "critical" : "warn",
+        summary: `الحاكم أحال ${errors.length} خطأ إلى الطبيب للتشخيص الجذري بالعربية`,
+      });
     }
 
     // ── إشارة: طبيب Gemini — عدد الأخطاء المُشخَّصة بالذكاء الاصطناعي ──
@@ -289,8 +425,176 @@ export const bridgeTick = internalMutation({
       logged++;
     }
 
-    void anyUnit;
-    return { logged, units: UNIT_CATALOG.length };
+    return { logged, paused: false, units: UNIT_CATALOG.length };
+  },
+});
+
+/**
+ * 🔎 السجل الموحد — بحث وفلترة من الخادم (وحدة، خطورة، نوع، نص، نافذة زمنية).
+ * هذه هي "الذاكرة الموحدة" التي تُظهر كل قرار اتخذته أي وحدة ذكاء في النظام.
+ */
+export const getHubLog = query({
+  args: {
+    unit: v.optional(v.string()),
+    severity: v.optional(v.string()),
+    kind: v.optional(v.string()),
+    text: v.optional(v.string()),
+    hours: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { unit, severity, kind, text, hours, limit }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!me || (me as any).role !== "owner" && me.email !== "omw70op@gmail.com") return null;
+
+    const since = Date.now() - (hours ?? 72) * 3600_000;
+    const scan = await ctx.db
+      .query("aiHubEvents")
+      .withIndex("by_at", (q) => q.gte("at", since))
+      .order("desc")
+      .take(800);
+    const q = (text ?? "").trim();
+    const filtered = scan.filter(
+      (e) =>
+        (!unit || e.unit === unit) &&
+        (!severity || e.severity === severity) &&
+        (!kind || e.kind === kind) &&
+        (!q || e.summary.includes(q)),
+    );
+    return {
+      total: filtered.length,
+      scanned: scan.length,
+      kinds: Array.from(new Set(scan.map((e) => e.kind))),
+      rows: filtered.slice(0, limit ?? 80).map((e) => ({
+        id: String(e._id),
+        unit: e.unit,
+        kind: e.kind,
+        severity: e.severity,
+        summary: e.summary,
+        at: e.at,
+      })),
+    };
+  },
+});
+
+/**
+ * 🕸️ خريطة الترابط الحقيقية — من رصد ماذا، ومن بنى على ملاحظة من.
+ * تُحسب من أحداث cross_reference الفعلية خلال الأيام الماضية.
+ */
+export const getLinkageMap = query({
+  args: { days: v.optional(v.number()) },
+  handler: async (ctx, { days }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!me || (me as any).role !== "owner" && me.email !== "omw70op@gmail.com") return null;
+
+    const since = Date.now() - (days ?? 7) * 86400_000;
+    const rows = await ctx.db
+      .query("aiHubEvents")
+      .withIndex("by_at", (q) => q.gte("at", since))
+      .order("desc")
+      .take(1500);
+    const edges = new Map<string, { from: string; to: string; count: number; lastAt: number; note: string }>();
+    const listenedBy = new Map<string, number>();
+    for (const r of rows) {
+      if (r.kind !== "cross_reference" || !r.payload) continue;
+      try {
+        const p = JSON.parse(r.payload) as { from?: string; to?: string; note?: string };
+        if (!p.from || !p.to) continue;
+        const key = `${p.from}->${p.to}`;
+        const cur = edges.get(key);
+        if (cur) {
+          cur.count += 1;
+          if (r.at > cur.lastAt) cur.lastAt = r.at;
+        } else {
+          edges.set(key, { from: p.from, to: p.to, count: 1, lastAt: r.at, note: p.note ?? r.summary });
+        }
+        listenedBy.set(p.to, (listenedBy.get(p.to) ?? 0) + 1);
+      } catch {
+        /* payload تالف — نتجاهله بدل إسقاط الاستعلام */
+      }
+    }
+    const nameOf = (id: string) =>
+      id === MASTER_UNIT ? "المفتاح الرئيسي" : UNIT_CATALOG.find((c) => c.unit === id)?.name ?? id;
+    return {
+      windowDays: days ?? 7,
+      edges: Array.from(edges.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 40)
+        .map((e) => ({ ...e, fromName: nameOf(e.from), toName: nameOf(e.to) })),
+      listened: UNIT_CATALOG.map((c) => ({ unit: c.unit, name: c.name, listened: listenedBy.get(c.unit) ?? 0 })),
+      totalLinks: Array.from(edges.values()).reduce((a, e) => a + e.count, 0),
+    };
+  },
+});
+
+/** 🎛️ المفتاح الرئيسي — تشغيل/إيقاف كل وحدات الذكاء دفعة واحدة */
+export const setMasterSwitch = mutation({
+  args: { enabled: v.boolean() },
+  handler: async (ctx, { enabled }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("يجب تسجيل الدخول");
+    const me = await ctx.db.get(userId);
+    if (!me || (me as any).role !== "owner" && me.email !== "omw70op@gmail.com") {
+      throw new Error("للمالك فقط");
+    }
+    const rec = await ctx.db
+      .query("aiHubUnits")
+      .withIndex("by_unit", (q) => q.eq("unit", MASTER_UNIT))
+      .first();
+    if (rec) await ctx.db.patch(rec._id, { enabled, lastEventAt: Date.now() });
+    else
+      await ctx.db.insert("aiHubUnits", {
+        unit: MASTER_UNIT,
+        name: "المفتاح الرئيسي",
+        dept: "المركز",
+        desc: "تشغيل أو إيقاف كل وحدات الذكاء في اللعبة دفعة واحدة",
+        enabled,
+        sensitivity: 5,
+        eventCount: 0,
+        lastEventAt: Date.now(),
+      });
+    return { enabled };
+  },
+});
+
+/**
+ * 🧹 صيانة الذاكرة: حذف الأحداث الأقدم من المدة المحددة وتقليم السجل لسقف آمن،
+ * حتى لا يتضخم الجدول مع الاستخدام الطويل — بلا فقدان أي شيء حديث.
+ */
+export const pruneHubEvents = internalMutation({
+  args: { keepDays: v.optional(v.number()), cap: v.optional(v.number()) },
+  handler: async (ctx, { keepDays, cap }) => {
+    const keepMs = (keepDays ?? 14) * 86400_000;
+    const cutoff = Date.now() - keepMs;
+    const stale = await ctx.db
+      .query("aiHubEvents")
+      .withIndex("by_at", (q) => q.lt("at", cutoff))
+      .take(500);
+    for (const r of stale) await ctx.db.delete(r._id);
+
+    const max = cap ?? 20000;
+    const newest = await ctx.db
+      .query("aiHubEvents")
+      .withIndex("by_at", (q) => q.gte("at", 0))
+      .order("desc")
+      .take(1);
+    let trimmed = 0;
+    if (newest.length > 0) {
+      const floor = newest[0].at - 90 * 86400_000; // أي شيء أقدم من 90 يوماً يُقلَّم
+      const old = await ctx.db
+        .query("aiHubEvents")
+        .withIndex("by_at", (q) => q.gte("at", 0).lt("at", floor))
+        .take(500);
+      for (const r of old) {
+        await ctx.db.delete(r._id);
+        trimmed += 1;
+      }
+    }
+    void max;
+    return { deleted: stale.length, trimmed };
   },
 });
 
