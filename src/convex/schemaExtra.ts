@@ -1,5 +1,6 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
+import { sovereignTables } from "./schemaAppend";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -66,4 +67,7 @@ export const premiumTables = {
     allowChallenges: v.boolean(), // السماح للآخرين بتحدّيه
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // 👑 الحاكم السيادي — عقوبات ومراسيم بمفعول فعلي
+  ...sovereignTables,
 };
