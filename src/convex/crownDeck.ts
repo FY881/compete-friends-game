@@ -69,7 +69,7 @@ export const getPulse360 = query({
     const [users, openReports, errors24h, rounds, chat24h, settings] = await Promise.all([
       ctx.db.query("users").collect(),
       ctx.db.query("reports").withIndex("by_status" as any, (q: any) => q.eq("status", "open")).collect(),
-      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("at", dayAgo)).collect(),
+      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("createdAt", dayAgo)).collect(),
       ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", dayAgo)).collect(),
       ctx.db.query("chatMessages").withIndex("by_created" as any, (q: any) => q.gte("createdAt", dayAgo)).collect(),
       ctx.db.query("settings").withIndex("by_key" as any, (q: any) => q.eq("key", "antiCheatEnabled")).unique(),
@@ -264,7 +264,7 @@ export const getDailyHealthCard = query({
       ctx.db.query("users").collect(),
       ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", dayAgo)).collect(),
       ctx.db.query("reports").withIndex("by_status" as any, (q: any) => q.eq("status", "open")).collect(),
-      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("at", dayAgo)).collect(),
+      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("createdAt", dayAgo)).collect(),
       ctx.db.query("chatMessages").withIndex("by_created" as any, (q: any) => q.gte("createdAt", dayAgo)).collect(),
     ]);
 
