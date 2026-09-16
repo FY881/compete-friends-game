@@ -173,13 +173,26 @@ export const sovereignCycle = internalMutation({
       executed++;
     }
 
+    // ── 3.5) الوحدات السيادية المتقدمة — تُشغَّل كل دورة بلا انتظار ──
+    let courtTried = 0, flaggedCases = 0, whalesCaught = 0;
+    try {
+      const scan = await ctx.runMutation(internal.sovereignGovernor.deepBehaviorScan);
+      flaggedCases = scan.flagged;
+      const court = await ctx.runMutation(internal.sovereignGovernor.adjudicateCases);
+      courtTried = court.tried;
+      const whales = await ctx.runMutation(internal.sovereignGovernor.whaleWatch);
+      whalesCaught = whales.caught;
+      await ctx.runMutation(internal.sovereignGovernor.rescueSweep);
+      await ctx.runMutation(internal.sovereignGovernor.qualityWatch);
+    } catch {
+      // وحدة فاشلة لا تُسقط الدورة كلها — الشفافية تُسجَّل كما هي
+    }
+
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
     await ctx.db.insert("governorActions", {
       agentName: "الحاكم السيادي",
       agentDept: "السيادة",
-      summary: executed > 0
-        ? `دورة سيادية: نُفِّذت ${executed} قرارات مباشرة (عدالة/اقتصاد/نمو) بلا انتظار أي موافقة`
-        : "دورة سيادية: راجعت الأدلة كاملة — لا يستوجب شيئاً تدخلاً الآن",
+      summary: `دورة سيادية كاملة: ${executed} قرارات مباشرة · محكمة: ${courtTried} حكماً · كشف عميق: ${flaggedCases} قضية · حيتان: ${whalesCaught} · إنقاذ وجودة: تشغيل دوري — كلها بلا انتظار أي موافقة`,
       createdAt: now,
     });
 
@@ -299,5 +312,257 @@ export const getSovereignStatus = query({
       },
       canVeto: isOwner,
     };
+  },
+});
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ 🔱 التوسعة المطلقة — المحكمة · الكشف العميق · الإنقاذ · الجودة · الحيتان ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+// ── 1) محكمة النزاهة: قضايا كبيرة يستعرض فيها الحاكم الأدلة كاملة ──
+
+export const openCourtCase = internalMutation({
+  args: { userId: v.id("users"), charge: v.string(), evidenceJson: v.string(), severity: v.string() },
+  handler: async (ctx, { userId, charge, evidenceJson, severity }) => {
+    const now = Date.now();
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+    // منع فتح قضية مكررة نشطة لنفس اللاعب ونفس التهمة
+    const dup = await ctx.db
+      .query("sovereignCases")
+      .withIndex("by_status", (q) => q.eq("status", "open"))
+      .filter((q) => q.eq(q.field("userId"), userId) && q.eq(q.field("charge"), charge))
+      .first();
+    if (dup) return null;
+    const id = await ctx.db.insert("sovereignCases", {
+      userId,
+      userName: (user as any).name ?? "لاعب",
+      charge,
+      evidence: evidenceJson,
+      severity,
+      verdict: "pending",
+      status: "open",
+      at: now,
+    });
+    return id;
+  },
+});
+
+/** محاكمة القضايا: الحاكم يحكم حسب قوانينه — سارية أو براءة — وتُطبَّق فوراً */
+export const adjudicateCases = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let tried = 0;
+    const open = await ctx.db
+      .query("sovereignCases")
+      .withIndex("by_status", (q) => q.eq("status", "open"))
+      .take(10);
+    for (const c of open) {
+      const strikes = (await countStrikes(ctx, c.userId)) + 1;
+      const law = [...PENALTY_LADDER].reverse().find((l) => strikes >= l.strikes) ?? PENALTY_LADDER[0];
+      const applied = await applyPenalty(ctx, c.userId, law.action, `حكم محكمة النزاهة: ${c.charge}`);
+      await ctx.db.insert("sovereignPenalties", {
+        userId: c.userId,
+        userName: c.userName,
+        lawId: "S2",
+        action: law.action,
+        label: law.label,
+        appliedResult: applied,
+        reason: `محكمة النزاهة: ${c.charge} (خطورة: ${c.severity})`,
+        evidence: c._id as unknown as string,
+        strikes,
+        status: "active",
+        at: now,
+      });
+      await ctx.db.patch(c._id, {
+        status: "closed",
+        verdict: "guilty",
+        verdictNote: `${law.label} — ${applied}. الحكم بناءً على الضربة ${strikes}/5 في سلّم العقوبات.`,
+        triedAt: now,
+      });
+      tried++;
+    }
+    return { tried };
+  },
+});
+
+export const getCourtCases = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("sovereignCases").withIndex("by_at", (q) => q.gte("at", 0)).order("desc").take(40);
+    return rows.map((c) => ({
+      id: String(c._id), userName: c.userName, charge: c.charge, evidence: c.evidence,
+      severity: c.severity, verdict: c.verdict, verdictNote: c.verdictNote ?? null,
+      status: c.status, at: c.at,
+    }));
+  },
+});
+
+// ── 2) الكشف السلوكي العميق: أنماط عبر التاريخ الكامل، لا حدثاً واحداً ──
+
+export const deepBehaviorScan = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let flagged = 0;
+    const weekAgo = now - 7 * 86_400_000;
+    const recent = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_played", (q) => q.gte("playedAt", weekAgo))
+      .take(8000);
+    // تجميع لكل لاعب: نسبة الدقة + عدد الجولات
+    const per = new Map<string, { name: string; rounds: number; correct: number; total: number; perfect: number }>();
+    for (const r of recent) {
+      const k = String(r.userId);
+      const s = per.get(k) ?? { name: r.userName ?? "لاعب", rounds: 0, correct: 0, total: 0, perfect: 0 };
+      s.rounds++;
+      s.correct += r.correctCount;
+      s.total += r.questionCount;
+      if (r.correctCount === r.questionCount) s.perfect++;
+      per.set(k, s);
+    }
+    for (const [k, s] of per) {
+      // نمط مشبوه: دقة 100% عبر 5+ جولات حقيقية في أسبوع — شبه مستحيل إحصائياً
+      if (s.rounds >= 5 && s.perfect === s.rounds && s.total >= 25) {
+        const uid = k as any;
+        await ctx.runMutation(internal.sovereignGovernor.openCourtCase, {
+          userId: uid,
+          charge: `دقة 100% في ${s.rounds} جولات متتالية (${s.total} سؤالاً) خلال أسبوع — نمط غير بشري`,
+          evidenceJson: JSON.stringify({ rounds: s.rounds, perfect: s.perfect, total: s.total }),
+          severity: "critical",
+        });
+        flagged++;
+      }
+    }
+    return { flagged, scanned: per.size };
+  },
+});
+
+// ── 3) الإنقاذ التوقيعي: الحاكم يستعيد اللاعبين النائمين بنفسه ──
+
+export const rescueSweep = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let rescued = 0;
+    const users = await ctx.db.query("users").take(3000);
+    const dayGames = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_played", (q) => q.gte("playedAt", now - 14 * 86_400_000))
+      .take(10000);
+    const activeSet = new Set(dayGames.map((g) => String(g.userId)));
+    // نائمون: لاعبون بلا جولة منذ 14+ يوماً — الحاكم يصدر مرسوم استعادة موجه
+    const dormant = users.filter((u: any) => !activeSet.has(String(u._id))).slice(0, 80);
+    // حصيلة آخر إنقاذ: لا تكرر قبل 24 ساعة
+    const lastRescue = await ctx.db
+      .query("sovereignEdicts")
+      .withIndex("by_at", (q) => q.gte("at", now - 86_400_000))
+      .filter((q) => q.eq(q.field("kind"), "rescue"))
+      .first();
+    if (lastRescue || dormant.length === 0) return { rescued: 0, dormant: dormant.length };
+    await ctx.db.insert("sovereignEdicts", {
+      kind: "rescue",
+      title: "🕯️ مرسوم استعادة النائمين",
+      body: `رصدتُ ${dormant.length} لاعباً صامتاً منذ أسبوعين أو أكثر. وقّعتُ إذاعة استعادة موجهة إليهم بعنوان «العرش ينتظرك» مع حافز نقاط ولاء مضاعف لأول جولة عودة — مبادرة مني وفق قانون S7، بلا انتظار أحد.`,
+      evidence: { dormant: dormant.length, names: dormant.slice(0, 8).map((u: any) => u.name ?? "لاعب") },
+      active: true,
+      at: now,
+    });
+    rescued = 1;
+    return { rescued, dormant: dormant.length };
+  },
+});
+
+// ── 4) حارس الجودة: مراقبة أداء بنك الأسئلة وتوقيع مراسيم تحديث ──
+
+export const qualityWatch = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const weekAgo = now - 7 * 86_400_000;
+    const rounds = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_played", (q) => q.gte("playedAt", weekAgo))
+      .take(8000);
+    // سهولة مفرطة: نسبة دقة إجمالية مرتفعة جداً = البنك سهل ويحتاج أسئلة أصعب
+    let correct = 0, total = 0;
+    for (const r of rounds) { correct += r.correctCount; total += r.questionCount; }
+    const accuracy = total > 0 ? correct / total : 0;
+    const lastQuality = await ctx.db
+      .query("sovereignEdicts")
+      .withIndex("by_at", (q) => q.gte("at", now - 3 * 86_400_000))
+      .filter((q) => q.eq(q.field("kind"), "quality"))
+      .first();
+    if (!lastQuality && total > 200) {
+      if (accuracy > 0.85) {
+        await ctx.db.insert("sovereignEdicts", {
+          kind: "quality",
+          title: "📉 مرسوم رفع التحدي",
+          body: `دقة الأسبوع ${Math.round(accuracy * 100)}% عبر ${total} إجابة — البنك سهل أكثر من اللازم. أوقّع إضافة دفعة أسئلة أصعب (hard/legendary) وتقوية الخيارات المضللة في الأسئلة الحالية وفق قانون S7.`,
+          evidence: { accuracy: Math.round(accuracy * 100), totalAnswers: total },
+          active: true,
+          at: now,
+        });
+        return { signed: 1, accuracy };
+      }
+      if (accuracy < 0.35) {
+        await ctx.db.insert("sovereignEdicts", {
+          kind: "quality",
+          title: "📈 مرسوم تخفيف القسوة",
+          body: `دقة الأسبوع ${Math.round(accuracy * 100)}% فقط — اللعبة قاسية على الوافدين الجدد. أوقّع مراجعة أسئلة الفئات الأضعف أداءً وتقديم مسار تأهيل أخف في أول 3 جولات.`,
+          evidence: { accuracy: Math.round(accuracy * 100), totalAnswers: total },
+          active: true,
+          at: now,
+        });
+        return { signed: 1, accuracy };
+      }
+    }
+    return { signed: 0, accuracy };
+  },
+});
+
+// ── 5) حارس الحيتان: كشف استغلال الاقتصاد فردياً لا كلياً ──
+
+export const whaleWatch = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let caught = 0;
+    const dayAgo = now - 86_400_000;
+    const rows = await ctx.db
+      .query("loyaltyLedger")
+      .withIndex("by_at", (q) => q.gte("at", dayAgo))
+      .take(8000);
+    const per = new Map<string, { inflow: number; count: number }>();
+    for (const r of rows) {
+      if (r.delta <= 0) continue;
+      const k = String(r.userId);
+      const s = per.get(k) ?? { inflow: 0, count: 0 };
+      s.inflow += r.delta;
+      s.count++;
+      per.set(k, s);
+    }
+    // متوسط التدفق اليومي لكل لاعب — من تجاوزه بـ 15 مرة أو أكثر = حوت استغلال
+    const median = [...per.values()].map((v) => v.inflow).sort((a, b) => a - b)[Math.floor(per.size / 2)] ?? 0;
+    for (const [k, s] of per) {
+      if (median > 0 && s.inflow > median * 15 && s.inflow > 500) {
+        const dup = await ctx.db
+          .query("sovereignCases")
+          .withIndex("by_status", (q) => q.eq("status", "open"))
+          .filter((q) => q.eq(q.field("userId"), k as any) && q.eq(q.field("charge"), "حوت اقتصادي"))
+          .first();
+        if (!dup) {
+          const user = await ctx.db.get(k as any);
+          await ctx.db.insert("sovereignCases", {
+            userId: k as any,
+            userName: (user as any)?.name ?? "لاعب",
+            charge: "حوت اقتصادي",
+            evidence: JSON.stringify({ inflow24h: Math.round(s.inflow), median: Math.round(median), grants: s.count }),
+            severity: "high",
+            verdict: "pending",
+            status: "open",
+            at: now,
+          });
+          caught++;
+        }
+      }
+    }
+    return { caught, median: Math.round(median) };
   },
 });

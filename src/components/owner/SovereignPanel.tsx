@@ -49,11 +49,12 @@ export function SovereignPanel() {
   const status = useQuery(api.sovereignGovernor.getSovereignStatus, {});
   const penalties = useQuery(api.sovereignGovernor.getPenaltyLog, {});
   const edicts = useQuery(api.sovereignGovernor.getEdicts, {});
+  const cases = useQuery(api.sovereignGovernor.getCourtCases, {});
   const veto = useMutation(api.sovereignGovernor.vetoPenalty);
   const [vetoNote, setVetoNote] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
-  if (!status || !penalties || !edicts) {
+  if (!status || !penalties || !edicts || !cases) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin ml-2" /> تحميل الدولة السيادية…
@@ -141,6 +142,41 @@ export function SovereignPanel() {
                   </Button>
                 </div>
               )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* محكمة النزاهة */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><Gavel className="h-4 w-4 text-violet-400" /> محكمة النزاهة — قضايا الحاكم بالأدلة الكاملة</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          {cases.length === 0 && (
+            <p className="text-sm text-muted-foreground">لا قضايا مفتوحة — الكشف السلوكي العميق يجري كل دورة (15 دقيقة) عبر تاريخ أسبوع كامل لكل لاعب.</p>
+          )}
+          {cases.slice(0, 12).map((c) => (
+            <div key={c.id} className={cn(
+              "rounded-lg border p-3 text-sm space-y-1",
+              c.status === "open" ? "border-amber-500/30 bg-amber-950/10" : "border-violet-500/20 bg-violet-950/10",
+            )}>
+              <div className="flex flex-wrap items-center gap-2">
+                <b>{c.userName}</b>
+                <Badge variant="outline" className={c.severity === "critical" ? "border-rose-500/50 text-rose-300" : "border-amber-500/50 text-amber-300"}>{c.severity === "critical" ? "خطورة حرجة" : "خطورة عالية"}</Badge>
+                {c.status === "open" ? (
+                  <Badge className="bg-amber-500/20 text-amber-300">قيد المحاكمة</Badge>
+                ) : (
+                  <Badge className="bg-violet-500/20 text-violet-300">صدر الحكم</Badge>
+                )}
+                <span className="text-xs text-muted-foreground">{new Date(c.at).toLocaleString("ar")}</span>
+              </div>
+              <p className="font-medium">التهمة: {c.charge}</p>
+              {c.status === "closed" && c.verdictNote && <p className="text-xs text-violet-200">الحكم: {c.verdictNote}</p>}
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer">عرض الأدلة</summary>
+                <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-black/30 p-2 text-[10px]" dir="ltr">{c.evidence}</pre>
+              </details>
             </div>
           ))}
         </CardContent>

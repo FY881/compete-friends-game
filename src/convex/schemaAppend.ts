@@ -25,11 +25,27 @@ export const sovereignTables = {
     .index("by_at", ["at"]),
 
   sovereignEdicts: defineTable({
-    kind: v.string(), // economy | growth | veto
+    kind: v.string(), // economy | growth | veto | rescue | quality
     title: v.string(),
     body: v.string(),
     evidence: v.optional(v.any()),
     active: v.boolean(),
     at: v.number(),
   }).index("by_at", ["at"]),
+
+  // ⚖️ محكمة النزاهة — قضايا الحاكم بأدلة كاملة وأحكام موثقة
+  sovereignCases: defineTable({
+    userId: v.id("users"),
+    userName: v.string(),
+    charge: v.string(),
+    evidence: v.string(), // JSON أدلة
+    severity: v.string(), // high | critical
+    verdict: v.string(), // pending | guilty | innocent
+    verdictNote: v.optional(v.string()),
+    status: v.string(), // open | closed
+    at: v.number(),
+    triedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_at", ["at"]),
 };
