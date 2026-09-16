@@ -1,6 +1,7 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { Infer, v } from "convex/values";
+import { premiumTables } from "./schemaExtra";
 
 // default user roles. can add / remove based on the project as needed
 export const ROLES = {
@@ -37,6 +38,9 @@ const schema = defineSchema(
   {
     // default auth tables using convex auth.
     ...authTables, // do not remove or modify
+
+    // ═══ 🧩 الطبقات البريميوم (إشعارات ذكية + تخصيص عميق للملف) ═══
+    ...premiumTables,
 
     // the users table is the default users table that is brought in by the authTables
     users: defineTable({

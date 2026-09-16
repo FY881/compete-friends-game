@@ -30,7 +30,11 @@ export const UNIT_CATALOG = [
   { unit: "doctor", name: "طبيب Gemini", dept: "الصحة", desc: "تشخيص الأخطاء بالذكاء الاصطناعي: سبب جذري بالعربية + حل + قابلية إصلاح تلقائي" },
 ] as const;
 
-/** تسجيل حدث من أي وحدة (داخلي — تستدعيه الوحدات الأخرى) */
+/**
+ * تسجيل حدث من أي وحدة (داخلي — تستدعيه الوحدات الأخرى).
+ * يحترم المفتاح الرئيسي وتفعيل الوحدة فعلياً: لا سجل لوحدة معطّلة ولا لمركز موقوف.
+ * `force: true` يُستثنى للعمليات الإدارية (ضبط المركز نفسه) حتى لا تفقد أثرها.
+ */
 export const logEvent = internalMutation({
   args: {
     unit: v.string(),
@@ -38,8 +42,13 @@ export const logEvent = internalMutation({
     severity: v.union(v.literal("info"), v.literal("warn"), v.literal("critical")),
     summary: v.string(),
     payload: v.optional(v.string()),
+    force: v.optional(v.boolean()),
   },
-  handler: async (ctx, { unit, kind, severity, summary, payload }) => {
+  handler: async (ctx, { unit, kind, severity, summary, payload, force }) => {
+    if (!force) {
+      if (!(await hubIsLive(ctx))) return null;
+      if (!(await unitIsEnabled(ctx, unit))) return null;
+    }
     const now = Date.now();
     await ctx.db.insert("aiHubEvents", { unit, kind, severity, summary, payload, at: now });
     const rec = await ctx.db
@@ -644,6 +653,7 @@ export const configureUnit = mutation({
       kind: "config",
       severity: "info",
       summary: `ضبط المالك: ${enabled !== undefined ? (enabled ? "تفعيل" : "تعطيل") : ""}${sensitivity !== undefined ? ` حساسية ${sensitivity}/10` : ""}`,
+      force: true,
     });
     return true;
   },

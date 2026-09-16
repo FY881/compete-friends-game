@@ -38,6 +38,236 @@ const CATEGORY_LABELS: Record<NotifCategory, string> = {
 
 // ─────────────────────────── التفضيلات ───────────────────────────
 
+// ═══════════════ طبقات الإشعارات الذكية — الأساس ═══════════════
+
+const PRIORITY_RANK: Record<string, number> = { normal: 0, important: 1, critical: 2 };
+
+export const TIER_DEFAULTS = { minPriority: "normal", quietDefer: true, maxPerHour: 12, digestHour: 9 };
+
+/** متى تنتهي ساعات الهدوء الحالية (أقرب وقت مسموح للتسليم) */
+function quietEndsAt(q: { from: number; to: number }): number {
+  const now = new Date();
+  const end = new Date(now);
+  end.setHours(q.to, 0, 0, 0);
+  if (end.getTime() <= now.getTime()) end.setDate(end.getDate() + 1);
+  return end.getTime();
+}
+
+/** إدراج إشعار في طابور التأجيل — لم يُلغَ، بل ينتظر اللحظة المناسبة */
+async function deferNotification(
+  ctx: any,
+  args: { userId: any; title: string; body: string; type: string; actionUrl?: string; priority?: string },
+  category: string,
+  reason: string,
+  deliverAfter: number,
+) {
+  return await ctx.db.insert("deferredNotifications", {
+    userId: args.userId,
+    title: args.title,
+    body: args.body,
+    type: args.type,
+    category: category !== "system" ? category : undefined,
+    priority: args.priority ?? "normal",
+    actionUrl: args.actionUrl,
+    reason,
+    createdAt: Date.now(),
+    deliverAfter,
+  });
+}
+
+/** تسجيل حقيقي في مركز الذكاء الموحد (وحدة وسيط الإشعارات) */
+async function logNotifier(ctx: any, summary: string) {
+  await ctx.runMutation(internal.aiHub.logEvent, {
+    unit: "notifier",
+    kind: "decision",
+    severity: "info",
+    summary,
+  });
+}
+
+/** طبقاتي — إعدادات الإشعارات الذكية المتقدمة */
+export const getMyTiers = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const rec = await ctx.db
+      .query("notificationTiers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    const waiting = await ctx.db
+      .query("deferredNotifications")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    return {
+      minPriority: rec?.minPriority ?? TIER_DEFAULTS.minPriority,
+      quietDefer: rec?.quietDefer ?? TIER_DEFAULTS.quietDefer,
+      maxPerHour: rec?.maxPerHour ?? TIER_DEFAULTS.maxPerHour,
+      digestHour: rec?.digestHour ?? TIER_DEFAULTS.digestHour,
+      waitingCount: waiting.length,
+      waiting: waiting
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 20)
+        .map((d) => ({
+          id: String(d._id),
+          title: d.title,
+          body: d.body,
+          category: d.category ?? "system",
+          priority: d.priority,
+          reason: d.reason,
+          deliverAfter: d.deliverAfter,
+          createdAt: d.createdAt,
+        })),
+    };
+  },
+});
+
+/** تحديث طبقات الإشعارات بتحقق حقيقي من كل قيمة */
+export const updateTiers = mutation({
+  args: {
+    minPriority: v.optional(v.string()),
+    quietDefer: v.optional(v.boolean()),
+    maxPerHour: v.optional(v.number()),
+    digestHour: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("غير مصرح");
+    if (args.minPriority !== undefined && !(args.minPriority in PRIORITY_RANK)) {
+      throw new Error("أدنى أولوية غير معروفة");
+    }
+    if (args.maxPerHour !== undefined && (args.maxPerHour < 0 || args.maxPerHour > 60)) {
+      throw new Error("السقف الساعي بين 0 و 60");
+    }
+    if (args.digestHour !== undefined && (args.digestHour < 0 || args.digestHour > 23)) {
+      throw new Error("ساعة الملخص بين 0 و 23");
+    }
+    const existing = await ctx.db
+      .query("notificationTiers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    const now = Date.now();
+    // نبني الرقعة صريحة: لا نمرّر undefined حتى لا نكتب حقولاً فارغة
+    const patch: Record<string, unknown> = { updatedAt: now };
+    if (args.minPriority !== undefined) patch.minPriority = args.minPriority;
+    if (args.quietDefer !== undefined) patch.quietDefer = args.quietDefer;
+    if (args.maxPerHour !== undefined) patch.maxPerHour = args.maxPerHour;
+    if (args.digestHour !== undefined) patch.digestHour = args.digestHour;
+    if (existing) {
+      await ctx.db.patch(existing._id, patch);
+    } else {
+      await ctx.db.insert("notificationTiers", {
+        userId,
+        minPriority: args.minPriority ?? TIER_DEFAULTS.minPriority,
+        quietDefer: args.quietDefer ?? TIER_DEFAULTS.quietDefer,
+        maxPerHour: args.maxPerHour ?? TIER_DEFAULTS.maxPerHour,
+        digestHour: args.digestHour ?? TIER_DEFAULTS.digestHour,
+        updatedAt: now,
+      });
+    }
+    return { ok: true as const };
+  },
+});
+
+/** سلّم ما لديّ من إشعارات مؤجلة الآن — بطلب اللاعب نفسه */
+export const flushMyDeferred = mutation({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("غير مصرح");
+    const waiting = await ctx.db
+      .query("deferredNotifications")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const d of waiting) {
+      await ctx.db.insert("notifications", {
+        userId,
+        title: d.title,
+        body: d.body,
+        type: d.type as any,
+        read: false,
+        actionUrl: d.actionUrl,
+        createdAt: Date.now(),
+        ...(d.category ? { category: d.category } : {}),
+      } as any);
+      await ctx.db.delete(d._id);
+    }
+    if (waiting.length > 0) await logNotifier(ctx, `${waiting.length} إشعاراً مؤجلاً سُلّمت بطلب اللاعب`);
+    return { ok: true as const, delivered: waiting.length };
+  },
+});
+
+/**
+ * ⏰ تسليم الملخص — cron: يُخرج الإشعارات المؤجلة من الطابور في الوقت المناسب:
+ *  • انتهت ساعات الهدوء
+ *  • أو بلغت ساعة الملخص اليومي التي اختارها اللاعب
+ *  • أو انتظرت أكثر من 12 ساعة (منعاً للتجويع)
+ * لا يُفقد أي إشعار أبداً.
+ */
+export const deliverDigests = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }) => {
+    const now = Date.now();
+    const due = await ctx.db
+      .query("deferredNotifications")
+      .withIndex("by_deliver", (q) => q.lte("deliverAfter", now))
+      .take(limit ?? 200);
+    if (due.length === 0) return { delivered: 0, players: 0 };
+
+    const byUser = new Map<string, typeof due>();
+    for (const d of due) {
+      const key = String(d.userId);
+      if (!byUser.has(key)) byUser.set(key, [] as any);
+      byUser.get(key)!.push(d);
+    }
+
+    const hour = new Date().getHours();
+    let delivered = 0;
+    let players = 0;
+
+    for (const [key, items] of byUser) {
+      const userId = items[0].userId;
+      const tiers = await ctx.db
+        .query("notificationTiers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      const digestHour = tiers?.digestHour ?? TIER_DEFAULTS.digestHour;
+      const forced = items.some((i) => now - i.deliverAfter > 12 * 3600_000);
+      if (!forced && hour < digestHour) continue; // ما زال مبكراً على الملخص
+
+      for (const d of items) {
+        await ctx.db.insert("notifications", {
+          userId,
+          title: d.title,
+          body: d.body,
+          type: d.type as any,
+          read: false,
+          actionUrl: d.actionUrl,
+          createdAt: Date.now(),
+          ...(d.category ? { category: d.category } : {}),
+        } as any);
+        await ctx.db.delete(d._id);
+        delivered += 1;
+      }
+      players += 1;
+      if (items.length > 1) {
+        await ctx.db.insert("notifications", {
+          userId,
+          title: `🧾 ملخص ما فاتك (${items.length})`,
+          body: `جمعنا لك ${items.length} إشعاراً انتظرت ساعات الهدوء بدل أن تضيع — راجعها الآن.`,
+          type: "info",
+          read: false,
+          actionUrl: "/play",
+          createdAt: Date.now(),
+          category: "system",
+        } as any);
+      }
+      if (tiers) await ctx.db.patch(tiers._id, { lastDigestAt: now });
+    }
+
+    await logNotifier(ctx, `سلّم ${delivered} إشعاراً مؤجلاً لـ ${players} لاعباً في الملخص`);
+    return { delivered, players };
+  },
+});
+
 export const getMyPreferences = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -259,15 +489,54 @@ export const smartPush = internalMutation({
         .query("notificationPrefs")
         .withIndex("by_user", (q) => q.eq("userId", args.userId as any))
         .first();
+      const tiers = await ctx.db
+        .query("notificationTiers")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId as any))
+        .first();
+      const minPriority = tiers?.minPriority ?? "normal";
+      const quietDefer = tiers?.quietDefer ?? true;
+      const maxPerHour = tiers?.maxPerHour ?? 12;
+      const rank = PRIORITY_RANK[args.priority ?? "normal"] ?? 0;
+      const isCritical = rank >= 2 || args.type === "ban";
+
       if (pref) {
         const enabledMap = (pref.enabled as Record<string, boolean>) ?? {};
+        // الفئة المكتومة تبقى مكتومة تماماً — قرار اللاعب الصريح
         if (enabledMap[category] === false) return { skipped: true as const, reason: "category muted" };
-        // ساعات الهدوء: تُتجاوز فقط للإشعارات الحرجة
-        if (pref.quietHours && args.priority !== "critical" && args.type !== "ban") {
+        // ساعات الهدوء: الحرجة تتجاوزها، وغيرها يُؤجَّل (لا يُلغى)
+        if (pref.quietHours && !isCritical) {
           const hour = new Date().getHours();
           const { from, to } = pref.quietHours;
           const inQuiet = from <= to ? hour >= from && hour < to : hour >= from || hour < to;
-          if (inQuiet) return { skipped: true as const, reason: "quiet hours" };
+          if (inQuiet) {
+            if (!quietDefer) return { skipped: true as const, reason: "quiet hours" };
+            const id = await deferNotification(ctx, args, category, "quiet_hours", quietEndsAt(pref.quietHours));
+            await logNotifier(ctx, `أجّل إشعاراً واحداً بسبب ساعات الهدوء (فئة ${category})`);
+            return { deferred: true as const, id, reason: "quiet_hours" };
+          }
+        }
+      }
+
+      // ⛔ دون أدنى أولوية يقبلها اللاعب ← يُؤجَّل إلى الملخص بدل الإزعاج
+      if (!isCritical && rank < (PRIORITY_RANK[minPriority] ?? 0)) {
+        const id = await deferNotification(ctx, args, category, "below_threshold", Date.now() + 3600_000);
+        await logNotifier(ctx, `أجّل إشعاراً لسبب: أدنى أولوية مقبولة ${minPriority}`);
+        return { deferred: true as const, id, reason: "below_threshold" };
+      }
+
+      // 🚦 سقف الإشعارات الفورية في الساعة — الحرجة تتجاوزه دائماً
+      if (!isCritical && maxPerHour > 0) {
+        const hourAgo = Date.now() - 3600_000;
+        const recent = await ctx.db
+          .query("notifications")
+          .withIndex("by_user", (q) => q.eq("userId", args.userId as any))
+          .order("desc")
+          .take(60);
+        const count = recent.filter((n) => n.createdAt >= hourAgo).length;
+        if (count >= maxPerHour) {
+          const id = await deferNotification(ctx, args, category, "rate_limited", Date.now() + 3600_000);
+          await logNotifier(ctx, `أجّل إشعاراً لبلوغ السقف الساعي (${maxPerHour}/ساعة)`);
+          return { deferred: true as const, id, reason: "rate_limited" };
         }
       }
     }

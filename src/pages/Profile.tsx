@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { AchievementsPanel, GiftsPanel, ArchivePanel, InvitePanel, CollectiveGoalsPanel, PerformanceAnalysis, SeasonBadge } from "@/components/PlayerFeatures";
 import { MembershipCard } from "@/components/MembershipCard";
+import { PremiumProfilePanel } from "@/components/PremiumProfilePanel";
 import { useNavigate } from "react-router";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
@@ -383,6 +384,11 @@ export default function Profile() {
               );
             })}
           </div>
+        </div>
+
+        {/* 🎨 الطبقات البريميوم — التخصيص العميق للملف */}
+        <div className="mt-10">
+          <PremiumProfilePanel />
         </div>
 
         {/* History */}

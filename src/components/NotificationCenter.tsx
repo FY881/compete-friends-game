@@ -62,6 +62,9 @@ export function NotificationCenter() {
   const removeOne = useMutation(api.smartNotifications.deleteNotification);
   const setCat = useMutation(api.smartNotifications.setCategoryEnabled);
   const setQuiet = useMutation(api.smartNotifications.setQuietHours);
+  const tiers = useQuery(api.smartNotifications.getMyTiers);
+  const setTiers = useMutation(api.smartNotifications.updateTiers);
+  const flushDeferred = useMutation(api.smartNotifications.flushMyDeferred);
 
   const unread = inbox?.filter((n: any) => !n.read).length ?? 0;
   const filtered =
@@ -151,7 +154,11 @@ export function NotificationCenter() {
               checked={!!(prefs as any)?.quietHours}
               onCheckedChange={(v) =>
                 setQuiet(v ? { from: 23, to: 8 } : {}).then(() =>
-                  toast.success(v ? "فُعّلت ساعات الهدوء — الإشعارات الحرجة فقط تصل" : "أُلغيت ساعات الهدوء"),
+                  toast.success(
+                    v
+                      ? "فُعّلت ساعات الهدوء — الحرجة تصل فوراً والباقي يُؤجَّل للملخص"
+                      : "أُلغيت ساعات الهدوء",
+                  ),
                 )
               }
             />
@@ -159,6 +166,142 @@ export function NotificationCenter() {
           <p className="text-[11px] text-muted-foreground">
             الإشعارات الحرجة (حظر/إنذار) تتجاوز ساعات الهدوء دائماً لحماية حسابك.
           </p>
+
+          {/* ═══ الطبقات الذكية — تأجيل لا إلغاء ═══ */}
+          <div className="space-y-3 border-t pt-3">
+            <p className="text-xs font-semibold text-muted-foreground">
+              🧠 طبقات ذكية — تحكّم دقيق في ما يقاطعك الآن وما ينتظر الملخص
+            </p>
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm">أدنى أولوية تقاطعني فوراً</span>
+              <div className="flex gap-1">
+                {[
+                  { k: "normal", l: "الكل" },
+                  { k: "important", l: "مهم فأعلى" },
+                  { k: "critical", l: "حرج فقط" },
+                ].map((o) => (
+                  <button
+                    key={o.k}
+                    onClick={() =>
+                      setTiers({ minPriority: o.k }).then(() => toast.success(`سيتوقف عند: ${o.l}`))
+                    }
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs transition",
+                      (tiers?.minPriority ?? "normal") === o.k
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted hover:bg-muted/70",
+                    )}
+                  >
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm">🌙 تأجيل إشعارات ساعات الهدوء بدل إسقاطها</span>
+              <Switch
+                checked={tiers?.quietDefer ?? true}
+                onCheckedChange={(v) =>
+                  setTiers({ quietDefer: v }).then(() =>
+                    toast.success(v ? "لن يُفقد أي إشعار — الكل يُؤجَّل ويُسلَّم في الملخص" : "إشعارات الهدوء ستُلغى"),
+                  )
+                }
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-sm">🚦 سقف الإشعارات الفورية كل ساعة</span>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-6 rounded-lg p-0"
+                  disabled={(tiers?.maxPerHour ?? 12) <= 0}
+                  onClick={() =>
+                    setTiers({ maxPerHour: Math.max(0, (tiers?.maxPerHour ?? 12) - 2) })
+                  }
+                >
+                  −
+                </Button>
+                <span className="w-14 text-center text-xs tabular-nums">
+                  {tiers?.maxPerHour ?? 12}/ساعة
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-6 rounded-lg p-0"
+                  disabled={(tiers?.maxPerHour ?? 12) >= 60}
+                  onClick={() =>
+                    setTiers({ maxPerHour: Math.min(60, (tiers?.maxPerHour ?? 12) + 2) })
+                  }
+                >
+                  +
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-sm">🧾 ساعة إرسال الملخص اليومي</span>
+              <select
+                value={String(tiers?.digestHour ?? 9)}
+                onChange={(e) =>
+                  setTiers({ digestHour: Number(e.target.value) }).then(() =>
+                    toast.success(`سيصلك الملخص عند ${e.target.value}:00`),
+                  )
+                }
+                className="h-8 rounded-lg border bg-background px-2 text-xs"
+                aria-label="ساعة الملخص"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {String(h).padStart(2, "0")}:00
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* طابور الانتظار — دليل أن التأجيل لا يعني الإلغاء */}
+            <div className="rounded-lg border border-dashed p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold">
+                  ⏳ في طابور التأجيل الآن: {tiers?.waitingCount ?? 0}
+                </span>
+                {(tiers?.waitingCount ?? 0) > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const r = await flushDeferred();
+                      toast.success(`سُلّم ${r?.delivered ?? 0} إشعاراً الآن`);
+                    }}
+                  >
+                    سلّمها الآن
+                  </Button>
+                )}
+              </div>
+              {(tiers?.waiting ?? []).length > 0 && (
+                <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                  {(tiers?.waiting ?? []).map((d: any) => (
+                    <div key={d.id} className="flex items-center gap-2 text-[11px]">
+                      <Badge variant="outline" className="shrink-0 text-[9px]">
+                        {d.reason === "quiet_hours"
+                          ? "ساعات هدوء"
+                          : d.reason === "rate_limited"
+                            ? "تجاوز السقف"
+                            : "دون أولويتي"}
+                      </Badge>
+                      <span className="min-w-0 flex-1 truncate text-muted-foreground">{d.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2 text-[10px] text-muted-foreground/70">
+                كل ما يُؤجَّل يبقى محفوظاً ويُسلَّم في ساعة الملخص التي اخترتها، أو خلال 12 ساعة كحد أقصى.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

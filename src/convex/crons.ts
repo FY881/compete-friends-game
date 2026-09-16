@@ -269,3 +269,13 @@ crons.interval(
   internal.aiHub.pruneHubEvents,
   {},
 );
+
+// 🔔 تسليم الملخص الذكي — كل ساعة: يُخرج الإشعارات المؤجلة من طابور التأجيل
+// (انتهت ساعات الهدوء، أو بلغت ساعة الملخص التي اختارها اللاعب، أو انتظرت 12 ساعة)
+// فلا يُفقد أي إشعار أبداً — التأجيل لا يعني الإلغاء.
+crons.interval(
+  "notify-digest-delivery",
+  { minutes: 60 },
+  internal.smartNotifications.deliverDigests,
+  {},
+);
