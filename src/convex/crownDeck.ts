@@ -297,7 +297,7 @@ export const getRiskRadar = query({
 
     const [rounds48, errors48, reportsWeek, chat24] = await Promise.all([
       ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", now - 48 * 3600_000)).collect(),
-      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("at", now - 48 * 3600_000)).collect(),
+      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("createdAt", now - 48 * 3600_000)).collect(),
       ctx.db.query("reports").withIndex("by_created" as any, (q: any) => q.gte("createdAt", now - 7 * 86_400_000)).collect(),
       ctx.db.query("chatMessages").withIndex("by_created" as any, (q: any) => q.gte("createdAt", now - 24 * 3600_000)).collect(),
     ]);
@@ -1039,7 +1039,7 @@ export const getIncidentReplay = query({
     if (!(await isOwner(ctx))) return null;
     const rows = await ctx.db
       .query("errorLogs")
-      .withIndex("by_created" as any, (q: any) => q.gte("at", 0))
+      .withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0))
       .order("desc")
       .take(60);
     const filtered = route && route !== "all"
@@ -1081,7 +1081,7 @@ export const getWeeklyTrends = query({
     const weekAgo = now - 7 * 86_400_000;
     const [rounds, errors, broadcasts] = await Promise.all([
       ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", weekAgo)).collect(),
-      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("at", weekAgo)).collect(),
+      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("createdAt", weekAgo)).collect(),
       ctx.db.query("crownBroadcasts").withIndex("by_created" as any, (q: any) => q.gte("createdAt", weekAgo)).collect(),
     ]);
     const days: { day: string; rounds: number; errors: number }[] = [];
@@ -1141,7 +1141,7 @@ export const captureImmortalSnapshot = internalMutation({
     const [users, rounds, errors, decisions, broadcasts, sessions] = await Promise.all([
       ctx.db.query("users").collect(),
       ctx.db.query("gameHistory").withIndex("by_played" as any, (q: any) => q.gte("playedAt", weekAgo)).collect(),
-      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("at", weekAgo)).collect(),
+      ctx.db.query("errorLogs").withIndex("by_created" as any, (q: any) => q.gte("createdAt", weekAgo)).collect(),
       ctx.db.query("crownDecisions").withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0)).order("desc").take(50),
       ctx.db.query("crownBroadcasts").withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0)).order("desc").take(50),
       ctx.db.query("crownCouncilSessions").withIndex("by_created" as any, (q: any) => q.gte("createdAt", 0)).order("desc").take(20),
