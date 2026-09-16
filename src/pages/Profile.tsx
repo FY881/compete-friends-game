@@ -33,6 +33,7 @@ import {
 import { AchievementsPanel, GiftsPanel, ArchivePanel, InvitePanel, CollectiveGoalsPanel, PerformanceAnalysis, SeasonBadge } from "@/components/PlayerFeatures";
 import { MembershipCard } from "@/components/MembershipCard";
 import { PremiumProfilePanel } from "@/components/PremiumProfilePanel";
+import { MindSpecializationsCard } from "@/components/MindSpecializationsCard";
 import { useNavigate } from "react-router";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
@@ -384,6 +385,11 @@ export default function Profile() {
               );
             })}
           </div>
+        </div>
+
+        {/* 🧬 تخصصات العقل المتطور — إتقان حقيقي لكل حقل */}
+        <div className="mt-10">
+          <MindSpecializationsCard />
         </div>
 
         {/* 🎨 الطبقات البريميوم — التخصيص العميق للملف */}

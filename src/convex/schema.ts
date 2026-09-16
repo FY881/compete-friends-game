@@ -204,6 +204,21 @@ const schema = defineSchema(
       eventCount: v.optional(v.number()),
     }).index("by_unit", ["unit"]),
 
+    // 🧬 تخصصات العقل المتطور — إتقان حقيقي لكل حقل معرفي (بريميوم)
+    // يُحدَّث آلياً من كل جولة، ويُستخدم لاختيار أسئلة حسب تخصص اللاعب
+    // وحساب ألقاب التخصص في ملفه الشخصي.
+    mindSpecializations: defineTable({
+      userId: v.id("users"),
+      category: v.string(),
+      mastery: v.number(), // 0-100: مستوى الإتقان الحقيقي المحسوب
+      level: v.string(), // novice | apprentice | scholar | master | grandmaster
+      correct: v.number(),
+      total: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_cat", ["userId", "category"]),
+
     // 🛡️ الاعتراضات — اللاعب المعاقب يستطيع الاعتراض على العقوبة
     appeals: defineTable({
       userId: v.id("users"),

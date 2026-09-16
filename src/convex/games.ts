@@ -378,6 +378,22 @@ export async function pickAdaptiveQuestions(
   }
   const hardRatio = Math.min(0.4, Math.max(0.1, skill * 0.5));
 
+  // ── 2.5) تخصصات العقل: الحقول التي أتقنها اللاعب تحصل على أثر أكبر ──
+  // الإتقان يخفّض الترجيح قليلاً (تعطي أسئلة متنوعة) بينما الحقول الأضعف
+  // ترتفع — فتصير الجولة تعكس تخصصك الحقيقي المزامن من كل جولة سابقة.
+  const specAcc = new Map<string, number>();
+  try {
+    const specs = await ctx.db
+      .query("mindSpecializations")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const s of specs) {
+      if (s.mastery >= 50) specAcc.set(s.category, s.mastery / 100);
+    }
+  } catch {
+    /* التخصصات اختيارية */
+  }
+
   // ── 3) منع التكرار: استبعاد أسئلة آخر جولتين ──
   const recent = await ctx.db
     .query("gameHistory")
@@ -398,7 +414,11 @@ export async function pickAdaptiveQuestions(
   for (const q of pool) {
     if (recentIds.has(q.id)) continue;
     const a = acc.get(q.category);
+    const spec = specAcc.get(q.category);
     let w = a === undefined ? 1.35 : a < 0.5 ? 2.2 - a : 1.2 - a * 0.6;
+    // 🧬 أثر التخصص: إتقان عالٍ يخفف الوزن (تنويع)، والغياب يرفعه (تدريب)
+    if (spec !== undefined) w *= 1.15 - spec * 0.35;
+    else if (specAcc.size > 0) w *= 1.1;
     if (q.difficulty === "hard") w *= skill > 0.6 ? 1.4 : 0.8;
     if (q.difficulty === "easy") w *= skill < 0.4 ? 1.3 : 0.7;
     weighted.push({ q, w });
@@ -1539,6 +1559,15 @@ export const finishGame = internalMutation({
         });
       } catch {
         /* التحديات اختيارية — لا تعطل تسجيل الجولة */
+      }
+
+      // 🧬 تخصصات العقل — مزامنة الإتقان الحقيقي لكل حقل معرفي بعد الجولة
+      try {
+        await ctx.runMutation(internal.mindSpecializations.syncFromCategoryHistory, {
+          userId: p.userId,
+        });
+      } catch {
+        /* التخصصات اختيارية — لا تعطل تسجيل الجولة */
       }
 
       // 🔗 المكافآت التكيفية — تربط التقدم × العضوية × العشيرة × الهيبة فعلياً

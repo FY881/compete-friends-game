@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import { MEMBERSHIP_TIERS } from "./membershipSystem";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -17,13 +18,12 @@ import { internal } from "./_generated/api";
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-const TIER_MULTIPLIER: Record<string, number> = {
-  bronze: 1.0,
-  silver: 1.1,
-  gold: 1.25,
-  diamond: 1.5,
-  exclusive: 2.0,
-};
+// ⚠️ مصدر واحد للحقيقة: مضاعفات العضوية تُشتق من كتالوج العضويات الرسمي
+// (MEMBERSHIP_TIERS.rewardMultiplier) بدل جدولين متضاربين — كانت الفضية
+// ×1.1 هنا و×1.25 في كتالوج العضويات، وهو تضارب حقيقي أُصلح الآن.
+const TIER_MULTIPLIER: Record<string, number> = Object.fromEntries(
+  MEMBERSHIP_TIERS.map((t) => [t.id, t.rewardMultiplier]),
+) as Record<string, number>;
 
 export type AdaptiveBreakdown = {
   base: number; // المكافأة الأساسية (نقاط ولاء)
