@@ -279,3 +279,12 @@ crons.interval(
   internal.smartNotifications.deliverDigests,
   {},
 );
+
+// 👑 الحاكم السيادي — دورة حكم مستقلة كل 15 دقيقة: يراقب الأدلة، يطبّق
+// قوانينه، يعاقب بعواقب حقيقية، ويوقّع قرارات النمو — بلا انتظار أحد.
+crons.interval(
+  "sovereign-cycle",
+  { minutes: 15 },
+  internal.sovereignGovernor.sovereignCycle,
+  {},
+);
