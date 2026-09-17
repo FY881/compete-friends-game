@@ -4,6 +4,94 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 
 /**
+ * 🗓️ الأرشيف الشخصي الأسبوعي — تحليل أسبوعي حقيقي لكل لاعب
+ *
+ * يُحسب فورياً من البيانات الفعلية (gameHistory + categoryHistory) عند الطلب:
+ *  • عدد جولاتك هذا الأسبوع + دقتك الأسبوعية مقابل دقتك الكلية
+ *  • أقوى 3 حقول وأضعف 3 (من دفتر الفئات الحقيقي)
+ *  • اتجاهك: صاعد / ثابت / هابط (مقارنة آخر 7 أيام بالأسبوع السابق)
+ *  • توصية تدريب مبنية على ضعفك الفعلي لا على قوالب
+ *
+ * لا جدول ولا cron — الاستعلام يقرأ الحقيقة الحية، فلا يتأخر ولا يكذب.
+ */
+export const getWeeklyArchive = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const now = Date.now();
+    const week = 7 * 86_400_000;
+
+    // جولات الأسبوعين الأخيرين (الحالي + السابق) لقياس الاتجاه
+    const history = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(200);
+
+    const thisWeek = history.filter((h) => h.playedAt > now - week);
+    const lastWeek = history.filter(
+      (h) => h.playedAt > now - 2 * week && h.playedAt <= now - week,
+    );
+
+    const accOf = (rows: typeof history) => {
+      const total = rows.reduce((a, r) => a + r.questionCount, 0);
+      const correct = rows.reduce((a, r) => a + r.correctCount, 0);
+      return total > 0 ? Math.round((correct / total) * 100) : null;
+    };
+
+    const totalAll = history.reduce((a, r) => a + r.questionCount, 0);
+    const correctAll = history.reduce((a, r) => a + r.correctCount, 0);
+    const accAll = totalAll > 0 ? Math.round((correctAll / totalAll) * 100) : null;
+    const accThis = accOf(thisWeek);
+    const accLast = accOf(lastWeek);
+
+    // الاتجاه: فرق الدقة الأسبوعية، مع حد أدنى 3 جولات في الأسبوعين للحكم
+    let trend: "up" | "down" | "flat" | "new" = "new";
+    if (accThis !== null && accLast !== null) {
+      trend = accThis - accLast >= 5 ? "up" : accLast - accThis >= 5 ? "down" : "flat";
+    }
+
+    // أقوى/أضعف الحقول من دفتر الفئات (فقط بما لديه دليل كافٍ)
+    const catRows = await ctx.db
+      .query("categoryHistory")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const fields = catRows
+      .filter((c) => c.total >= 5)
+      .map((c) => ({
+        category: c.category,
+        accuracy: Math.round((c.correct / c.total) * 100),
+        answers: c.total,
+      }))
+      .sort((a, b) => b.accuracy - a.accuracy);
+
+    const strongest = fields.slice(0, 3);
+    const weakest = fields.slice(-3).reverse().filter((f) => f.accuracy < 70);
+
+    // توصية التدريب: أضعف حقل نشط، أو التنويع إن كان متقناً لكل شيء
+    const recommendation =
+      weakest.length > 0
+        ? `دَرِّب حقل «${weakest[0].category}» — دقتك فيه ${weakest[0].accuracy}% عبر ${weakest[0].answers} إجابة، وهو أدنى حقولك النشطة`
+        : fields.length >= 3
+          ? "حقولك كلها قوية — نوّع تحدياتك بحقول جديدة لتفتح تخصصاً رابعاً"
+          : "العب المزيد لنبني أرشيفك — 5 إجابات في أي حقل تفتح تحليله";
+
+    return {
+      roundsThisWeek: thisWeek.length,
+      accuracyThisWeek: accThis,
+      accuracyLastWeek: accLast,
+      accuracyAllTime: accAll,
+      trend,
+      strongest,
+      weakest,
+      recommendation,
+      totalRounds: history.length,
+    };
+  },
+});
+
+/**
  * ═══════════════════════════════════════════════════════════════════════
  * 🧬 تخصصات العقل المتطور — إتقان حقيقي لكل حقل معرفي
  *

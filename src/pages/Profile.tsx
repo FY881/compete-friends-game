@@ -34,6 +34,7 @@ import { AchievementsPanel, GiftsPanel, ArchivePanel, InvitePanel, CollectiveGoa
 import { MembershipCard } from "@/components/MembershipCard";
 import { PremiumProfilePanel } from "@/components/PremiumProfilePanel";
 import { MindSpecializationsCard } from "@/components/MindSpecializationsCard";
+import { WeeklyArchiveCard } from "@/components/WeeklyArchiveCard";
 import { useNavigate } from "react-router";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
@@ -390,6 +391,11 @@ export default function Profile() {
         {/* 🧬 تخصصات العقل المتطور — إتقان حقيقي لكل حقل */}
         <div className="mt-10">
           <MindSpecializationsCard />
+        </div>
+
+        {/* 🗓️ الأرشيف الشخصي الأسبوعي — تحليل حي من بياناتك الفعلية */}
+        <div className="mt-10">
+          <WeeklyArchiveCard />
         </div>
 
         {/* 🎨 الطبقات البريميوم — التخصيص العميق للملف */}
