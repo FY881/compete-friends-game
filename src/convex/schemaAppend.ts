@@ -48,4 +48,36 @@ export const sovereignTables = {
   })
     .index("by_status", ["status"])
     .index("by_at", ["at"]),
+
+  // 🌊 سجل أفعال الحاكم السيادية المباشرة — كل فعل يطبّقه على الموقع لحظياً
+  sovereignActions: defineTable({
+    kind: v.string(),
+    target: v.string(), // ما فُعل بالضبط
+    details: v.optional(v.string()), // JSON
+    ok: v.boolean(),
+    at: v.number(),
+  }).index("by_at", ["at"]),
+
+  // 🚨 إنذارات الحاكم الاستباقية — مخاطر رصدها قبل وقوعها
+  sovereignAlerts: defineTable({
+    kind: v.string(),
+    level: v.string(), // info | warning | critical
+    title: v.string(),
+    body: v.string(),
+    evidence: v.optional(v.any()),
+    acknowledged: v.boolean(),
+    at: v.number(),
+  }).index("by_at", ["at"]),
+
+  // 🔥 سجل الحملات السيادية — مبادرات تطوير وقّعها الحاكم ونفّذها بنفسه
+  sovereignCampaigns: defineTable({
+    name: v.string(),
+    goal: v.string(),
+    metric: v.string(), // المؤشر الذي يقيس النجاح
+    baseline: v.number(), // قيمة المؤشر عند الإطلاق
+    deadline: v.number(),
+    status: v.string(), // active | succeeded | failed
+    resultNote: v.optional(v.string()),
+    at: v.number(),
+  }).index("by_status", ["status"]),
 };

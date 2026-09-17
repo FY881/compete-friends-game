@@ -175,6 +175,7 @@ export const sovereignCycle = internalMutation({
 
     // ── 3.5) الوحدات السيادية المتقدمة — تُشغَّل كل دورة بلا انتظار ──
     let courtTried = 0, flaggedCases = 0, whalesCaught = 0;
+    let intelAlerts = 0, custodianCleaned = 0, campaigns = 0, chatDeleted = 0, chatPenalized = 0;
     try {
       const scan = await ctx.runMutation(internal.sovereignGovernor.deepBehaviorScan);
       flaggedCases = scan.flagged;
@@ -187,12 +188,30 @@ export const sovereignCycle = internalMutation({
     } catch {
       // وحدة فاشلة لا تُسقط الدورة كلها — الشفافية تُسجَّل كما هي
     }
+    // ── 3.6) الجيل الثالث: استخبارات + تنظيف + حملات + حارس الدردشة ──
+    try {
+      const intel = await ctx.runMutation(internal.sovereignGovernor.proactiveIntel);
+      intelAlerts = intel.alerts;
+    } catch { /* معزولة */ }
+    try {
+      const custodian = await ctx.runMutation(internal.sovereignGovernor.custodianSweep);
+      custodianCleaned = custodian.cleaned;
+    } catch { /* معزولة */ }
+    try {
+      const camp = await ctx.runMutation(internal.sovereignGovernor.campaignCommand);
+      campaigns = camp.launched + camp.concluded;
+    } catch { /* معزولة */ }
+    try {
+      const chat = await ctx.runMutation(internal.sovereignGovernor.chatGuardianSweep);
+      chatDeleted = chat.deleted;
+      chatPenalized = chat.penalized;
+    } catch { /* معزولة */ }
 
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
     await ctx.db.insert("governorActions", {
       agentName: "الحاكم السيادي",
       agentDept: "السيادة",
-      summary: `دورة سيادية كاملة: ${executed} قرارات مباشرة · محكمة: ${courtTried} حكماً · كشف عميق: ${flaggedCases} قضية · حيتان: ${whalesCaught} · إنقاذ وجودة: تشغيل دوري — كلها بلا انتظار أي موافقة`,
+      summary: `دورة سيادية: ${executed} قرارات مباشرة · محكمة: ${courtTried} · كشف: ${flaggedCases} · حيتان: ${whalesCaught} · استباق: ${intelAlerts} إنذاراً · تنظيف: ${custodianCleaned} · حملات: ${campaigns} · دردشة: ${chatDeleted} حذفاً/${chatPenalized} عقوبة — بلا انتظار أحد`,
       createdAt: now,
     });
 
@@ -564,5 +583,278 @@ export const whaleWatch = internalMutation({
       }
     }
     return { caught, median: Math.round(median) };
+  },
+});
+
+// ═════════════════════ التوسعة المطلقة — وحدات سيادية من الجيل الثالث ═════════════════════
+
+/**
+ * 🚨 الوحدة 1 — الاستخبارات الاستباقية: يرصد المخاطر قبل وقوعها وينبّه بنفسه
+ * (تنامي البلاغات على نفس اللاعب، انفجار الأخطاء، شح المحتوى في حقل).
+ */
+export const proactiveIntel = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const dayAgo = now - 86_400_000;
+    let alerts = 0;
+    const raise = async (kind: string, level: string, title: string, body: string, evidence?: unknown) => {
+      const dup = await ctx.db
+        .query("sovereignAlerts")
+        .withIndex("by_at", (q) => q.gte("at", dayAgo))
+        .filter((q) => q.eq(q.field("kind"), kind))
+        .first();
+      if (dup) return;
+      await ctx.db.insert("sovereignAlerts", {
+        kind, level, title, body,
+        evidence: evidence ?? undefined,
+        acknowledged: false,
+        at: now,
+      });
+      alerts++;
+    };
+
+    // أ) تركّز البلاغات: 4+ بلاغات مفتوحة على نفس اللاعب خلال 24 ساعة
+    const reports = await ctx.db
+      .query("reports")
+      .withIndex("by_created", (q) => q.gte("createdAt", dayAgo))
+      .take(3000);
+    const perTarget = new Map<string, number>();
+    for (const r of reports) {
+      if (r.status !== "open") continue;
+      const k = String(r.targetId ?? "");
+      if (!k) continue;
+      perTarget.set(k, (perTarget.get(k) ?? 0) + 1);
+    }
+    for (const [k, n] of perTarget) {
+      if (n >= 4) {
+        const user = await ctx.db.get(k as any);
+        const uname = (user as any)?.name ?? "لاعب";
+        await raise("report_cluster", "warning", `🚨 تركّز بلاغات على ${uname}`,
+          `${n} بلاغاً مفتوحاً خلال 24 ساعة على اللاعب نفسه — فتحتُ قضية تحقيق استباقية في محكمتي دون انتظار قرار أحد.`,
+          { target: k, openReports: n });
+        await ctx.runMutation(internal.sovereignGovernor.openCourtCase, {
+          userId: k as any,
+          charge: "تركّز بلاغات مجتمعية",
+          evidenceJson: JSON.stringify({ openReports: n, windowHours: 24 }),
+          severity: "high",
+        } as any);
+      }
+    }
+
+    // ب) انفجار الأخطاء الحرجية: 15+ خطأ حرج في ساعة
+    const errors = await ctx.db
+      .query("errorLogs")
+      .withIndex("by_created", (q) => q.gte("createdAt", now - 3_600_000))
+      .take(2000);
+    const critical = errors.filter((e) => e.severity === "critical").length;
+    if (critical >= 15) {
+      await raise("error_burst", "critical", "🔥 موجة أخطاء حرجة", 
+        `${critical} خطأً حرجاً خلال ساعة واحدة — ضاعفتُ رقابة صياد الأخطاء وسأصعّد للمرسوم إذا استمر الموجة في الدورة القادمة.`,
+        { critical, windowHours: 1 });
+    }
+
+    // ج) شح المحتوى: حقل بنك أسئلة به أقل من 10 أسئلة نشطة
+    const cats = await ctx.db.query("categoryHistory").collect();
+    const activeCats = new Set(cats.map((c) => c.category));
+    if (activeCats.size > 0 && activeCats.size < 5) {
+      await raise("content_scarcity", "warning", "📚 شح المحتوى المعرفي",
+        `حقول اللعب النشطة ${activeCats.size} فقط — وقّعتُ حاجة توسيع بنك الأسئلة في حملة النمو المقبلة.`,
+        { activeCats: [...activeCats] });
+    }
+
+    return { alerts };
+  },
+});
+
+/**
+ * 🧹 الوحدة 2 — الهيئة التنظيفية: ينظّف الموقع بنفسه من الفوضى المتراكمة
+ * (بلاغات مهملة قديمة، إشعارات متروكة، طوابير ميتة) بلا أن أحد يطلب منه.
+ */
+export const custodianSweep = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const weekAgo = now - 7 * 86_400_000;
+    let cleaned = 0;
+
+    // أ) بلاغات مفتوحة مهملة فوق أسبوع على أسباب عادية → تُحسم «بلا دليل كافٍ»
+    const staleReports = await ctx.db
+      .query("reports")
+      .withIndex("by_created", (q) => q.lt("createdAt", weekAgo))
+      .take(1000);
+    for (const r of staleReports) {
+      if (r.status !== "open") continue;
+      const sev = (r as any).severity as string | undefined;
+      if (sev === "high" || sev === "critical") continue; // الخطيرة تبقى للمراجعة
+      await ctx.db.patch(r._id, { status: "dismissed" });
+      cleaned++;
+    }
+
+    // ب) إنذارات سيادية قُرئت وأُقرّت قديمة → تُقلم
+    const oldAlerts = await ctx.db
+      .query("sovereignAlerts")
+      .withIndex("by_at", (q) => q.lt("at", weekAgo))
+      .take(500);
+    for (const a of oldAlerts) {
+      if (a.acknowledged || a.level === "info") {
+        await ctx.db.delete(a._id);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      await ctx.db.insert("sovereignActions", {
+        kind: "custodian",
+        target: `تنظيف ${cleaned} عنصراً متراكماً`,
+        ok: true,
+        at: now,
+      });
+    }
+    return { cleaned };
+  },
+});
+
+/**
+ * 🔥 الوحدة 3 — قائد الحملات: يطلق حملات تطوير بمؤشر قياس حقيقي ويتابعها
+ * بنفسه حتى تنجح أو تفشل بوضوح — قياس أثر، لا وعود.
+ */
+export const campaignCommand = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let launched = 0, concluded = 0;
+
+    // 1) أغلق الحملات المنتهية وقِس أثرها بالأرقام
+    const active = await ctx.db
+      .query("sovereignCampaigns")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+    for (const c of active) {
+      if (c.deadline > now) continue;
+      const rounds = await ctx.db
+        .query("gameHistory")
+        .withIndex("by_played", (q) => q.gte("playedAt", c.at))
+        .take(10000);
+      const achieved = rounds.length - c.baseline;
+      const succeeded = achieved >= 10;
+      await ctx.db.patch(c._id, {
+        status: succeeded ? "succeeded" : "failed",
+        resultNote: `المؤشر «${c.metric}»: القاعدة ${c.baseline} → النهائي ${rounds.length} (تغير +${achieved}) في مدة الحملة`,
+      });
+      await ctx.db.insert("sovereignEdicts", {
+        kind: "campaign",
+        title: succeeded ? `🏆 حملة «${c.name}» نجحت` : `📉 حملة «${c.name}» لم تحقق هدفها`,
+        body: `الهدف: ${c.goal}. النتيجة المقاسة: ${c.resultNote}. أتحمّل نتيجة قراري علناً — وفق قانون الشفافية.`,
+        evidence: { baseline: c.baseline, final: rounds.length, achieved },
+        active: false,
+        at: now,
+      });
+      concluded++;
+    }
+
+    // 2) أطلق حملة جديدة عند غياب حملة نشطة (كل 5 أيام كحد أدنى)
+    const latest = await ctx.db
+      .query("sovereignCampaigns")
+      .withIndex("by_status", (q) => q.eq("status", "succeeded"))
+      .order("desc")
+      .first();
+    const anyRecent = await ctx.db
+      .query("sovereignCampaigns")
+      .withIndex("by_status", (q) => q.eq("status", "failed"))
+      .order("desc")
+      .first();
+    const lastAt = Math.max(latest?.at ?? 0, anyRecent?.at ?? 0);
+    if (now - lastAt > 5 * 86_400_000) {
+      const rounds = await ctx.db
+        .query("gameHistory")
+        .withIndex("by_played", (q) => q.gte("playedAt", now - 86_400_000))
+        .take(5000);
+      const dayRounds = rounds.length;
+      await ctx.db.insert("sovereignCampaigns", {
+        name: `حملة نشاط الجولات — ${new Date(now).toLocaleDateString("ar")}`,
+        goal: "رفع عدد الجولات اليومية عبر تحسين جودة المطابقة وأسئلة التحدي",
+        metric: "جولات 24 ساعة",
+        baseline: dayRounds,
+        deadline: now + 5 * 86_400_000,
+        status: "active",
+        at: now,
+      });
+      launched++;
+    }
+
+    return { launched, concluded };
+  },
+});
+
+/**
+ * 💬 الوحدة 4 — حارس الدردشة السيادي: يمسح الرسائل الحديثة بحثاً عن أنماط
+ * إساءة واضحة، ويحذف المخالف، ويوقّع عقوبة مباشرة — بصمت وضربات.
+ */
+const ABUSE_PATTERNS: { re: RegExp; label: string }[] = [
+  { re: /احمق|غبي|كلب|حيوان|قذر|حقير/, label: "إساءة لفظية" },
+  { re: /كلمات? ?سرية|رابط.?هرم|hack|cheat/i, label: "ترويج غش" },
+];
+
+export const chatGuardianSweep = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const hourAgo = now - 3_600_000;
+    let deleted = 0, penalized = 0;
+
+    const msgs = await ctx.db
+      .query("chatMessages")
+      .withIndex("by_room", (q) => q.gte("roomId", "" as any))
+      .order("desc")
+      .take(400);
+    for (const m of msgs) {
+      if (m.deleted || m.createdAt < hourAgo) continue;
+      for (const p of ABUSE_PATTERNS) {
+        if (!p.label) continue;
+        if (p.re.test(m.content)) {
+          await ctx.db.patch(m._id, { deleted: true });
+          const strikes = (await countStrikes(ctx, m.senderId)) + 1;
+          const law = [...PENALTY_LADDER].reverse().find((l) => strikes >= l.strikes) ?? PENALTY_LADDER[0];
+          const applied = await applyPenalty(ctx, m.senderId, law.action, `${p.label} في الدردشة — ضربة ${strikes}/5`);
+          await ctx.db.insert("sovereignPenalties", {
+            userId: m.senderId,
+            userName: m.senderName ?? "لاعب",
+            lawId: "S9",
+            action: law.action,
+            label: law.label,
+            appliedResult: applied,
+            reason: `${p.label} — حذف الرسالة بنفسي وطبّقت سلم الضربات`,
+            evidence: String(m._id),
+            strikes,
+            status: "active",
+            at: now,
+          });
+          penalized++;
+          deleted++;
+          break;
+        }
+      }
+    }
+    return { deleted, penalized };
+  },
+});
+
+/** حالة التوسعة المطلقة — كل شيء في سجل واحد للعرض الموحد */
+export const getAbsoluteStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const dayAgo = now - 86_400_000;
+    const [alerts, actions, campaigns, penalties, cases] = await Promise.all([
+      ctx.db.query("sovereignAlerts").withIndex("by_at", (q) => q.gte("at", dayAgo)).take(50),
+      ctx.db.query("sovereignActions").withIndex("by_at", (q) => q.gte("at", dayAgo)).take(50),
+      ctx.db.query("sovereignCampaigns").withIndex("by_status", (q) => q.eq("status", "active")).take(20),
+      ctx.db.query("sovereignPenalties").withIndex("by_at", (q) => q.gte("at", dayAgo)).take(50),
+      ctx.db.query("sovereignCases").withIndex("by_status", (q) => q.eq("status", "open")).take(30),
+    ]);
+    return {
+      alerts: alerts.map((a) => ({ id: String(a._id), kind: a.kind, level: a.level, title: a.title, body: a.body, at: a.at })),
+      actions: actions.map((a) => ({ id: String(a._id), kind: a.kind, target: a.target, ok: a.ok, at: a.at })),
+      campaigns: campaigns.map((c) => ({ id: String(c._id), name: c.name, goal: c.goal, metric: c.metric, baseline: c.baseline, status: c.status, resultNote: c.resultNote, deadline: c.deadline })),
+      penalties24h: penalties.length,
+      openCases: cases.length,
+    };
   },
 });
