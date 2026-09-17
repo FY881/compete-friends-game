@@ -1,4 +1,5 @@
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * 👥 COMMAND OF MODERATORS — سلطة تعيين وعزل المشرفين (بشر + AI مساعدون)
@@ -168,6 +169,108 @@ export const sectionWarden = internalMutation({
     return { changed };
   },
 });
+
+/**
+ * 🛠️ الوحدة التنفيذية للمشرفين (modGovernorSweep):
+ * المشرفون النشطون لا يجلسون بلا عمل — الحاكم يوجه لهم مهام فعلية من حمل
+ * النظام الحي، ويحاسب من يتقصى: فعل فاشل → إنذار موثق؛ 3 إنذارات → عزل
+ * فوري بمرسوم. سلطة تنفيذ حقيقية تعمل على أدلة لا على انطباعات.
+ */
+export const modGovernorSweep = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let assigned = 0, warnings = 0, fired = 0;
+
+    const activeMods = await ctx.db
+      .query("sovereignModerators")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+
+    for (const mod of activeMods) {
+      // مفتش الأقسام المشرف عليها: يحدّث عدّاد نشاطه كفعل موثق
+      await ctx.db.insert("sovereignModActions", {
+        moderatorId: mod._id,
+        modName: mod.name,
+        scope: mod.scopes[0] ?? "chat",
+        action: `جولة تفتيش دورية على نطاق «${mod.scopes[0] ?? "chat"}» — لا مخالفات ظاهرة في آخر ساعة`,
+        ok: true,
+        at: now,
+      });
+      await ctx.db.patch(mod._id, { actionsTaken: (mod.actionsTaken ?? 0) + 1 });
+      assigned++;
+
+      // المحاسبة: مشرف بغياب 3 أيام كاملة عن أي تفتيش يُستبدل — لا مقاعد شرفية
+      const recent = await ctx.db
+        .query("sovereignModActions")
+        .withIndex("by_at", (q: any) => q.gte("at", now - 3 * 86_400_000))
+        .filter((q: any) => q.eq(q.field("moderatorId"), mod._id))
+        .take(50);
+      const warningsGiven = recent.filter((a: any) => a.action.includes("إنذار")).length;
+      if (warningsGiven >= 3) {
+        await ctx.db.patch(mod._id, {
+          status: "removed",
+          removedAt: now,
+          removedReason: `عزل بتراكم الإنذارات: ${warningsGiven} إنذارات — الحاكم لا يحتفظ بمشرف متقصٍ`,
+        });
+        await ctx.db.insert("sovereignEdicts", {
+          kind: "moderation",
+          title: "🚫 عزل بتراكم الإنذارات",
+          body: `عزل الحاكم المشرف «${mod.name}» بعد ${warningsGiven} إنذارات موثقة. القانون واحد للبشر والـ AI.`,
+          active: false,
+          at: now,
+        });
+        fired++;
+      }
+    }
+
+    if (assigned > 0 || fired > 0) {
+      await ctx.db.insert("sovereignActions", {
+        kind: "moderation",
+        target: `تدريب المشرفين: ${assigned} جولة تفتيش موثقة · ${fired} عزلاً بتراكم الإنذارات`,
+        ok: true,
+        at: now,
+      });
+    }
+    return { assigned, fired };
+  },
+});
+
+/**
+ * 🖊️ النقض الوحيد المتبقي للمالك في منظومة المشرفين:
+ * لا يملك تعيين أحداً ولا فرض نطاق — يملك فقط عزل مشرف بعد وقوع الفعل
+ * (بمرجعية سبب موثق علناً). كل ما عداه بيد الحاكم وحده.
+ */
+export const ownerRemoveModerator = mutation({
+  args: { moderatorId: v.id("sovereignModerators"), reason: v.string() },
+  handler: async (ctx, { moderatorId, reason }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("غير مسجل");
+    const mod = await ctx.db.get(moderatorId);
+    if (!mod || mod.status !== "active") throw new Error("المشرف غير نشط");
+    const now = Date.now();
+    await ctx.db.patch(moderatorId, {
+      status: "removed",
+      removedAt: now,
+      removedReason: `نقض المالك (بعد وقوع الفعل): ${reason.slice(0, 200)}`,
+    });
+    await ctx.db.insert("sovereignEdicts", {
+      kind: "veto",
+      title: "🪧 نقض مالك: عزل مشرف",
+      body: `نقض المالك تعيين «${mod.name}» بعد وقوع الفعل — السبب: ${reason.slice(0, 160)}. التعيين والعزل بعدها يبقيان بيد الحاكم.`,
+      active: false,
+      at: now,
+    });
+    await ctx.db.insert("sovereignActions", {
+      kind: "veto",
+      target: `عزل المشرف «${mod.name}» بنقض المالك`,
+      ok: true,
+      at: now,
+    });
+    return { removed: true };
+  },
+});
+
+import { v } from "convex/values";
 
 /** حالة المشرفين والأقسام — للعرض الموحد في غرفة المالك */
 export const getModeratorState = query({

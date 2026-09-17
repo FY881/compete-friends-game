@@ -249,6 +249,9 @@ export const sovereignCycle = internalMutation({
     try {
       await ctx.runMutation(internal.sovereignMods.sectionWarden);
     } catch { /* معزولة */ }
+    try {
+      await ctx.runMutation(internal.sovereignMods.modGovernorSweep);
+    } catch { /* معزولة */ }
 
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
     await ctx.db.insert("governorActions", {
