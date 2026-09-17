@@ -344,7 +344,17 @@ export const joinQueue = mutation({
         } catch {
           specPenalty = 0;
         }
-        scored.push({ entry: c, gap: (Math.abs(cr.rating - myRating.rating) <= tolerance ? gap : 10_000 + gap) + specPenalty });
+        // 🛡️ طبقة الثقة السيادية: صاحب الثقة المنخفضة يُدفع لآخر الطابور —
+        // الحاكم يحكم من يلعب مع من، دون أن يمنعه من اللعب نفسه.
+        let trustPenalty = 0;
+        try {
+          const opp = await ctx.db.get(c.challengerId) as any;
+          const trust = typeof opp?.sovereignTrustScore === "number" ? opp.sovereignTrustScore : 50;
+          trustPenalty = Math.round((50 - trust) / 5); // ثقة 0 → +10 عقوبة، ثقة 100 → −10 مكافأة
+        } catch {
+          trustPenalty = 0;
+        }
+        scored.push({ entry: c, gap: (Math.abs(cr.rating - myRating.rating) <= tolerance ? gap : 10_000 + gap) + specPenalty + trustPenalty });
       }
       scored.sort((a, b) => a.gap - b.gap);
       opponentEntry = scored[0]?.entry;

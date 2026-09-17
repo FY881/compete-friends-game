@@ -209,6 +209,9 @@ export const sovereignCycle = internalMutation({
     try {
       await ctx.runMutation(internal.sovereignGovernor.systemsOverseer);
     } catch { /* معزولة */ }
+    try {
+      await ctx.runMutation(internal.sovereignGovernor.trustScoreSweep);
+    } catch { /* معزولة */ }
 
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
     await ctx.db.insert("governorActions", {
@@ -836,6 +839,88 @@ export const chatGuardianSweep = internalMutation({
       }
     }
     return { deleted, penalized };
+  },
+});
+
+/**
+ * 🛡️ الوحدة 6 — درجة الثقة السيادية: سجل صلاحية حي لكل لاعب يحكمه الحاكم بنفسه
+ *
+ * تُحسب من أدلة فعلية لا أهواء:
+ *  • نقطة البداية 50 (محايد)
+ *  • كل عقوبة سارية (غير منقوضة): −12 لكل ضربة
+ *  • كل قضية محكومة بالذنب: −15
+ *  • جولات نظيفة دون أي مخالفة: +1 لكل 10 جولات (سقف 100)
+ *  • الحساب الموقوف/الدائم: الثقة تُصفَّر فعلياً
+ *
+ * تُقرأ من المطابقة (تجنّب المشبوهين) ومن الحاكم (تصعيد آلي للمنخفض).
+ */
+export const trustScoreSweep = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const users = await ctx.db.query("users").take(2000);
+    let scored = 0, escalated = 0;
+
+    for (const u of users) {
+      const uid = u._id as any;
+      const penalties = await ctx.db
+        .query("sovereignPenalties")
+        .withIndex("by_user", (q: any) => q.eq("userId", uid))
+        .collect();
+      const active = penalties.filter((p: any) => p.status !== "vetoed");
+      const cases = await ctx.db
+        .query("sovereignCases")
+        .withIndex("by_status", (q) => q.eq("status", "closed"))
+        .filter((q) => q.eq(q.field("userId"), uid))
+        .collect();
+      const guilty = cases.filter((c) => c.verdict === "guilty").length;
+
+      // جولات نظيفة: جولات اللاعب دون أي عقوبة سارية
+      const rounds = await ctx.db
+        .query("gameHistory")
+        .withIndex("by_user", (q: any) => q.eq("userId", uid))
+        .collect();
+      const cleanBonus = active.length === 0 ? Math.min(100, Math.floor(rounds.length / 10) * 1) : 0;
+
+      let score = 50 - active.length * 12 - guilty * 15 + cleanBonus;
+      const banned = Boolean((u as any).bannedUntil && (u as any).bannedUntil > now) || Boolean((u as any).bannedPermanent);
+      if (banned) score = 0;
+      score = Math.max(0, Math.min(100, score));
+
+      await ctx.db.patch(uid, { sovereignTrustScore: score } as any);
+      scored++;
+
+      // التصعيد الآلي: ثقة أقل من 15 مع أكثر من ضربتين → قضية تحقيق جديدة
+      if (score < 15 && active.length >= 2 && !banned) {
+        const dup = await ctx.db
+          .query("sovereignCases")
+          .withIndex("by_status", (q) => q.eq("status", "open"))
+          .filter((q) => q.eq(q.field("userId"), uid) && q.eq(q.field("charge"), "ثقة سيادية منهارة"))
+          .first();
+        if (!dup) {
+          await ctx.db.insert("sovereignCases", {
+            userId: uid,
+            userName: (u as any).name ?? "لاعب",
+            charge: "ثقة سيادية منهارة",
+            evidence: JSON.stringify({ score, activePenalties: active.length, guiltyCases: guilty, rounds: rounds.length }),
+            severity: "high",
+            verdict: "pending",
+            status: "open",
+            at: now,
+          });
+          escalated++;
+        }
+      }
+    }
+
+    if (scored > 0) {
+      await ctx.db.insert("sovereignActions", {
+        kind: "trust",
+        target: `قيّمت ثقة ${scored} لاعباً · فتحت ${escalated} قضية تصعيد`,
+        ok: true,
+        at: now,
+      });
+    }
+    return { scored, escalated };
   },
 });
 
