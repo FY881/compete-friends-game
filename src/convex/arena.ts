@@ -316,6 +316,7 @@ export const joinQueue = mutation({
     }
 
     // 🎯 المطابقة الذكية: الأقرب تقييماً أولاً، ثم الأقدم انتظاراً (تراجع زمني آمن)
+    // 🧬 v3: تُضاف طبقة تخصصات العقل — الخصم ذو التخصصات المشابهة أفضل من المتفاوت
     const myRating = await getOrCreateRating(ctx, userId, false);
     const candidates = waiting.filter((d) => d.challengerId !== userId);
     let opponentEntry: (typeof waiting)[number] | undefined;
@@ -327,7 +328,23 @@ export const joinQueue = mutation({
         // فجوة ELO تتناقش قيمتها مع طول الانتظار: بعد 5 دقائق يقبل أي خصم تقريباً
         const tolerance = 100 + Math.min(500, waitMinutes * 100);
         const gap = Math.abs(cr.rating - myRating.rating) - waitMinutes * 2;
-        scored.push({ entry: c, gap: Math.abs(cr.rating - myRating.rating) <= tolerance ? gap : 10_000 + gap });
+        // طبقة التخصص: فرق الإتقان في الحقول المشتركة (0-100) يُضاف لعقوبة المطابقة
+        let specPenalty = 0;
+        try {
+          const mine = await ctx.db.query("mindSpecializations").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
+          const theirs = await ctx.db.query("mindSpecializations").withIndex("by_user", (q) => q.eq("userId", c.challengerId)).collect();
+          if (mine.length > 0 && theirs.length > 0) {
+            const theirMap = new Map(theirs.map((s) => [s.category, s.mastery]));
+            const shared = mine.filter((s) => theirMap.has(s.category));
+            if (shared.length > 0) {
+              const avgGap = shared.reduce((acc, s) => acc + Math.abs(s.mastery - (theirMap.get(s.category) ?? 0)), 0) / shared.length;
+              specPenalty = Math.round(avgGap / 10); // 0-10 نقاط عقوبة حسب التفاوت
+            }
+          }
+        } catch {
+          specPenalty = 0;
+        }
+        scored.push({ entry: c, gap: (Math.abs(cr.rating - myRating.rating) <= tolerance ? gap : 10_000 + gap) + specPenalty });
       }
       scored.sort((a, b) => a.gap - b.gap);
       opponentEntry = scored[0]?.entry;
@@ -353,11 +370,13 @@ export const joinQueue = mutation({
       // 🧠 تسجيل المطابقة الذكية في مركز الذكاء الموحد
       try {
         const oppR = await getOrCreateRating(ctx, opponentEntry.challengerId, false);
+        const oppSpecs = await ctx.db.query("mindSpecializations").withIndex("by_user", (q) => q.eq("userId", opponentEntry.challengerId)).collect();
+        const topSpec = [...oppSpecs].sort((a, b) => b.mastery - a.mastery)[0];
         await ctx.runMutation(internal.aiHub.logEvent, {
           unit: "personalizer",
           kind: "match",
           severity: "info",
-          summary: `مبارزة ذكية: فجوة ${Math.abs(oppR.rating - myRating.rating)} نقطة ELO بين الطرفين`,
+          summary: `مبارزة ذكية: فجوة ${Math.abs(oppR.rating - myRating.rating)} ELO${topSpec ? ` · تخصص الخصم الأقوى: ${topSpec.category} (${topSpec.mastery})` : " · خصم بلا تخصصات بعد"}`,
         });
       } catch {
         /* تسجيل المركز اختياري */
