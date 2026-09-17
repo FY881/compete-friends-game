@@ -44,6 +44,7 @@ import MembershipShowcase from "@/components/MembershipShowcase";
 import { Sound } from "@/lib/sounds";
 import { FeaturesShowcase } from "@/components/FeaturesShowcase";
 import { GameModes } from "@/components/game/GameModes";
+import { SmartGateway } from "@/components/SmartGateway";
 import { Volume2, VolumeX } from "lucide-react";
 import { OwnerLoginDialog } from "@/components/OwnerLoginDialog";
 import StorePage from "@/components/StorePage";
@@ -984,7 +985,12 @@ export default function Play() {
           </div>
         </section>
 
-        {/* ── 5 Game Modes ────────────────────────────────────── */}          <section className="mt-14">
+        {/* ── 🚪 بوابة البداية الذكية — ترحيب وتوجيه الحاكم الذكي ── */}
+        <section className="mt-10">
+          <SmartGateway />
+        </section>
+
+        {/* ── 5 Game Modes ────────────────────────────────────── */}          <section className="mt-14" id="modes">
           <GameModes />
         </section>
 

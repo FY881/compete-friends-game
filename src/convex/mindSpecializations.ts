@@ -4,6 +4,105 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 
 /**
+ * 🚪 بوابة البداية الذكية — أحدث ما فعلته يحدد خطوتك القادمة
+ *
+ * الحاكم الذكي يقرأ تاريخك الفعلي ويوجهك فور دخولك صفحة اللعب:
+ *  • لاعب جديد (0 جولات) → سباق الذكاء: أسرع انطباع وأخف عتبة دخول
+ *  • لاعب عائد دون جولة أسبوعية → سباق الذكاء للإعادة
+ *  • لاعب نشط → أقرب إنجاز أو الحقل الأضعف للتدريب
+ *  • لاعب متقن → التحدي الأعلى المتاح لعضويته
+ *
+ * لا تخمين ولا قوالب — كل توصية محسوبة من البيانات الحية.
+ */
+export const getSmartGateway = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const now = Date.now();
+    const week = 7 * 86_400_000;
+
+    const history = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(60);
+
+    const lastPlayed = history[0]?.playedAt ?? null;
+    const daysAway = lastPlayed ? Math.floor((now - lastPlayed) / 86_400_000) : null;
+    const roundsThisWeek = history.filter((h) => h.playedAt > now - week).length;
+
+    // حالة اللاعب الحقيقية
+    let playerKind: "brand_new" | "returning" | "active" | "veteran";
+    if (history.length === 0) playerKind = "brand_new";
+    else if (daysAway !== null && daysAway >= 7) playerKind = "returning";
+    else if (history.length < 15) playerKind = "active";
+    else playerKind = "veteran";
+
+    // أنماط اللعب المتاحة — الحاكم الذكي يرشح حسب الحالة والعضوية
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    const tier = (membership as any)?.tier ?? "bronze";
+    const TIER_ORDER = ["bronze", "silver", "gold", "diamond", "exclusive"];
+    const tierIdx = Math.max(0, TIER_ORDER.indexOf(tier));
+
+    // أقرب إنجاز للنشطين: أقل مسافة للأهداف المعروفة (من gameStats)
+    const user = await ctx.db.get(userId);
+    const stats = ((user as any)?.gameStats ?? {}) as Record<string, number>;
+    const totalGames = stats.totalGames ?? 0;
+    const nextGamesMilestone = [10, 50, 100].find((m) => m > totalGames) ?? null;
+
+    // أضعف حقل نشط (للتدريب الموجّه)
+    const catRows = await ctx.db
+      .query("categoryHistory")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const weakest = catRows
+      .filter((c) => c.total >= 5)
+      .sort((a, b) => a.correct / a.total - b.correct / b.total)[0];
+
+    // التوجيه الفعلي — قرار الحاكم الذكي لحظة الدخول
+    let recommendedMode = "quiz_rush";
+    let headline = "";
+    let sub = "";
+    if (playerKind === "brand_new") {
+      headline = "أهلاً بك في حرب العقول 🧠";
+      sub = "ابدأ بسباق الذكاء — خمسة أسئلة خاطفة تُخبرك فوراً أين عقلك الأقوى";
+    } else if (playerKind === "returning") {
+      headline = `العرش اشتاق إليك — ${daysAway} يوماً بعد رحيلك`;
+      sub = "سباق الذكاء بانتظارك لاستعادة إيقاعك — جولة واحدة تُعيدك للسير";
+    } else if (playerKind === "active" && weakest) {
+      recommendedMode = "puzzle_masters";
+      headline = `فرصة تدريب ذهبية`;
+      sub = `حقل «${weakest.category}» أدنى حقولك (${Math.round((weakest.correct / weakest.total) * 100)}%) — عصر الألغاز يرشدك لرفعه`;
+    } else if (playerKind === "veteran" && nextGamesMilestone) {
+      recommendedMode = "champion_battle";
+      headline = `تبعد ${nextGamesMilestone - totalGames} جولة عن إنجاز جديد`; 
+      sub = "تحدي الأبطال أسرع طريق لبلوغه — سبعة أسئلة تُغيّر ترتيبك";
+    } else if (playerKind === "veteran" && tierIdx >= 3) {
+      recommendedMode = "diamond_rush";
+      headline = "النادر يستحق المثابرة";
+      sub = "اندفاع الماس مفتوح لك — مكافآت ضخمة بانتظار من لا يخاف";
+    } else {
+      headline = "أبقِ إيقاعك حياً";
+      sub = "سباق الذكاء كل يوم يبني سلسلتك ويحمي نقاط ولائك";
+    }
+
+    return {
+      playerKind,
+      roundsThisWeek,
+      daysAway,
+      recommendedMode,
+      headline,
+      sub,
+      totalGames,
+    };
+  },
+});
+
+/**
  * 🗓️ الأرشيف الشخصي الأسبوعي — تحليل أسبوعي حقيقي لكل لاعب
  *
  * يُحسب فورياً من البيانات الفعلية (gameHistory + categoryHistory) عند الطلب:
