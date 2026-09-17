@@ -9,7 +9,7 @@ const crons = cronJobs();
 
 crons.interval(
   "auto-admin-sweep",
-  { minutes: 180 },
+  { hours: 12 },
   internal.autoAdmin.runSweep,
   {},
 );
@@ -17,7 +17,7 @@ crons.interval(
 // 👑 «العرش» — كل 10 دقائق: فتح الأقفال الطارئة المنتهية آلياً
 crons.interval(
   "crown-expire-locks",
-  { minutes: 60 },
+  { hours: 6 },
   internal.crownDeck.expireLocks,
   {},
 );
@@ -25,7 +25,7 @@ crons.interval(
 // 👑 «العرش» — كل 6 ساعات: قياس أثر القرارات الموثّقة التي مضى عليها أسبوع
 crons.interval(
   "crown-measure-decisions",
-  { hours: 24 },
+  { hours: 48 },
   internal.crownDeck.measureDecision,
   {},
 );
@@ -35,7 +35,7 @@ crons.interval(
 // حتى لو تعطل خادم الملفات الثابت أو انتهت صلاحية المرآة المؤقتة.
 crons.interval(
   "apk-release-sync",
-  { minutes: 180 },
+  { hours: 12 },
   internal.apkSync.syncApkFromSources,
   {},
 );
@@ -44,7 +44,7 @@ crons.interval(
 // AI تلقائياً (تصفير قاطع الدائرة، إعادة تفعيل المزودين) بلا أي تدخل بشري.
 crons.interval(
   "ai-guardian-patrol",
-  { minutes: 120 },
+  { hours: 24 },
   internal.aiGuardian.patrol,
   {},
 );
@@ -53,7 +53,7 @@ crons.interval(
 // بالذكاء الاصطناعي (تحليل السبب الجذري + الحل المقترح + تعلّم النمط) — بلا أي تدخل بشري.
 crons.interval(
   "error-hunter-autopsy",
-  { minutes: 120 },
+  { hours: 24 },
   internal.errorHunter.analyzeErrorsWithAIInternal,
   {},
 );
@@ -62,7 +62,7 @@ crons.interval(
 // لكل الدوريات آلياً وتبدأ صدارة جديدة نظيفة.
 crons.interval(
   "leagues-weekly-rollover",
-  { hours: 6 },
+  { hours: 12 },
   internal.leagues.weeklyRollover,
   {},
 );
@@ -71,7 +71,7 @@ crons.interval(
 // جديدة بأسماء متجددة، ويمنح الفائزين نقاط ولاء — بلا أي تدخل بشري.
 crons.interval(
   "auto-tournament-manager",
-  { hours: 6 },
+  { hours: 12 },
   internal.autoTournament.manage,
   {},
 );
@@ -80,7 +80,7 @@ crons.interval(
 // التي اكتمل أسبوعها ويسجّل التاج في سجلّ القرارات.
 crons.interval(
   "clan-weekly-crown",
-  { hours: 6 },
+  { hours: 12 },
   internal.clans.weeklyCrown,
   {},
 );
@@ -89,7 +89,7 @@ crons.interval(
 // نشطة ولم يلعب اليوم (مرة واحدة يومياً) قبل انقطاعها في منتصف الليل.
 crons.interval(
   "streak-risk-alerts",
-  { hours: 6 },
+  { hours: 12 },
   internal.notify.streakRiskSweep,
   {},
 );
@@ -107,7 +107,7 @@ crons.interval(
 // الإقصائية الشهرية، حسم كل دور من أفضل جولات المؤهلَين، وتتويج البطل.
 crons.interval(
   "world-championship-cycle",
-  { hours: 12 },
+  { hours: 24 },
   internal.worldChampionship.manage,
   {},
 );
@@ -117,14 +117,14 @@ crons.interval(
 // تُرسَل كطلبات موافقة للمالك مع دردشة نقاش، ولا تُنفَّذ أبداً دون موافقته.
 crons.interval(
   "ai-governor-cycle",
-  { hours: 2 },
+  { hours: 12 },
   internal.aiGovernor.runCycle,
 );
 
 // 🧠 مركز الذكاء الموحد — جسر الإشارات بين الوحدات كل 15 دقيقة
 crons.interval(
   "ai-hub-bridge",
-  { hours: 2 },
+  { hours: 12 },
   internal.aiHub.bridgeTick,
   {},
 );
@@ -134,7 +134,7 @@ crons.interval(
 // ويُكملون كتيّبهم بمولودين جدد. بلا أي API خارجي وبلا تدخل بشري.
 crons.interval(
   "ai-living-cycle",
-  { minutes: 60 },
+  { hours: 6 },
   internal.aiAgents.lifeTick,
   {},
 );
@@ -144,7 +144,7 @@ crons.interval(
 // يُطلب منهم، ويرفضون بحرية. المحرّك مجاني بالكامل وبلا أي تدخل بشري.
 crons.interval(
   "living-minds-cycle",
-  { minutes: 90 },
+  { hours: 6 },
   internal.livingMinds.lifeTick,
   {},
 );
@@ -153,7 +153,7 @@ crons.interval(
 // من سجل الجولات ويرسلها تلقائياً إلى دردشة كل العشائر.
 crons.interval(
   "weekly-highlights",
-  { hours: 6 },
+  { hours: 12 },
   internal.highlights.computeWeeklyHighlights,
   {},
 );
@@ -162,7 +162,7 @@ crons.interval(
 // مواجهة نشطة بخصم متقارب في النقاط.
 crons.interval(
   "clan-wars-matchmake",
-  { hours: 6 },
+  { hours: 12 },
   internal.clanWars.matchmakeWars,
   {},
 );
@@ -171,7 +171,7 @@ crons.interval(
 // مكافأة الخزينة للفائز + ترقية/هبوط الأقسام.
 crons.interval(
   "clan-wars-settle",
-  { hours: 6 },
+  { hours: 12 },
   internal.clanWars.settleWars,
   {},
 );
@@ -189,7 +189,7 @@ crons.interval(
 // بلغ موعده المجدول من المالك (جدولة حزم مستقبلية بلا تدخل يدوي).
 crons.interval(
   "question-scheduled-publish",
-  { minutes: 60 },
+  { hours: 6 },
   internal.aiQuestions.publishScheduled,
   {},
 );
@@ -199,7 +199,7 @@ crons.interval(
 // ويكتب التشخيص على سجل الخطأ نفسه في غرفة المالك.
 crons.interval(
   "gemini-doctor-cycle",
-  { minutes: 120 },
+  { hours: 24 },
   internal.geminiDoctor.diagnoseUnanalyzed,
 );
 
@@ -207,7 +207,7 @@ crons.interval(
 // عبر Gemini (عناقيد) + كشف الانتكاسات تلقائياً + ربط الأخطاء بعناقيدها.
 crons.interval(
   "apex-cluster-cycle",
-  { hours: 2 },
+  { hours: 24 },
   internal.geminiApex.clusterUntriaged,
 );
 
@@ -256,7 +256,7 @@ export default crons;
 // (ذاكرة، FPS، استجابة، ميول أخطاء) ويطلق تنبؤات قبل العطل لغرفة المالك.
 crons.interval(
   "anomaly-predictor",
-  { hours: 2 },
+  { hours: 12 },
   internal.errorHunter.detectAnomalies,
   {},
 );
@@ -265,7 +265,7 @@ crons.interval(
 // والحفاظ على سقف آمن، فيبقى السجل الموحد سريعاً مهما طال التشغيل.
 crons.interval(
   "ai-hub-memory-prune",
-  { hours: 6 },
+  { hours: 48 },
   internal.aiHub.pruneHubEvents,
   {},
 );
@@ -275,7 +275,7 @@ crons.interval(
 // فلا يُفقد أي إشعار أبداً — التأجيل لا يعني الإلغاء.
 crons.interval(
   "notify-digest-delivery",
-  { minutes: 60 },
+  { hours: 12 },
   internal.smartNotifications.deliverDigests,
   {},
 );
@@ -284,7 +284,7 @@ crons.interval(
 // قوانينه، يعاقب بعواقب حقيقية، ويوقّع قرارات النمو — بلا انتظار أحد.
 crons.interval(
   "sovereign-cycle",
-  { hours: 2 },
+  { hours: 6 },
   internal.sovereignGovernor.sovereignCycle,
   {},
 );
@@ -293,7 +293,7 @@ crons.interval(
 // النخبة (ولاء + XP حقيقيان)، ويفتح الموسم التالي لمدة 30 يوماً — بلا تدخل المالك.
 crons.interval(
   "season-auto-rollover",
-  { hours: 6 },
+  { hours: 12 },
   internal.seasons.autoRollover,
   {},
 );
@@ -303,6 +303,6 @@ crons.interval(
 crons.interval(
   "log-pruning",
   { hours: 24 },
-  internal.maintenance.pruneOldLogs,
+  internal.maintenance.pruneAll,
   {},
 );
