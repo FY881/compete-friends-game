@@ -206,6 +206,9 @@ export const sovereignCycle = internalMutation({
       chatDeleted = chat.deleted;
       chatPenalized = chat.penalized;
     } catch { /* معزولة */ }
+    try {
+      await ctx.runMutation(internal.sovereignGovernor.systemsOverseer);
+    } catch { /* معزولة */ }
 
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
     await ctx.db.insert("governorActions", {
@@ -836,25 +839,123 @@ export const chatGuardianSweep = internalMutation({
   },
 });
 
+/**
+ * 🤖 الوحدة 5 — رقيب الأنظمة: الحاكم يفتّش كل وحدات الذكاء الاصطناعي
+ * في المركز الموحد — يكتشف الصامتة والمزمنة والمعطلة، ويوقّع قراراته
+ * الإدارية بنفسه (إنعاش وحدة صامتة = إشارة إنعاش موثقة في المركز).
+ * هذه هي «السلطة على الأنظمة نفسها» لا على اللاعبين فقط.
+ */
+export const systemsOverseer = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const dayAgo = now - 86_400_000;
+    let inspected = 0, revived = 0, dormant = 0;
+
+    const units = await ctx.db.query("aiHubUnits").collect();
+    // 🔌 البذر الذاتي: أي وحدة من الكتالوج الرسمي بلا سجل يُنشئها الحاكم بنفسه
+    // كي تخضع كلها لمراقبته — لا تظل وحدة خارج نطاق عينه لأن أحداً لم يضبطها يدوياً.
+    const known = new Set(units.map((u) => u.unit));
+    const CATALOG = [
+      { unit: "coach", name: "المدرب الشخصي", dept: "الشخصي" },
+      { unit: "referee", name: "الحكم الآلي", dept: "الرقابي" },
+      { unit: "guardian", name: "الحارس الرقابي", dept: "الرقابي" },
+      { unit: "reports", name: "محلل البلاغات", dept: "البلاغات" },
+      { unit: "governor", name: "الحاكم الآلي", dept: "الإدارة" },
+      { unit: "questions", name: "مهندس الأسئلة", dept: "المحتوى" },
+      { unit: "health", name: "مراقب الصحة", dept: "الصحة" },
+      { unit: "recommender", name: "المُوصي الذكي", dept: "التوصيات" },
+      { unit: "personalizer", name: "مخصص التجربة", dept: "التخصيص" },
+      { unit: "notifier", name: "وسيط الإشعارات", dept: "التخصيص" },
+      { unit: "doctor", name: "طبيب Gemini", dept: "الصحة" },
+      { unit: "sovereign", name: "الحاكم السيادي", dept: "السيادة" },
+    ];
+    for (const c of CATALOG) {
+      if (!known.has(c.unit)) {
+        await ctx.db.insert("aiHubUnits", {
+          unit: c.unit,
+          name: c.name,
+          dept: c.dept,
+          desc: "بُذرت تلقائياً من رقيب الأنظمة السيادي",
+          enabled: true,
+          sensitivity: 5,
+          eventCount: 0,
+        });
+      }
+    }
+    const all = await ctx.db.query("aiHubUnits").collect();
+    for (const u of all) {
+      if (u.unit === "__hub__") continue;
+      inspected++;
+      if (!u.enabled) {
+        dormant++;
+        await ctx.db.insert("sovereignActions", {
+          kind: "overseer",
+          target: `وحدة «${u.name}» معطّلة — موثّق الحالة`,
+          ok: true,
+          at: now,
+        });
+        continue;
+      }
+      const last = u.lastEventAt ?? 0;
+      if (last > 0 && now - last > 48 * 3600_000) {
+        // وحدة صامتة 48 ساعة: الحاكم يوقّع إشارة إنعاش في المركز الموحد نفسه
+        // (كحدث observation من وحدته السيادية) — فتصير الوحدة الصامتة ظاهرة
+        // في خريطة الترابط ولوحة المركز دون أن يحتاج أحد لتشغيلها يدوياً.
+        await ctx.runMutation(internal.aiHub.logEvent, {
+          unit: "sovereign",
+          kind: "observation",
+          severity: "warn",
+          summary: `🔗 رقيب الأنظمة: وحدة «${u.name}» صامتة منذ أكثر من 48 ساعة (${Math.round((now - last) / 3600_000)} ساعة) — أوقّع إنعاشاً موثقاً وأرفع حالتها للوحة المالك`,
+        });
+        await ctx.db.patch(u._id, { lastEventAt: now });
+        revived++;
+      }
+    }
+
+    if (inspected > 0 || revived > 0) {
+      await ctx.db.insert("sovereignActions", {
+        kind: "overseer",
+        target: `فتّش ${inspected} وحدة ذكاء · أنعشت ${revived} صامتة · ${dormant} معطلة`,
+        ok: true,
+        at: now,
+      });
+    }
+    return { inspected, revived, dormant };
+  },
+});
+
 /** حالة التوسعة المطلقة — كل شيء في سجل واحد للعرض الموحد */
 export const getAbsoluteStatus = query({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
     const dayAgo = now - 86_400_000;
-    const [alerts, actions, campaigns, penalties, cases] = await Promise.all([
+    const [alerts, actions, campaigns, penalties, cases, aiUnits] = await Promise.all([
       ctx.db.query("sovereignAlerts").withIndex("by_at", (q) => q.gte("at", dayAgo)).take(50),
       ctx.db.query("sovereignActions").withIndex("by_at", (q) => q.gte("at", dayAgo)).take(50),
       ctx.db.query("sovereignCampaigns").withIndex("by_status", (q) => q.eq("status", "active")).take(20),
       ctx.db.query("sovereignPenalties").withIndex("by_at", (q) => q.gte("at", dayAgo)).take(50),
       ctx.db.query("sovereignCases").withIndex("by_status", (q) => q.eq("status", "open")).take(30),
+      ctx.db.query("aiHubUnits").collect(),
     ]);
+    // 🤖 صحة أنظمة الذكاء تحت عين الحاكم — كل وحدة بحالتها الفعلية
+    const aiHealth = aiUnits
+      .filter((u) => u.unit !== "__hub__")
+      .map((u) => ({
+        unit: u.unit,
+        name: u.name,
+        dept: u.dept,
+        enabled: u.enabled,
+        lastEventAt: u.lastEventAt ?? null,
+        silentHours: u.lastEventAt ? Math.round((now - u.lastEventAt) / 3600_000) : null,
+      }));
     return {
       alerts: alerts.map((a) => ({ id: String(a._id), kind: a.kind, level: a.level, title: a.title, body: a.body, at: a.at })),
       actions: actions.map((a) => ({ id: String(a._id), kind: a.kind, target: a.target, ok: a.ok, at: a.at })),
       campaigns: campaigns.map((c) => ({ id: String(c._id), name: c.name, goal: c.goal, metric: c.metric, baseline: c.baseline, status: c.status, resultNote: c.resultNote, deadline: c.deadline })),
       penalties24h: penalties.length,
       openCases: cases.length,
+      aiHealth,
     };
   },
 });

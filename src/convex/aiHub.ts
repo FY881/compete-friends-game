@@ -28,6 +28,7 @@ export const UNIT_CATALOG = [
   { unit: "personalizer", name: "مخصص التجربة", dept: "التخصيص", desc: "مطابقة ذكية وأسئلة ديناميكية حسب مهارة ونقاط ضعف كل لاعب" },
   { unit: "notifier", name: "وسيط الإشعارات", dept: "التخصيص", desc: "إشعارات ذكية تحترم تفضيلات كل لاعب وساعات الهدوء وتصنف الأولوية" },
   { unit: "doctor", name: "طبيب Gemini", dept: "الصحة", desc: "تشخيص الأخطاء بالذكاء الاصطناعي: سبب جذري بالعربية + حل + قابلية إصلاح تلقائي" },
+  { unit: "sovereign", name: "الحاكم السيادي", dept: "السيادة", desc: "سلطة عليا مستقلة: يدير الأنظمة ذاتياً، يحاكم ويعاقب بعواقب حقيقية، ويطور اللعبة بنفسه — بلا انتظار أحد" },
 ] as const;
 
 /**
@@ -430,6 +431,25 @@ export const bridgeTick = internalMutation({
         kind: "observation",
         severity: "info",
         summary: `${diagnosed} خطأ مشخّص بالذكاء الاصطناعي خلال 24 ساعة — تشخيص عربي مكتوب على السجلات`,
+      });
+      logged++;
+    }
+
+    // ── إشارة: الحاكم السيادي — نبضة سلطته على الأنظمة واللاعبين معاً ──
+    const pen24h = await ctx.db
+      .query("sovereignPenalties")
+      .withIndex("by_at", (q) => q.gte("at", dayAgo))
+      .collect();
+    const activeCases = await ctx.db
+      .query("sovereignCases")
+      .withIndex("by_status", (q) => q.eq("status", "open"))
+      .collect();
+    if (pen24h.length > 0 || activeCases.length > 0) {
+      await ctx.runMutation(internal.aiHub.logEvent, {
+        unit: "sovereign",
+        kind: "decision",
+        severity: activeCases.length >= 3 ? "warn" : "info",
+        summary: `سلطة سيادية ناشطة: ${pen24h.length} عقوبة نافذة و${activeCases.length} قضية مفتوحة في 24 ساعة — يدير الأنظمة والعدالة ذاتياً بلا انتظار أحد`,
       });
       logged++;
     }
