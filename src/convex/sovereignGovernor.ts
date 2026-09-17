@@ -215,6 +215,9 @@ export const sovereignCycle = internalMutation({
     try {
       await ctx.runMutation(internal.sovereignGovernor.membershipGovernorSweep);
     } catch { /* معزولة */ }
+    try {
+      await ctx.runMutation(internal.sovereignGovernor.selfDeveloper);
+    } catch { /* معزولة */ }
 
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
     await ctx.db.insert("governorActions", {
@@ -842,6 +845,159 @@ export const chatGuardianSweep = internalMutation({
       }
     }
     return { deleted, penalized };
+  },
+});
+
+/**
+ * 🏗️ الوحدة 8 — مطوّر اللعبة الذاتي: الحاكم يطوّر تجربة اللعبة بنفسه
+ *
+ *  1) إعلان ديناميكي موقّع: يكتب إعلان الشريط العلوي بنفسه من إحصاءات حية
+ *     (يُحدّثه كل 6 ساعات على الأكثر — بلا تكرار مزعج).
+ *  2) إشعارات نمو مخصصة: يرسل للنائمين 3-7 أيام دعوة شخصية بدل الصمت.
+ *  3) ضبط صعوبة الموسم: يقيس دقة 24 ساعة ويوقّع قرار رفع/خفض التحدي
+ *     كمرسوم موثق — المحتوى يتكيف مع مهارة المجتمع الفعلية.
+ */
+export const selfDeveloper = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const dayAgo = now - 86_400_000;
+    let actions = 0;
+
+    const getSetting = async (key: string, fallback: any) => {
+      const row = await ctx.db.query("settings").withIndex("by_key", (q: any) => q.eq("key", key)).first();
+      if (!row) return fallback;
+      try { return JSON.parse(row.value); } catch { return fallback; }
+    };
+    const setSettingDirect = async (key: string, value: any) => {
+      const row = await ctx.db.query("settings").withIndex("by_key", (q: any) => q.eq("key", key)).first();
+      const encoded = JSON.stringify(value);
+      if (row) await ctx.db.patch(row._id, { value: encoded });
+      else await ctx.db.insert("settings", { key, value: encoded });
+    };
+
+    // ── 1) الإعلان الديناميكي الموقّع (كل 6 ساعات كحد أقصى) ──
+    const lastDev = await ctx.db
+      .query("sovereignActions")
+      .withIndex("by_at", (q: any) => q.gte("at", 0))
+      .order("desc")
+      .first();
+    const devCooldownOk = !lastDev || now - lastDev.at > 6 * 3600_000;
+
+    if (devCooldownOk) {
+      const announcementActive = await getSetting("announcementActive", false);
+      const currentAnnouncement = await getSetting("announcement", "");
+      const isSovereignSigned = currentAnnouncement.includes("الحاكم") || currentAnnouncement.includes("⚖️");
+      // لا يتجاوز إعلان المالك النشط — يحترم حيّزه وإن كان سيادياً بلا حدود زمنية
+      if ((announcementActive === false || isSovereignSigned)) {
+        const dayRounds = await ctx.db
+          .query("gameHistory")
+          .withIndex("by_played", (q: any) => q.gte("playedAt", dayAgo))
+          .take(5000);
+        const players = new Set(dayRounds.map((g) => String(g.userId))).size;
+        if (dayRounds.length > 0) {
+          const lines = [
+            `⚖️ ${dayRounds.length} جولة من ${players} عقل خلال 24 ساعة — السجلات تتحدث بنفسها`,
+            `⚖️ ${players} لاعباً نشطاً اليوم — الحاكم يراقب العدالة في كل جولة`,
+            `⚖️ الصرامة تصون اللعبة: ${dayRounds.length} جولة موثقة وكل غش يُحاسب`,
+          ];
+          const picked = lines[dayRounds.length % lines.length];
+          if (picked !== currentAnnouncement) {
+            await setSettingDirect("announcement", picked);
+            await setSettingDirect("announcementActive", true);
+            await ctx.db.insert("sovereignActions", {
+              kind: "selfdev",
+              target: "وقّع إعلاناً ديناميكياً من إحصاءات حية",
+              ok: true,
+              at: now,
+            });
+            actions++;
+          }
+        }
+      }
+    }
+
+    // ── 2) دعوات النائمين القريبين (3-7 أيام) — صيد الاستبقاء الذاتي ──
+    const users = await ctx.db.query("users").take(2000);
+    let invited = 0;
+    for (const u of users) {
+      if ((u as any).bannedPermanent || ((u as any).bannedUntil && (u as any).bannedUntil > now)) continue;
+      const last = await ctx.db
+        .query("gameHistory")
+        .withIndex("by_user", (q: any) => q.eq("userId", u._id as any))
+        .order("desc")
+        .take(1);
+      if (last.length === 0) continue;
+      const awayDays = Math.floor((now - last[0].playedAt) / 86_400_000);
+      if (awayDays >= 3 && awayDays <= 7) {
+        // منع التكرار: إشعار واحد كل 3 أيام لهذا اللاعب
+        const recentNotifs = await ctx.db
+          .query("notifications")
+          .withIndex("by_user", (q: any) => q.eq("userId", u._id as any))
+          .order("desc")
+          .take(10);
+        const alreadyInvited = recentNotifs.some(
+          (n) => n.createdAt > now - 3 * 86_400_000 && n.title.includes("اشتاقت"));
+        if (!alreadyInvited) {
+          await ctx.runMutation(internal.notify.push, {
+            userId: u._id as any,
+            title: "👑 السجلات اشتاقت إليك",
+            body: `غبت ${awayDays} أيام — الحاكم وثّق غيابك في السجل. جولة واحدة تعيدك للحساب: سلسلتك وترتيبك بانتظارك.`,
+            type: "info",
+            actionUrl: "/play",
+          });
+          invited++;
+          if (invited >= 50) break; // سقف دفعة آمن
+        }
+      }
+    }
+    if (invited > 0) {
+      await ctx.db.insert("sovereignActions", {
+        kind: "selfdev",
+        target: `أرسل ${invited} دعوة عودة شخصية للنائمين القريبين`,
+        ok: true,
+        at: now,
+      });
+      actions++;
+    }
+
+    // ── 3) ضبط صعوبة الموسم بمرسوم موقّع ──
+    const answers = await ctx.db
+      .query("categoryHistory")
+      .collect();
+    let totalA = 0, totalC = 0;
+    for (const a of answers) { totalA += a.total; totalC += a.correct; }
+    const accuracy = totalA > 0 ? totalC / totalA : 0.5;
+    if (totalA >= 100) {
+      const lastQ = await ctx.db
+        .query("sovereignEdicts")
+        .withIndex("by_at", (q: any) => q.gte("at", 0))
+        .order("desc")
+        .first();
+      const quiet = !lastQ || lastQ.kind !== "difficulty" || now - lastQ.at > 3 * 86_400_000;
+      if (quiet && accuracy > 0.85) {
+        await ctx.db.insert("sovereignEdicts", {
+          kind: "difficulty",
+          title: "📈 مرسوم رفع التحدي",
+          body: `دقة المجتمع ${Math.round(accuracy * 100)}% عبر ${totalA} إجابة — أعلى من المريح. وقّعتُ توجيهاً لمحرك الأسئلة التكيفي برفع نسبة الصعب تدريجياً في الدورات القادمة.`,
+          evidence: { accuracy: Math.round(accuracy * 100), answers: totalA },
+          active: true,
+          at: now,
+        });
+        actions++;
+      } else if (quiet && accuracy < 0.35) {
+        await ctx.db.insert("sovereignEdicts", {
+          kind: "difficulty",
+          title: "📉 مرسوم تخفيف القسوة",
+          body: `دقة المجتمع ${Math.round(accuracy * 100)}% عبر ${totalA} إجابة — أصعب من اللازم. وقّعتُ مسار تأهيل: نسبة الصعب تنخفض تدريجياً حتى يستعيد اللاعبون ثقتهم.`,
+          evidence: { accuracy: Math.round(accuracy * 100), answers: totalA },
+          active: true,
+          at: now,
+        });
+        actions++;
+      }
+    }
+
+    return { actions, invited };
   },
 });
 
