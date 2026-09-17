@@ -1,260 +1,345 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
-import { useState } from "react";
-import { Crown, Gavel, ScrollText, Loader2, Landmark, TrendingUp, Undo2, ShieldCheck, BrainCircuit } from "lucide-react";
+import {
+  Loader2,
+  Crown,
+  Zap,
+  Siren,
+  Snowflake,
+  Undo2,
+  ShieldCheck,
+  Timer,
+  Sparkles,
+} from "lucide-react";
 
-/**
- * 🛡️ نبضة الحاكم — شريط حي يُعرض أعلى كل تبويب رئيسي في غرفة المالك:
- * يذكّر أن الحاكم السيادي يراقب وينفّذ باستقلال، ويعرض آخر قراراته.
- */
-export function SovereignPulseCard({ compact = false }: { compact?: boolean }) {
-  const status = useQuery(api.sovereignGovernor.getSovereignStatus, {});
-  const edicts = useQuery(api.sovereignGovernor.getEdicts, {});
-  const latest = edicts?.[0];
-  if (!status) return null;
-  return (
-    <div className={cn(
-      "flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/30 bg-gradient-to-l from-amber-950/25 via-transparent to-transparent px-4 py-3",
-      compact && "py-2.5",
-    )} dir="rtl">
-      <ShieldCheck className="h-5 w-5 shrink-0 text-amber-400" />
+const KIND_LABELS: Record<string, string> = {
+  xp_multiplier: "⭐ مضاعف الخبرة",
+  coin_multiplier: "🪙 مضاعف العملات",
+  shop_discount: "🏷️ خصم المتجر",
+  category_spotlight: "🎯 تخصص الأسبوع",
+  martial_mode: "🚨 وضع الطوارئ",
+  quarantine: "🧊 عزل لاعب",
+};
+
+/** بطاقة نبض الحاكم السيادي — تظهر في لوحة القيادة: حالة الطوارئ والمراسيم النشطة */
+export function SovereignPulseCard({ compact }: { compact?: boolean }) {
+  const state = useQuery(api.sovereign.getSovereignState);
+  if (state === undefined || state === null) return null;
+  const active = state.activeDecrees ?? [];
+  const pending = state.pendingDualSign ?? [];
+  const martial = active.find((d) => d.kind === "martial_mode");
+  return (      <div
+      className={cn(
+        "flex flex-wrap items-center gap-3 rounded-2xl border px-5 py-4 shadow-sm",
+        compact && "px-4 py-3",
+        martial
+          ? "border-rose-500/50 bg-rose-500/10"
+          : active.length > 0
+            ? "border-amber-500/40 bg-amber-500/5"
+            : "border-border/70 bg-card",
+      )}
+    >
+      <Crown className="size-5 shrink-0 text-primary" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-amber-200">
-          الحاكم السيادي يراقب وينفّذ — {status.stats.activeEdicts} مرسوماً نشطاً · {status.stats.totalPenalties - status.stats.vetoed} عقوبة نافذة
+        <p className="text-sm font-bold">الحاكم السيادي</p>
+        <p className="text-xs text-muted-foreground">
+          {martial
+            ? "🚨 وضع الطوارئ مفعّل — الاقتصاد والمطابقة والدردشة مجمّدة"
+            : active.length > 0
+              ? `${active.length} مرسوماً نشطاً — ${active.map((d) => KIND_LABELS[d.kind] ?? d.kind).join(" · ")}`
+              : "اللعبة بوضعها الطبيعي — لا مراسيم نشطة"}
         </p>
-        {latest && !compact && (
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">آخر قرار موقّع: {latest.title} — {latest.body.slice(0, 110)}…</p>
-        )}
       </div>
-      {!compact && (
-        <Button size="sm" variant="outline" className="border-amber-500/40 text-amber-200" onClick={() => window.dispatchEvent(new CustomEvent("owner-navigate", { detail: "sovereign" }))}>
-          فتح سجل السيادة
-        </Button>
+      {pending.length > 0 && (
+        <Badge className="rounded-full bg-rose-500 text-[10px] text-white">
+          {pending.length} بصمة مزدوجة بانتظار التأكيد
+        </Badge>
       )}
     </div>
   );
 }
 
-/**
- * 🧠 لوحة الثقة السيادية وذكاء التعلّم — توزيع درجات الثقة ودروس الحاكم المستخلصة من أثر قراراته.
- */
-export function TrustAndLessonsCard() {
-  const data = useQuery(api.sovereignGovernor.getTrustAndLessons, {});
-  if (!data) return null;
-  return (
-    <Card className="border-sky-500/25 bg-gradient-to-l from-sky-950/15 to-transparent">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <BrainCircuit className="h-4 w-4 text-sky-400" /> الثقة السيادية وذكاء التعلّم ({data.total} لاعب)
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <div className="grid grid-cols-4 gap-2 text-center text-xs">
-          <div className="rounded-lg bg-emerald-500/10 p-2"><b className="text-emerald-400">{data.tiers.high}</b><p className="text-muted-foreground">ثقة عالية 80+</p></div>
-          <div className="rounded-lg bg-sky-500/10 p-2"><b className="text-sky-400">{data.tiers.mid}</b><p className="text-muted-foreground">محايد 50-79</p></div>
-          <div className="rounded-lg bg-amber-500/10 p-2"><b className="text-amber-400">{data.tiers.low}</b><p className="text-muted-foreground">منخفضة 20-49</p></div>
-          <div className="rounded-lg bg-rose-500/10 p-2"><b className="text-rose-400">{data.tiers.critical}</b><p className="text-muted-foreground">حرجة أقل من 20</p></div>
-        </div>
-        <div className="grid gap-2 md:grid-cols-2">
-          <div className="rounded-lg bg-muted/40 p-2">
-            <p className="mb-1 text-xs font-bold text-emerald-300">أعلى الثقة</p>
-            {data.top.map((t) => (
-              <p key={t.id} className="flex justify-between text-xs"><span>{t.name}</span><b className="text-emerald-400">{t.trust}</b></p>
-            ))}
-          </div>
-          <div className="rounded-lg bg-muted/40 p-2">
-            <p className="mb-1 text-xs font-bold text-rose-300">أدنى الثقة — تحت مراقبة الحاكم</p>
-            {data.bottom.map((t) => (
-              <p key={t.id} className="flex justify-between text-xs"><span>{t.name}</span><b className="text-rose-400">{t.trust}</b></p>
-            ))}
-          </div>
-        </div>
-        {data.lessons.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs font-bold text-sky-300">دروس استخلصها الحاكم من أثر قراراته</p>
-            {data.lessons.slice(0, 5).map((l) => (
-              <div key={l.id} className="rounded-md border border-sky-500/20 bg-sky-950/10 p-2 text-xs">
-                <span className="font-bold">{l.subject}</span>
-                <Badge variant={l.applied ? "default" : "outline"} className="mr-2 text-[10px]">{l.applied ? "مطبّق" : `ثقة ${l.confidence}`}</Badge>
-                <p className="mt-1 text-muted-foreground">{l.lesson}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/**
- * 👑 لوحة الحاكم السيادي — عرض علني لكتاب قوانينه وعقوباته ومراسيمه.
- * الحق الوحيد هنا: النقض (بعد وقوع الفعل). لا أمر ولا اقتراح ولا ضغط.
- */
+/** لوحة الحاكم السيادي — المرحلة 1: المرسوم الفوري + الطوارئ + العزل + البصمة المزدوجة */
 export function SovereignPanel() {
-  const status = useQuery(api.sovereignGovernor.getSovereignStatus, {});
-  const penalties = useQuery(api.sovereignGovernor.getPenaltyLog, {});
-  const edicts = useQuery(api.sovereignGovernor.getEdicts, {});
-  const cases = useQuery(api.sovereignGovernor.getCourtCases, {});
-  const veto = useMutation(api.sovereignGovernor.vetoPenalty);
-  const [vetoNote, setVetoNote] = useState<Record<string, string>>({});
+  const state = useQuery(api.sovereign.getSovereignState);
+  const issueDecree = useMutation(api.sovereign.issueDecree);
+  const toggleMartial = useMutation(api.sovereign.toggleMartialMode);
+  const quarantine = useMutation(api.sovereign.quarantinePlayer);
+  const releaseQuarantine = useMutation(api.sovereign.releaseQuarantine);
+  const confirmDecree = useMutation(api.sovereign.confirmDecree);
+  const dropDecree = useMutation(api.sovereign.dropDecree);
+
+  const [kind, setKind] = useState("xp_multiplier");
+  const [value, setValue] = useState("2");
+  const [label, setLabel] = useState("مضاعف نهاية الأسبوع");
+  const [reason, setReason] = useState("");
+  const [duration, setDuration] = useState("24");
+  const [martialReason, setMartialReason] = useState("");
+  const [qName, setQName] = useState("");
+  const [qReason, setQReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
-  if (!status || !penalties || !edicts || !cases) {
+  if (state === undefined || state === null) {
     return (
-      <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin ml-2" /> تحميل الدولة السيادية…
+      <div className="flex justify-center py-12">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  const doVeto = async (id: string) => {
-    setBusy(id);
+  const run = async (key: string, fn: () => Promise<unknown>, okMsg: string) => {
+    setBusy(key);
     try {
-      await veto({ penaltyId: id as any, note: vetoNote[id] || "نقض المالك" });
-      toast.success("تم النقض — أُلغي أثر العقوبة فعلياً واستُرد ما سُلب");
-    } catch (e: any) {
-      toast.error(e?.message ?? "فشل النقض");
+      await fn();
+      toast.success(okMsg);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذّر التنفيذ");
     } finally {
       setBusy(null);
     }
   };
 
+  const pending = state.pendingDualSign ?? [];
+
   return (
-    <div className="space-y-4" dir="rtl">
-      {/* الحالة */}
-      <Card className="border-amber-500/30 bg-gradient-to-l from-amber-950/20 to-transparent">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-300">
-            <Crown className="h-5 w-5" /> الحاكم السيادي — سجل علني
+    <div className="space-y-5">
+      {/* البصمة المزدوجة */}
+      {pending.length > 0 && (
+        <Card className="border-rose-500/40 bg-rose-500/5 shadow-md">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-rose-700">
+              <ShieldCheck className="size-4" /> بصمة مزدوجة مطلوبة — {pending.length} أمراً خطيراً
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pending.map((d) => {
+              const secs = Math.max(0, Math.round(((d.dualSignDeadline ?? 0) - state.now) / 1000));
+              return (
+                <div key={d._id} className="flex flex-wrap items-center gap-3 rounded-xl border border-rose-500/20 bg-card p-3">
+                  <span className="text-sm font-bold">{d.label}</span>
+                  <Badge variant="outline" className="rounded-full text-[10px]">
+                    <Timer className="me-1 size-3" /> {secs} ثانية
+                  </Badge>
+                  <p className="w-full text-xs text-muted-foreground">السبب: {d.reason}</p>
+                  <div className="ms-auto flex gap-2">
+                    <Button
+                      size="sm"
+                      className="gap-1.5 rounded-xl"
+                      disabled={busy === `c-${d._id}`}
+                      onClick={() =>
+                        run(`c-${d._id}`, () => confirmDecree({ decreeId: d._id }), "نُفِّذ الأمر")
+                      }
+                    >
+                      {busy === `c-${d._id}` ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
+                      تأكيد (بصمة ثانية)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-rose-600"
+                      disabled={busy === `d-${d._id}`}
+                      onClick={() => run(`d-${d._id}`, () => dropDecree({ decreeId: d._id }), "أُسقط الأمر")}
+                    >
+                      <Undo2 className="size-3.5" /> إسقاط
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* المرسوم الفوري */}
+      <Card className="border-primary/25 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Crown className="size-4 text-primary" /> المرسوم الفوري
+            <Badge variant="outline" className="rounded-full text-[10px]">يُطبَّق لحظياً على الجميع</Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div><span className="text-muted-foreground">مراسيم نشطة:</span> <b className="text-emerald-400">{status.stats.activeEdicts}</b></div>
-          <div><span className="text-muted-foreground">إجمالي المراسيم:</span> <b>{status.stats.totalEdicts}</b></div>
-          <div><span className="text-muted-foreground">عقوبات نافذة:</span> <b className="text-rose-400">{status.stats.totalPenalties - status.stats.vetoed}</b></div>
-          <div><span className="text-muted-foreground">منقوضة:</span> <b className="text-sky-400">{status.stats.vetoed}</b></div>
-        </CardContent>
-      </Card>
-
-      {/* كتاب القوانين */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><ScrollText className="h-4 w-4 text-amber-400" /> كتاب قوانين الحاكم (يصدره هو وحده)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {status.laws.map((l) => (
-            <div key={l.id} className="flex gap-2 items-start rounded-md bg-muted/40 px-3 py-2">
-              <Badge variant="outline" className="shrink-0 border-amber-500/40 text-amber-300">{l.id}</Badge>
-              <span>{l.text}</span>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold">نوع المرسوم</label>
+              <Select value={kind} onValueChange={setKind}>
+                <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="xp_multiplier">⭐ مضاعف الخبرة</SelectItem>
+                  <SelectItem value="coin_multiplier">🪙 مضاعف العملات</SelectItem>
+                  <SelectItem value="shop_discount">🏷️ خصم المتجر (٪)</SelectItem>
+                  <SelectItem value="category_spotlight">🎯 تخصص الأسبوع المضاعف</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ))}
-          <div className="pt-2 text-xs text-muted-foreground">
-            سلّم العقوبات: {status.penaltyLadder.map((p) => `${p.label} (${p.strikes}ض)`).join(" ← ")}
+            <div>
+              <label className="mb-1 block text-xs font-semibold">
+                {kind === "shop_discount" ? "نسبة الخصم (1–70)" : kind === "category_spotlight" ? "اسم التخصص" : "المضاعف (مثال: 2 = ×2)"}
+              </label>
+              <Input value={value} onChange={(e) => setValue(e.target.value)} className="h-10 rounded-xl" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold">الوصف الظاهر للاعبين</label>
+              <Input value={label} onChange={(e) => setLabel(e.target.value)} className="h-10 rounded-xl" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold">المدة (ساعات — 0 = دائم حتى الإلغاء)</label>
+              <Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} className="h-10 rounded-xl" />
+            </div>
           </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold">سبب الحاكم (موثَّق في السجل ويظهر للاعبين)</label>
+            <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="مثال: احتفال موسم الحروب الفكرية" className="rounded-xl" />
+          </div>
+          <Button
+            className="gap-2 rounded-xl"
+            disabled={busy === "decree" || !reason.trim() || !label.trim()}
+            onClick={() =>
+              run(
+                "decree",
+                () =>
+                  issueDecree({
+                    kind: kind as "xp_multiplier" | "coin_multiplier" | "shop_discount" | "category_spotlight",
+                    value: Number(value) || 1,
+                    label: label.trim(),
+                    reason: reason.trim(),
+                    durationHours: kind === "category_spotlight" ? 168 : Number(duration) || 0,
+                  }),
+                "صدر المرسوم — يُطبَّق الآن على كل الأنظمة",
+              )
+            }
+          >
+            {busy === "decree" ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
+            إصدار المرسوم
+          </Button>
         </CardContent>
       </Card>
 
-      {/* سجل العقوبات + النقض */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><Gavel className="h-4 w-4 text-rose-400" /> سجل العقوبات النافذة</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {penalties.length === 0 && <p className="text-sm text-muted-foreground">لا عقوبات بعد — الدورة السيادية كل 15 دقيقة.</p>}
-          {penalties.slice(0, 15).map((p) => (
-            <div key={p.id} className="rounded-lg border border-rose-500/20 bg-rose-950/10 p-3 text-sm space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <b>{p.userName}</b>
-                <Badge variant="outline" className="border-rose-500/40 text-rose-300">{p.label}</Badge>
-                <span className="text-xs text-muted-foreground">ضربة {p.strikes}/5 · قانون {p.lawId}</span>
-                {p.status === "vetoed" && <Badge className="bg-sky-500/20 text-sky-300">مُنقوضة</Badge>}
-              </div>
-              <p className="text-muted-foreground text-xs">السبب: {p.reason} · النتيجة الفعلية: {p.appliedResult}</p>
-              {p.status === "vetoed" && p.vetoNote && (
-                <p className="text-xs text-sky-300">مبرر النقض: {p.vetoNote}</p>
-              )}
-              {status.canVeto && p.status !== "vetoed" && (
-                <div className="flex gap-2 pt-1">
-                  <Textarea
-                    value={vetoNote[p.id] ?? ""}
-                    onChange={(e) => setVetoNote((s) => ({ ...s, [p.id]: e.target.value }))}
-                    placeholder="مبرر النقض (يُوثَّق علناً)"
-                    className="min-h-[38px] text-xs"
-                    dir="rtl"
-                  />
-                  <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => doVeto(p.id)} className="shrink-0">
-                    {busy === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Undo2 className="h-3 w-3 ml-1" />} نقض
-                  </Button>
-                </div>
-              )}
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* وضع الطوارئ */}
+        <Card className="border-rose-500/25 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-rose-700">
+              <Siren className="size-4" /> وضع الطوارئ (Martial Mode)
+              <Badge variant="outline" className="rounded-full text-[10px]">بصمة مزدوجة إلزامية</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              تجميد كامل: يتوقف الاقتصاد والمطابقة والدردشة العامة لحظياً — للصيانة العاجلة أو الرد على اختراق.
+            </p>
+            <Textarea rows={2} value={martialReason} onChange={(e) => setMartialReason(e.target.value)} placeholder="سبب الطوارئ…" className="rounded-xl" />
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                className="gap-2 rounded-xl"
+                disabled={busy === "martial-on" || !martialReason.trim()}
+                onClick={() =>
+                  run("martial-on", () => toggleMartial({ enable: true, reason: martialReason.trim() }), "بانتظار البصمة الثانية (60 ثانية)")
+                }
+              >
+                {busy === "martial-on" ? <Loader2 className="size-4 animate-spin" /> : <Siren className="size-4" />}
+                تفعيل الطوارئ
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 rounded-xl"
+                disabled={busy === "martial-off"}
+                onClick={() => run("martial-off", () => toggleMartial({ enable: false, reason: "قرار الحاكم" }), "رُفعت حالة الطوارئ")}
+              >
+                {busy === "martial-off" ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                رفع الطوارئ
+              </Button>
             </div>
-          ))}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* محكمة النزاهة */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><Gavel className="h-4 w-4 text-violet-400" /> محكمة النزاهة — قضايا الحاكم بالأدلة الكاملة</CardTitle>
+        {/* العزل */}
+        <Card className="border-sky-500/25 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-sky-700">
+              <Snowflake className="size-4" /> حجرة العزل (Quarantine)
+              <Badge variant="outline" className="rounded-full text-[10px]">بصمة مزدوجة إلزامية</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              فصل لاعب مشتبه به حتى المراجعة: لا يرى ولا يُرى، وتجري جولاته مراقَبة.
+            </p>
+            <Input value={qName} onChange={(e) => setQName(e.target.value)} placeholder="اسم اللاعب" className="h-10 rounded-xl" />
+            <Textarea rows={2} value={qReason} onChange={(e) => setQReason(e.target.value)} placeholder="سبب العزل…" className="rounded-xl" />
+            <Button
+              className="gap-2 rounded-xl"
+              disabled={busy === "quar" || !qName.trim() || !qReason.trim()}
+              onClick={() =>
+                run(
+                  "quar",
+                  () => quarantine({ username: qName.trim(), reason: qReason.trim() }),
+                  "طلب العزل جاهز — أكّده بالبصمة الثانية",
+                )
+              }
+            >
+              {busy === "quar" ? <Loader2 className="size-4 animate-spin" /> : <Snowflake className="size-4" />}
+              طلب عزل
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* المراسيم النشطة */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="size-4 text-amber-500" /> المراسيم النشطة ({state.activeDecrees?.length ?? 0})
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2.5">
-          {cases.length === 0 && (
-            <p className="text-sm text-muted-foreground">لا قضايا مفتوحة — الكشف السلوكي العميق يجري كل دورة (15 دقيقة) عبر تاريخ أسبوع كامل لكل لاعب.</p>
-          )}
-          {cases.slice(0, 12).map((c) => (
-            <div key={c.id} className={cn(
-              "rounded-lg border p-3 text-sm space-y-1",
-              c.status === "open" ? "border-amber-500/30 bg-amber-950/10" : "border-violet-500/20 bg-violet-950/10",
-            )}>
-              <div className="flex flex-wrap items-center gap-2">
-                <b>{c.userName}</b>
-                <Badge variant="outline" className={c.severity === "critical" ? "border-rose-500/50 text-rose-300" : "border-amber-500/50 text-amber-300"}>{c.severity === "critical" ? "خطورة حرجة" : "خطورة عالية"}</Badge>
-                {c.status === "open" ? (
-                  <Badge className="bg-amber-500/20 text-amber-300">قيد المحاكمة</Badge>
+        <CardContent className="space-y-2">
+          {(state.activeDecrees ?? []).length === 0 ? (
+            <p className="rounded-xl border border-dashed py-8 text-center text-sm text-muted-foreground">
+              لا مراسيم نشطة — اللعبة بوضعها الطبيعي.
+            </p>
+          ) : (
+            (state.activeDecrees ?? []).map((d) => (
+              <div key={d._id} className={cn("flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3", d.kind === "martial_mode" ? "border-rose-500/30 bg-rose-500/5" : "border-border/70 bg-card")}>
+                <span className="min-w-0 flex-1 truncate text-sm font-bold">{KIND_LABELS[d.kind] ?? d.kind} — {d.label}</span>
+                {d.expiresAt ? (
+                  <Badge variant="outline" className="rounded-full text-[10px]">
+                    ينتهي بعد {Math.max(0, Math.round((d.expiresAt - state.now) / 3600_000))} ساعة
+                  </Badge>
                 ) : (
-                  <Badge className="bg-violet-500/20 text-violet-300">صدر الحكم</Badge>
+                  <Badge variant="outline" className="rounded-full text-[10px]">دائم</Badge>
                 )}
-                <span className="text-xs text-muted-foreground">{new Date(c.at).toLocaleString("ar")}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-rose-600"
+                  disabled={busy === `x-${d._id}`}
+                  onClick={() =>
+                    d.kind === "quarantine"
+                      ? run(`x-${d._id}`, () => releaseQuarantine({ decreeId: d._id }), "رُفع العزل")
+                      : run(`x-${d._id}`, () => dropDecree({ decreeId: d._id }), "أُلغي المرسوم")
+                  }
+                >
+                  <Undo2 className="size-3.5" /> إلغاء
+                </Button>
               </div>
-              <p className="font-medium">التهمة: {c.charge}</p>
-              {c.status === "closed" && c.verdictNote && <p className="text-xs text-violet-200">الحكم: {c.verdictNote}</p>}
-              <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer">عرض الأدلة</summary>
-                <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-black/30 p-2 text-[10px]" dir="ltr">{c.evidence}</pre>
-              </details>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* المراسيم */}
-      <TrustAndLessonsCard />
-
-      {/* المراسيم */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-4 w-4 text-emerald-400" /> مراسيم الحاكم الموقّعة</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2.5">
-          {edicts.length === 0 && <p className="text-sm text-muted-foreground">لا مراسيم بعد.</p>}
-          {edicts.slice(0, 15).map((e) => (
-            <div key={e.id} className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 text-sm space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                {e.kind === "growth" && <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />}
-                {e.kind === "economy" && <Landmark className="h-3.5 w-3.5 text-amber-400" />}
-                {e.kind === "veto" && <Undo2 className="h-3.5 w-3.5 text-sky-400" />}
-                <b>{e.title}</b>
-                <span className="text-xs text-muted-foreground">{new Date(e.at).toLocaleString("ar")}</span>
-              </div>
-              <p className="text-muted-foreground">{e.body}</p>
-            </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
     </div>

@@ -419,6 +419,36 @@ const schema = defineSchema(
       createdAt: v.number(),
     }).index("by_created", ["createdAt"]),
 
+    // ═══ الحاكم السيادي — المراسيم والطوارئ والعزل (المرحلة 1) ═══
+    // كل أمر يصدره الحاكم (أو نائبه بتوقيع مزدوج) يُسجَّل هنا نهائياً —
+    // مع مدة انتهاء تلقائية وإمكانية الإلغاء، ويُقرأ من أنظمة اللعب.
+    sovereignDecrees: defineTable({
+      kind: v.union(
+        v.literal("xp_multiplier"), // مضاعف الخبرة
+        v.literal("coin_multiplier"), // مضاعف العملات
+        v.literal("shop_discount"), // خصم المتجر (٪)
+        v.literal("category_spotlight"), // تخصص الأسبوع المضاعف
+        v.literal("martial_mode"), // وضع الطوارئ
+        v.literal("quarantine"), // عزل لاعب
+      ),
+      value: v.number(), // مضاعف (1.5 = ×1.5) أو نسبة خصم (20 = ٪20) أو معرف تخصص
+      label: v.string(), // وصف عربي مختصر يظهر للاعبين
+      reason: v.string(), // سبب الحاكم (موثّق)
+      targetUserId: v.optional(v.id("users")), // للعزل فقط
+      scope: v.union(v.literal("global"), v.literal("player")),
+      active: v.boolean(),
+      issuedBy: v.id("users"),
+      issuedByName: v.string(),
+      confirmedBy: v.optional(v.id("users")), // البصمة المزدوجة
+      dualSignRequired: v.boolean(),
+      dualSignDeadline: v.optional(v.number()), // 60 ثانية للتأكيد الثاني
+      expiresAt: v.optional(v.number()), // انتهاء تلقائي
+      createdAt: v.number(),
+    })
+      .index("by_active", ["active"])
+      .index("by_kind", ["kind"])
+      .index("by_created", ["createdAt"]),
+
     // A competitive challenge room created by a host.
     games: defineTable({
       code: v.string(), // short join code (e.g. "K7P2MX")
