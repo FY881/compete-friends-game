@@ -377,6 +377,10 @@ function safeReload(): void {
 
 /** v6.0: يُضبط عند كسر حلقة الإعادة — يمنع استراتيجيات reload اللاحقة */
 let reloadLoopBroken = false;
+
+/** v6.2: مزلاج chunk_load — إعادة تحميل واحدة لكل جلسة كحد أقصى؛ إن عاد
+ * الخطأ بعد الإصلاح فلا حلقة: نعرض التقرير ونصعّد فوراً */
+let chunkReloadLatch = typeof sessionStorage !== "undefined" && sessionStorage.getItem("eh_chunk_reload") !== null;
 export function isReloadLoopBroken(): boolean { return reloadLoopBroken; }
 
 function safeNavigate(path: string): void {
@@ -965,7 +969,7 @@ export class ErrorHunter extends Component<Props, State> {
     // Auto-recovery is ONLY allowed in game rooms (/game/*).
     // ════════════════════════════════════════════════════════════════════
     const isPageRoute = !isInGameRoom();
-    if (isPageRoute) {
+    if (isPageRoute && diagnosis.category !== "chunk_load") {
       this.setState({
         healing: false,
         healingResult: null,
@@ -973,6 +977,35 @@ export class ErrorHunter extends Component<Props, State> {
         healingSteps: [],
       });
       this.addTimeline("system_action", "تعطيل الإصلاح التلقائي — الصفحة الرئيسية لا تُعاد تحميل تلقائياً");
+      return;
+    }
+    if (isPageRoute && diagnosis.category === "chunk_load") {
+      // v6.2: فشل تحميل chunk بعد نشر تحديث — إعادة التحميل مع كسر الكاش
+      // هي العلاج الفعلي الوحيد، وحلقة الإعادة غير واردة هنا لأن الـ chunk
+      // الجديد سينجح. ننفّذ مرة واحدة فقط بمزلاج (لا تكرار أبداً).
+      if (chunkReloadLatch) {
+        this.addTimeline("system_action", "🩺 v6.2: محاولة chunk_load ثانية بعد الإصلاح — عرض الشاشة الاحتياطية بدل الإعادة");
+        this.setState({ healing: false, healingResult: "failed", healingMessage: "فشل إصلاح تحميل الملف بعد إعادة التحميل — استخدم زر نسخ التقرير" });
+        this.autoRetryPasses = this.MAX_AUTO_PASSES;
+        this.escalateToOwner();
+        return;
+      }
+      chunkReloadLatch = true;
+      sessionStorage.setItem("eh_chunk_reload", String(Date.now()));
+      this.addTimeline("system_action", "🩺 v6.2: chunk_load — مسح الكاش وإعادة تحميل واحدة آمنة (مزلاج يمنع التكرار)");
+      try {
+        if ("caches" in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map((n) => caches.delete(n)));
+        }
+        if (navigator.serviceWorker?.controller) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch { /* best-effort */ }
+      const url = new URL(window.location.href);
+      url.searchParams.set("_chunkfix", Date.now().toString());
+      window.location.replace(url.toString());
       return;
     }
 
