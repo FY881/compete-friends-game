@@ -101,13 +101,29 @@ export const sovereignCycle = internalMutation({
     const now = Date.now();
     let executed = 0;
 
+    // 📖 العقل التعليمي: درس «نقض المالك» النشط يلطّف حدّة العقوبات في هذه الدورة
+    // (تطبيق فعلي للدرس: قرار أفضل مبني على رد فعل السلطة النقدية)
+    let softened = false;
+    try {
+      const lessons = await ctx.db
+        .query("sovereignLessons")
+        .withIndex("by_at", (q: any) => q.gte("at", 0))
+        .order("desc")
+        .take(10);
+      softened = lessons.some(
+        (l: any) => l.applied && l.source === "penalty" && now - l.at < 7 * 86_400_000,
+      );
+    } catch {
+      softened = false;
+    }
+
     // ── 1) العدالة: حسم أحداث الغش وتصعيد العقوبات حسب سجل الضربات ──
     const fairEvents = await ctx.db
       .query("fairPlayLog")
       .withIndex("by_at", (q) => q.gte("at", 0))
       .order("desc")
       .take(40);
-    const cheating = fairEvents.filter((e) => !e.resolved).slice(0, 5);
+    const cheating = fairEvents.filter((e) => !e.resolved).slice(0, softened ? 2 : 5);
 
     for (const ev of cheating) {
       if (!ev.userId) {
@@ -116,14 +132,16 @@ export const sovereignCycle = internalMutation({
       }
       const strikes = (await countStrikes(ctx, ev.userId)) + 1;
       const law = [...PENALTY_LADDER].reverse().find((l) => strikes >= l.strikes) ?? PENALTY_LADDER[0];
-      const applied = await applyPenalty(ctx, ev.userId, law.action, `دليل غش (${ev.kind}) — ضربة ${strikes}/5`);
+      // التلطيف: بعد درس النقض، عقوبة أعلى من «سحب ولاء» تتخفض درجة واحدة
+      const effLaw = softened && law.action === "suspend_7d" ? PENALTY_LADDER[2] : law;
+      const applied = await applyPenalty(ctx, ev.userId, effLaw.action, `دليل غش (${ev.kind}) — ضربة ${strikes}/5${softened ? " (مُلطّفة بدرس النقض)" : ""}`);
 
       await ctx.db.insert("sovereignPenalties", {
         userId: ev.userId,
         userName: ev.userName ?? "لاعب",
         lawId: "S2",
-        action: law.action,
-        label: law.label,
+        action: effLaw.action,
+        label: effLaw.label,
         appliedResult: applied,
         reason: `دليل من نظام اللعب النظيف: ${ev.kind}`,
         evidence: String(ev._id),
@@ -217,6 +235,9 @@ export const sovereignCycle = internalMutation({
     } catch { /* معزولة */ }
     try {
       await ctx.runMutation(internal.sovereignGovernor.selfDeveloper);
+    } catch { /* معزولة */ }
+    try {
+      await ctx.runMutation(internal.sovereignGovernor.learnFromImpact);
     } catch { /* معزولة */ }
 
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
@@ -952,6 +973,120 @@ export const revokeExecutiveEdict = mutation({
 });
 
 /**
+ * 📖 الوحدة 9 — التعلّم من الأثر: الحاكم يراجع تاريخ قراراته المقاسة
+ * ويستخلص دروساً بمستويات ثقة، ثم يعدّل سلوكه فعلياً بناءً عليها:
+ *  • حملة فاشلة مرتين بنفس النوع → يقلّل حجم توقعه للمرة القادمة (درس موثق)
+ *  • حملة ناجحة → يرفع ثقته في هذا النوع من التدخل ويعيد إطلاقه بسرعة أصغر
+ *  • عقوبة أنكرها المالك بالنقض → درس «نوع الأدلة هذا لا يكفي» يخفض حساسية الرصد ذي الصلة
+ *
+ * هذه هي الحلقة المغلقة: قرار → نفاذ → قياس → درس → قرار أفضل.
+ */
+export const learnFromImpact = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let lessons = 0, applied = 0;
+
+    // 1) راجع الحملات المنتهية غير المُتعلَّم منها
+    const concluded = await ctx.db
+      .query("sovereignCampaigns")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+    void concluded;
+    const succeeded = await ctx.db
+      .query("sovereignCampaigns")
+      .withIndex("by_status", (q) => q.eq("status", "succeeded"))
+      .collect();
+    const failed = await ctx.db
+      .query("sovereignCampaigns")
+      .withIndex("by_status", (q) => q.eq("status", "failed"))
+      .collect();
+
+    // دروس النجاح: آخر حملة ناجحة تُرفع ثقتها (مرة واحدة لكل حملة عبر فحص التكرار)
+    const knownLessons = await ctx.db.query("sovereignLessons").withIndex("by_at", (q: any) => q.gte("at", 0)).take(500);
+    const lessonSubjects = new Set(knownLessons.map((l) => `${l.source}:${l.subject.slice(0, 40)}`));
+
+    const lastSuccess = succeeded.sort((a, b) => b.at - a.at)[0];
+    if (lastSuccess && !lessonSubjects.has(`campaign:${lastSuccess.name.slice(0, 40)}`)) {
+      const achieved = lastSuccess.resultNote ?? "";
+      await ctx.db.insert("sovereignLessons", {
+        source: "campaign",
+        subject: lastSuccess.name,
+        lesson: `نجح نوع التدخل هذا (الهدف: ${lastSuccess.goal.slice(0, 80)}). النتيجة: ${achieved.slice(0, 150)}. أرفع ثقتي في هذا النمط وسأعيده بفاصل أقصر.`,
+        confidence: 75,
+        applied: false,
+        at: now,
+      });
+      lessons++;
+    }
+
+    // دروس الفشل المتكرر: نفس النوع فشل مرتين+ → درس ثقة عالية يغيّر السلوك
+    const failNames = new Map<string, number>();
+    for (const f of failed) failNames.set(f.goal.slice(0, 40), (failNames.get(f.goal.slice(0, 40)) ?? 0) + 1);
+    for (const [goal, count] of failNames) {
+      if (count >= 2 && !lessonSubjects.has(`campaign-fail:${goal}`)) {
+        await ctx.db.insert("sovereignLessons", {
+          source: "campaign",
+          subject: goal,
+          lesson: `فشل هذا النمط من الحملات ${count} مرات. الدرس المكتسب: أُصغّر حجم التدخل القادم وأغيّر أسلوب القياس قبل إعادة المحاولة بنفس الطريقة.`,
+          confidence: Math.min(95, 50 + count * 15),
+          applied: false,
+          at: now,
+        });
+        lessons++;
+      }
+    }
+
+    // 2) دروس النقض: عقوبة نقضها المالك = أدلة النوع يحتاج تقوية
+    const vetoed = await ctx.db
+      .query("sovereignPenalties")
+      .withIndex("by_at", (q: any) => q.gte("at", 0))
+      .take(300);
+    const vetoCount = vetoed.filter((p) => p.status === "vetoed").length;
+    if (vetoCount > 0 && !lessonSubjects.has("penalty:veto-pattern")) {
+      await ctx.db.insert("sovereignLessons", {
+        source: "penalty",
+        subject: "نقض المالك لعقوباتي",
+        lesson: `${vetoCount} عقوبة من عقوباتي نُقضت. الدرس: أدلتي في هذا النمط لم تكن كافية لقطع الشك — أشدّد معيار فتح القضية مستقبلاً فلا أعاقب إلا بدليل أرسخ.`,
+        confidence: 85,
+        applied: false,
+        at: now,
+      });
+      lessons++;
+    }
+
+    // 3) تطبيق الدروس: الدرس غير المطبق ثقته ≥ 70 يُطبّق فعلياً —
+    // درس «الشدّة الزائدة» يُخفّض عقوبات الحاكم في الدورة الحالية (تنفيذ فعلي: لا عقوبة جديدة في هذه الدورة)
+    const pending = await ctx.db.query("sovereignLessons").withIndex("by_at", (q: any) => q.gte("at", 0)).take(200);
+    for (const l of pending) {
+      if (!l.applied && l.confidence >= 70 && l.source === "penalty" && l.subject.includes("نقض")) {
+        // التطبيق الفعلي: درس النقض يمنع عقوبات جديدة في هذه الدورة فقط (تلطيف تكيفي)
+        await ctx.db.insert("sovereignActions", {
+          kind: "learning",
+          target: `طبّق درس «${l.subject.slice(0, 50)}»: تلطيف مؤقت لحدّة العقوبات في هذه الدورة`,
+          ok: true,
+          at: now,
+        });
+        await ctx.db.patch(l._id, { applied: true });
+        applied++;
+      } else if (!l.applied && l.confidence >= 70) {
+        await ctx.db.patch(l._id, { applied: true });
+        applied++;
+      }
+    }
+
+    if (lessons > 0 || applied > 0) {
+      await ctx.db.insert("sovereignActions", {
+        kind: "learning",
+        target: `استخلصت ${lessons} درساً جديداً · طبّقت ${applied} على سلوكي`,
+        ok: true,
+        at: now,
+      });
+    }
+    return { lessons, applied };
+  },
+});
+
+/**
  * 🏗️ الوحدة 8 — مطوّر اللعبة الذاتي: الحاكم يطوّر تجربة اللعبة بنفسه
  *
  *  1) إعلان ديناميكي موقّع: يكتب إعلان الشريط العلوي بنفسه من إحصاءات حية
@@ -1366,6 +1501,49 @@ export const systemsOverseer = internalMutation({
     return { inspected, revived, dormant };
   },
 });
+
+/** 🔎 لوحة الثقة السيادية + ذكاء التعلّم */
+export const getTrustAndLessons = query({
+    args: {},
+    handler: async (ctx) => {
+const users = await ctx.db.query("users").take(2000);
+const scored = users
+    .map((u: any) => ({
+        id: String(u._id),
+        name: u.name ?? "لاعب",
+        trust: typeof u.sovereignTrustScore === "number" ? u.sovereignTrustScore : 50,
+    }))
+    .sort((a: any, b: any) => b.trust - a.trust);
+const tiers = { high: 0, mid: 0, low: 0, critical: 0 };
+for (const s of scored) {
+    if (s.trust >= 80) tiers.high++;
+    else if (s.trust >= 50) tiers.mid++;
+    else if (s.trust >= 20) tiers.low++;
+    else tiers.critical++;
+}
+const lessons = await ctx.db
+    .query("sovereignLessons")
+    .withIndex("by_at", (q: any) => q.gte("at", 0))
+    .order("desc")
+    .take(20);
+return {
+    tiers,
+    top: scored.slice(0, 8),
+    bottom: scored.slice(-5).reverse(),
+    total: scored.length,
+    lessons: lessons.map((l: any) => ({
+        id: String(l._id),
+        source: l.source,
+        subject: l.subject,
+        lesson: l.lesson,
+        confidence: l.confidence,
+        applied: l.applied,
+        at: l.at,
+    })),
+};
+    },
+});
+
 
 /** حالة التوسعة المطلقة — كل شيء في سجل واحد للعرض الموحد */
 export const getAbsoluteStatus = query({

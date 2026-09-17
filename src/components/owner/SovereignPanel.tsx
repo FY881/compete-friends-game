@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Crown, Gavel, ScrollText, Loader2, Landmark, TrendingUp, Undo2, ShieldCheck } from "lucide-react";
+import { Crown, Gavel, ScrollText, Loader2, Landmark, TrendingUp, Undo2, ShieldCheck, BrainCircuit } from "lucide-react";
 
 /**
  * 🛡️ نبضة الحاكم — شريط حي يُعرض أعلى كل تبويب رئيسي في غرفة المالك:
@@ -38,6 +38,57 @@ export function SovereignPulseCard({ compact = false }: { compact?: boolean }) {
         </Button>
       )}
     </div>
+  );
+}
+
+/**
+ * 🧠 لوحة الثقة السيادية وذكاء التعلّم — توزيع درجات الثقة ودروس الحاكم المستخلصة من أثر قراراته.
+ */
+export function TrustAndLessonsCard() {
+  const data = useQuery(api.sovereignGovernor.getTrustAndLessons, {});
+  if (!data) return null;
+  return (
+    <Card className="border-sky-500/25 bg-gradient-to-l from-sky-950/15 to-transparent">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <BrainCircuit className="h-4 w-4 text-sky-400" /> الثقة السيادية وذكاء التعلّم ({data.total} لاعب)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+          <div className="rounded-lg bg-emerald-500/10 p-2"><b className="text-emerald-400">{data.tiers.high}</b><p className="text-muted-foreground">ثقة عالية 80+</p></div>
+          <div className="rounded-lg bg-sky-500/10 p-2"><b className="text-sky-400">{data.tiers.mid}</b><p className="text-muted-foreground">محايد 50-79</p></div>
+          <div className="rounded-lg bg-amber-500/10 p-2"><b className="text-amber-400">{data.tiers.low}</b><p className="text-muted-foreground">منخفضة 20-49</p></div>
+          <div className="rounded-lg bg-rose-500/10 p-2"><b className="text-rose-400">{data.tiers.critical}</b><p className="text-muted-foreground">حرجة أقل من 20</p></div>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          <div className="rounded-lg bg-muted/40 p-2">
+            <p className="mb-1 text-xs font-bold text-emerald-300">أعلى الثقة</p>
+            {data.top.map((t) => (
+              <p key={t.id} className="flex justify-between text-xs"><span>{t.name}</span><b className="text-emerald-400">{t.trust}</b></p>
+            ))}
+          </div>
+          <div className="rounded-lg bg-muted/40 p-2">
+            <p className="mb-1 text-xs font-bold text-rose-300">أدنى الثقة — تحت مراقبة الحاكم</p>
+            {data.bottom.map((t) => (
+              <p key={t.id} className="flex justify-between text-xs"><span>{t.name}</span><b className="text-rose-400">{t.trust}</b></p>
+            ))}
+          </div>
+        </div>
+        {data.lessons.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-bold text-sky-300">دروس استخلصها الحاكم من أثر قراراته</p>
+            {data.lessons.slice(0, 5).map((l) => (
+              <div key={l.id} className="rounded-md border border-sky-500/20 bg-sky-950/10 p-2 text-xs">
+                <span className="font-bold">{l.subject}</span>
+                <Badge variant={l.applied ? "default" : "outline"} className="mr-2 text-[10px]">{l.applied ? "مطبّق" : `ثقة ${l.confidence}`}</Badge>
+                <p className="mt-1 text-muted-foreground">{l.lesson}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -181,6 +232,9 @@ export function SovereignPanel() {
           ))}
         </CardContent>
       </Card>
+
+      {/* المراسيم */}
+      <TrustAndLessonsCard />
 
       {/* المراسيم */}
       <Card>

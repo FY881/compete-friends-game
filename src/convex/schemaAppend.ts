@@ -80,4 +80,14 @@ export const sovereignTables = {
     resultNote: v.optional(v.string()),
     at: v.number(),
   }).index("by_status", ["status"]),
+
+  // 📖 ذاكرة الحاكم التعلمية — درس من كل نتيجة مقاسة، يتطور به سلوكه
+  sovereignLessons: defineTable({
+    source: v.string(), // campaign | penalty | edict | rescue | quality
+    subject: v.string(), // عن ماذا تعلم
+    lesson: v.string(), // الدرس المستخلص بالعربية
+    confidence: v.number(), // 0-100 قوة الدليل
+    applied: v.boolean(), // هل غيّر سلوكه بناءً عليه فعلاً؟
+    at: v.number(),
+  }).index("by_at", ["at"]),
 };
