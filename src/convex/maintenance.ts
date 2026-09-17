@@ -1,4 +1,7 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, action } from "./_generated/server";
+import { v } from "convex/values";
+import { internal } from "./_generated/api";
+// eslint-disable-next-line no-restricted-imports
 
 /**
  * 🧹 نظام AI للصيانة الذاتية — يعمل كل 24 ساعة
@@ -61,3 +64,16 @@ export const pruneAll = internalMutation({
 
 // حافظ على الدالة القديمة للتوافق
 export const pruneOldLogs = pruneAll;
+
+/** تشغيل التنظيف الآن عبر CLI: bunx convex run maintenance:runPrune */
+export const runPrune = action({
+  args: {},
+  handler: async (ctx): Promise<{ deleted: number; stats: Record<string, number> }> => {
+    const res: { deleted: number; stats: Record<string, number> } = await ctx.runMutation(
+      internal.maintenance.pruneAll as never,
+      {},
+    ) as never;
+    console.log("🧹 pruneAll:", JSON.stringify(res));
+    return res;
+  },
+});
