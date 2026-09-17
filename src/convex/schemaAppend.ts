@@ -90,4 +90,42 @@ export const sovereignTables = {
     applied: v.boolean(), // هل غيّر سلوكه بناءً عليه فعلاً؟
     at: v.number(),
   }).index("by_at", ["at"]),
+
+  // 👥 سجل المشرفين السياديين — بشر وAI مساعدون يعيّنهم الحاكم ويعزلهم بنفسه
+  // كل مشرف له نطاق حكم فعلي (scope) وصلاحيات موثقة قابلة للسحب لحظياً
+  sovereignModerators: defineTable({
+    userId: v.optional(v.id("users")), // للبشر — للـ AI يكون فارغاً
+    name: v.string(),
+    kind: v.string(), // human | ai
+    aiMindId: v.optional(v.id("minds")), // للـ AI: أي عقل حي يرأسه
+    scopes: v.array(v.string()), // نطاقات التحكم الفعلية
+    status: v.string(), // active | suspended | removed
+    appointedReason: v.string(), // لماذا عيّنه الحاكم — بالأدلة
+    removedReason: v.optional(v.string()),
+    actionsTaken: v.optional(v.number()), // عدد الأفعال المسجلة باسمه
+    appointedAt: v.number(),
+    removedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_user", ["userId"]),
+
+  // 📜 سجل أفعال المشرفين — كل ما فعله مشرف (بشر أو AI) يوثّق هنا علناً
+  sovereignModActions: defineTable({
+    moderatorId: v.id("sovereignModerators"),
+    modName: v.string(),
+    scope: v.string(),
+    action: v.string(),
+    target: v.optional(v.string()),
+    ok: v.boolean(),
+    at: v.number(),
+  }).index("by_at", ["at"]),
+
+  // 🧩 مفاتيح أقسام غرفة المالك — الحاكم يفتح ويغلق أقساماً كاملة بنفسه
+  // المالك وحده يرى مفتاح الحاكم — الأقسام المغلقة تنطفئ فعلياً عن الجميع
+  sovereignSectionLocks: defineTable({
+    section: v.string(), // معرّف القسم
+    locked: v.boolean(),
+    reason: v.string(),
+    at: v.number(),
+  }).index("by_section", ["section"]),
 };

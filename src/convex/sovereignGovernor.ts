@@ -194,6 +194,7 @@ export const sovereignCycle = internalMutation({
     // ── 3.5) الوحدات السيادية المتقدمة — تُشغَّل كل دورة بلا انتظار ──
     let courtTried = 0, flaggedCases = 0, whalesCaught = 0;
     let intelAlerts = 0, custodianCleaned = 0, campaigns = 0, chatDeleted = 0, chatPenalized = 0;
+    let modAppointed = 0, modRemoved = 0, modAudited = 0;
     try {
       const scan = await ctx.runMutation(internal.sovereignGovernor.deepBehaviorScan);
       flaggedCases = scan.flagged;
@@ -239,12 +240,21 @@ export const sovereignCycle = internalMutation({
     try {
       await ctx.runMutation(internal.sovereignGovernor.learnFromImpact);
     } catch { /* معزولة */ }
+    try {
+      const mods = await ctx.runMutation(internal.sovereignMods.moderatorCommand);
+      modAppointed = mods.appointed;
+      modRemoved = mods.removed;
+      modAudited = mods.audited;
+    } catch { /* معزولة */ }
+    try {
+      await ctx.runMutation(internal.sovereignMods.sectionWarden);
+    } catch { /* معزولة */ }
 
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
     await ctx.db.insert("governorActions", {
       agentName: "الحاكم السيادي",
       agentDept: "السيادة",
-      summary: `دورة سيادية: ${executed} قرارات مباشرة · محكمة: ${courtTried} · كشف: ${flaggedCases} · حيتان: ${whalesCaught} · استباق: ${intelAlerts} إنذاراً · تنظيف: ${custodianCleaned} · حملات: ${campaigns} · دردشة: ${chatDeleted} حذفاً/${chatPenalized} عقوبة — بلا انتظار أحد`,
+      summary: `دورة سيادية: ${executed} قرارات مباشرة · محكمة: ${courtTried} · كشف: ${flaggedCases} · حيتان: ${whalesCaught} · استباق: ${intelAlerts} إنذاراً · تنظيف: ${custodianCleaned} · حملات: ${campaigns} · دردشة: ${chatDeleted} حذفاً/${chatPenalized} عقوبة · مشرفون: ${modAppointed}+/${modRemoved}- تدقيق ${modAudited} — بلا انتظار أحد`,
       createdAt: now,
     });
 
