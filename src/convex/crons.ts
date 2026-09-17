@@ -2,66 +2,23 @@ import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
 
 // ═══════════════════════════════════════════════════════════════
-// جدول مجدوَل مصغَّر جذرياً — وضع الاستقرار الأقصى 🛡
+// 🛡 وضع الاستقرار الأقصى — مهمة واحدة فقط
 //
-// الهدف: عدم تجاوز حدود الخطة المجانية أبداً حتى لا يُعطَّل
-// النشر (deployments disabled). لذلك أُلغيت كل المهام غير
-// الأساسية نهائياً، وبقيت 6 مهام ضرورية فقط بفترات 12–24 ساعة.
+// الهدف: نظام لا ينقطع أبداً. كل مهام الخلفية الأخرى أُلغيت
+// نهائياً حتى لا تتجاوز حصة الخطة المجانية أبداً:
+//   leagues rollover, crown locks, scheduled questions,
+//   seasons rollover, clans crown — أصبحت تعمل عند الطلب فقط
+//   (من غرفة المالك أو من تفاعل اللاعبين).
 //
-// المهام الملغاة (كانت تستهلك الحصة الأكبر):
-//   autoAdmin, crownDeck.measureDecision, apkSync, aiGuardian,
-//   errorHunter (تشريح + تنبؤ), streakRiskSweep, autoTournament,
-//   worldChampionship, aiGovernor, aiHub (bridge + prune),
-//   aiAgents.lifeTick, livingMinds.lifeTick, highlights,
-//   clanWars (matchmake + settle), geminiDoctor, geminiApex,
-//   sovereignGovernor.sovereignCycle, smartNotifications
+// المتبقي: نظام AI للصيانة الذاتية كل 24 ساعة — يحذف السجلات
+// القديمة من كل الجداول الكبيرة للحفاظ على التخزين وسرعة
+// الاستعلامات (internal.maintenance.pruneAll).
 // ═══════════════════════════════════════════════════════════════
 
 const crons = cronJobs();
 
-// 🏆 تصفير النقاط الأسبوعية للدوريات
 crons.interval(
-  "leagues-weekly-rollover",
-  { hours: 24 },
-  internal.leagues.weeklyRollover,
-  {},
-);
-
-// 👑 فتح الأقفال الطارئة المنتهية
-crons.interval(
-  "crown-expire-locks",
-  { hours: 12 },
-  internal.crownDeck.expireLocks,
-  {},
-);
-
-// 🎯 اعتماد الأسئلة المجدولة من المالك
-crons.interval(
-  "question-scheduled-publish",
-  { hours: 12 },
-  internal.aiQuestions.publishScheduled,
-  {},
-);
-
-// 🔄 إغلاق المواسم المنتهية وفتح الموسم التالي
-crons.interval(
-  "season-auto-rollover",
-  { hours: 24 },
-  internal.seasons.autoRollover,
-  {},
-);
-
-// 👑 تاج العشائر الأسبوعي
-crons.interval(
-  "clan-weekly-crown",
-  { hours: 24 },
-  internal.clans.weeklyCrown,
-  {},
-);
-
-// 🧹 الصيانة الذاتية — كل 24 ساعة: حذف السجلات القديمة (11 جدول)
-crons.interval(
-  "log-pruning",
+  "ai-self-maintenance-daily",
   { hours: 24 },
   internal.maintenance.pruneAll,
   {},
