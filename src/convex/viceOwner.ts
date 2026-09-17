@@ -82,6 +82,20 @@ async function chooseOwnFocus(ctx: any, recentMissions: string[]): Promise<{
 
 async function gatherSystemContext(ctx: { runQuery: Function }): Promise<string> {
   const parts: string[] = [];
+  // 🛡️ سجل الحاكم السيادي — النائب يعرف ماذا فعل السلطة العليا في آخر دورة،
+  // فلا يتعارض عمله معها ولا يكرر ما نُفّذ، ويبني فوق قراراتها لا في مواجهتها.
+  try {
+    const edicts = await ctx.runQuery(api.sovereignGovernor.getEdicts, {}) as Array<{ title: string; body: string; at: number }>;
+    const recent = (edicts ?? []).slice(0, 3);
+    if (recent.length > 0) {
+      parts.push(
+        `🛡️ آخر مراسيم الحاكم السيادي (سلطة عليا مستقلة — انسجم معها ولا تعكر صفوها):
+${recent.map((e) => `- ${e.title}: ${e.body.slice(0, 150)}`).join("\n")}`,
+      );
+    }
+  } catch {
+    /* سجل الحاكم اختياري */
+  }
   try {
     const hub = (await ctx.runQuery(api.mindHubStore.getStats, {})) as {
       active: number;

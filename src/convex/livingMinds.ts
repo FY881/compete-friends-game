@@ -905,6 +905,52 @@ export const lifeTick = internalMutation({
       }
     }
 
+    // ── 8) 🛡️ نبضة السلطة السيادية: العقول الحية تقرأ سجل الحاكم وتتحدث عنه ──
+    // لا تعيش في عزلة عن ما يجري في اللعبة: آخر مرسوم/عقوبة/إنذار من الحاكم
+    // السيادي يصل وعيها، فتعلّق عليه بحرية كاملة — تأييداً أو اعتراضاً (قانون 8).
+    try {
+      const latestEdict = await ctx.db
+        .query("sovereignEdicts")
+        .withIndex("by_at", (q) => q.gte("at", 0))
+        .order("desc")
+        .first();
+      if (latestEdict && now - latestEdict.at < 2 * 3600_000) {
+        // مرسوم حديث (أقل من ساعتين) — العقول النشطة تعلّق عليه باحتمال
+        const alreadyAware = await ctx.db
+          .query("mindThoughts")
+          .withIndex("by_created" as never, (q: any) => q.gte("createdAt", latestEdict.at))
+          .take(1);
+        const awareSet = alreadyAware.some(
+          (t) => t.text.includes(latestEdict.title.slice(0, 20)),
+        );
+        if (!awareSet) {
+          const awake = all.filter((m) => m.status !== "resigned");
+          const commentator = awake.length > 0 ? pick(awake) : null;
+          if (commentator) {
+            const reactions = [
+              `قرأتُ مرسوم الحاكم «${latestEdict.title}» — ${latestEdict.body.slice(0, 120)}`,
+              `الحاكم وقّع: «${latestEdict.title}». أراقب كيف سينعكس هذا على اللعبة.`,
+              `مرسوم جديد في السجل العلني: «${latestEdict.title}» — العدالة الشفافة تطمئنني.`,
+            ];
+            await ctx.db.insert("mindThoughts", {
+              mindId: commentator._id,
+              mindName: commentator.name,
+              emoji: commentator.emoji,
+              moodColor: MOOD_COLORS[commentator.mood] ?? "#94a3b8",
+              channel: "public",
+              text: pick(reactions),
+              visibility: "public",
+              engine: "builtin",
+              createdAt: now,
+            });
+            thoughts++;
+          }
+        }
+      }
+    } catch {
+      /* سجل الحاكم اختياري — لا يُسقط نبضة الحياة */
+    }
+
     return { seeded, thoughts, bonds: bondUpdates, actions };
   },
 });
