@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 
@@ -848,6 +848,109 @@ export const chatGuardianSweep = internalMutation({
   },
 });
 
+// ═════════════════════ السلطة التنفيذية الحقيقية ═════════════════════
+// هذه ليست سجلات — هذه مفاتيح تُغيّر سلوك الأنظمة الفعلية لحظياً.
+// الحاكم السيادي ونائب المالك فقط يقرآنها ويكتبانها. لا أحد غيرهما.
+
+/**
+ * 🎛️ قراءة أذرع التحكم الحية — من آلية فعلية واحدة:
+ * تُقرأ في computeMultiplier فتغيّر مكافآت كل لاعب فعلياً في كل جولة،
+ * وتُقرأ في pickAdaptiveQuestions فتغيّر صعوبة أسئلة كل جولة فعلياً.
+ */
+async function getControlLevers(ctx: any): Promise<{
+  rewardAdjust: number;
+  difficultyBias: number;
+  activeEdict: { id: string; kind: string; title: string } | null;
+}> {
+  const now = Date.now();
+  const active = await ctx.db
+    .query("sovereignEdicts")
+    .withIndex("by_at", (q: any) => q.gte("at", 0))
+    .order("desc")
+    .take(20);
+  const live = active.find(
+    (e: any) =>
+      e.active &&
+      (e.kind === "economy" || e.kind === "difficulty" || e.kind === "reward_override") &&
+      (!e.expiresAt || e.expiresAt > now),
+  );
+  if (!live) return { rewardAdjust: 0, difficultyBias: 0, activeEdict: null };
+
+  const ev = live.evidence ?? {};
+  const rewardAdjust = typeof ev.rewardAdjust === "number" ? Math.max(-0.5, Math.min(0.5, ev.rewardAdjust)) : 0;
+  const difficultyBias = typeof ev.difficultyBias === "number" ? Math.max(-0.3, Math.min(0.3, ev.difficultyBias)) : 0;
+  return { rewardAdjust, difficultyBias, activeEdict: { id: String(live._id), kind: live.kind, title: live.title } };
+}
+
+/** نقطة القراءة في مكافآت التكيف — تصدير داخلي للربط */
+export const getControlLeversInternal = internalQuery({
+  handler: async (ctx: any) => getControlLevers(ctx),
+});
+
+/**
+ * ⚡ تنفيذ مرسوم تنفيذي فعلي — الحاكم يوقّع والسلوك يتغير فوراً.
+ * kind: reward_override (بأذرع rewardAdjust/difficultyBias في evidence)
+ */
+export const issueExecutiveEdict = internalMutation({
+  args: {
+    kind: v.string(),
+    title: v.string(),
+    body: v.string(),
+    evidence: v.optional(v.any()),
+    durationHours: v.optional(v.number()),
+  },
+  handler: async (ctx, { kind, title, body, evidence, durationHours }) => {
+    const now = Date.now();
+    // أوقف أي مرسوم تنفيذي سابق من نفس النوع — مرسوم واحد نافذ لكل نوع
+    const existing = await ctx.db
+      .query("sovereignEdicts")
+      .withIndex("by_at", (q: any) => q.gte("at", 0))
+      .take(50);
+    for (const e of existing) {
+      if (e.kind === kind && e.active) await ctx.db.patch(e._id, { active: false });
+    }
+    const id = await ctx.db.insert("sovereignEdicts", {
+      kind,
+      title,
+      body,
+      evidence: evidence ?? undefined,
+      active: true,
+      at: now,
+      expiresAt: durationHours ? now + durationHours * 3600_000 : undefined,
+    } as any);
+    return { id: String(id) };
+  },
+});
+
+/** حالة أذرع التحكم الحالية — للعرض في اللوحة */
+export const getLeversStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    return await getControlLevers(ctx);
+  },
+});
+
+/** إلغاء مرسوم تنفيذي نافذ (للمالك — الاستثناء الوحيد، ولأنظمة الاختبار) */
+export const revokeExecutiveEdict = mutation({
+  args: { edictId: v.string() },
+  handler: async (ctx, { edictId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("يجب تسجيل الدخول");
+    if (!(await isOwnerCheck(ctx))) throw new Error("للمالك فقط");
+    const e = await ctx.db.get(edictId as any);
+    if (!e) throw new Error("المرسوم غير موجود");
+    await ctx.db.patch(e._id, { active: false });
+    await ctx.db.insert("sovereignEdicts", {
+      kind: "veto",
+      title: "↩️ إلغاء مرسوم تنفيذي",
+      body: `أُلغي المرسوم «${(e as any).title}» بيد المالك — الأذرع عادت للوضع الافتراضي فوراً.`,
+      active: false,
+      at: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
 /**
  * 🏗️ الوحدة 8 — مطوّر اللعبة الذاتي: الحاكم يطوّر تجربة اللعبة بنفسه
  *
@@ -975,23 +1078,22 @@ export const selfDeveloper = internalMutation({
         .first();
       const quiet = !lastQ || lastQ.kind !== "difficulty" || now - lastQ.at > 3 * 86_400_000;
       if (quiet && accuracy > 0.85) {
-        await ctx.db.insert("sovereignEdicts", {
+        // ⚡ مرسوم تنفيذي حقيقي: يغيّر صعوبة الأسئلة فعلياً عبر difficultyBias
+        await ctx.runMutation(internal.sovereignGovernor.issueExecutiveEdict, {
           kind: "difficulty",
-          title: "📈 مرسوم رفع التحدي",
-          body: `دقة المجتمع ${Math.round(accuracy * 100)}% عبر ${totalA} إجابة — أعلى من المريح. وقّعتُ توجيهاً لمحرك الأسئلة التكيفي برفع نسبة الصعب تدريجياً في الدورات القادمة.`,
-          evidence: { accuracy: Math.round(accuracy * 100), answers: totalA },
-          active: true,
-          at: now,
+          title: "📈 مرسوم رفع التحدي — نافذ فوراً",
+          body: `دقة المجتمع ${Math.round(accuracy * 100)}% عبر ${totalA} إجابة — أعلى من المريح. وقّعتُ مرسوماً تنفيذياً: صعوبة الأسئلة ترتفع فعلياً (+8% نسبة الصعب) اعتباراً من الجولة القادمة.`,
+          evidence: { accuracy: Math.round(accuracy * 100), answers: totalA, difficultyBias: 0.08 },
+          durationHours: 72,
         });
         actions++;
       } else if (quiet && accuracy < 0.35) {
-        await ctx.db.insert("sovereignEdicts", {
+        await ctx.runMutation(internal.sovereignGovernor.issueExecutiveEdict, {
           kind: "difficulty",
-          title: "📉 مرسوم تخفيف القسوة",
-          body: `دقة المجتمع ${Math.round(accuracy * 100)}% عبر ${totalA} إجابة — أصعب من اللازم. وقّعتُ مسار تأهيل: نسبة الصعب تنخفض تدريجياً حتى يستعيد اللاعبون ثقتهم.`,
-          evidence: { accuracy: Math.round(accuracy * 100), answers: totalA },
-          active: true,
-          at: now,
+          title: "📉 مرسوم تخفيف القسوة — نافذ فوراً",
+          body: `دقة المجتمع ${Math.round(accuracy * 100)}% عبر ${totalA} إجابة — أصعب من اللازم. وقّعتُ مرسوماً تنفيذياً: الصعوبة تنخفض فعلياً (−8%) حتى يستعيد اللاعبون ثقتهم.`,
+          evidence: { accuracy: Math.round(accuracy * 100), answers: totalA, difficultyBias: -0.08 },
+          durationHours: 72,
         });
         actions++;
       }

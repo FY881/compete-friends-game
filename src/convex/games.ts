@@ -376,7 +376,18 @@ export async function pickAdaptiveQuestions(
   } catch {
     /* الافتراضي متوسط */
   }
-  const hardRatio = Math.min(0.4, Math.max(0.1, skill * 0.5));
+  let hardRatio = Math.min(0.4, Math.max(0.1, skill * 0.5));
+
+  // 🎛️ مرسوم الحاكم السيادي التنفيذي — صعوبة فعلية بقرار السلطة العليا
+  try {
+    const levers = (await ctx.runQuery(internal.sovereignGovernor.getControlLeversInternal, {})) as {
+      difficultyBias: number;
+    };
+    if (levers.difficultyBias !== 0) {
+      const biased = hardRatio + levers.difficultyBias;
+      hardRatio = Math.min(0.5, Math.max(0.05, biased));
+    }
+  } catch { /* الأذرع اختيارية */ }
 
   // ── 2.5) تخصصات العقل: الحقول التي أتقنها اللاعب تحصل على أثر أكبر ──
   // الإتقان يخفّض الترجيح قليلاً (تعطي أسئلة متنوعة) بينما الحقول الأضعف

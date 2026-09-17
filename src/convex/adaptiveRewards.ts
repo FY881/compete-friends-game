@@ -102,6 +102,25 @@ async function computeMultiplier(
     factors.push({ key: "prestige", label: "نقاط الهيبة", effect: `+${Math.round(prestigeBonus * 100)}%`, value: prestigeBonus });
   }
 
+  // 7) 🎛️ مرسوم الحاكم السيادي التنفيذي — سلطة حقيقية تغيّر المكافآت فعلياً
+  // هذا ليس سجلاً للقراءة: مرسوم reward_override النافذ يعدّل مضاعف كل
+  // مكافأة تكيفية في كل جولة لحظياً، بصوت السلطة العليا.
+  try {
+    const levers = (await ctx.runQuery(internal.sovereignGovernor.getControlLeversInternal, {})) as {
+      rewardAdjust: number;
+      activeEdict: { title: string } | null;
+    };
+    if (levers.rewardAdjust !== 0) {
+      multiplier += levers.rewardAdjust;
+      factors.push({
+        key: "sovereign",
+        label: "⚖️ مرسوم الحاكم السيادي",
+        effect: `${levers.rewardAdjust > 0 ? "+" : ""}${Math.round(levers.rewardAdjust * 100)}%`,
+        value: levers.rewardAdjust,
+      });
+    }
+  } catch { /* الأذرع اختيارية — لا تُعطل المكافأة */ }
+
   return {
     base: 0,
     multiplier: Math.round(multiplier * 100) / 100,
