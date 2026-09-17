@@ -1,6 +1,7 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 
 // ═══════════════════════════════════════════════════════════════════════
 // SEASONS & ACHIEVEMENTS SYSTEM
@@ -18,6 +19,132 @@ export const getActiveSeason = query({
       (s) => s.active && s.startAt <= now && s.endAt >= now
     );
     return active ?? null;
+  },
+});
+
+/**
+ * 🔄 الموسم المتجدد — دورة حياة آلية كاملة (تستدعيها cron كل ساعة):
+ *
+ *  1. يغلق الموسم المنتهي (endAt مضى) ويمنح مكافآت أعلى 10 من seasonScores
+ *     (نقاط ولاء + XP حقيقيان على الحساب) — لا مكافآت وهمية.
+ *  2. يفتح الموسم التالي آلياً: رقم تصاعدي، اسم متجدد، 30 يوماً،
+ *     وشرائح مكافآت موثقة — بلا أي تدخل من المالك.
+ *  3. يثبّت كل شيء في سجل مركز الذكاء الموحد (وحدة التحكم) + سجل الحاكم.
+ *  4. Idempotent: لو لم يوجد موسم منتهٍ فلا يفعل شيئاً — ومنع ازدواج
+ *     الموسم المفتوح مضمون بفحص active قبل الإنشاء.
+ */
+export const autoRollover = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const DAY = 86_400_000;
+    const all = await ctx.db.query("seasons").collect();
+
+    // ── 0) لا مواسم إطلاقاً؟ أنشئ الأول آلياً (بذرة نظام المتجدد) ──
+    if (all.length === 0) {
+      await ctx.db.insert("seasons", {
+        name: "موسم العقول المتوهجة #1",
+        number: 1,
+        startAt: now,
+        endAt: now + 30 * DAY,
+        active: true,
+        rewards: [
+          { rank: 1, badge: "👑 بطل الموسم", xp: 2000 },
+          { rank: 2, badge: "🥈 نائب البطل", xp: 1500 },
+          { rank: 3, badge: "🥉 ثالث السلم", xp: 1000 },
+          { rank: 10, badge: "🏅 نخبة العشرة", xp: 500 },
+          { rank: 50, badge: "🎯 ضمن الخمسين", xp: 150 },
+        ],
+      });
+      try {
+        await ctx.runMutation(internal.aiHub.logEvent, {
+          unit: "doctor",
+          kind: "decision",
+          severity: "info",
+          summary: "🔄 أُطلق الموسم الأول آلياً — نظام المواسم المتجددة يعمل الآن بلا تدخل بشري (30 يوماً، إغلاق ومكافآت وفتح تلقائي)",
+        });
+      } catch {
+        /* المركز اختياري */
+      }
+      return { action: "seeded" as const, opened: 1 };
+    }
+
+    // ── 1) إغلاق الموسم المنتهي + منح المكافآت ──
+    const expired = all.find((s) => s.active && s.endAt < now);
+    if (!expired) return { action: "none" as const };
+
+    const top = await ctx.db
+      .query("seasonScores")
+      .withIndex("by_season", (q) => q.eq("seasonNumber", expired.number))
+      .order("desc")
+      .take(10);
+
+    let rewarded = 0;
+    for (let i = 0; i < top.length; i++) {
+      const entry = top[i];
+      const rank = i + 1;
+      const loyaltyReward = rank <= 3 ? 500 : rank <= 10 ? 200 : 0;
+      const xpReward = rank <= 3 ? 2000 : rank <= 10 ? 800 : 0;
+      if (loyaltyReward === 0) continue;
+      try {
+        await ctx.runMutation(internal.loyalty.awardPoints, {
+          userId: entry.userId,
+          amount: loyaltyReward,
+          reason: `مكافأة الموسم ${expired.number} — المرتبة ${rank}`,
+        });
+      } catch {
+        /* الولاء اختياري */
+      }
+      const user = await ctx.db.get(entry.userId);
+      if (user) {
+        const curXp = ((user as Record<string, unknown>).totalXp as number) ?? 0;
+        await ctx.db.patch(user._id, { totalXp: curXp + xpReward } as Record<string, unknown>);
+        rewarded++;
+      }
+    }
+
+    await ctx.db.patch(expired._id, { active: false });
+
+    // ── 2) فتح الموسم التالي آلياً ──
+    const SEASON_NAMES = [
+      "موسم العقول المتوهجة",
+      "موسم حرب المعرفة",
+      "موسم الأسئلة العظيمة",
+      "موسم تاج الحكمة",
+      "موسم النخبة الفكرية",
+    ];
+    const nextNumber = expired.number + 1;
+    const hasOpen = all.some((s) => s.active);
+    if (!hasOpen) {
+      await ctx.db.insert("seasons", {
+        name: `${SEASON_NAMES[nextNumber % SEASON_NAMES.length]} #${nextNumber}`,
+        number: nextNumber,
+        startAt: now,
+        endAt: now + 30 * DAY,
+        active: true,
+        rewards: [
+          { rank: 1, badge: "👑 بطل الموسم", xp: 2000 },
+          { rank: 2, badge: "🥈 نائب البطل", xp: 1500 },
+          { rank: 3, badge: "🥉 ثالث السلم", xp: 1000 },
+          { rank: 10, badge: "🏅 نخبة العشرة", xp: 500 },
+          { rank: 50, badge: "🎯 ضمن الخمسين", xp: 150 },
+        ],
+      });
+    }
+
+    // ── 3) توثيق في المركز الموحد ──
+    try {
+      await ctx.runMutation(internal.aiHub.logEvent, {
+        unit: "doctor",
+        kind: "decision",
+        severity: "info",
+        summary: `🔄 الموسم ${expired.number} «${expired.name}» أُغلق آلياً — كُوفئ ${rewarded} لاعباً من النخبة، وفتح الموسم ${nextNumber} لمدة 30 يوماً`,
+      });
+    } catch {
+      /* المركز اختياري */
+    }
+
+    return { action: "rolled" as const, closed: expired.number, opened: nextNumber, rewarded };
   },
 });
 
@@ -205,6 +332,40 @@ export const recordGameCompletion = mutation({
     if (achievements.length >= 10 && !achievements.includes("collector")) {
       achievements.push("collector");
       newAchievement = "collector";
+    }
+
+    // 🔄 لوحة شرف الموسم الحي — كل جولة مكتملة تتراكم في seasonScores
+    // للموسم المفتوح حالياً، فتصبح مكافآت الإغلاق الآلي مبنية على أدلة حقيقية.
+    try {
+      const now2 = Date.now();
+      const seasons = await ctx.db.query("seasons").collect();
+      const active = seasons.find((s) => s.active && s.startAt <= now2 && s.endAt >= now2);
+      if (active) {
+        const existing = await ctx.db
+          .query("seasonScores")
+          .withIndex("by_user_season", (q) =>
+            q.eq("userId", userId).eq("seasonNumber", active.number))
+          .first();
+        const scoreGain = args.score + (args.isPerfect ? 100 : 0);
+        const won = args.score > 0;
+        if (existing) {
+          await ctx.db.patch(existing._id, {
+            totalScore: existing.totalScore + scoreGain,
+            gamesPlayed: existing.gamesPlayed + 1,
+            wins: existing.wins + (won ? 1 : 0),
+          });
+        } else {
+          await ctx.db.insert("seasonScores", {
+            userId,
+            seasonNumber: active.number,
+            totalScore: scoreGain,
+            gamesPlayed: 1,
+            wins: won ? 1 : 0,
+          });
+        }
+      }
+    } catch {
+      /* لوحة الموسم اختيارية — لا تعطل الجولة */
     }
 
     await ctx.db.patch(userId, {

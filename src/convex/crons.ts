@@ -288,3 +288,12 @@ crons.interval(
   internal.sovereignGovernor.sovereignCycle,
   {},
 );
+
+// 🔄 الموسم المتجدد — كل ساعة: يغلق الموسم المنتهي آلياً، يمنح مكافآت
+// النخبة (ولاء + XP حقيقيان)، ويفتح الموسم التالي لمدة 30 يوماً — بلا تدخل المالك.
+crons.interval(
+  "season-auto-rollover",
+  { minutes: 60 },
+  internal.seasons.autoRollover,
+  {},
+);
