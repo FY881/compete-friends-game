@@ -212,6 +212,9 @@ export const sovereignCycle = internalMutation({
     try {
       await ctx.runMutation(internal.sovereignGovernor.trustScoreSweep);
     } catch { /* معزولة */ }
+    try {
+      await ctx.runMutation(internal.sovereignGovernor.membershipGovernorSweep);
+    } catch { /* معزولة */ }
 
     // ── 4) نبضة شفافية: سجل دورة كاملة علناً ──
     await ctx.db.insert("governorActions", {
@@ -839,6 +842,103 @@ export const chatGuardianSweep = internalMutation({
       }
     }
     return { deleted, penalized };
+  },
+});
+
+/**
+ * 👑 الوحدة 7 — الحاكم على العضويات: يدارة الصلاحيات ذاتياً بصرامة حقيقية
+ *
+ *  1) الخفض التلقائي: عضوية منتهية تُخفَّد فوراً إلى البرونزي — لا أحد يظل
+ *     يتمتع بمضاعفات ودخول ألعاب متقدمة بعد انتهاء عضويته.
+ *  2) سحب عقابي: لاعب بإيقاف دائم أو 4+ ضربات يُسحب منه التمييز فوراً
+ *     — العضوية امتياز لا يحمله من أثبت النظام استحالته.
+ *  3) مكافأة سلوك: لاعب نظيف 30 يوماً بثقة سيادية ≥ 80 يحصل على برونزية
+ *     ممنوحة بوقيعه (إن لم يملك شيئاً) — تكريم بقراره لا بأمر أحد.
+ */
+export const membershipGovernorSweep = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const memberships = await ctx.db.query("memberships").collect();
+    let downgraded = 0, confiscated = 0, awarded = 0;
+
+    for (const m of memberships) {
+      if (m.tier === "bronze") continue;
+      const uid = m.userId as any;
+      const user = await ctx.db.get(uid) as any;
+      if (!user) continue;
+
+      const expired = m.expiresAt !== undefined && m.expiresAt !== null && m.expiresAt <= now;
+      const permanentlyBanned = Boolean(user.bannedPermanent);
+      const suspended = Boolean(user.bannedUntil && user.bannedUntil > now);
+
+      // 1) الخفض التلقائي المنتهية
+      if (expired) {
+        await ctx.db.patch(m._id, { tier: "bronze", expiresAt: undefined });
+        await ctx.db.insert("membershipLogs", {
+          actor: "sovereign", actorName: "الحاكم السيادي", action: "revoke",
+          targetUserId: uid, targetName: user.name ?? "لاعب", tier: "bronze",
+          detail: `⚖️ عضوية ${m.tier} انتهت — خُفّضت آلياً إلى البرونزي بسلطة الحاكم`,
+          at: now,
+        });
+        downgraded++;
+        continue;
+      }
+
+      // 2) السحب العقابي: حظر دائم أو 4+ ضربات سارية
+      if (permanentlyBanned || suspended) {
+        const strikes = await countStrikes(ctx, uid);
+        if (permanentlyBanned || strikes >= 4) {
+          await ctx.db.patch(m._id, { tier: "bronze" });
+          await ctx.db.insert("membershipLogs", {
+            actor: "sovereign", actorName: "الحاكم السيادي", action: "revoke",
+            targetUserId: uid, targetName: user.name ?? "لاعب", tier: "bronze",
+            detail: `⚖️ سُحبت عضوية ${m.tier} عقابياً (${permanentlyBanned ? "حظر دائم" : `${strikes} ضربات`}): امتياز لا يحمله من أثبت النظام استحالته`,
+            at: now,
+          });
+          confiscated++;
+          continue;
+        }
+      }
+
+      // 3) المكافأة السلوكية — لاعب نظيف بثقة عالية وعضوية منتهية صلاحياً → ترقية مؤقتة
+      const trust = typeof user.sovereignTrustScore === "number" ? user.sovereignTrustScore : 50;
+      if (trust >= 80 && !user.bannedPermanent) {
+        const dayRounds = await ctx.db
+          .query("gameHistory")
+          .withIndex("by_user", (q: any) => q.eq("userId", uid))
+          .order("desc")
+          .take(30);
+        const hasRecent = dayRounds.some((r) => r.playedAt > now - 30 * 86_400_000);
+        if (hasRecent) {
+          await ctx.db.patch(m._id, { tier: "silver", activatedAt: now, expiresAt: now + 7 * 86_400_000 });
+          await ctx.db.insert("membershipLogs", {
+            actor: "sovereign", actorName: "الحاكم السيادي", action: "grant",
+            targetUserId: uid, targetName: user.name ?? "لاعب", tier: "silver",
+            detail: `🏆 كافأ الحاكم اللاعب بفضية 7 أيام: ثقة سيادية ${trust} وجولة خلال 30 يوماً — قراره وحده`,
+            at: now,
+          });
+          awarded++;
+        }
+      }
+    }
+
+    if (downgraded + confiscated + awarded > 0) {
+      await ctx.db.insert("sovereignActions", {
+        kind: "membership",
+        target: `خفّض ${downgraded} منتهية · سحب ${confiscated} عقابياً · كافأ ${awarded} بنفسه`,
+        ok: true,
+        at: now,
+      });
+      try {
+        await ctx.runMutation(internal.aiHub.logEvent, {
+          unit: "sovereign",
+          kind: "decision",
+          severity: "info",
+          summary: `👑 سلطة العضويات: ${downgraded} خفضاً تلقائياً · ${confiscated} سحباً عقابياً · ${awarded} مكافأة سلوكية بوقيعه`,
+        });
+      } catch { /* المركز اختياري */ }
+    }
+    return { downgraded, confiscated, awarded };
   },
 });
 
