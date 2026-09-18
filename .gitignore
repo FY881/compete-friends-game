@@ -3,5 +3,15 @@ node_modules
 dist
 src/convex/_generated
 
+# 🧹 منع تضخّم التخزين مجدداً (السبب الجذري لامتلاء قرص الـ VM)
+# «isolate/» كانت نسخة كاملة مكررة من public/ تُخزَّن داخل المشروع بلا فائدة.
+isolate/
+# ملفات APK الميتة داخل الكود — لا يستوردها أي ملف؛ الإصدارات تُستضاف خارجياً.
+src/assets/*.apk
+# كاشات بناء وسيطة
+.vite
+.turbo
+.cache
+
 # Native Android project is generated fresh by the CI workflow (cap add android)
 android
