@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { sounds } from "@/lib/sounds";
+// 🏅 أنظمة العضوية 4.0 (فرق/رتب/تجديد/خزنة) — مراقبة وتحكم فعلي للمالك
+import { MembershipOpsPanel } from "@/components/membership/MembershipOwnerPanel";
 import {
   Crown,
   Users,
@@ -569,7 +571,9 @@ function StewardPanel() {
 
 // ─── Main Component ───────────────────────────────────────────
 export default function MembershipAdmin() {
-  const [activeTab, setActiveTab] = useState<"overview" | "codes" | "honor" | "settings" | "steward">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "codes" | "honor" | "settings" | "steward" | "ops"
+  >("overview");
   const stats = useQuery(api.membershipSystem.getMembershipStats);
   const data = useQuery(api.membershipSystem.getOwnerMembershipData);
 
@@ -591,6 +595,7 @@ export default function MembershipAdmin() {
           { id: "honor" as const, label: "لوحة الشرف", icon: Trophy },
           { id: "settings" as const, label: "الإعدادات", icon: Settings },
           { id: "steward" as const, label: "حارسة العضويات", icon: Gem },
+          { id: "ops" as const, label: "أنظمة 4.0", icon: BarChart3 },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -728,6 +733,11 @@ export default function MembershipAdmin() {
       {/* ── حارسة العضويات «جيم» — ربط نظام العضويات بمساعد نائب المالك ── */}
       {activeTab === "steward" && (
         <StewardPanel />
+      )}
+
+      {/* ── أنظمة العضوية 4.0: فرق ومقاعد · رتب شرفية · تجديد واسترداد · خزنة ── */}
+      {activeTab === "ops" && (
+        <MembershipOpsPanel />
       )}
     </div>
   );

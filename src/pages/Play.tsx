@@ -686,6 +686,26 @@ export default function Play() {
                 </Button>
               </div>
 
+              {/* Membership Center Quick Access — 10 تباوبات: متجر، فرق، رتب، تجديد، خزنة */}
+              <div className="mt-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🏅</span>
+                  <p className="text-sm font-bold">مركز العضويات</p>
+                  <span className="ms-auto rounded-full border border-violet-500/30 px-2 py-0.5 text-[10px] text-violet-600">
+                    نسخة 4.0
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  مقاعد لفرقتك · رتب شرفية بمكافآت دائمة · تجديد ورصيد أيام · خزنة بنِسَب معلنة
+                </p>
+                <Button asChild size="sm" variant="ghost" className="mt-2 gap-1.5 rounded-xl text-violet-600">
+                  <Link to="/membership">
+                    <Crown className="size-3" />
+                    افتح المركز
+                  </Link>
+                </Button>
+              </div>
+
 
 
               {/* AI Analysis Display */}

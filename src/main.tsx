@@ -41,6 +41,7 @@ const OwnerPremiumLogin = lazyRetry(() => import("./components/owner/OwnerPremiu
 const Rules = lazyRetry(() => import("./pages/Rules.tsx"));
 const Download = lazyRetry(() => import("./pages/Download.tsx"));
 const NotFound = lazyRetry(() => import("./pages/NotFound.tsx"));
+const Membership = lazyRetry(() => import("./pages/Membership.tsx"));
 const MiniGames = lazyRetry(() => import("./pages/MiniGames.tsx"));
 const ChatRooms = lazyRetry(() => import("./pages/ChatRooms.tsx"));
 const Hub = lazyRetry(() => import("./pages/Hub.tsx"));
@@ -439,6 +440,15 @@ function AppShell() {
                 element={
                   <RequireAuth>
                     <Atlas />
+                  </RequireAuth>
+                }
+              />
+              {/* مسار العضويات 4.0: يحتاج مصادقة (يقرأ عضويتك ورصيدك ورتبك) */}
+              <Route
+                path="/membership"
+                element={
+                  <RequireAuth>
+                    <Membership />
                   </RequireAuth>
                 }
               />

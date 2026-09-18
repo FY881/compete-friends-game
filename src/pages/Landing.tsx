@@ -8,6 +8,8 @@ import {
   Eraser,
   Flame,
   Gamepad2,
+  Gem,
+  RefreshCw,
   Hourglass,
   Layers,
   Link2,
@@ -228,7 +230,11 @@ const AI_FEATURES = [
   { icon: Zap, title: "حل ذاتي", desc: "نظام حل المشاكل الذاتي يكتشف ويصلح الأخطاء" },
   { icon: Shield, title: "تحكم بالـ AI", desc: "تحكم كامل باللعبة بأوامر ذكية من المالك" },
   { icon: MessageSquare, title: "شفافية", desc: "صراحة مطلقة — الذكاء الاصطناعي يساعدك تطوّر اللعبة" },
-  { icon: Globe, title: "تحديات يومية", desc: "تحديات يومية ذكية تتجدد كل يوم" },
+  { icon: Globe, title: "تحديات يومية", desc: "تحديات ذكية تتجدد كل يوم" },
+  { icon: Users, title: "فرق ومقاعد", desc: "افتح فرقة وامنح أصدقاءك مستوى حقيقياً بمقعد واحد" },
+  { icon: Crown, title: "رتب شرفية", desc: "أيام عضويتك تُبنى إلى رتب بمكافآت دائمة لا تنتهي" },
+  { icon: Gem, title: "خزنة بنِسَب معلنة", desc: "نِسَب معلنة ونظام رحمة يضمن لك مكافأة نادرة" },
+  { icon: RefreshCw, title: "رصيد أيام", desc: "ادّخر أيام عضويتك واسترد نصفها في أي تجديد" },
 ];
 
 const STATS = [

@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { DAY, TIER_META, TIER_ORDER, tierIndex, type Tier } from "./tiers";
@@ -107,7 +108,7 @@ function seatExpiry(leaderExpiresAt: number | null): number {
 // ═══════════════════════════════════════════════════════════════════════
 
 export interface SquadSeatRow {
-  id: string;
+  id: Id<"squadSeats">;
   userName: string;
   role: string;
   status: string;
@@ -117,7 +118,7 @@ export interface SquadSeatRow {
   note: string | null;
 }
 export interface OpenSquadRow {
-  id: string;
+  id: Id<"memberSquads">;
   code: string;
   name: string;
   emoji: string;
@@ -136,7 +137,7 @@ export interface MySquadResult {
   seatCap: number;
   seatTier: Tier | null;
   squad: {
-    id: string;
+    id: Id<"memberSquads">;
     name: string;
     emoji: string;
     code: string;
@@ -151,7 +152,7 @@ export interface MySquadResult {
     seats: SquadSeatRow[];
   } | null;
   mySeat: {
-    squadId: string;
+    squadId: Id<"memberSquads">;
     squadName: string;
     leaderName: string;
     tier: Tier;
@@ -180,7 +181,7 @@ export const getMySquad = query({
         .take(60);
       if (active.length >= s.seatsTotal) continue;
       openSquads.push({
-        id: String(s._id),
+        id: s._id,
         code: s.code,
         name: s.name,
         emoji: s.emoji,
@@ -229,7 +230,7 @@ export const getMySquad = query({
         .withIndex("by_squad", (q) => q.eq("squadId", active._id))
         .take(60);
       const map = (row: any): SquadSeatRow => ({
-        id: String(row._id),
+        id: row._id,
         userName: row.userName,
         role: row.role,
         status: row.status,
@@ -244,7 +245,7 @@ export const getMySquad = query({
       const seats = rows.filter((r) => r.status === "active").map(map);
       const pending = rows.filter((r) => r.status === "pending").map(map);
       squad = {
-        id: String(active._id),
+        id: active._id,
         name: active.name,
         emoji: active.emoji,
         code: active.code,
@@ -270,7 +271,7 @@ export const getMySquad = query({
       const parent = await ctx.db.get(s.squadId);
       if (!parent || parent.disbandedAt) continue;
       mySeat = {
-        squadId: String(parent._id),
+        squadId: parent._id,
         squadName: parent.name,
         leaderName: parent.ownerName,
         tier: s.squadId ? parent.seatTier as Tier : "silver",
@@ -682,7 +683,7 @@ export const getSquadLeaderboard = query({
   handler: async (ctx) => {
     const squads = await ctx.db.query("memberSquads").withIndex("by_code").take(40);
     const rows: {
-      id: string;
+      id: Id<"memberSquads">;
       name: string;
       emoji: string;
       leaderName: string;
@@ -698,7 +699,7 @@ export const getSquadLeaderboard = query({
         .withIndex("by_squad", (q) => q.eq("squadId", s._id).eq("status", "active"))
         .take(60);
       rows.push({
-        id: String(s._id),
+        id: s._id,
         name: s.name,
         emoji: s.emoji,
         leaderName: s.ownerName,

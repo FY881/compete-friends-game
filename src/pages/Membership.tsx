@@ -16,10 +16,13 @@ import {
   Clock,
   Coins,
   Crown,
+  Flame,
+  Gem,
   Gift,
   Handshake,
   Loader2,
   Lock,
+  RefreshCw,
   Sparkles,
   Target,
   Ticket,
@@ -27,6 +30,12 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import {
+  PrestigePanel,
+  RenewalPanel,
+  SquadPanel,
+  VaultPanel,
+} from "@/components/membership/MembershipPanels";
 
 /** شكل بيانات النظرة العامة — مشتق من دالة الخادم حتى لا يتباعد النوعان. */
 type OverviewData = FunctionReturnType<typeof api.entitlements.getEntitlements>;
@@ -39,7 +48,17 @@ type OverviewData = FunctionReturnType<typeof api.entitlements.getEntitlements>;
  * المهام — وكلها مربوطة بمحرك الاستحقاقات الموحّد في الخادم.
  */
 
-type TabId = "overview" | "matrix" | "store" | "offers" | "share" | "quests";
+type TabId =
+  | "overview"
+  | "matrix"
+  | "store"
+  | "offers"
+  | "share"
+  | "quests"
+  | "squad"
+  | "prestige"
+  | "renewal"
+  | "vault";
 
 const TABS: { id: TabId; label: string; icon: typeof Crown }[] = [
   { id: "overview", label: "نظرتي", icon: Crown },
@@ -48,6 +67,10 @@ const TABS: { id: TabId; label: string; icon: typeof Crown }[] = [
   { id: "offers", label: "العروض", icon: Ticket },
   { id: "share", label: "المشاركة", icon: Handshake },
   { id: "quests", label: "المهام", icon: Target },
+  { id: "squad", label: "فرقي", icon: Users },
+  { id: "prestige", label: "الرتب الشرفية", icon: Flame },
+  { id: "renewal", label: "التجديد", icon: RefreshCw },
+  { id: "vault", label: "الخزنة", icon: Gem },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -186,6 +209,10 @@ export default function Membership() {
       {tab === "offers" && <Offers />}
       {tab === "share" && <Share />}
       {tab === "quests" && <Quests />}
+      {tab === "squad" && <SquadPanel />}
+      {tab === "prestige" && <PrestigePanel />}
+      {tab === "renewal" && <RenewalPanel />}
+      {tab === "vault" && <VaultPanel />}
     </Shell>
   );
 }
@@ -203,12 +230,12 @@ function Shell({ children }: { children: ReactNode }) {
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-base font-bold tracking-tight">مركز العضويات</h1>
             <p className="truncate text-[11px] text-muted-foreground">
-              ٥ مستويات · ٣٢ امتيازاً حقيقياً · اقتصاد بنقاط الولاء بلا مال حقيقي
+              ١٠ تبويبات · ٣٢ امتيازاً · مقاعد وفرق · رتب شرفية · تجديد واسترداد · خزنة بنِسَب معلنة
             </p>
           </div>
           <Badge variant="outline" className="gap-1 rounded-full text-[10px]">
             <Sparkles className="size-3" />
-            نسخة 3.0
+            نسخة 4.0
           </Badge>
         </div>
       </header>

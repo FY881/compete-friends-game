@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { DAY, TIER_META, tierIndex, type Tier } from "./tiers";
@@ -168,7 +169,7 @@ export const getRenewalCenter = query({
     const offers = offersRaw
       .filter((o) => o.expiresAt > now)
       .map((o) => ({
-        id: String(o._id),
+        id: o._id as Id<"renewalOffers">,
         tier: o.tier as Tier,
         tierName: TIER_META[o.tier as Tier].name,
         days: o.days,
