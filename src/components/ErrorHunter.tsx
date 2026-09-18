@@ -32,6 +32,10 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
 import { api } from "@/convex/_generated/api";
 import {
+  isBackendDegraded,
+  noteBackendError,
+} from "@/lib/backendGuard";
+import {
   addBreadcrumb, getBreadcrumbs, installBreadcrumbListeners,
   enqueueErrorReport, flushErrorQueue, pendingReportCount,
   storeIncident, getStoredIncidents, type StoredIncident,
@@ -126,6 +130,21 @@ function diagnoseAdvanced(error: Error): ErrorDiagnosis {
   // ═══ v6.1 — SERVER-ERROR SURGERY ═══
   // Convex server errors carry the truth INSIDE the message (file:line +
   // the real error class). Classify them honestly instead of guessing.
+  // ═══ v8.0 — أولوية المنصة: تعطّل الخادم/تجاوز الحصة ليس عيباً في اللعبة ═══
+  // لا إعادة تحميل، لا تقرير، لا عاصفة استدعاءات — فقط وضع استقرار هادئ
+  // حتى يعود الخادم، ثم استئناف تلقائي كامل.
+  if (/exceeded the free plan|free plan limits|deployments have been disabled|upgrade to a pro plan|resource limit|rate limit exceeded/i.test(combined)) {
+    return {
+      category: "platform_limit", severity: "critical",
+      displayName: "🛡️ حماية النظام — الخادم قيد الاستقرار",
+      description: "خادم اللعبة وصل حدّ خطته مؤقتاً. النظام أوقف كل العمليات الخلفية تلقائياً لحماية حصتك من الإجهاد.",
+      rootCause: "حد المنصة (حصة/طلبات) — ليس عيباً في اللعبة. لا حاجة لأي إجراء يدوي.",
+      confidence: 0.99,
+      estimatedImpact: "بعض البيانات الحيّة تتوقف مؤقتاً — اللعب يعود تلقائياً عند تعافي الخادم",
+      recoveryStrategies: ["log_only"],
+    };
+  }
+
   const isServerError = /\[CONVEX [QM]\(|Uncaught Error.*at handler|Server Error/i.test(combined);
   if (isServerError) {
     // استخراج الملف والسطر الحقيقي من نص الخادم: (../src/convex/x.ts:958:28)
@@ -645,6 +664,11 @@ export async function reportErrorToHunter(
   error: Error | string,
   ctx?: { component?: string; route?: string; autoHealed?: boolean; strategy?: string },
 ) {
+  const msg = typeof error === "string" ? error : error.message;
+  // 🛡 أخطاء المنصة/الحصة: تُفعّل وضع الاستقرار ولا تُرسل أبداً
+  // (كل بلاغ كان يُضاعف الاستهلاك وقت الأزمة بالذات)
+  if (noteBackendError(msg, typeof error === "object" ? error.stack : undefined)) return;
+  if (isBackendDegraded()) return;
   recordErrorForRate();
   const payload = {
     message: (typeof error === "string" ? error : error.message).slice(0, 500),
@@ -712,7 +736,7 @@ export function startPerformanceMonitor() {
   // حالة زومبي (صمت 45s والصفحة مرئية) = حادثة فورية لغرفة المالك.
   startZombieWatch((v) => {
     addBreadcrumb("action", `🧟 حارس الفشل الصامت: ${v.reason}`);
-    if (convexClient) {
+    if (convexClient && !isBackendDegraded()) {
       convexClient.mutation(api.errorHunter.logError, {
         message: `حالة زومبي: ${v.reason}`,
         autoHealed: false,
@@ -727,7 +751,7 @@ export function startPerformanceMonitor() {
   // بلا أخطاء جديدة = إصلاح مُثبَت. انهيار جديد = الإصلاح لم يثبت.
   setTimeout(() => {
     const { seed, stableAfterMs } = confirmHealIfStable();
-    if (seed && convexClient) {
+    if (seed && convexClient && !isBackendDegraded()) {
       convexClient.mutation(api.errorHunter.verifyHeal, {
         seed, passed: true, stableAfterMs,
       }).catch(() => {});
@@ -737,7 +761,7 @@ export function startPerformanceMonitor() {
   // إذا انهار التطبيق مجدداً بعد إصلاح معلّق → ألغِ التحقق (يتعلم الصياد)
   window.addEventListener("error", () => {
     const seed = invalidatePendingVerify();
-    if (seed && convexClient) {
+    if (seed && convexClient && !isBackendDegraded()) {
       convexClient.mutation(api.errorHunter.verifyHeal, {
         seed, passed: false, stableAfterMs: 0,
       }).catch(() => {});
@@ -765,12 +789,14 @@ export function startPerformanceMonitor() {
   // كان يُرسل كتابتين إلى Convex كل ٣٠ ثانية من كل تبويب مفتوح =
   // ~٥٧٦٠ كتابة/يوم لكل تبويب، تنمو بالجدول وتستهلك الحصة المجانية حتى
   // تُعطَّل النشر — وهو أحد أكبر أسباب تعطّل النظام المتكرر.
-  // الآن: كل ١٠ دقائق فقط (تخفيض ٩٥٪)، ولا يُرسل شيء إطلاقاً والتبويب مخفي
-  // أو غير متصل. المراقبة تبقى حقيقية وفعّالة لكن بجزء ضئيل من الكلفة.
-  const PERF_INTERVAL_MS = 10 * 60 * 1000;
+  // الآن: كل ٣٠ دقيقة فقط (تخفيض ~٩٨٪)، ولا يُرسل شيء إطلاقاً والتبويب
+  // مخفي أو غير متصل أو أثناء «وضع الاستقرار». المراقبة تبقى حقيقية
+  // وفعّالة لكن بجزء ضئيل من الكلفة.
+  const PERF_INTERVAL_MS = 30 * 60 * 1000;
   perfInterval = setInterval(() => {
     if (!convexClient || perfStopped) return;
-    // تبويب في الخلفية أو بلا اتصال = لا قياس ولا إرسال (كلفة صفر)
+    // 🛡 بوابة واحدة: وضع الاستقرار + تبويب مخفي + بلا اتصال = كلفة صفر
+    if (isBackendDegraded()) return;
     if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
     const health = collectHealth();
@@ -933,6 +959,9 @@ export class ErrorHunter extends Component<Props, State> {
   }
 
   private reportError(error: Error, errorInfo: ErrorInfo, diagnosis: ErrorDiagnosis, autoHealed = false, strategy?: string) {
+    // 🛡 لا بلاغات أثناء تعطّل الخادم — ولا أخطاء منصة تُبلَّغ أصلاً
+    if (noteBackendError(error.message, error.stack)) return;
+    if (isBackendDegraded()) return;
     recordErrorForRate();
     const payload = {
       message: error.message.slice(0, 500),
@@ -1286,6 +1315,40 @@ export class ErrorHunter extends Component<Props, State> {
     const { error, diagnosis, healingSteps, healingResult, circuitState,
       showDetails, showTimeline, showBrain, rootCauseChain, incidentEvents } = this.state;
     const d = diagnosis || (error ? diagnoseAdvanced(error) : null);
+
+    // 🛡 v8.0 — تعطّل الخادم/الحصة: شاشة هادئة مطمئنة بدل تقرير خطأ مرعب.
+    // لا إجراء مطلوب من اللاعب — النظام يحمي نفسه ويعود تلقائياً.
+    if (d?.category === "platform_limit") {
+      return (
+        <ErrorFallback>
+          <div style={cardStyle}>
+            <div style={iconCircleStyle}>
+              <span style={{ fontSize: 30 }}>🛡️</span>
+            </div>
+            <h2 style={titleStyle}>النظام في وضع الاستقرار</h2>
+            <p style={subtitleStyle}>
+              وصل خادم اللعبة حدّ خطته مؤقتاً، فأوقف صياد الأخطاء كل العمليات
+              الخلفية تلقائياً حتى لا يُجهد النظام أكثر. لا تحتاج لأي إجراء —
+              ستعود كل الخصائص تلقائياً بمجرد تعافي الخادم.
+            </p>
+            <div style={{ marginTop: 18, fontSize: 12, color: "#64748b", lineHeight: 1.9 }}>
+              • الكتابات الخلفية: موقوفة مؤقتاً<br />
+              • بلاغات الأخطاء: موقوفة مؤقتاً<br />
+              • الاستفسار عن التعافي: نبضة واحدة كل فترة (كلفة شبه معدومة)<br />
+              • الاستئناف: تلقائي بالكامل
+            </div>
+            <div style={{ marginTop: 20, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+              <button type="button" onClick={this.handleGoHome} style={primaryBtnStyle}>
+                العودة للصفحة الرئيسية
+              </button>
+              <button type="button" onClick={this.handleReload} style={secondaryBtnStyle}>
+                إعادة المحاولة الآن
+              </button>
+            </div>
+          </div>
+        </ErrorFallback>
+      );
+    }
 
     // ── HEALING IN PROGRESS ──
     if (this.state.healing && !healingResult) {

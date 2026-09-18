@@ -17,6 +17,8 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 import { ErrorHunter, setErrorHunterClient, startPerformanceMonitor } from "@/components/ErrorHunter";
 import { SplashScreen } from "@/components/SplashScreen";
 import { PremiumThemeProvider } from "@/components/PremiumThemeProvider";
+import { BackendStatusBanner } from "@/components/BackendStatusBanner";
+import { initBackendGuard, isBackendDegraded, noteBackendError } from "@/lib/backendGuard";
 import "./index.css";
 
 // ── أعلام نسخة البناء (محلية لتُمكّن Rollup من إسقاط كود المالك نهائياً) ──
@@ -102,11 +104,19 @@ export function isNonAppError(message: string, stack?: string): boolean {
 /** Fire-and-forget: send a runtime error to the owner room automatically. */
 function reportRuntimeError(message: string, stack?: string) {
   try {
-    // 1+2) أخطاء الحصة/الشبكة لا تُبلَّغ — تمنع حلقة "الخطأ يولّد بلاغاً يولّد خطأً"
+    // 🛡 v8.0 — أولاً: إن كان خطأ منصة/حصة، يُفعّل «وضع الاستقرار» فوراً
+    // فتُوقف كل الكتابات الاختيارية ولا يتضاعف الاستهلاك أثناء الأزمة.
+    if (noteBackendError(message, stack)) {
+      console.warn("[حرب العقول] 🛡️ حد المنصة — تم تفعيل وضع الاستقرار تلقائياً");
+      return;
+    }
+    // 1+2) أخطاء الشبكة لا تُبلَّغ — تمنع حلقة "الخطأ يولّد بلاغاً يولّد خطأً"
     if (isNonAppError(message, stack)) {
       console.warn("[حرب العقول] خطأ منصة/شبكة — لم يُبلَّغ عنه:", message.slice(0, 120));
       return;
     }
+    // 3) وضع الاستقرار = لا بلاغات إطلاقاً حتى يعود الخادم
+    if (isBackendDegraded()) return;
     // 4) سقف صارم لكل جلسة + فاصل زمني
     if (reportsSent >= MAX_REPORTS_PER_SESSION) return;
     const now = Date.now();
@@ -193,6 +203,10 @@ const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 // ── Error Hunter: initialize client + start performance monitor ──
 setErrorHunterClient(convex);
 startPerformanceMonitor();
+
+// 🛡 حارس الخلفية: نبضة استفسار رخيصة (بلا أي قراءة قاعدة بيانات) تُستخدم
+// فقط عند تعطّل الخادم لمعرفة لحظة تعافيه، فيعود النظام تلقائياً بلا تدخل.
+initBackendGuard(() => convex.query(api.health.ping, {}));
 
 // Global capture: any uncaught error or rejected promise anywhere in the app
 // lands in the error hunter (deduped) so no failure stays invisible.
@@ -361,6 +375,7 @@ function AppShell() {
   return (
     <ConvexAuthProvider client={convex}>
       <PremiumThemeProvider>
+        <BackendStatusBanner />
       <BrowserRouter>
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>
