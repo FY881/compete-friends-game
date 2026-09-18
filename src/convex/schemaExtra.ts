@@ -1,6 +1,7 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { sovereignTables } from "./schemaAppend";
+import { tierValidator } from "./tiers";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -67,6 +68,222 @@ export const premiumTables = {
     allowChallenges: v.boolean(), // السماح للآخرين بتحدّيه
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ║ 🏅 العضويات 3.0 — الترقيات المؤقتة والاقتصاد والعروض والمشاركة      ║
+  // ║ كل جدول هنا يخدم ميزة حقيقية قابلة للتطبيق، لا عرضاً شكلياً.        ║
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ║ الترقيات المؤقتة: قسيمة/تجربة/مهمة/مشاركة ترفع المستوى الفعّال ║
+  // ║ لمدة محدودة، ثم يعود النظام تلقائياً للمستوى المدفوع.           ║
+  membershipBoosts: defineTable({
+    userId: v.id("users"),
+    tier: tierValidator,
+    source: v.string(), // promo | trial | quest | share | gift | owner
+    label: v.string(),
+    startedAt: v.number(),
+    expiresAt: v.number(),
+    note: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_expiry", ["expiresAt"]),
+
+  // ║ سجل أحداث العضوية الموسّع — كل عملية لها أثر دائم قابل للتدقيق ║
+  // ║ (لا يمسّ membershipLogs القديم حتى لا نغيّر اتحاد قيمه)          ║
+  membershipEvents: defineTable({
+    userId: v.optional(v.id("users")),
+    actorName: v.string(),
+    kind: v.string(), // purchase | promo | trial | share | quest | boost | upgrade | renew
+    tier: v.optional(tierValidator),
+    detail: v.string(),
+    points: v.optional(v.number()),
+    days: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    at: v.number(),
+  })
+    .index("by_user", ["userId", "at"])
+    .index("by_at", ["at"]),
+
+  // ║ قسائم ترويجية حقيقية بقيود مُنفَّذة (سقف استخدام/سقف لكل لاعب/انتهاء) ║
+  promoCodes: defineTable({
+    code: v.string(),
+    tier: tierValidator,
+    days: v.number(),
+    maxUses: v.number(),
+    usedCount: v.number(),
+    perUserLimit: v.number(),
+    minTier: v.optional(tierValidator), // أقل مستوى مؤهّل للاستبدال
+    maxTier: v.optional(tierValidator), // أعلى مستوى مؤهّل (لمنع الاستغلال)
+    expiresAt: v.optional(v.number()),
+    active: v.boolean(),
+    note: v.optional(v.string()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_code", ["code"])
+    .index("by_active", ["active"]),
+
+  promoRedemptions: defineTable({
+    promoId: v.id("promoCodes"),
+    userId: v.id("users"),
+    tier: tierValidator,
+    days: v.number(),
+    at: v.number(),
+  })
+    .index("by_promo_user", ["promoId", "userId"])
+    .index("by_user", ["userId"]),
+
+  // ║ التجارب المجانية — مرة واحدة لكل مستوى، وتُسجَّل للأبد ║
+  membershipTrials: defineTable({
+    userId: v.id("users"),
+    tier: tierValidator,
+    startedAt: v.number(),
+    expiresAt: v.number(),
+    source: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_tier", ["userId", "tier"]),
+
+  // ║ مشاركة الامتيازات: عضو مميّز يمنح صديقاً/عضو فرقته مستوى فعّالاً ║
+  // ║ لمدة محدودة — بعدد مقاعد يحدّده امتياز perkShareSlots.          ║
+  perkShares: defineTable({
+    ownerId: v.id("users"),
+    ownerName: v.string(),
+    beneficiaryId: v.id("users"),
+    beneficiaryName: v.string(),
+    tier: tierValidator,
+    startedAt: v.number(),
+    expiresAt: v.number(),
+    active: v.boolean(),
+    note: v.optional(v.string()),
+    // ربط مباشر بالترقية المؤقتة — يتيح إلغاء المنح فوراً عند سحب المشاركة
+    boostId: v.optional(v.id("membershipBoosts")),
+  })
+    .index("by_owner", ["ownerId", "active"])
+    .index("by_beneficiary", ["beneficiaryId", "active"]),
+
+  // ║ مهام العضوية: تقدّم مشتق من الإحصاءات الحقيقية + استلام دفعة ترقية ║
+  membershipQuestClaims: defineTable({
+    userId: v.id("users"),
+    questId: v.string(),
+    at: v.number(),
+    tier: tierValidator,
+    hours: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_quest", ["userId", "questId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ║ 🏅 العضويات 4.0 — فرق ومقاعد · رتب شرفية · تجديد واسترداد · خزنة     ║
+  // ║ أربعة أنظمة حقيقية تربط العضوية بالمجتمع والاقتصاد وطويلة الأمد.     ║
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ║ فرق العضوية: عضو مميّز يفتح فرقة بكود، ويُمنح أعضاؤها مستوى مشتقاً  ║
+  // ║ (درجة واحدة دون مستوى القائد) كترقية مؤقتة حقيقية قابلة للسحب.      ║
+  memberSquads: defineTable({
+    ownerId: v.id("users"),
+    ownerName: v.string(),
+    name: v.string(),
+    emoji: v.string(),
+    code: v.string(),
+    seatTier: tierValidator,
+    seatsTotal: v.number(),
+    open: v.boolean(),
+    autoAccept: v.boolean(),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    disbandedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_code", ["code"]),
+
+  squadSeats: defineTable({
+    squadId: v.id("memberSquads"),
+    userId: v.id("users"),
+    userName: v.string(),
+    role: v.string(), // leader | member
+    status: v.string(), // pending | active | declined | left | kicked
+    requestedAt: v.number(),
+    joinedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    // ربط مباشر بالترقية المؤقتة — الطرد يُلغي المنح فوراً
+    boostId: v.optional(v.id("membershipBoosts")),
+    note: v.optional(v.string()),
+  })
+    .index("by_squad", ["squadId", "status"])
+    .index("by_user", ["userId", "status"])
+    .index("by_user_squad", ["userId", "squadId"]),
+
+  // ║ الرتب الشرفية: مسار طويل الأمد يُحتسب من أيام العضوية الفعلية     ║
+  // ║ ومستواها، ويُترجم إلى مكافآت **دائمة** لا تنتهي بانتهاء العضوية.    ║
+  membershipPrestige: defineTable({
+    userId: v.id("users"),
+    points: v.number(),
+    level: v.number(),
+    membershipDays: v.number(),
+    highestTier: tierValidator,
+    streak: v.number(), // أسابيع متتالية بعضوية مدفوعة
+    claimedLevels: v.array(v.number()),
+    lastAccrualAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_points", ["points"]),
+
+  // ║ التجديد والاسترداد: تفضيلات التجديد + رصيد الأيام المدخرة       ║
+  renewalPrefs: defineTable({
+    userId: v.id("users"),
+    autoRenew: v.boolean(),
+    payWithLoyalty: v.boolean(),
+    keepTierOnExpiry: v.boolean(), // فترة سماح تحفظ المستوى بعد الانتهاء
+    graceDays: v.number(),
+    remindersOn: v.boolean(),
+    lastReminderAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  membershipCredits: defineTable({
+    userId: v.id("users"),
+    bankedDays: v.number(),
+    lifetimeBanked: v.number(),
+    lifetimeUsed: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  renewalOffers: defineTable({
+    userId: v.id("users"),
+    tier: tierValidator,
+    days: v.number(),
+    discountPct: v.number(),
+    extraDays: v.number(),
+    reason: v.string(), // winback | streak | grace | owner
+    expiresAt: v.number(),
+    used: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId", "used"])
+    .index("by_expiry", ["expiresAt"]),
+
+  // ║ خزنة المميزات: فتح بنظام حظّ عادل (pity) + تصنيع بالفُتات        ║
+  perkVault: defineTable({
+    userId: v.id("users"),
+    fragments: v.number(),
+    opens: v.number(),
+    pity: v.number(), // عدّاد الرحمة: يضمن مكافأة نادرة بعد عدد فتحات
+    lastOpenAt: v.number(),
+    unlocked: v.array(v.string()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  perkVaultOpens: defineTable({
+    userId: v.id("users"),
+    rewardKind: v.string(), // perk | fragments | boost | loyalty
+    rewardKey: v.string(),
+    label: v.string(),
+    rarity: v.string(), // common | rare | epic | legendary
+    at: v.number(),
+  }).index("by_user", ["userId", "at"]),
 
   // 👑 الحاكم السيادي — عقوبات ومراسيم بمفعول فعلي
   ...sovereignTables,
