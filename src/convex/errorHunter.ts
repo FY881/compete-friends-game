@@ -396,21 +396,15 @@ export const recordPerformance = mutation({
     domNodes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // ═══ v8.0 — كتابة واحدة فقط (تخفيض الكلفة) ═══
+    // كان كل قياس يُنفّذ ٢١ عملية قاعدة بيانات: إدراج + قراءة مؤشر +
+    // حتى ٢٠ حذفاً — ويُستدعى من كل تبويب مفتوح. الكلفة الآن عملية
+    // واحدة فقط، والتنظيف انتقل إلى مهمة الصيانة اليومية
+    // (maintenance.pruneAll) التي تُفرّغ الجدول بالكامل مرة واحدة.
     const id = await ctx.db.insert("performanceMetrics", {
       ...args,
       recordedAt: Date.now(),
     });
-
-    // تنظيف المقاييس القديمة (أقدم من 24 ساعة)
-    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    const oldMetrics = await ctx.db
-      .query("performanceMetrics")
-      .withIndex("by_time", (q) => q.lt("recordedAt", dayAgo))
-      .take(20);
-    for (const m of oldMetrics) {
-      await ctx.db.delete(m._id);
-    }
-
     return { id };
   },
 });

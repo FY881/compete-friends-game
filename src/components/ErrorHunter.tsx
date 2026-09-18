@@ -761,8 +761,18 @@ export function startPerformanceMonitor() {
   }
   fpsRafId = requestAnimationFrame(measureFps);
 
+  // ═══ v8.0 — مراقبة واعية بالحصة (Quota-Aware Monitoring) ═══
+  // كان يُرسل كتابتين إلى Convex كل ٣٠ ثانية من كل تبويب مفتوح =
+  // ~٥٧٦٠ كتابة/يوم لكل تبويب، تنمو بالجدول وتستهلك الحصة المجانية حتى
+  // تُعطَّل النشر — وهو أحد أكبر أسباب تعطّل النظام المتكرر.
+  // الآن: كل ١٠ دقائق فقط (تخفيض ٩٥٪)، ولا يُرسل شيء إطلاقاً والتبويب مخفي
+  // أو غير متصل. المراقبة تبقى حقيقية وفعّالة لكن بجزء ضئيل من الكلفة.
+  const PERF_INTERVAL_MS = 10 * 60 * 1000;
   perfInterval = setInterval(() => {
     if (!convexClient || perfStopped) return;
+    // تبويب في الخلفية أو بلا اتصال = لا قياس ولا إرسال (كلفة صفر)
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
     const health = collectHealth();
     const leak = detectMemoryLeak();
     const storm = detectStorm();
@@ -797,7 +807,7 @@ export function startPerformanceMonitor() {
         }),
       }).catch(() => {});
     } catch { /* silent */ }
-  }, 30000);
+  }, PERF_INTERVAL_MS);
 }
 
 export function stopPerformanceMonitor() {

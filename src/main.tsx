@@ -72,9 +72,52 @@ class ToolbarErrorBoundary extends React.Component<
   }
 }
 
+/**
+ * 🛡 قاطع دائرة الإبلاغ عن الأخطاء (Error-Report Circuit Breaker)
+ *
+ * السبب الحقيقي لتعطّل النشر المتكرر: عند تجاوز حصة Convex تُرفض كل
+ * الاستعلامات على الخادم، فينتج عن كل رفض خطأ جديد على العميل، وكل خطأ
+ * كان يُرسَل كـ mutation — أي حلقة تصعيد تُضاعف الاستهلاك وقت الأزمة بالذات.
+ *
+ * هذا القاطع يوقف الحلقة نهائياً:
+ *  1) لا يُبلَّغ أبداً عن أخطاء الحصة/الحدود — هي ليست أخطاء تطبيق.
+ *  2) لا يُبلَّغ عن أخطاء الشبكة/انقطاع الاتصال — ليست أخطاء تطبيق.
+ *  3) إزالة التكرار: نفس البصمة تُبلَّغ مرة واحدة فقط في الجلسة.
+ *  4) سقف صارم: 10 بلاغات كحد أقصى لكل جلسة، وفاصل 5 ثوانٍ بينها.
+ */
+const REPORT_DEDUPE = new Set<string>();
+let reportsSent = 0;
+let lastReportAt = 0;
+const MAX_REPORTS_PER_SESSION = 10;
+const MIN_REPORT_INTERVAL_MS = 5_000;
+
+/** أخطاء المنصة/الحصة/الشبكة — لا تُبلَّغ ولا تُحتسب كعيوب في اللعبة. */
+const NON_APP_ERROR =
+  /exceeded the free plan|free plan limits|deployments have been disabled|upgrade to a pro plan|too many requests|rate limit|quota|ECONNRESET|ETIMEDOUT|Failed to fetch|NetworkError|Load failed|dynamically imported module|Importing a module script failed|offline|ERR_INTERNET_DISCONNECTED|ERR_NETWORK|ConvexError:.*Server Error/i;
+
+export function isNonAppError(message: string, stack?: string): boolean {
+  return NON_APP_ERROR.test(`${message} ${stack ?? ""}`);
+}
+
 /** Fire-and-forget: send a runtime error to the owner room automatically. */
 function reportRuntimeError(message: string, stack?: string) {
   try {
+    // 1+2) أخطاء الحصة/الشبكة لا تُبلَّغ — تمنع حلقة "الخطأ يولّد بلاغاً يولّد خطأً"
+    if (isNonAppError(message, stack)) {
+      console.warn("[حرب العقول] خطأ منصة/شبكة — لم يُبلَّغ عنه:", message.slice(0, 120));
+      return;
+    }
+    // 4) سقف صارم لكل جلسة + فاصل زمني
+    if (reportsSent >= MAX_REPORTS_PER_SESSION) return;
+    const now = Date.now();
+    if (now - lastReportAt < MIN_REPORT_INTERVAL_MS) return;
+    // 3) إزالة التكرار بالبصمة
+    const fingerprint = `${message.slice(0, 160)}|${(stack ?? "").slice(0, 120)}`;
+    if (REPORT_DEDUPE.has(fingerprint)) return;
+    REPORT_DEDUPE.add(fingerprint);
+    reportsSent += 1;
+    lastReportAt = now;
+
     const route =
       typeof window !== "undefined" ? window.location.pathname : undefined;
     const url =

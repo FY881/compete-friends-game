@@ -36,6 +36,27 @@ async function pruneByIndex(
   return docs.length;
 }
 
+/**
+ * يحذف حتى `max` صفاً على دفعات متتالية — لتفريغ الجداول ذات التراكم
+ * الكبير (مثل مقاييس الأداء التي كان كل تبويب مفتوح يكتب فيها).
+ */
+async function pruneDeep(
+  ctx: any,
+  table: string,
+  index: string,
+  field: string,
+  before: number,
+  max: number,
+): Promise<number> {
+  let deleted = 0;
+  while (deleted < max) {
+    const n = await pruneByIndex(ctx, table, index, field, before);
+    deleted += n;
+    if (n < BATCH) break; // الجدول لم يعد يحوي صفوفاً قديمة
+  }
+  return deleted;
+}
+
 export const pruneAll = internalMutation({
   handler: async (ctx) => {
     const opsBefore = cutoff(OPS_RETENTION_DAYS);
@@ -52,6 +73,19 @@ export const pruneAll = internalMutation({
     stats.membershipLogs = await pruneByIndex(ctx, "membershipLogs", "by_created", "at", opsBefore);
     stats.assistantLogs = await pruneByIndex(ctx, "assistantLogs", "by_created", "at", opsBefore);
     stats.apiCallLogs = await pruneByIndex(ctx, "apiCallLogs", "by_created", "createdAt", opsBefore);
+
+    // ── مقاييس الأداء (أقدم من 24 ساعة) — تفريغ عميق ──
+    // أكبر جدول حقيقي متنامٍ: كل تبويب مفتوح كان يكتب فيه كل ٣٠ ثانية.
+    // التنظيف هنا (مرة واحدة يومياً) بدلاً من داخل كل كتابة — يوفّر
+    // آلاف عمليات قاعدة البيانات يومياً ويحفظ التخزين والحصة.
+    stats.performanceMetrics = await pruneDeep(
+      ctx,
+      "performanceMetrics",
+      "by_time",
+      "recordedAt",
+      cutoff(1),
+      4000,
+    );
 
     // ── أخطاء العميل (أقدم من 30 يوماً) ──
     stats.clientErrors = await pruneByIndex(ctx, "clientErrors", "by_last", "lastSeen", errBefore);
