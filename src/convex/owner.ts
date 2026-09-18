@@ -331,11 +331,16 @@ export const getPublicInfo = query({
   args: {},
   handler: async (ctx) => {
     const settings = await getSettingsData(ctx);
-    const rulesCount = await ctx.db.query("rules").collect();
+    // ⚠️ هذا استعلام **عالمي** يُشترك من كل صفحة لكل زائر — فأي قراءة
+    // غير محدودة فيه تتضاعف آلاف المرات. لذلك: قراءة مفهرسة محدودة فقط.
+    const rulesCount = await ctx.db.query("rules").take(100);
 
     // مركز الإعلانات المركزي: إن وُجد إعلان ظاهر نُفضّله، وإلا نعود للإعلان القديم في الإعدادات.
     const now = Date.now();
-    const activeRows = await ctx.db.query("announcements").withIndex("by_active", (q) => q.eq("active", true)).collect();
+    const activeRows = await ctx.db
+      .query("announcements")
+      .withIndex("by_active", (q) => q.eq("active", true))
+      .take(10);
     const topAnnouncement = activeRows
       .filter((a) => (a.startsAt ?? 0) <= now && (a.expiresAt ?? Infinity) >= now)
       .sort((a, b) => b.createdAt - a.createdAt)[0];

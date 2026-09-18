@@ -1,6 +1,6 @@
 import { ZakaLogo } from "@/components/ZakaLogo";
 import { OWNER_ROOM_ENABLED } from "@/lib/buildFlags";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { api } from "@/convex/_generated/api";
@@ -266,6 +266,48 @@ export default function Play() {
     ((discipline?.bannedUntil ?? 0) > Date.now());
   const muted = (discipline?.mutedUntil ?? 0) > Date.now();
 
+  /**
+   * 🧊 سطح الأنظمة — يُركَّب عند الطلب
+   *
+   * السبب الحقيقي لتعطّل النشر على الخطة المجانية: **Database I/O**
+   * (٣٫٥٥GB من ١GB)، لا عدد استدعاءات الدوال (٨٥ ألف من مليون).
+   * وكانت هذه الصفحة تُركِّب ٢٢ لوحة ثقيلة **دفعة واحدة**، ولكل لوحة
+   * اشتراكاتها التفاعلية — فأي كتابة في اللعبة تُعيد تشغيل عشرات
+   * الاستعلامات لكل لاعب واقف هنا. الآن تُركَّب لوحة واحدة عند الطلب
+   * فقط: كل المميزات كما هي، واستهلاك قاعدة البيانات ينزل بنسبة ضخمة.
+   */
+  const [deckPanel, setDeckPanel] = useState<string | null>(null);
+  const SYSTEMS_DECK: { id: string; label: string; emoji: string; group: string; node: ReactNode }[] = [
+    // ── المسابقات ──
+    { id: "tournament", label: "البطولات", emoji: "🏆", group: "المسابقات", node: <TournamentPanel /> },
+    { id: "world", label: "بطولة العالم", emoji: "🌍", group: "المسابقات", node: <WorldChampionshipPanel /> },
+    { id: "arena", label: "الساحة", emoji: "⚔️", group: "المسابقات", node: <ArenaPanel /> },
+    { id: "rivalry", label: "المنافسات", emoji: "🔥", group: "المسابقات", node: <RivalryPanel /> },
+    { id: "league", label: "الدوري", emoji: "📊", group: "المسابقات", node: <LeaguePanel /> },
+    { id: "clan", label: "عشيرتي", emoji: "👥", group: "المسابقات", node: <ClanPanel /> },
+    { id: "clanwar", label: "حروب العشائر", emoji: "🛡️", group: "المسابقات", node: <ClanWarPanel /> },
+    { id: "season", label: "جواز الموسم", emoji: "🎟️", group: "المسابقات", node: <SeasonPassPanel /> },
+    { id: "quests", label: "المهام", emoji: "🎯", group: "المسابقات", node: <QuestsPanel /> },
+    { id: "modes", label: "أنماط اللعب", emoji: "🎮", group: "المسابقات", node: <GameModesPanel /> },
+
+    // ── الذكاء والعقول ──
+    { id: "agents", label: "العقول الحيّة", emoji: "🧠", group: "الذكاء والعقول", node: <LivingAgentsTab /> },
+    { id: "council", label: "مجلس العقول", emoji: "🗳️", group: "الذكاء والعقول", node: <MindsCouncil /> },
+    { id: "match", label: "المطابقة الذكية", emoji: "🧩", group: "الذكاء والعقول", node: <SmartMatchCard /> },
+    { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
+
+    // ── لك شخصياً ──
+    { id: "loyalty", label: "الولاء", emoji: "💎", group: "لك شخصياً", node: <LoyaltyPanel /> },
+    { id: "shop", label: "متجر التجميلات", emoji: "🛍️", group: "لك شخصياً", node: <CosmeticShop /> },
+    { id: "trophies", label: "خزانة الجوائز", emoji: "🏅", group: "لك شخصياً", node: <TrophyCase /> },
+    { id: "legacy", label: "الإرث", emoji: "🏛️", group: "لك شخصياً", node: <LegacyCard /> },
+    { id: "reward", label: "المكافأة المتكيّفة", emoji: "🎁", group: "لك شخصياً", node: <AdaptiveRewardCard /> },
+    { id: "live", label: "الأحداث الحيّة", emoji: "📣", group: "لك شخصياً", node: <LiveEventBanner /> },
+    { id: "appeal", label: "الاعتراضات", emoji: "⚖️", group: "لك شخصياً", node: <AppealForm /> },
+  ];
+  const DECK_GROUPS = ["المسابقات", "الذكاء والعقول", "لك شخصياً"];
+  const activePanel = deckPanel ? SYSTEMS_DECK.find((s) => s.id === deckPanel)?.node : null;
+
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
       <AnnouncementBanner />
@@ -276,28 +318,57 @@ export default function Play() {
         <UpdateBanner />
         <ActivePackBanner />
         <HighlightsCard />
-        <TournamentPanel />
-        <WorldChampionshipPanel />
-        <GameModesPanel />
-        <LivingAgentsTab />
-        <ArenaPanel />
-        <RivalryPanel />
-        <LeaguePanel />
-        <ClanWarPanel />
-        <ClanPanel />
-        <SeasonPassPanel />
-        <QuestsPanel />
-        <SmartMatchCard />
-        <PersonalChallenges />
-        <LegacyCard />
-        <MindsCouncil />
-        <AppealForm />
-        <LiveEventBanner />
-        <AdaptiveRewardCard />
         <NotificationCenter />
-        <TrophyCase />
-        <LoyaltyPanel />
-        <CosmeticShop />
+
+        {/* ── 🧊 سطح الأنظمة — نظام واحد فقط يُركَّب عند الطلب ── */}
+        <section className="rounded-2xl border border-border/70 bg-card/70 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-bold">سطح الأنظمة</p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                افتح النظام الذي تريده — يُحمَّل عند الطلب فقط حمايةً لخادم اللعبة من الاستهلاك الزائد
+              </p>
+            </div>
+            {deckPanel && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0 rounded-xl text-[11px]"
+                onClick={() => setDeckPanel(null)}
+              >
+                إغلاق
+              </Button>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {DECK_GROUPS.map((group) => (
+              <div key={group}>
+                <p className="mb-1.5 text-[10px] font-bold tracking-wide text-muted-foreground">{group}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SYSTEMS_DECK.filter((s) => s.group === group).map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setDeckPanel(deckPanel === s.id ? null : s.id)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-bold transition-colors",
+                        deckPanel === s.id
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/70 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                      )}
+                    >
+                      <span>{s.emoji}</span>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {activePanel && <div className="space-y-4">{activePanel}</div>}
       </div>
 
       {/* ── Header ─────────────────────────────────────────────── */}

@@ -475,7 +475,12 @@ const schema = defineSchema(
     })
       .index("by_code", ["code"])
       .index("by_host", ["hostId"])
-      .index("by_rematch", ["rematchOf"]),
+      .index("by_rematch", ["rematchOf"])
+      // 🧹 فهارس التنظيف: تتيح حذف الغرف المنتهية/المهجورة بقراءة مفهرسة
+      // محدودة بدل مسح الجدول كاملاً (كان الجدول الأكبر بلا أي فهرس زمني،
+      // و٤٠ استعلاماً تقرأه بـ collect = السبب الرئيسي في Database I/O).
+      .index("by_created", ["createdAt"])
+      .index("by_status_created", ["status", "createdAt"]),
 
     // One row per player per game.
     gamePlayers: defineTable({

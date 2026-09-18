@@ -178,12 +178,17 @@ export const getHub = query({
       fastestAnswerMs: profile?.fastestAnswerMs ?? null,
       correctAnswers: profile?.correctAnswers ?? 0,
       level,
+      // ⚠️ هذا الاستعلام مشترك من كل تبويب في «ملتقى العقول»، وكان يقرأ
+      // **كل** تاريخ اللاعب بلا حدّ — وكل كتابة في gameHistory تُعيد تشغيله.
+      // الآن: قراءة مفهرسة محدودة بأحدث ٥٠٠ جولة (كافية لكل الألقاب والأهداف).
       perfectGames: await ctx.db
         .query("gameHistory")
         .withIndex("by_user", (q: any) => q.eq("userId", userId))
-        .filter((q: any) => q.gte(q.field("questionCount"), 1))
-        .collect()
-        .then((rows: any[]) => rows.filter((r: any) => r.correctCount === r.questionCount).length),
+        .order("desc")
+        .take(500)
+        .then((rows: any[]) =>
+          rows.filter((r: any) => r.questionCount >= 1 && r.correctCount === r.questionCount).length,
+        ),
       dailyStreak: profile?.dailyStreak ?? 0,
     };
     const settingsDoc = await getSettingsDoc(ctx, userId);
