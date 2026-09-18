@@ -41,6 +41,12 @@ const MEMBERSHIP_EVENT_RETENTION_DAYS = 90;
 const BOOST_RETENTION_DAYS = 30; // ترقيات منتهية
 const LEDGER_RETENTION_DAYS = 120; // سجل الولاء القديم فقط
 
+// 🧠 جداول العقول الحية ووحدة الـ AI — كانت تتضخم بلا سقف (١٣ ألف فكرة!)
+const THOUGHT_RETENTION_DAYS = 2; // أفكار العقول: كلام عابر، عمره قصير جداً
+const FEED_RETENTION_DAYS = 3; // تغذية الوكلاء وأحداث المركز
+const SPECTATOR_RETENTION_DAYS = 3; // رسائل المتفرجين
+const MEMORY_PER_MIND_CAP = 40; // سقف ذكريات لكل عقل (يحفظ الأهم حديثاً)
+
 function cutoff(days: number): number {
   return Date.now() - days * 24 * 60 * 60 * 1000;
 }
@@ -140,6 +146,29 @@ async function pruneChatMessages(ctx: any, before: number, max: number): Promise
       removedHere += 1;
     }
     if (removedHere === 0 || rows.length < 200) break;
+  }
+  return deleted;
+}
+
+/**
+ * سقف ذكريات كل عقل: يحفظ الأحدث فقط لكل عقل.
+ * الفهرس by_mind يرتب قديماً أولاً (كسر التعادل بـ _creationTime)،
+ * فأي صف يتجاوز السقف هو الأقدم — حذف آمن بترتيب مضمون.
+ */
+async function pruneMindMemories(ctx: any, cap: number): Promise<number> {
+  const minds = await ctx.db.query("minds").take(200);
+  let deleted = 0;
+  for (const mind of minds) {
+    const rows = await ctx.db
+      .query("mindMemories")
+      .withIndex("by_mind", (q: any) => q.eq("mindId", mind._id))
+      .take(500);
+    if (rows.length <= cap) continue;
+    // الترتيب داخل الفهرس: الأقدم أولاً → المحذوف هو ما تجاوز السقف
+    for (let i = 0; i < rows.length - cap; i++) {
+      await ctx.db.delete(rows[i]._id);
+      deleted += 1;
+    }
   }
   return deleted;
 }
@@ -250,6 +279,62 @@ async function pruneBody(ctx: any) {
     // ── أخطاء العميل ──
     stats.clientErrors = await pruneByIndex(ctx, "clientErrors", "by_last", "lastSeen", errBefore);
     stats.errorLogs = await pruneByIndex(ctx, "errorLogs", "by_created", "createdAt", errBefore);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🧠 جداول العقول الحية ووحدة الـ AI — أكبر مصادر التضخم المقيسة
+    //    (mindThoughts ١٣ ألف صف، aiDecisionLog ٩٫٧ آلاف، aiAgentFeed ٥ آلاف…)
+    // ═══════════════════════════════════════════════════════════════════
+    stats.mindThoughts = await pruneDeep(
+      ctx,
+      "mindThoughts",
+      "by_created",
+      "createdAt",
+      cutoff(THOUGHT_RETENTION_DAYS),
+      6000,
+    );
+    stats.aiAgentFeed = await pruneDeep(
+      ctx,
+      "aiAgentFeed",
+      "by_created",
+      "createdAt",
+      cutoff(FEED_RETENTION_DAYS),
+      4000,
+    );
+    stats.aiHubEvents = await pruneDeep(
+      ctx,
+      "aiHubEvents",
+      "by_at",
+      "at",
+      cutoff(FEED_RETENTION_DAYS),
+      4000,
+    );
+    stats.mindMemories = await pruneMindMemories(ctx, MEMORY_PER_MIND_CAP);
+
+    // حوار العقول القديم (سجل محادثات، عمره قصير مفيد)
+    stats.mindChat = await pruneDeep(
+      ctx,
+      "mindChat",
+      "by_created",
+      "createdAt",
+      cutoff(OPS_RETENTION_DAYS),
+      2000,
+    );
+
+    // ── رسائل المتفرجين: للألعاب المتبقية فقط (المنتهية حُذفت مع غرفها) ──
+    let spectators = 0;
+    const sBefore = cutoff(SPECTATOR_RETENTION_DAYS);
+    const liveGames = await ctx.db.query("games").take(300);
+    for (const g of liveGames) {
+      const rows = await ctx.db
+        .query("spectatorMessages")
+        .withIndex("by_game_time", (q: any) => q.eq("gameId", g._id).lt("createdAt", sBefore))
+        .take(100);
+      for (const m of rows) {
+        await ctx.db.delete(m._id);
+        spectators += 1;
+      }
+    }
+    stats.spectatorMessages = spectators;
 
     const total = Object.values(stats).reduce((a, b) => a + b, 0);
     return { deleted: total, stats, opsBefore, errBefore };
