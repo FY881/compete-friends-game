@@ -37,7 +37,7 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   { id: "o14", category: "علوم", difficulty: "easy", question: "ما هي وظيفة القلب؟", options: ["التنفس", "ضخ الدم", "هضم الطعام", "تنقية الدم"], correctIndex: 1, stage: 2, reward: 100 },
   { id: "o15", category: "علوم", difficulty: "easy", question: "كم عدد الكواكب التي تدور حول الشمس؟", options: ["7", "8", "9", "10"], correctIndex: 1, stage: 2, reward: 100 },
   { id: "o16", category: "علوم", difficulty: "easy", question: "ما هو الكوكب الأحمر؟", options: ["المشتري", "زحل", "المريخ", "عطارد"], correctIndex: 2, stage: 2, reward: 100 },
-  { id: "o17", category: "علوم", difficulty: "easy", question: "ما هيghestMountains in the world؟", options: ["كيليمنجارو", "الإفرست", "ك2", "مون بلان"], correctIndex: 1, stage: 2, reward: 100 },
+  { id: "o17", category: "علوم", difficulty: "easy", question: "ما هي أعلى قمة جبلية في العالم؟", options: ["كيليمنجارو", "الإفرست", "ك2", "مون بلان"], correctIndex: 1, stage: 2, reward: 100 },
   { id: "o18", category: "علوم", difficulty: "easy", question: "ما هو المرض الذي تسببه نقص فيتامين C؟", options: ["السكري", "السرطان", "القرابي", "السل"], correctIndex: 2, stage: 2, reward: 100 },
   { id: "o19", category: "علوم", difficulty: "easy", question: "ما هو أكبر كوكب في المجموعة الشمسية؟", options: ["زحل", "المشتري", "أورانوس", "نبتون"], correctIndex: 1, stage: 2, reward: 100 },
   { id: "o20", category: "علوم", difficulty: "easy", question: "كم عدد أضلاع المربع؟", options: ["3", "4", "5", "6"], correctIndex: 1, stage: 2, reward: 100 },
@@ -59,7 +59,7 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   { id: "o32", category: "ثقافة عربية", difficulty: "easy", question: "ما هي أطول سورة في القرآن الكريم؟", options: ["البقرة", "آل عمران", "المائدة", "الأعراف"], correctIndex: 0, stage: 4, reward: 100 },
   { id: "o33", category: "ثقافة عربية", difficulty: "easy", question: "ما هي عاصمة المملكة العربية السعودية؟", options: ["جدة", "مكة المكرمة", "الرياض", "المدينة المنورة"], correctIndex: 2, stage: 4, reward: 100 },
   { id: "o34", category: "ثقافة عربية", difficulty: "easy", question: "في أي عام كانت هجرة النبي صلى الله عليه وسلم؟", options: ["620 م", "622 م", "624 م", "630 م"], correctIndex: 1, stage: 4, reward: 100 },
-  { id: "o35", category: "ثقافة عربية", difficulty: "easy", question: "ما هو اسم الكتاب المقدس للuslimين؟", options: ["التوراة", "الإنجيل", "القرآن", "الزبور"], correctIndex: 2, stage: 4, reward: 100 },
+  { id: "o35", category: "ثقافة عربية", difficulty: "easy", question: "ما هو اسم الكتاب المقدس للمسلمين؟", options: ["التوراة", "الإنجيل", "القرآن", "الزبور"], correctIndex: 2, stage: 4, reward: 100 },
   { id: "o36", category: "ثقافة عربية", difficulty: "easy", question: "كم عدد أعمدة الإسلام؟", options: ["3", "4", "5", "6"], correctIndex: 2, stage: 4, reward: 100 },
   { id: "o37", category: "ثقافة عربية", difficulty: "easy", question: "من هو مؤسس الدولة الأموية؟", options: ["عمر بن عبد العزيز", "معاوية بن أبي سفيان", "عبد الملك بن مروان", "الوليد بن عبد الملك"], correctIndex: 1, stage: 4, reward: 100 },
   { id: "o38", category: "ثقافة عربية", difficulty: "easy", question: "ما هي أقدم جامعة في العالم الإسلامي؟", options: ["الزهراء", "الأزهر", "القرويين", "الزيتونة"], correctIndex: 2, stage: 4, reward: 100 },
@@ -88,7 +88,7 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   { id: "o54", category: "تاريخ", difficulty: "medium", question: "من هو قائد معركة عين جالوت؟", options: ["صلاح الدين الأيوبي", "سيف الدين قطز", "الظاهر بيبرس", "الناصر محمد بن قلاوون"], correctIndex: 1, stage: 6, reward: 200 },
   { id: "o55", category: "تاريخ", difficulty: "medium", question: "ما هي أقدم حضارة في التاريخ؟", options: ["المصرية", "السومرية", "الصينية", "الهندية"], correctIndex: 1, stage: 6, reward: 200 },
   { id: "o56", category: "تاريخ", difficulty: "medium", question: "في أي سنة تم فتح القسطنطينية؟", options: ["1451", "1453", "1455", "1460"], correctIndex: 1, stage: 6, reward: 200 },
-  { id: "o57", category: "تاريخ", difficulty: "medium", question: "من هو مخترع الطباعة؟", options: ["غutenberg", "إديسون", "غاليليو", "ديكارت"], correctIndex: 0, stage: 6, reward: 200 },
+  { id: "o57", category: "تاريخ", difficulty: "medium", question: "من هو مخترع الطباعة؟", options: ["غوتنبرغ", "إديسون", "غاليليو", "ديكارت"], correctIndex: 0, stage: 6, reward: 200 },
   { id: "o58", category: "تاريخ", difficulty: "medium", question: "ما هي دولة الاستكشاف الكبرى في عصر النهضة؟", options: ["إنجلترا", "فرنسا", "إسبانيا والبرتغال", "هولندا"], correctIndex: 2, stage: 6, reward: 200 },
   { id: "o59", category: "تاريخ", difficulty: "medium", question: "في أي سنة أعلنت أمريكا استقلالها؟", options: ["1774", "1776", "1778", "1780"], correctIndex: 1, stage: 6, reward: 200 },
   { id: "o60", category: "تاريخ", difficulty: "medium", question: "من هو الفاتح العثماني للقسطنطينية؟", options: ["بايزيد الثاني", "محمد الفاتح", "سليم الأول", "سليمان القانوني"], correctIndex: 1, stage: 6, reward: 200 },
@@ -132,7 +132,7 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   // Stage 10 — تقنية
   { id: "o91", category: "تقنية", difficulty: "medium", question: "ما هو اختصار HTML؟", options: ["Hyper Text Markup Language", "High Tech Modern Language", "Home Tool Markup Language", "Hyper Transfer Markup Language"], correctIndex: 0, stage: 10, reward: 200 },
   { id: "o92", category: "تقنية", difficulty: "medium", question: "في أي سنة تأسس فيسبوك؟", options: ["2002", "2003", "2004", "2005"], correctIndex: 2, stage: 10, reward: 200 },
-  { id: "o93", category: "تقنية", difficulty: "medium", question: "ما هو اختصار CPU؟", options: ["Central Processing Unit", "Computer Personal Unit", "Central Program Utility", "Core Processing Unit"], correctIndex: 0, stage: 10, reward: 200 },
+  { id: "o93", category: "تقنية", difficulty: "medium", question: "ما هو اختصار CPU؟", options: ["Central Processing Unit", "Computer Pزيموفal Unit", "Central Program Utility", "Core Processing Unit"], correctIndex: 0, stage: 10, reward: 200 },
   { id: "o94", category: "تقنية", difficulty: "medium", question: "ما هو أول هاتف ذكي من Apple؟", options: ["iPhone 3G", "iPhone 2G", "iPhone 4", "iPhone 5"], correctIndex: 1, stage: 10, reward: 200 },
   { id: "o95", category: "تقنية", difficulty: "medium", question: "ما هي لغة البرمجة الأكثر استخداماً في العالم؟", options: ["Python", "Java", "JavaScript", "C++"], correctIndex: 2, stage: 10, reward: 200 },
   { id: "o96", category: "تقنية", difficulty: "medium", question: "ما هو اختصار RAM؟", options: ["Random Access Memory", "Read Access Memory", "Run Access Memory", "Rapid Access Memory"], correctIndex: 0, stage: 10, reward: 200 },
@@ -183,12 +183,12 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   // Stage 14-15 — ثقافة ورياضة
   { id: "o131", category: "رياضة", difficulty: "hard", question: "كم مرة فاز البرازيل بكأس العالم؟", options: ["4", "5", "6", "7"], correctIndex: 1, stage: 14, reward: 300 },
   { id: "o132", category: "رياضة", difficulty: "hard", question: "في أي دولة أُقيمت أول دورة أولمبية حديثة؟", options: ["إيطاليا", "يونان", "فرنسا", "إنجلترا"], correctIndex: 1, stage: 14, reward: 300 },
-  { id: "o133", category: "رياضة", difficulty: "hard", question: "كم مساحة ملعب كرة القدم стандартياً؟", options: ["7,000 م²", "7,140 م²", "8,000 م²", "6,500 م²"], correctIndex: 1, stage: 14, reward: 300 },
+  { id: "o133", category: "رياضة", difficulty: "hard", question: "كم مساحة ملعب كرة القدم المعيارية؟", options: ["7,000 م²", "7,140 م²", "8,000 م²", "6,500 م²"], correctIndex: 1, stage: 14, reward: 300 },
   { id: "o134", category: "رياضة", difficulty: "hard", question: "من هو أكثر لاعب حصولاً على كرات ذهبية؟", options: ["رونالدو", "ميسي", "مودريتش", "إينييستا"], correctIndex: 1, stage: 14, reward: 300 },
   { id: "o135", category: "رياضة", difficulty: "hard", question: "في أي سنة أقيمت أول بطولة لكأس العالم لكرة القدم؟", options: ["1926", "1928", "1930", "1932"], correctIndex: 2, stage: 14, reward: 300 },
   { id: "o136", category: "رياضة", difficulty: "hard", question: "كم عدد ألوان الأعلام الأولمبية؟", options: ["4", "5", "6", "7"], correctIndex: 1, stage: 14, reward: 300 },
   { id: "o137", category: "رياضة", difficulty: "hard", question: "ما هي أطول مسابقة سباحة في الأولمبياد؟", options: ["200 م", "400 م", "800 م", "1500 م"], correctIndex: 3, stage: 14, reward: 300 },
-  { id: "o138", category: "رياضة", difficulty: "hard", question: "من هو أسرع عداء في التاريخ (100 م)؟", options: ["يوسين بولت", "تاي슨 غاي", "جاستن غاتلين", "أسافا باول"], correctIndex: 0, stage: 14, reward: 300 },
+  { id: "o138", category: "رياضة", difficulty: "hard", question: "من هو أسرع عداء في التاريخ (100 م)؟", options: ["يوسين بولت", "تايسون غاي", "جاستن غاتلين", "أسافا باول"], correctIndex: 0, stage: 14, reward: 300 },
   { id: "o139", category: "رياضة", difficulty: "hard", question: "كم عدد مجموعات التنس في بطولة غراند سلام للرجال؟", options: ["3", "4", "5", "6"], correctIndex: 1, stage: 14, reward: 300 },
   { id: "o140", category: "رياضة", difficulty: "hard", question: "في أي دولة نشأ رياضة الكارتيه؟", options: ["اليابان", "الصين", "الهند", "كوريا"], correctIndex: 0, stage: 14, reward: 300 },
 
@@ -207,15 +207,15 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   // المرحلة 16-25: صعب جداً + اختبار منطقي + بديهة
   // ═══════════════════════════════════════════════════════════════
   // Stage 16 — منطق وتفكير نقدي
-  { id: "o151", category: "منطق", difficulty: "hard", question: "إذا كان جميع القطط حيوانات، وبعض الحيوانات ناطقة، فهل بعض القطط ناطقة؟", options: ["نعم بالتأكيد", "لا بالتأكيد", "ربما", "الstatement خاطئ"], correctIndex: 1, stage: 16, reward: 300 },
+  { id: "o151", category: "منطق", difficulty: "hard", question: "إذا كان جميع القطط حيوانات، وبعض الحيوانات ناطقة، فهل بعض القطط ناطقة؟", options: ["نعم بالتأكيد", "لا بالتأكيد", "ربما", "العبارة خاطئة"], correctIndex: 1, stage: 16, reward: 300 },
   { id: "o152", category: "منطق", difficulty: "hard", question: "أب عنده 3 أبناء، كل ابن عنده أخ واحد. كم عدد الأبناء؟", options: ["3", "4", "6", "9"], correctIndex: 0, stage: 16, reward: 300 },
   { id: "o153", category: "منطق", difficulty: "hard", question: ".Speed + Time = Distance. إذا كان المسافة تضاعفت والسرعة ثابتة، ماذا يحدث للوقت؟", options: ["يقل النصف", "يظل كما هو", "يضاعف", "يصبح صفر"], correctIndex: 2, stage: 16, reward: 300 },
   { id: "o154", category: "منطق", difficulty: "hard", question: "رجل يمشي جنوباً 5 كم، ثم شرقاً 5 كم، ثم شمالاً 5 كم، فيجد نفس المكان الذي بدأ منه. أين هو؟", options: ["القطب الجنوبي", "القطب الشمالي", "خط الاستواء", "في الصحراء"], correctIndex: 0, stage: 16, reward: 300 },
   { id: "o155", category: "منطق", difficulty: "hard", question: "ثعبان في صندوق مربع. إذا قطعت الصندوق من المنتصف أفقياً وعمودياً، كم قطعة ستكون؟", options: ["3", "4", "5", "6"], correctIndex: 2, stage: 16, reward: 300 },
   { id: "o156", category: "منطق", difficulty: "hard", question: "رقم مضاعف 6، أكبر من 20 وأصغر من 35. ما هو؟", options: ["24", "30", "36", "28"], correctIndex: 1, stage: 16, reward: 300 },
-  { id: "o157", category: "منطق", difficulty: "hard", question: "إذا كان أمسriday، فماذا يكون بعد غد؟", options: ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس"], correctIndex: 2, stage: 16, reward: 300 },
+  { id: "o157", category: "منطق", difficulty: "hard", question: "إذا كان أمس الجمعة، فماذا يكون بعد غد؟", options: ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس"], correctIndex: 0, stage: 16, reward: 300 },
   { id: "o158", category: "منطق", difficulty: "hard", question: "5×5÷5+5-5 = ؟", options: ["0", "5", "10", "25"], correctIndex: 1, stage: 16, reward: 300 },
-  { id: "o159", category: "منطق", difficulty: "hard", question: "أين يمكن أن تجد أantaGravity Naturally?", options: ["الفضاء", "القارة القطبية", "لا يوجد مكان", "المحيط"], correctIndex: 2, stage: 16, reward: 300 },
+  { id: "o159", category: "منطق", difficulty: "hard", question: "أين يمكن أن تجد مضاد الجاذبية بشكل طبيعي؟", options: ["الفضاء", "القارة القطبية", "لا يوجد مكان", "المحيط"], correctIndex: 2, stage: 16, reward: 300 },
   { id: "o160", category: "منطق", difficulty: "hard", question: "كم مرة يظهر الرقم 3 من 1 إلى 100؟", options: ["18", "19", "20", "21"], correctIndex: 2, stage: 16, reward: 300 },
 
   // Stage 17-20 — ألغاز وبديهة
@@ -228,7 +228,7 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   { id: "o167", category: "ألغاز", difficulty: "hard", question: "شيء له عيون لكن لا يرى. ما هو؟", options: ["الوجه", "البطاطس", "الإبرة", "الكتاب"], correctIndex: 1, stage: 18, reward: 300 },
   { id: "o168", category: "ألغاز", difficulty: "hard", question: "شيء تراه في منتصف الماء لكن لا تراه في الباخرة. ما هو؟", options: ["السمكة", "الحفرة", "العجلة", "الإسكلة"], correctIndex: 1, stage: 18, reward: 300 },
   { id: "o169", category: "ألغاز", difficulty: "hard", question: "شيء يمشي في الشمس ويتوقف في الظل. ما هو؟", options: ["الإنسان", "الظل", "الساعة", "الحصان"], correctIndex: 1, stage: 18, reward: 300 },
-  { id: "o170", category: "ألغاز", difficulty: "hard", question: "شيء يمكنه السباحة لكنه يموت إذا مَسَّه الماء. ما هو؟", options: ["السمكة", "الماء الملح", "الמلح", "الحرب"], correctIndex: 2, stage: 18, reward: 300 },
+  { id: "o170", category: "ألغاز", difficulty: "hard", question: "شيء يمكنه السباحة لكنه يموت إذا مَسَّه الماء. ما هو؟", options: ["السمكة", "الثلج", "الملح", "الحرب"], correctIndex: 2, stage: 18, reward: 300 },
 
   // Stage 19-20 — سرعة بديهة
   { id: "o171", category: "سرعة بديهة", difficulty: "hard", question: "تث الـ3 تسقط في قاع دلو. كم بقي؟", options: ["0", "1", "2", "3"], correctIndex: 1, stage: 19, reward: 300 },
@@ -247,8 +247,8 @@ export const OFFLINE_QUESTION_BANK: OfflineQuestion[] = [
   // ═══════════════════════════════════════════════════════════════
   // Stage 21-25 — تحديات متقدمة
   { id: "o181", category: "تحدي", difficulty: "hard", question: "في فيبوناتشي، ما هو الرقم السادس؟ (0,1,1,2,3,5...)", options: ["6", "7", "8", "9"], correctIndex: 2, stage: 21, reward: 400 },
-  { id: "o182", category: "تحدي", difficulty: "hard", question: "ما هي القوة التي تجذب الجسم نحو مركز الأرض؟", options: ["المغناطيسية", "الجاذبية", "الاحتكاك", "الipherals"], correctIndex: 1, stage: 21, reward: 400 },
-  { id: "o183", category: "تحدي", difficulty: "hard", question: "كم عددAngles in a hexagon?", options: ["4", "5", "6", "7"], correctIndex: 2, stage: 21, reward: 400 },
+  { id: "o182", category: "تحدي", difficulty: "hard", question: "ما هي القوة التي تجذب الجسم نحو مركز الأرض؟", options: ["المغناطيسية", "الجاذبية", "الاحتكاك", "الطرد المركزي"], correctIndex: 1, stage: 21, reward: 400 },
+  { id: "o183", category: "تحدي", difficulty: "hard", question: "كم عدد زوايا الشكل السداسي؟", options: ["4", "5", "6", "7"], correctIndex: 2, stage: 21, reward: 400 },
   { id: "o184", category: "تحدي", difficulty: "hard", question: "ما هو فيتامين الشمس؟", options: ["A", "B", "C", "D"], correctIndex: 3, stage: 21, reward: 400 },
   { id: "o185", category: "تحدي", difficulty: "hard", question: "ما هي أصغر دولة في العالم من حيث المساحة؟", options: ["موناكو", "الفاتيكان", "سان مارينو", "ليختنشتاين"], correctIndex: 1, stage: 21, reward: 400 },
   { id: "o186", category: "تحدي", difficulty: "hard", question: "ما هو أكبر عدد أولي واحد yAxis 50؟", options: ["43", "47", "49", "53"], correctIndex: 1, stage: 22, reward: 400 },

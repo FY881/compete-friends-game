@@ -46,6 +46,8 @@ const ChatRooms = lazyRetry(() => import("./pages/ChatRooms.tsx"));
 const Hub = lazyRetry(() => import("./pages/Hub.tsx"));
 const Atlas = lazyRetry(() => import("./pages/Atlas.tsx"));
 const AtlasLogin = lazyRetry(() => import("./components/atlas/AtlasLogin.tsx"));
+// 🛡 ساحة الأوفلاين — تعمل بلا خادم، فلا تُحاط بـ RequireAuth أبداً.
+const Offline = lazyRetry(() => import("./pages/Offline.tsx"));
 
 // Simple loading fallback for route transitions — all Arabic
 function RouteLoading() {
@@ -441,6 +443,8 @@ function AppShell() {
                 }
               />
               <Route path="/rules" element={<Rules />} />
+              {/* مسار مفتوح دائماً بلا مصادقة: يبقى اللعب متاحاً ولو تعطّل الخادم */}
+              <Route path="/offline" element={<Offline />} />
               <Route path="/download" element={<Download />} />
               <Route path="/games" element={<MiniGames />} />
               <Route
