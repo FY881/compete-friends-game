@@ -13,12 +13,14 @@ import {
   Bot,
   Check,
   Clock,
+  HardDrive,
   Loader2,
   Play,
   Power,
   RotateCcw,
   ShieldCheck,
   Timer,
+  Trash2,
   TrendingUp,
   X,
   Zap,
@@ -89,9 +91,17 @@ export function AiCronCenter() {
   const setAllEnabled = useMutation(api.aiCron.setAllEnabled);
   const resetJob = useMutation(api.aiCron.resetJob);
   const runAllEnabledNow = useMutation(api.aiCron.runAllEnabledNow);
+  const purgeAiData = useMutation(api.aiCron.purgeAiData);
+  const dataLeft = useQuery(api.aiCron.aiDataLeft);
 
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<{
+    total: number;
+    deleted: Record<string, number>;
+    more: boolean;
+  } | null>(null);
 
   const grouped = useMemo(() => {
     if (!data) return [];
@@ -408,6 +418,102 @@ export function AiCronCenter() {
           </CardContent>
         </Card>
       ))}
+
+      {/* ── 🗑 تنظيف بيانات AI نهائياً ─────────────────────────── */}
+      <Card className="border-rose-500/30">
+        <CardHeader className="gap-1 pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600">
+              <Trash2 className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1 truncate">تنظيف بيانات AI والسجلات</span>
+            {dataLeft && dataLeft.nonEmpty.length === 0 && (
+              <Badge
+                variant="outline"
+                className="rounded-full border-emerald-500/40 text-[10px] text-emerald-600"
+              >
+                نظيفة تماماً
+              </Badge>
+            )}
+          </CardTitle>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            يحذف نهائياً مخلّفات AI: قراراتها وسجلاتها وتغذياتها وذاكرتها وأفكار
+            العقول، مع سجلات الأخطاء والأداء. لا يمسّ حسابات اللاعبين ولا تقدّمهم
+            ولا مقتنياتهم ولا الأسئلة.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5">
+            <HardDrive className="size-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold">
+                الجداول المراقَبة: {dataLeft ? dataLeft.tables : "…"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {dataLeft === undefined
+                  ? "جارٍ الفحص…"
+                  : dataLeft.nonEmpty.length === 0
+                    ? "لا يوجد أي صف متبقٍّ — كل جداول المخلفات فارغة."
+                    : `جداول فيها بيانات: ${dataLeft.nonEmpty.length} — ${dataLeft.nonEmpty.slice(0, 6).join(" · ")}${dataLeft.nonEmpty.length > 6 ? " …" : ""}`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 border-rose-500/40 text-rose-600 hover:bg-rose-500/10"
+              disabled={purging}
+              onClick={async () => {
+                setPurging(true);
+                try {
+                  const res = (await purgeAiData({ limitPerTable: 150 })) as {
+                    total: number;
+                    deleted: Record<string, number>;
+                    more: boolean;
+                  };
+                  setPurgeResult(res);
+                  toast.success(
+                    res.total > 0
+                      ? `حُذف ${res.total} صفاً من ${Object.keys(res.deleted).length} جدولاً`
+                      : "لا شيء للحذف — كل الجداول فارغة",
+                  );
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "تعذّر التنظيف");
+                } finally {
+                  setPurging(false);
+                }
+              }}
+            >
+              {purging ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+              نظّف دفعة واحدة
+            </Button>
+          </div>
+
+          {purgeResult && (
+            <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+              <p className="text-xs font-bold tabular-nums">
+                نتيجة آخر تنظيف: {purgeResult.total} صفاً محذوفاً
+                {purgeResult.more && " · بقي المزيد — اضغط مرة أخرى"}
+              </p>
+              {Object.keys(purgeResult.deleted).length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {Object.entries(purgeResult.deleted).map(([table, count]) => (
+                    <Badge
+                      key={table}
+                      variant="outline"
+                      className="rounded-full text-[9px] tabular-nums"
+                    >
+                      {table} · {count}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
         ملاحظة تشغيلية: جدولة الخادم نفسها ثابتة وقت النشر (مهمة تفتيش واحدة كل ساعة)،

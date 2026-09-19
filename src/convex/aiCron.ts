@@ -480,3 +480,117 @@ export const ensureSeeded = internalMutation({
     return { created, total: JOB_DEFS.length };
   },
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🗑 تنظيف بيانات AI نهائياً — حذف حقيقي مدرَّج
+// ═══════════════════════════════════════════════════════════════════════
+//
+// لماذا هذا مهم؟ كان أكبر مُستهلك لـ Database I/O هو الاستعلامات التفاعلية
+// التي تمسح جداول ضخمة (أفكار العقول، سجلات قرارات AI، التغذيات). حذف
+// هذه الجداول يقلّص كل قراءة لاحقة إلى الصفر تقريباً — أي يمنع تكرار
+// تجاوز الحصة جذرياً بلا حاجة لتعديل كود.
+//
+// الحذف **مدرَّج ومقيّد** (دفعة لكل جدول في كل استدعاء) لأن المعاملة
+// الواحدة محدودة بـ 16,000 كتابة — يُعاد الضغط للحصول على الدفعة التالية.
+
+/**
+ * جداول «المخلفات»: سجلات ومخارج AI وذاكرته ومراقب الأداء والأخطاء.
+ * كلها قابلة للحذف بلا أثر على حسابات اللاعبين أو تقدّمهم أو مقتنياتهم.
+ */
+export const AI_DATA_TABLES = [
+  // سجلات وقرارات AI
+  "aiDecisionLog",
+  "aiLogs",
+  "aiErrorClusters",
+  "aiFeedback",
+  "aiPatches",
+  "aiSuggestions",
+  "aiOwnerEscalations",
+  "aiSuiteActivity",
+  // تغذيات وأحداث
+  "aiAgentFeed",
+  "aiHubEvents",
+  "assistantLogs",
+  "assistantOrders",
+  "spectatorMessages",
+  "spectators",
+  // ذاكرة AI وعقول
+  "aiMemories",
+  "aiCollectiveMemories",
+  "aiFreeMemory",
+  "aiFreeCommands",
+  "mindThoughts",
+  "mindChat",
+  "mindRequests",
+  "mindVotes",
+  "atlasLearningMemory",
+  "atlasCommands",
+  // قياسات وأخطاء وسجلات إدارية
+  "performanceMetrics",
+  "clientErrors",
+  "errorLogs",
+  "errorPatterns",
+  "moderationLogs",
+  "auditLog",
+  "fairPlayLog",
+  "apiCallLogs",
+  "apiEvents",
+  "viceAudit",
+  "viceCommands",
+] as const;
+
+/**
+ * 👑 حذف بيانات AI/السجلات نهائياً — دفعة محدودة في كل ضغطة.
+ *
+ * `limitPerTable` = أقصى عدد صفوف تُحذف من كل جدول في الاستدعاء الواحد
+ * (افتراضياً 150، وبسقف 400 للحفاظ على حدود المعاملة).
+ *
+ * يعيد عدد ما حُذف فعلاً لكل جدول، و`more: true` إن بقي المزيد
+ * (اضغط مرة أخرى لإكمال التنظيف).
+ */
+export const purgeAiData = mutation({
+  args: { limitPerTable: v.optional(v.number()) },
+  handler: async (ctx, { limitPerTable }) => {
+    await requireOwner(ctx);
+    const cap = Math.max(25, Math.min(400, Math.floor(limitPerTable ?? 150)));
+    const deleted: Record<string, number> = {};
+    let more = false;
+
+    for (const table of AI_DATA_TABLES) {
+      try {
+        const rows = await ctx.db.query(table as any).take(cap);
+        for (const row of rows) {
+          await ctx.db.delete(row._id);
+        }
+        if (rows.length > 0) deleted[table] = rows.length;
+        if (rows.length >= cap) more = true;
+      } catch {
+        // جدول غير موجود في هذا المخطط — نتخطّاه بلا فشل للاستدعاء كله
+      }
+    }
+
+    const total = Object.values(deleted).reduce((sum, n) => sum + n, 0);
+    return { total, deleted, more };
+  },
+});
+
+/**
+ * 📊 فحص سريع: هل بقي شيء في جداول المخلفات؟
+ * يقرأ صفاً واحداً فقط من كل جدول (تكلفته شبه معدومة) فلا يُستهلك I/O.
+ */
+export const aiDataLeft = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireOwner(ctx);
+    const nonEmpty: string[] = [];
+    for (const table of AI_DATA_TABLES) {
+      try {
+        const one = await ctx.db.query(table as any).take(1);
+        if (one.length > 0) nonEmpty.push(table);
+      } catch {
+        // جدول غير موجود — لا يُحتسب
+      }
+    }
+    return { tables: AI_DATA_TABLES.length, nonEmpty };
+  },
+});
