@@ -18,7 +18,21 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+
+    /* 🛡 فحص تراكمي (Incremental) — ضروري للاستقرار في هذه البيئة:
+       فحص Convex لهذا المشروع (57 ألف سطر، 152 وحدة) يستهلك ~650MB من
+       الذاكرة. بيئة التشغيل محدودة بـ 2GB، فأقدم نفاد ذاكرة يقتل عملية
+       tsc فتظهر الرسالة المضللة «TypeScript typecheck timed out».
+
+       مع الفحص التراكمي: التشغيل الأول يبني الحالة كاملة، ثم كل تشغيل
+       تالٍ يفحص المتغيّر فقط — من ٢٥ ثانية/650MB إلى ~٥ ثوانٍ/أقل بكثير،
+       مع الحفاظ على كامل قائمة الملفات التي يقرأها Convex (--listFiles).
+
+       ملف الحالة في node_modules/.tmp (نفس مسار حالة التطبيق) فلا
+       يُلوّث الكود ولا يُرفع للمستودع. */
+    "incremental": true,
+    "tsBuildInfoFile": "../../node_modules/.tmp/tsconfig.convex.tsbuildinfo"
   },
   "include": ["./**/*"],
   "exclude": ["./_generated"]
