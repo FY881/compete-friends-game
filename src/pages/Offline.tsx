@@ -1,73 +1,118 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
+import { type OfflineQuestion } from "@/lib/offline-bank";
 import {
-  OFFLINE_BANK,
-  QUESTIONS_PER_STAGE,
-  type OfflineQuestion,
-} from "@/lib/offline-bank";
+  ACHIEVEMENTS,
+  AVATARS,
+  BANK_SIZE,
+  CATEGORIES,
+  RANKS,
+  buildQuestions,
+  categoryAccuracy,
+  finishSession,
+  isDailyDone,
+  leaderboard,
+  levelInfo,
+  mindPower,
+  myRank,
+  resetAll,
+  unlockedTitles,
+  updateProfile,
+  useLocalGame,
+  withShuffledOptions,
+  type AchievementDef,
+  type ModeId,
+} from "@/lib/localEngine";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   ArrowRight,
+  Award,
+  BarChart3,
+  Brain,
+  CalendarDays,
   Check,
   ChevronLeft,
   CloudOff,
+  Crown,
+  Flame,
+  Heart,
   Home,
-  Lock,
+  Play,
   RotateCcw,
-  Sparkles,
+  Swords,
+  Target,
+  Timer,
   Trophy,
+  User,
   X,
   Zap,
 } from "lucide-react";
 
 /**
- * 🛡 بلا إنترنت — وضع اللعب المُحصَّن (Offline Arena)
+ * ═══════════════════════════════════════════════════════════════════════
+ * ⚔️ ساحة حرب العقول — الوضع المحلي الكامل (Local Arena)
+ * ═══════════════════════════════════════════════════════════════════════
  *
- * الغاية: ألا تتوقف اللعبة **أبداً**. كل الأسئلة (360 سؤالاً على 50 مرحلة)
- * مضمّنة داخل التطبيق نفسه، والتقدّم يُحفظ في المتصفح. لا يمر أي شيء عبر
- * الشبكة ولا خادم Convex — صفر استدعاءات، صفر كلفة حصة، صفر انقطاع.
+ * هذه الصفحة **لا تلمس الخادم إطلاقاً**: لا Convex، لا شبكة، لا حصة،
+ * لا حساب. كل شيء (المحرك، بنك الأسئلة، التخزين) يعمل داخل المتصفح،
+ * فتبقى اللعبة حيّة مهما تعطّل الخادم.
  *
- * هذا هو المسار الذي يستعمله اللاعب تلقائياً حين يكون الخادم غير متاح.
+ * الأنماط المتاحة:
+ *   • تحدي سريع — ١٠ أسئلة متدرّجة تُختار تكيّفياً مع أدائك.
+ *   • ماراثون الذكاء — ٢٥ سؤالاً بثلاث قلوب فقط.
+ *   • التحدي اليومي — نفس الأسئلة للجميع في اليوم، ومكافأة مضاعفة.
+ *   • اختيار الفئة — تمرين مركّز على ذكاء واحد بعينه.
+ *   • مواجهة العقول — نزال مباشر ضد خصم ذكاء اصطناعي.
  */
 
-const STORAGE_KEY = "mindclash.offline.v1";
-const PASS_RATIO = 0.6; // ٦٠٪ لفتح المرحلة التالية
+type TabId = "arena" | "board" | "profile";
 
-type SavedProgress = {
-  /** أفضل نسبة لكل مرحلة (0-100) */
-  best: Record<string, number>;
-  /** أعلى مرحلة مفتوحة */
-  unlocked: number;
+const TIMER_BY_MODE: Record<ModeId, number> = {
+  quick: 20,
+  marathon: 16,
+  daily: 22,
+  category: 20,
+  duel: 18,
 };
 
-const DEFAULT_PROGRESS: SavedProgress = { best: {}, unlocked: 1 };
-
-function loadProgress(): SavedProgress {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_PROGRESS;
-    const parsed = JSON.parse(raw) as Partial<SavedProgress>;
-    return {
-      best: parsed.best && typeof parsed.best === "object" ? parsed.best : {},
-      unlocked: typeof parsed.unlocked === "number" && parsed.unlocked >= 1 ? parsed.unlocked : 1,
-    };
-  } catch {
-    return DEFAULT_PROGRESS;
-  }
-}
-
-function saveProgress(p: SavedProgress): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
-  } catch {
-    /* التخزين ممتلئ/محجوب — الجولة نفسها تعمل */
-  }
-}
+const MODE_META: Record<ModeId, { title: string; desc: string; icon: ReactNode; accent: string }> = {
+  quick: {
+    title: "تحدي سريع",
+    desc: "١٠ أسئلة تُنتقى من أضعف فئاتك — الأسرع للتقدّم",
+    icon: <Zap className="size-5" />,
+    accent: "bg-primary/10 text-primary",
+  },
+  marathon: {
+    title: "ماراثون الذكاء",
+    desc: "٢٥ سؤالاً وثلاث قلوب — أقصى نقاط ممكنة",
+    icon: <Flame className="size-5" />,
+    accent: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  },
+  daily: {
+    title: "التحدي اليومي",
+    desc: "نفس الأسئلة لكل اللاعبين اليوم + مكافأة ٤٠٠ نقطة",
+    icon: <CalendarDays className="size-5" />,
+    accent: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+  category: {
+    title: "اختيار الفئة",
+    desc: "١٠ أسئلة مركّزة على ذكاء واحد تختاره",
+    icon: <Target className="size-5" />,
+    accent: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+  duel: {
+    title: "مواجهة العقول",
+    desc: "نزال مباشر ضد خصم ذكاء اصطناعي — من يعرف أكثر؟",
+    icon: <Swords className="size-5" />,
+    accent: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  },
+};
 
 const DIFFICULTY_LABEL: Record<OfflineQuestion["difficulty"], string> = {
   easy: "سهل",
@@ -81,89 +126,63 @@ const DIFFICULTY_CLASS: Record<OfflineQuestion["difficulty"], string> = {
   hard: "text-rose-700 border-rose-500/30 bg-rose-500/10 dark:text-rose-400",
 };
 
-function shuffle<T>(items: T[]): T[] {
-  const a = [...items];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
+// ═══════════════════════════════════════════════════════════════════════
+// الصفحة
+// ═══════════════════════════════════════════════════════════════════════
 
-/** يعيد ترتيب الخيارات مع تصحيح موضع الإجابة الصحيحة. */
-function withShuffledOptions(q: OfflineQuestion): { options: string[]; correctIndex: number } {
-  const pairs = q.options.map((text, i) => ({ text, correct: i === q.correctIndex }));
-  const mixed = shuffle(pairs);
-  return {
-    options: mixed.map((p) => p.text),
-    correctIndex: mixed.findIndex((p) => p.correct),
-  };
-}
+type RunRequest = {
+  mode: ModeId;
+  label: string;
+  questions: OfflineQuestion[];
+  rival?: { name: string; avatar: string; accuracy: number };
+};
 
 export default function Offline() {
-  const [progress, setProgress] = useState<SavedProgress>(DEFAULT_PROGRESS);
-  const [openStage, setOpenStage] = useState<number | null>(null);
+  const save = useLocalGame();
+  const [tab, setTab] = useState<TabId>("arena");
+  const [run, setRun] = useState<RunRequest | null>(null);
 
-  useEffect(() => {
-    setProgress(loadProgress());
-  }, []);
+  const level = levelInfo(save.stats.xp);
+  const rank = myRank(save);
+  const dailyDone = isDailyDone(save);
 
-  // تجميع الأسئلة حسب المرحلة مرة واحدة
-  const stages = useMemo(() => {
-    const map = new Map<number, OfflineQuestion[]>();
-    for (const q of OFFLINE_BANK) {
-      const list = map.get(q.stage);
-      if (list) list.push(q);
-      else map.set(q.stage, [q]);
+  const startMode = (mode: ModeId, category?: string) => {
+    const questions = buildQuestions(mode, save, { category });
+    if (questions.length === 0) {
+      toast.error("لا توجد أسئلة متاحة لهذا النمط حالياً");
+      return;
     }
-    return [...map.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([stage, questions]) => ({ stage, questions }));
-  }, []);
+    const label =
+      mode === "category" && category ? `فئة: ${category}` : MODE_META[mode].title;
 
-  const bestOf = useCallback(
-    (stage: number) => progress.best[String(stage)] ?? 0,
-    [progress.best],
-  );
-
-  const handleFinish = useCallback(
-    (stage: number, percent: number) => {
-      setProgress((prev) => {
-        const key = String(stage);
-        const improved = percent > (prev.best[key] ?? 0);
-        const next = {
-          best: improved ? { ...prev.best, [key]: percent } : prev.best,
-          unlocked:
-            percent >= PASS_RATIO * 100 ? Math.max(prev.unlocked, stage + 1) : prev.unlocked,
-        };
-        saveProgress(next);
-        return next;
-      });
-    },
-    [],
-  );
-
-  if (openStage !== null) {
-    const entry = stages.find((s) => s.stage === openStage);
-    if (entry) {
-      return (
-        <StageRun
-          key={openStage}
-          stage={entry.stage}
-          questions={entry.questions}
-          onExit={() => setOpenStage(null)}
-          onFinish={handleFinish}
-        />
-      );
+    let rival: RunRequest["rival"];
+    if (mode === "duel") {
+      const rivals = leaderboard(save).filter((r) => !r.isYou);
+      // نختار من صفوة الخصوم فقط، وقوّة إجابته مشتقة من مكانته في اللوحة
+      const idx = Math.floor(Math.random() * Math.max(1, Math.min(5, rivals.length)));
+      const pick = rivals[idx];
+      rival = {
+        name: pick.name,
+        avatar: pick.avatar,
+        accuracy: Math.min(0.88, 0.55 + (rivals.length - idx) * 0.03),
+      };
     }
+
+    setRun({ mode, label, questions, rival });
+  };
+
+  if (run) {
+    return (
+      <RunScreen
+        key={`${run.mode}-${run.label}-${run.questions.length}`}
+        request={run}
+        onExit={() => setRun(null)}
+      />
+    );
   }
-
-  const clearedCount = stages.filter((s) => bestOf(s.stage) >= PASS_RATIO * 100).length;
-  const totalStars = stages.filter((s) => bestOf(s.stage) === 100).length;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
-      {/* ── الترويسة ── */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-card/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
           <Button variant="ghost" size="icon" className="size-9" asChild>
@@ -172,144 +191,566 @@ export default function Offline() {
             </Link>
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-bold tracking-tight">ساحة الأوفلاين</h1>
+            <h1 className="truncate text-base font-bold tracking-tight">ساحة حرب العقول</h1>
             <p className="truncate text-[11px] text-muted-foreground">
-              {OFFLINE_BANK.length} سؤالاً · {stages.length} مرحلة · تعمل بلا إنترنت
+              {BANK_SIZE} سؤالاً · {CATEGORIES.length} ذكاء · تعمل بلا إنترنت
             </p>
           </div>
           <Badge
             variant="outline"
-            className="gap-1 rounded-full border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-400"
+            className="hidden gap-1 rounded-full border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-700 sm:flex dark:text-emerald-400"
           >
             <CloudOff className="size-3" />
             بلا خادم
           </Badge>
+          <Badge variant="outline" className="gap-1 rounded-full text-[10px] tabular-nums">
+            <Zap className="size-3" />
+            {save.stats.coins}
+          </Badge>
+        </div>
+        <div className="mx-auto flex max-w-5xl gap-1 px-4 pb-3 sm:px-6">
+          <TabButton active={tab === "arena"} onClick={() => setTab("arena")} icon={<Play className="size-3.5" />}>
+            العب
+          </TabButton>
+          <TabButton active={tab === "board"} onClick={() => setTab("board")} icon={<Trophy className="size-3.5" />}>
+            التصنيف
+          </TabButton>
+          <TabButton active={tab === "profile"} onClick={() => setTab("profile")} icon={<User className="size-3.5" />}>
+            الملف
+          </TabButton>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-        {/* ── ملخص التقدّم ── */}
-        <div className="grid gap-3 sm:grid-cols-3">
-          <StatCard
-            icon={<Zap className="size-4" />}
-            label="مراحل مكتملة"
-            value={`${clearedCount} / ${stages.length}`}
-          />
-          <StatCard
-            icon={<Trophy className="size-4" />}
-            label="إتقان تام (100%)"
-            value={String(totalStars)}
-          />
-          <StatCard
-            icon={<Sparkles className="size-4" />}
-            label="مفتوحة الآن"
-            value={String(Math.min(progress.unlocked, stages.length))}
-          />
-        </div>
-
-        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-border/70 bg-muted/30 px-4 py-3">
-          <CloudOff className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            هذا الوضع لا يلمس الخادم إطلاقاً — لا حساب ولا شبكة ولا حصة. تقدّمك محفوظ
-            في متصفحك، وإنجازاتك الرسمية تُحفظ تلقائياً عند عودة الخادم.
-            {" "}
-            حقّق <span className="font-bold text-foreground">60%</span> لفتح المرحلة التالية.
-          </p>
-        </div>
-
-        {/* ── خريطة المراحل ── */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {stages.map(({ stage, questions }) => {
-            const best = bestOf(stage);
-            const locked = stage > progress.unlocked;
-            const cleared = best >= PASS_RATIO * 100;
-            const perfect = best === 100;
-            return (
-              <button
-                key={stage}
-                type="button"
-                disabled={locked}
-                onClick={() => {
-                  if (locked) {
-                    toast.info(`أكمل المرحلة ${stage - 1} بنسبة 60% لفتح هذه المرحلة`);
-                    return;
-                  }
-                  setOpenStage(stage);
-                }}
-                className={cn(
-                  "group relative overflow-hidden rounded-2xl border p-4 text-start transition-all",
-                  locked
-                    ? "cursor-not-allowed border-dashed border-border/70 bg-muted/30 opacity-60"
-                    : "border-border/70 bg-card shadow-sm hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-black",
-                      perfect
-                        ? "bg-amber-500/15 text-amber-600"
-                        : cleared
-                          ? "bg-emerald-500/15 text-emerald-600"
-                          : locked
-                            ? "bg-muted text-muted-foreground"
-                            : "bg-primary/10 text-primary",
-                    )}
-                  >
-                    {locked ? <Lock className="size-4" /> : perfect ? <Trophy className="size-4" /> : stage}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">المرحلة {stage}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">
-                      {questions.length === QUESTIONS_PER_STAGE
-                        ? `${questions.length} أسئلة`
-                        : `${questions.length} أسئلة متاحة`}
-                      {cleared && ` · أفضل نتيجة ${best}%`}
-                      {locked && " · مقفلة"}
-                    </p>
-                  </div>
-                  {!locked && (
-                    <ChevronLeft className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-x-0.5" />
-                  )}
-                </div>
-                {!locked && best > 0 && (
-                  <Progress value={best} className="mt-3 h-1.5" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {tab === "arena" && (
+          <ArenaTab save={save} level={level} rank={rank} dailyDone={dailyDone} onStart={startMode} />
+        )}
+        {tab === "board" && <BoardTab save={save} />}
+        {tab === "profile" && <ProfileTab save={save} level={level} />}
       </main>
     </div>
   );
 }
 
-function StatCard({
+function TabButton({
+  active,
+  onClick,
   icon,
-  label,
-  value,
+  children,
 }: {
+  active: boolean;
+  onClick: () => void;
   icon: ReactNode;
-  label: string;
-  value: string;
+  children: ReactNode;
 }) {
   return (
-    <Card className="border-border/70 shadow-sm">
-      <CardContent className="flex items-center gap-3 p-4">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          {icon}
-        </span>
-        <div className="min-w-0">
-          <p className="text-[11px] text-muted-foreground">{label}</p>
-          <p className="truncate text-lg font-black tabular-nums">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors",
+        active
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+      )}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 🎯 جولة مرحلة واحدة — كل الحساب محلي، بلا أي استدعاء شبكة
+// تبويب الساحة
+// ═══════════════════════════════════════════════════════════════════════
+
+function ArenaTab({
+  save,
+  level,
+  rank,
+  dailyDone,
+  onStart,
+}: {
+  save: ReturnType<typeof useLocalGame>;
+  level: ReturnType<typeof levelInfo>;
+  rank: ReturnType<typeof myRank>;
+  dailyDone: boolean;
+  onStart: (mode: ModeId, category?: string) => void;
+}) {
+  const [showCategories, setShowCategories] = useState(false);
+  const accuracy =
+    save.stats.answered > 0 ? Math.round((save.stats.correct / save.stats.answered) * 100) : 0;
+
+  return (
+    <div className="space-y-5">
+      {/* بطاقة العقل */}
+      <Card className="overflow-hidden border-border/70 shadow-sm">
+        <div className="h-1.5 w-full bg-gradient-to-l from-primary/70 via-primary/30 to-transparent" />
+        <CardContent className="p-5">
+          <div className="flex items-center gap-4">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-3xl">
+              {save.profile.avatar}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-base font-black">{save.profile.name}</p>
+                <Badge variant="outline" className="rounded-full border-primary/30 bg-primary/10 text-[10px] text-primary">
+                  <Crown className="size-3" />
+                  {save.profile.title}
+                </Badge>
+              </div>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                المستوى {level.level} · قوة العقل {mindPower(save.stats).toLocaleString("ar-EG")} · الترتيب #
+                {rank.rank}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>التقدّم للمستوى {level.level + 1}</span>
+              <span className="tabular-nums">
+                {level.inLevel} / {level.needed} XP
+              </span>
+            </div>
+            <Progress value={level.progress * 100} className="h-2" />
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <MiniStat icon={<Zap className="size-3.5" />} label="نقاط الخبرة" value={save.stats.xp.toLocaleString("ar-EG")} />
+            <MiniStat icon={<Flame className="size-3.5" />} label="أفضل سلسلة" value={String(save.stats.bestStreak)} />
+            <MiniStat icon={<Target className="size-3.5" />} label="الدقة" value={`${accuracy}%`} />
+            <MiniStat icon={<Swords className="size-3.5" />} label="جولات" value={String(save.stats.matches)} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* الأنماط */}
+      <div>
+        <h2 className="mb-2.5 text-sm font-bold text-muted-foreground">اختر نمط المعركة</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(["quick", "marathon", "daily", "duel"] as ModeId[]).map((mode) => {
+            const meta = MODE_META[mode];
+            const isDaily = mode === "daily";
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => onStart(mode)}
+                className="group flex items-start gap-3 rounded-2xl border border-border/70 bg-card p-4 text-start shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              >
+                <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", meta.accent)}>
+                  {meta.icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-bold">{meta.title}</p>
+                    {isDaily && dailyDone && (
+                      <Badge variant="outline" className="rounded-full text-[9px] text-emerald-600">
+                        أُنجز اليوم
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{meta.desc}</p>
+                </div>
+                <ChevronLeft className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-x-0.5" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* الفئات */}
+      <Card className="border-border/70 shadow-sm">
+        <CardHeader className="flex-row items-center justify-between gap-2 pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Brain className="size-4 text-primary" />
+            تمرين مركّز على ذكاء واحد
+          </CardTitle>
+          <Button variant="ghost" size="sm" className="text-[11px]" onClick={() => setShowCategories((v) => !v)}>
+            {showCategories ? "إخفاء" : "اعرض الفئات"}
+          </Button>
+        </CardHeader>
+        {showCategories && (
+          <CardContent className="grid grid-cols-2 gap-2 pt-0 sm:grid-cols-3">
+            {CATEGORIES.map((c) => {
+              const acc = categoryAccuracy(save, c.name);
+              return (
+                <button
+                  key={c.name}
+                  type="button"
+                  onClick={() => onStart("category", c.name)}
+                  className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 text-start transition-colors hover:border-primary/40 hover:bg-muted/50"
+                >
+                  <p className="truncate text-xs font-bold">{c.name}</p>
+                  <p className="text-[10px] text-muted-foreground tabular-nums">
+                    {c.count} سؤالاً
+                    {acc !== null ? ` · دقتك ${Math.round(acc * 100)}%` : " · لم تُجرَّب"}
+                  </p>
+                </button>
+              );
+            })}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* آخر الجولات */}
+      {save.stats.history.length > 0 && (
+        <Card className="border-border/70 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">آخر الجولات</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5 pt-0">
+            {save.stats.history.slice(0, 6).map((h, i) => {
+              const pct = h.total > 0 ? Math.round((h.correct / h.total) * 100) : 0;
+              return (
+                <div
+                  key={`${h.at}-${i}`}
+                  className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2"
+                >
+                  <span
+                    className={cn(
+                      "flex size-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-black tabular-nums",
+                      pct >= 80
+                        ? "bg-emerald-500/15 text-emerald-600"
+                        : pct >= 50
+                          ? "bg-amber-500/15 text-amber-600"
+                          : "bg-rose-500/10 text-rose-600",
+                    )}
+                  >
+                    {pct}%
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold">{h.label}</p>
+                    <p className="text-[10px] text-muted-foreground tabular-nums">
+                      {h.correct}/{h.total} صحيحة · {h.score} نقطة
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+        كل ما تراه هنا يعمل داخل متصفحك: لا حساب، لا شبكة، لا حصة. تقدّمك وإنجازاتك محفوظة
+        تلقائياً وتُرحَّل لملفك الرسمي بمجرد عودة الخادم.
+      </p>
+    </div>
+  );
+}
+
+function MiniStat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+      <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        {icon}
+        {label}
+      </p>
+      <p className="mt-0.5 truncate text-sm font-black tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// تبويب التصنيف
+// ═══════════════════════════════════════════════════════════════════════
+
+function BoardTab({ save }: { save: ReturnType<typeof useLocalGame> }) {
+  const rows = useMemo(() => leaderboard(save), [save]);
+  return (
+    <div className="space-y-4">
+      <Card className="border-border/70 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Trophy className="size-4 text-amber-500" />
+            لوحة شرف العقول
+          </CardTitle>
+          <p className="text-[11px] text-muted-foreground">
+            خصومك يتقدّمون كل يوم — ارتقِ بقوّة عقلك لتجاوزهم
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-1.5 pt-0">
+          {rows.map((r, i) => (
+            <div
+              key={r.id}
+              className={cn(
+                "flex items-center gap-3 rounded-xl border px-3 py-2.5",
+                r.isYou
+                  ? "border-primary/40 bg-primary/5"
+                  : "border-border/60 bg-muted/20",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-black tabular-nums",
+                  i === 0
+                    ? "bg-amber-500/15 text-amber-600"
+                    : i === 1
+                      ? "bg-slate-400/20 text-slate-600 dark:text-slate-300"
+                      : i === 2
+                        ? "bg-orange-500/15 text-orange-600"
+                        : "bg-muted text-muted-foreground",
+                )}
+              >
+                {i + 1}
+              </span>
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-card text-lg">
+                {r.avatar}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold">
+                  {r.name}
+                  {r.isYou && <span className="ms-1.5 text-[10px] font-semibold text-primary">(أنت)</span>}
+                </p>
+                {r.isYou && r.gapToNext !== undefined && (
+                  <p className="text-[10px] text-muted-foreground tabular-nums">
+                    تحتاج {r.gapToNext.toLocaleString("ar-EG")} نقطة لتجاوز من فوقك
+                  </p>
+                )}
+              </div>
+              <p className="shrink-0 text-xs font-black tabular-nums">{r.score.toLocaleString("ar-EG")}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// تبويب الملف
+// ═══════════════════════════════════════════════════════════════════════
+
+function ProfileTab({
+  save,
+  level,
+}: {
+  save: ReturnType<typeof useLocalGame>;
+  level: ReturnType<typeof levelInfo>;
+}) {
+  const [name, setName] = useState(save.profile.name);
+  const titles = unlockedTitles(save.stats.xp);
+  const accuracy =
+    save.stats.answered > 0 ? Math.round((save.stats.correct / save.stats.answered) * 100) : 0;
+  const unlocked = new Set(save.stats.achievements);
+
+  const catRows = useMemo(
+    () =>
+      Object.entries(save.stats.categories)
+        .map(([name, c]) => ({ name, ...c, acc: c.answered > 0 ? c.correct / c.answered : 0 }))
+        .sort((a, b) => b.answered - a.answered)
+        .slice(0, 8),
+    [save.stats.categories],
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* التخصيص */}
+      <Card className="border-border/70 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">تخصيص العقل</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-0">
+          <div className="flex flex-wrap gap-2">
+            {AVATARS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => updateProfile({ avatar: a })}
+                className={cn(
+                  "flex size-11 items-center justify-center rounded-xl border text-xl transition-all",
+                  save.profile.avatar === a
+                    ? "border-primary bg-primary/10"
+                    : "border-border/70 bg-muted/20 hover:border-primary/40",
+                )}
+                aria-label={`رمز ${a}`}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-muted-foreground" htmlFor="mind-name">
+              اسمك في الساحة
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="mind-name"
+                value={name}
+                maxLength={18}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="اكتب اسمك"
+              />
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const trimmed = name.trim();
+                  if (!trimmed) {
+                    toast.error("اكتب اسماً صالحاً");
+                    return;
+                  }
+                  updateProfile({ name: trimmed });
+                  toast.success("حُفظ اسمك");
+                }}
+              >
+                حفظ
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-bold text-muted-foreground">رتبتك (تفتحها بالمستوى)</p>
+            <div className="flex flex-wrap gap-2">
+              {RANKS.map((r) => {
+                const open = titles.includes(r.title);
+                const active = save.profile.title === r.title;
+                return (
+                  <button
+                    key={r.title}
+                    type="button"
+                    disabled={!open}
+                    onClick={() => {
+                      updateProfile({ title: r.title });
+                      toast.success(`رتبتك الآن: ${r.title}`);
+                    }}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all",
+                      active
+                        ? "border-primary bg-primary/10 text-primary"
+                        : open
+                          ? "border-border/70 bg-muted/20 hover:border-primary/40"
+                          : "cursor-not-allowed border-dashed border-border/60 text-muted-foreground/60",
+                    )}
+                  >
+                    {r.title}
+                    {!open && ` · م${r.level}`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* الأرقام */}
+      <Card className="border-border/70 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <BarChart3 className="size-4 text-primary" />
+            أرقامك الحقيقية
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-2 pt-0 sm:grid-cols-3">
+          <MiniStat icon={<Zap className="size-3.5" />} label="نقاط الخبرة" value={save.stats.xp.toLocaleString("ar-EG")} />
+          <MiniStat icon={<Trophy className="size-3.5" />} label="المستوى" value={String(level.level)} />
+          <MiniStat icon={<Target className="size-3.5" />} label="الدقة" value={`${accuracy}%`} />
+          <MiniStat icon={<Check className="size-3.5" />} label="إجابات صحيحة" value={save.stats.correct.toLocaleString("ar-EG")} />
+          <MiniStat icon={<Brain className="size-3.5" />} label="أسئلة واجهتها" value={save.stats.answered.toLocaleString("ar-EG")} />
+          <MiniStat icon={<Flame className="size-3.5" />} label="أفضل سلسلة" value={String(save.stats.bestStreak)} />
+          <MiniStat icon={<Award className="size-3.5" />} label="جولات مثالية" value={String(save.stats.perfectRuns)} />
+          <MiniStat icon={<Swords className="size-3.5" />} label="انتصارات المواجهة" value={String(save.stats.duelWins)} />
+          <MiniStat icon={<CalendarDays className="size-3.5" />} label="سلسلة الأيام" value={String(save.stats.dailyStreak)} />
+        </CardContent>
+      </Card>
+
+      {/* الفئات */}
+      {catRows.length > 0 && (
+        <Card className="border-border/70 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">أداؤك بحسب الذكاء</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 pt-0">
+            {catRows.map((c) => (
+              <div key={c.name}>
+                <div className="mb-1 flex items-center justify-between text-[11px]">
+                  <span className="font-semibold">{c.name}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {c.correct}/{c.answered} · {Math.round(c.acc * 100)}%
+                  </span>
+                </div>
+                <Progress
+                  value={c.acc * 100}
+                  className={cn(
+                    "h-1.5",
+                    c.acc >= 0.8 ? "[&>*]:bg-emerald-500" : c.acc < 0.5 ? "[&>*]:bg-rose-500" : "[&>*]:bg-amber-500",
+                  )}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* الإنجازات */}
+      <Card className="border-border/70 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Award className="size-4 text-primary" />
+            الإنجازات · {unlocked.size}/{ACHIEVEMENTS.length}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2 pt-0 sm:grid-cols-2">
+          {ACHIEVEMENTS.map((a) => {
+            const got = unlocked.has(a.id);
+            return (
+              <div
+                key={a.id}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl border px-3 py-2.5",
+                  got ? "border-amber-500/40 bg-amber-500/5" : "border-border/60 bg-muted/20 opacity-70",
+                )}
+              >
+                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg text-lg", got ? "bg-amber-500/15" : "bg-muted grayscale")}>
+                  {a.icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold">{a.title}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{a.desc}</p>
+                </div>
+                {got ? (
+                  <Check className="size-4 shrink-0 text-amber-600" />
+                ) : (
+                  <Badge variant="outline" className="shrink-0 rounded-full text-[9px] tabular-nums">
+                    +{a.reward}
+                  </Badge>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card className="border-rose-500/30 bg-rose-500/5 shadow-sm">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <p className="text-xs font-bold">تصفير كل شيء</p>
+            <p className="text-[10px] text-muted-foreground">يمسح تقدمك المحلي بالكامل — لا يمكن التراجع</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-rose-500/40 text-rose-600 hover:bg-rose-500/10"
+            onClick={() => {
+              if (window.confirm("هل أنت متأكد؟ سيُمحى كل تقدّمك المحلي نهائياً.")) {
+                resetAll();
+                toast.success("تم التصفير");
+              }
+            }}
+          >
+            <RotateCcw className="size-3.5" />
+            تصفير
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// شاشة الجولة — كل الحساب محلي
 // ═══════════════════════════════════════════════════════════════════════
 
 type RunQuestion = {
@@ -318,107 +759,152 @@ type RunQuestion = {
   correctIndex: number;
 };
 
-function StageRun({
-  stage,
-  questions,
-  onExit,
-  onFinish,
-}: {
-  stage: number;
-  questions: OfflineQuestion[];
-  onExit: () => void;
-  onFinish: (stage: number, percent: number) => void;
-}) {
-  const [run, setRun] = useState<RunQuestion[]>([]);
+function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => void }) {
+  const total = request.questions.length;
+  const timerSeconds = TIMER_BY_MODE[request.mode];
+  const isMarathon = request.mode === "marathon";
+  const isDuel = request.mode === "duel";
+
+  const [run] = useState<RunQuestion[]>(() =>
+    request.questions.map((q) => {
+      const { options, correctIndex } = withShuffledOptions(q);
+      return { q, options, correctIndex };
+    }),
+  );
+
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
-  const [xp, setXp] = useState(0);
-  const [done, setDone] = useState(false);
-
-  // تجهيز الجولة — ترتيب عشوائي للأسئلة والخيارات في كل محاولة
-  useEffect(() => {
-    setRun(
-      shuffle(questions).map((q) => {
-        const { options, correctIndex } = withShuffledOptions(q);
-        return { q, options, correctIndex };
-      }),
-    );
-    setIndex(0);
-    setPicked(null);
-    setCorrectCount(0);
-    setXp(0);
-    setDone(false);
-  }, [questions]);
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [timeLeft, setTimeLeft] = useState(timerSeconds);
+  const [rivalScore, setRivalScore] = useState(0);
+  const [rivalPick, setRivalPick] = useState<number | null>(null);
+  const [finished, setFinished] = useState(false);
+  const [summary, setSummary] = useState<{ xpGained: number; unlocked: AchievementDef[] } | null>(null);
 
   const current = run[index];
-  const total = run.length;
+  const answersRef = useRef<number[]>([]);
+  const finishedRef = useRef(false);
 
-  const answer = (choice: number) => {
-    if (picked !== null || !current) return;
-    setPicked(choice);
-    if (choice === current.correctIndex) {
-      setCorrectCount((c) => c + 1);
-      setXp((v) => v + current.q.reward);
+  // ⏱ العدّاد التنازلي — يتوقف عند الكشف أو الإنهاء
+  useEffect(() => {
+    if (revealed || finished) return;
+    if (timeLeft <= 0) {
+      submit(-1);
+      return;
     }
+    const t = window.setTimeout(() => setTimeLeft((v) => v - 1), 1000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, revealed, finished]);
+
+  const submit = (choice: number) => {
+    if (revealed || finishedRef.current || !current) return;
+    const isCorrect = choice === current.correctIndex;
+    let nextStreak = streak;
+    let gained = 0;
+
+    if (isCorrect) {
+      nextStreak = streak + 1;
+      gained = current.q.reward + nextStreak * 20 + Math.max(0, timeLeft) * 3;
+      setCorrectCount((c) => c + 1);
+      setScore((s) => s + gained);
+      setBestStreak((b) => Math.max(b, nextStreak));
+    } else {
+      nextStreak = 0;
+      if (isMarathon) setLives((l) => Math.max(0, l - 1));
+    }
+    setStreak(nextStreak);
+
+    // خصم المواجهة: يجيب بنسبة دقة مشتقة من قوته
+    if (isDuel && request.rival) {
+      const rivalRight = Math.random() < request.rival.accuracy;
+      setRivalPick(rivalRight ? current.correctIndex : (current.correctIndex + 1) % current.options.length);
+      if (rivalRight) setRivalScore((s) => s + current.q.reward);
+    }
+
+    answersRef.current = [...answersRef.current, choice];
+    setPicked(choice === -1 ? null : choice);
+    setRevealed(true);
+  };
+
+  const finish = (finalAnswers: number[]) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    const outcome = finishSession({
+      mode: request.mode,
+      label: request.label,
+      questions: request.questions,
+      answers: finalAnswers,
+      score,
+      bestStreak,
+    });
+    setSummary({ xpGained: outcome.xpGained, unlocked: outcome.unlocked });
+    setFinished(true);
   };
 
   const next = () => {
-    if (picked === null || !current) return;
-    const isLast = index + 1 >= total;
-    if (isLast) {
-      setDone(true);
-      const percent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
-      onFinish(stage, percent);
+    const dead = isMarathon && lives <= 0;
+    if (index + 1 >= total || dead) {
+      finish(answersRef.current);
       return;
     }
     setIndex((i) => i + 1);
     setPicked(null);
+    setRevealed(false);
+    setRivalPick(null);
+    setTimeLeft(timerSeconds);
   };
 
   const restart = () => {
-    setRun(
-      shuffle(questions).map((q) => {
-        const { options, correctIndex } = withShuffledOptions(q);
-        return { q, options, correctIndex };
-      }),
-    );
+    finishedRef.current = false;
+    answersRef.current = [];
     setIndex(0);
     setPicked(null);
+    setRevealed(false);
+    setStreak(0);
+    setBestStreak(0);
     setCorrectCount(0);
-    setXp(0);
-    setDone(false);
+    setScore(0);
+    setLives(3);
+    setTimeLeft(timerSeconds);
+    setRivalScore(0);
+    setRivalPick(null);
+    setFinished(false);
+    setSummary(null);
   };
 
   const percent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
-  const passed = percent >= PASS_RATIO * 100;
+  const duelWon = isDuel && score > rivalScore;
 
   // ── شاشة النتيجة ──
-  if (done) {
+  if (finished) {
     return (
       <div dir="rtl" className="min-h-screen bg-background text-foreground">
         <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-4 py-10">
           <Card
             className={cn(
               "border-2 shadow-sm",
-              passed ? "border-emerald-500/40" : "border-amber-500/40",
+              percent >= 80 ? "border-emerald-500/40" : percent >= 50 ? "border-amber-500/40" : "border-rose-500/30",
             )}
           >
             <CardHeader className="items-center text-center">
               <span
                 className={cn(
                   "flex size-16 items-center justify-center rounded-2xl text-3xl",
-                  passed ? "bg-emerald-500/15" : "bg-amber-500/15",
+                  percent >= 80 ? "bg-emerald-500/15" : percent >= 50 ? "bg-amber-500/15" : "bg-rose-500/10",
                 )}
               >
-                {percent === 100 ? "🏆" : passed ? "✅" : "💪"}
+                {percent === 100 ? "🏆" : percent >= 80 ? "🎯" : percent >= 50 ? "💪" : "🌱"}
               </span>
               <CardTitle className="mt-3 text-xl">
-                {percent === 100 ? "إتقان تام!" : passed ? "أحسنت — المرحلة مكتملة" : "محاولة جيدة"}
+                {percent === 100 ? "إتقان تام!" : percent >= 80 ? "أداء بطل" : percent >= 50 ? "أحسنت" : "واصل المحاولة"}
               </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                المرحلة {stage} · {passed ? "فتحت المرحلة التالية" : "تحتاج 60% لفتح التالية"}
-              </p>
+              <p className="text-xs text-muted-foreground">{request.label}</p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-3 text-center">
@@ -427,39 +913,55 @@ function StageRun({
                   <p className="text-xl font-black tabular-nums">{percent}%</p>
                 </div>
                 <div className="rounded-2xl border border-border/70 bg-muted/30 p-3">
-                  <p className="text-[11px] text-muted-foreground">صحيحة</p>
-                  <p className="text-xl font-black tabular-nums">
-                    {correctCount}/{total}
-                  </p>
+                  <p className="text-[11px] text-muted-foreground">النقاط</p>
+                  <p className="text-xl font-black tabular-nums text-primary">{score}</p>
                 </div>
                 <div className="rounded-2xl border border-border/70 bg-muted/30 p-3">
-                  <p className="text-[11px] text-muted-foreground">نقاط خبرة</p>
-                  <p className="text-xl font-black tabular-nums text-primary">{xp}</p>
+                  <p className="text-[11px] text-muted-foreground">أفضل سلسلة</p>
+                  <p className="text-xl font-black tabular-nums">{bestStreak}</p>
                 </div>
               </div>
 
-              <Progress value={percent} className="h-2" />
+              {isDuel && request.rival && (
+                <div
+                  className={cn(
+                    "flex items-center justify-between rounded-2xl border px-4 py-3",
+                    duelWon ? "border-emerald-500/40 bg-emerald-500/10" : "border-rose-500/40 bg-rose-500/10",
+                  )}
+                >
+                  <p className="text-sm font-bold">{duelWon ? "🥊 فزت في المواجهة!" : "خسرت المواجهة هذه المرة"}</p>
+                  <p className="text-xs tabular-nums text-muted-foreground">
+                    {score} — {rivalScore}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
+                <p className="text-xs font-bold text-muted-foreground">نقاط الخبرة المكتسبة</p>
+                <p className="text-lg font-black tabular-nums text-primary">+{summary?.xpGained ?? 0} XP</p>
+              </div>
+
+              {summary && summary.unlocked.length > 0 && (
+                <div className="space-y-1.5 rounded-2xl border border-amber-500/40 bg-amber-500/5 p-3">
+                  <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                    🎉 إنجازات جديدة · +{summary.unlocked.reduce((sum, a) => sum + a.reward, 0)} عملة
+                  </p>
+                  {summary.unlocked.map((a) => (
+                    <p key={a.id} className="text-xs font-semibold">
+                      {a.icon} {a.title} — <span className="text-muted-foreground">{a.desc}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button className="flex-1 gap-2" onClick={restart}>
                   <RotateCcw className="size-4" />
                   أعد المحاولة
                 </Button>
-                {passed && (
-                  <Button
-                    variant="secondary"
-                    className="flex-1 gap-2"
-                    onClick={() => {
-                      onExit();
-                    }}
-                  >
-                    <ChevronLeft className="size-4" />
-                    اختر المرحلة التالية
-                  </Button>
-                )}
                 <Button variant="outline" className="flex-1 gap-2" onClick={onExit}>
                   <Home className="size-4" />
-                  خريطة المراحل
+                  الساحة
                 </Button>
               </div>
             </CardContent>
@@ -470,6 +972,8 @@ function StageRun({
   }
 
   // ── شاشة اللعب ──
+  const timeRatio = timerSeconds > 0 ? timeLeft / timerSeconds : 0;
+
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-card/90 backdrop-blur-xl">
@@ -478,21 +982,64 @@ function StageRun({
             <X className="size-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold">المرحلة {stage}</p>
-            <p className="truncate text-[11px] text-muted-foreground">
+            <p className="truncate text-sm font-bold">{request.label}</p>
+            <p className="truncate text-[11px] text-muted-foreground tabular-nums">
               السؤال {Math.min(index + 1, total)} من {total} · صحيحة {correctCount}
+              {isMarathon && ` · القلوب ${lives}`}
             </p>
           </div>
-          <Badge variant="outline" className="rounded-full text-[10px] tabular-nums">
-            {xp} XP
-          </Badge>
+          {isMarathon ? (
+            <span className="flex items-center gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <Heart
+                  key={i}
+                  className={cn("size-3.5", i < lives ? "fill-rose-500 text-rose-500" : "text-muted-foreground/40")}
+                />
+              ))}
+            </span>
+          ) : (
+            <Badge variant="outline" className="gap-1 rounded-full text-[10px] tabular-nums">
+              <Zap className="size-3" />
+              {score}
+            </Badge>
+          )}
         </div>
-        <div className="mx-auto max-w-3xl px-4 pb-3 sm:px-6">
-          <Progress value={total > 0 ? ((index + (picked !== null ? 1 : 0)) / total) * 100 : 0} className="h-1.5" />
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 pb-3 sm:px-6">
+          <Progress value={total > 0 ? ((index + (revealed ? 1 : 0)) / total) * 100 : 0} className="h-1.5 flex-1" />
+          <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold tabular-nums text-muted-foreground">
+            <Timer className="size-3.5" />
+            {timeLeft}s
+          </span>
+        </div>
+        <div className="mx-auto max-w-3xl px-4 pb-2 sm:px-6">
+          <Progress
+            value={timeRatio * 100}
+            className={cn(
+              "h-1",
+              timeRatio > 0.5 ? "[&>*]:bg-emerald-500" : timeRatio > 0.25 ? "[&>*]:bg-amber-500" : "[&>*]:bg-rose-500",
+            )}
+          />
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        {isDuel && request.rival && (
+          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-card text-lg">{request.rival.avatar}</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold">{request.rival.name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {rivalPick !== null
+                  ? rivalPick === current?.correctIndex
+                    ? "أجاب صحيحاً ⚡"
+                    : "أخطأ هذه المرة"
+                  : "يفكّر…"}
+              </p>
+            </div>
+            <p className="shrink-0 text-sm font-black tabular-nums">{rivalScore}</p>
+          </div>
+        )}
+
         {current ? (
           <div className="space-y-4">
             <Card className="border-border/70 shadow-sm">
@@ -501,15 +1048,18 @@ function StageRun({
                   <Badge variant="outline" className="rounded-full text-[10px]">
                     {current.q.category}
                   </Badge>
-                  <Badge
-                    variant="outline"
-                    className={cn("rounded-full text-[10px]", DIFFICULTY_CLASS[current.q.difficulty])}
-                  >
+                  <Badge variant="outline" className={cn("rounded-full text-[10px]", DIFFICULTY_CLASS[current.q.difficulty])}>
                     {DIFFICULTY_LABEL[current.q.difficulty]}
                   </Badge>
                   <Badge variant="outline" className="rounded-full text-[10px] tabular-nums">
                     +{current.q.reward} XP
                   </Badge>
+                  {streak >= 2 && (
+                    <Badge variant="outline" className="gap-1 rounded-full border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-400">
+                      <Flame className="size-3" />
+                      سلسلة {streak}
+                    </Badge>
+                  )}
                 </div>
                 <p className="mt-3 text-base font-bold leading-relaxed">{current.q.question}</p>
               </CardContent>
@@ -517,7 +1067,6 @@ function StageRun({
 
             <div className="grid gap-2 sm:grid-cols-2">
               {current.options.map((option, i) => {
-                const revealed = picked !== null;
                 const isCorrect = revealed && current.correctIndex === i;
                 const isWrongPick = revealed && picked === i && current.correctIndex !== i;
                 return (
@@ -525,7 +1074,7 @@ function StageRun({
                     key={i}
                     type="button"
                     disabled={revealed}
-                    onClick={() => answer(i)}
+                    onClick={() => submit(i)}
                     className={cn(
                       "flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-start text-sm font-semibold transition-all disabled:cursor-not-allowed",
                       isCorrect
@@ -546,7 +1095,7 @@ function StageRun({
               })}
             </div>
 
-            {picked !== null && (
+            {revealed && (
               <div
                 className={cn(
                   "flex items-center justify-between gap-3 rounded-2xl border px-4 py-3",
@@ -556,10 +1105,14 @@ function StageRun({
                 )}
               >
                 <p className="text-sm font-bold">
-                  {picked === current.correctIndex ? "✅ إجابة صحيحة" : "❌ إجابة خاطئة"}
+                  {picked === current.correctIndex
+                    ? "✅ إجابة صحيحة"
+                    : picked === null
+                      ? "⏱ انتهى الوقت"
+                      : "❌ إجابة خاطئة"}
                 </p>
                 <Button size="sm" className="gap-1.5" onClick={next}>
-                  {index + 1 >= total ? "إنهاء المرحلة" : "السؤال التالي"}
+                  {index + 1 >= total || (isMarathon && lives <= 0) ? "عرض النتيجة" : "التالي"}
                   <ChevronLeft className="size-3.5" />
                 </Button>
               </div>
