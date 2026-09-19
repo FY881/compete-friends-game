@@ -10,15 +10,21 @@ import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import React, { StrictMode, useEffect, lazy, Suspense, useState } from "react";
+import React, { StrictMode, useEffect, lazy, Suspense, useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { ErrorHunter, setErrorHunterClient, startPerformanceMonitor } from "@/components/ErrorHunter";
+import { useAuth } from "@/hooks/use-auth";
 import { SplashScreen } from "@/components/SplashScreen";
 import { PremiumThemeProvider } from "@/components/PremiumThemeProvider";
 import { BackendStatusBanner } from "@/components/BackendStatusBanner";
-import { initBackendGuard, isBackendDegraded, noteBackendError } from "@/lib/backendGuard";
+import {
+  initBackendGuard,
+  isBackendDegraded,
+  noteBackendError,
+  subscribeBackendState,
+} from "@/lib/backendGuard";
 import "./index.css";
 
 // ── أعلام نسخة البناء (محلية لتُمكّن Rollup من إسقاط كود المالك نهائياً) ──
@@ -56,6 +62,55 @@ function RouteLoading() {
     <div dir="rtl" className="min-h-screen flex items-center justify-center">
       <div className="animate-pulse text-muted-foreground">جارٍ التحميل…</div>
     </div>
+  );
+}
+
+/**
+ * 🛡 بوابة اللعب ذاتية التعافي (Self-Healing Play Gate)
+ *
+ * هذا هو ضمان «اللعبة لا تنقطع أبداً» على مستوى المسار نفسه:
+ *
+ *   • الخادم سليم  → اللعبة الرسمية بكل أنظمتها (تحتاج حساباً كما كان).
+ *   • الخادم معطّل  → تتحوّل البوابة فوراً للساحة المحلية الكاملة
+ *                     (٥ أنماط لعب، تصنيف، ملف، إنجازات، ٣٦٠+ سؤالاً)
+ *                     بلا حساب، بلا شبكة، بلا انتظار.
+ *
+ * وأهم من ذلك: لحظة تعافي الخادم تعود البوابة تلقائياً للعبة الرسمية
+ * بلا أي إجراء من اللاعب ولا إعادة تحميل.
+ *
+ * السبب: كل روابط «العب» في الموقع تشير إلى `/play` — فبدل تعديلها كلها،
+ * جعلنا هذا المسار نفسه لا يفشل أبداً.
+ */
+/** أقصى انتظار لمن يفتح `/play` قبل التحوّل التلقائي للساحة المحلية. */
+const PLAY_FALLBACK_MS = 6_000;
+
+function PlayGate() {
+  const degraded = useSyncExternalStore(
+    subscribeBackendState,
+    isBackendDegraded,
+    () => false,
+  );
+  const { isLoading } = useAuth();
+  const [waitedTooLong, setWaitedTooLong] = useState(false);
+
+  // حدّ زمني صارم: لا يمكن للسبينر أن يستمر أكثر من هذا أبداً.
+  useEffect(() => {
+    if (!isLoading) {
+      setWaitedTooLong(false);
+      return;
+    }
+    const t = window.setTimeout(() => setWaitedTooLong(true), PLAY_FALLBACK_MS);
+    return () => window.clearTimeout(t);
+  }, [isLoading]);
+
+  // خادم معطّل، أو انتظار بلا نتيجة → الساحة المحلية الكاملة فوراً.
+  // لا يصل اللاعب إلى سبينر صامت مهما كان سبب التعطّل.
+  if (degraded || (isLoading && waitedTooLong)) return <Offline />;
+
+  return (
+    <RequireAuth>
+      <Play />
+    </RequireAuth>
   );
 }
 
@@ -393,11 +448,7 @@ function AppShell() {
               />
               <Route
                 path="/play"
-                element={
-                  <RequireAuth>
-                    <Play />
-                  </RequireAuth>
-                }
+                element={<PlayGate />}
               />
               <Route
                 path="/game/:code"
@@ -453,8 +504,9 @@ function AppShell() {
                 }
               />
               <Route path="/rules" element={<Rules />} />
-              {/* مسار مفتوح دائماً بلا مصادقة: يبقى اللعب متاحاً ولو تعطّل الخادم */}
+              {/* مساران مفتوحان دائماً بلا مصادقة: يبقى اللعب متاحاً ولو تعطّل الخادم */}
               <Route path="/offline" element={<Offline />} />
+              <Route path="/arena" element={<Offline />} />
               <Route path="/download" element={<Download />} />
               <Route path="/games" element={<MiniGames />} />
               <Route

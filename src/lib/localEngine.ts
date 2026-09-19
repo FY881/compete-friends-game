@@ -267,6 +267,14 @@ export function useLocalGame(): SaveState {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+/**
+ * قراءة لقطة الحالة الحالية خارج React.
+ * تُستخدم للتصدير وللاختبارات التي تتحقق من أثر الجولات فعلاً.
+ */
+export function readSave(): SaveState {
+  return state;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // الإجراءات
 // ═══════════════════════════════════════════════════════════════════════
@@ -316,6 +324,7 @@ export function finishSession(outcome: SessionOutcome): { unlocked: AchievementD
   const { questions, answers } = outcome;
 
   let correct = 0;
+  let answeredCount = 0;
   let xpGained = 0;
   const categories: Record<string, CategoryStat> = { ...state.stats.categories };
 
@@ -323,12 +332,15 @@ export function finishSession(outcome: SessionOutcome): { unlocked: AchievementD
     const picked = answers[i];
     const cat = q.category;
     const cur = categories[cat] ?? { answered: 0, correct: 0 };
+    // سؤال انتهى وقته أو لم يُلمس (‎-1) لا يُحتسب «مُجاباً» — وإلا هبطت
+    // دقة اللاعب بغير ذنبٍ منه، وهو ما يخالف منطق الفئات أدناه.
     const answered = picked !== undefined && picked >= 0;
     const isCorrect = answered && q.correctIndex === picked;
     categories[cat] = {
       answered: cur.answered + (answered ? 1 : 0),
       correct: cur.correct + (isCorrect ? 1 : 0),
     };
+    if (answered) answeredCount += 1;
     if (isCorrect) {
       correct += 1;
       xpGained += q.reward;
@@ -372,7 +384,7 @@ export function finishSession(outcome: SessionOutcome): { unlocked: AchievementD
     ...state.stats,
     xp: state.stats.xp + xpGained,
     coins: state.stats.coins + Math.round(outcome.score / 8),
-    answered: state.stats.answered + total,
+    answered: state.stats.answered + answeredCount,
     correct: state.stats.correct + correct,
     bestStreak: Math.max(state.stats.bestStreak, outcome.bestStreak),
     perfectRuns: state.stats.perfectRuns + (perfect ? 1 : 0),

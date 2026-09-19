@@ -371,6 +371,18 @@ export default function Landing() {
                   انضم برمز
                 </Link>
               </Button>
+              {/* 🛡 مدخل فوري مضمون: ساحة محلية كاملة تعمل بلا خادم ولا حساب */}
+              <Button
+                asChild
+                size="lg"
+                variant="secondary"
+                className="gap-2 rounded-xl px-7 text-base"
+              >
+                <Link to="/arena">
+                  <Gamepad2 className="size-4.5" />
+                  العب فوراً بلا حساب
+                </Link>
+              </Button>
             </motion.div>
 
             <motion.div
