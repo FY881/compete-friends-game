@@ -1,6 +1,10 @@
 /**
  * AI Control Mode — وضع التحكم الكامل بالذكاء الاصطناعي
  * المالك يتحكم في كل شيء بالأوامر
+ *
+ * 💡 يضمّ أيضاً «مركز التحكم بمهام AI المجدولة» (AiCronCenter):
+ * كل مهمة تستهلك من جدولة الخادم تظهر هناك بحالتها الحقيقية، ويمكن
+ * تفعيلها/إيقافها/تغيير دوريتها/تشغيلها فوراً — بلا إعادة نشر.
  */
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -10,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { AiCronCenter } from "@/components/owner/AiCronCenter";
 import {
   Sparkles,
   Send,
@@ -88,6 +93,9 @@ export function AiControlTab() {
 
   return (
     <div className="space-y-6" dir="rtl">
+      {/* ⏱️ مركز التحكم بمهام AI المجدولة — أولاً لأنه يحكم كل شيء آخر */}
+      <AiCronCenter />
+
       {/* API Key */}
       <Card className="border-primary/20 bg-primary/5">
         <CardHeader className="pb-3">

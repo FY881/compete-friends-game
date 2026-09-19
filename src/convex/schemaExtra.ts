@@ -285,6 +285,21 @@ export const premiumTables = {
     at: v.number(),
   }).index("by_user", ["userId", "at"]),
 
+  // ⏱️ مركز التحكم بمهام AI المجدولة — حالة كل مهمة يتحكم بها المالك فوراً
+  // بلا إعادة نشر: مفعّلة؟ كل كم؟ آخر تشغيل؟ كم مرة؟ آخر خطأ؟
+  aiCronJobs: defineTable({
+    key: v.string(), // معرّف المهمة (ثابت في الكود)
+    enabled: v.boolean(),
+    intervalMinutes: v.number(),
+    lastRunAt: v.number(),
+    lastDurationMs: v.number(),
+    lastStatus: v.string(), // never | ok | error
+    lastResult: v.string(),
+    runCount: v.number(),
+    errorCount: v.number(),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
   // 👑 الحاكم السيادي — عقوبات ومراسيم بمفعول فعلي
   ...sovereignTables,
 };
