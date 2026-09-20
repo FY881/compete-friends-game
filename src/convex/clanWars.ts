@@ -11,12 +11,15 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation, type MutationCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
-import { internal } from "./_generated/api";
+import { clanPerks } from "./clanCore";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** سقف مسح العشائر/الحروب — يمنع أي قراءة غير محدودة. */
+const CLAN_SCAN = 200;
+const WAR_SCAN = 50;
 
 export const WAR_DIVISIONS = ["برونز", "فضي", "ذهبي", "ماسي"] as const;
 export type WarDivision = (typeof WAR_DIVISIONS)[number];
@@ -59,19 +62,19 @@ export const matchmakeWars = internalMutation({
 
     // العشائر التي لا تملك حرباً هذا الأسبوع — مرتبة بالنقاط لتقارب الخصوم
     const free = clans
-      .filter((c: any) => !activeByClan.has(c._id as Id<"clans">) && c.members.length >= 1)
-      .sort((a: any, b: any) => b.pointsThisWeek - a.pointsThisWeek);
+      .filter((c) => !activeByClan.has(c._id) && c.members.length >= 1)
+      .sort((a, b) => b.pointsThisWeek - a.pointsThisWeek);
 
     let matched = 0;
     const used = new Set<Id<"clans">>();
     for (let i = 0; i < free.length; i++) {
-      const a = free[i] as any;
+      const a = free[i];
       if (used.has(a._id)) continue;
       // أقرب خصم في النقاط لم يُستخدم بعد
-      let best: any = null;
+      let best: (typeof free)[number] | null = null;
       let bestGap = Infinity;
       for (let j = i + 1; j < free.length; j++) {
-        const b = free[j] as any;
+        const b = free[j];
         if (used.has(b._id)) continue;
         const gap = Math.abs(a.pointsThisWeek - b.pointsThisWeek);
         if (gap < bestGap) {
@@ -102,7 +105,7 @@ export const matchmakeWars = internalMutation({
 });
 
 /** قسم الحرب: أعلى قسم من وسط العشيرتين بالنقاط التاريخية */
-function divisionOf(a: any, b: any): string {
+function divisionOf(a: { totalPoints: number }, b: { totalPoints: number }): string {
   const avg = (a.totalPoints + b.totalPoints) / 2;
   if (avg >= 5000) return "ماسي";
   if (avg >= 2500) return "ذهبي";
@@ -125,15 +128,15 @@ export const recordWarFaceoff = internalMutation({
   handler: async (ctx, { userId, won, correctRatio, score }) => {
     const now = Date.now();
     const week = weekKey(now);
-    const clans = await ctx.db.query("clans").collect();
-    const clan = clans.find((c: any) => c.members.includes(userId));
+    const clans = await ctx.db.query("clans").take(CLAN_SCAN);
+    const clan = clans.find((c) => c.members.includes(userId));
     if (!clan) return;
 
     const war = await ctx.db
       .query("clanWars")
       .withIndex("by_week", (q) => q.eq("week", week))
-      .collect()
-      .then((rows: any[]) =>
+      .take(WAR_SCAN)
+      .then((rows) =>
         rows.find(
           (w) => w.status === "active" && (w.clanAId === clan._id || w.clanBId === clan._id),
         ),
@@ -205,7 +208,7 @@ export const settleWars = internalMutation({
   },
 });
 
-async function bumpDivision(ctx: any, clanId: any, delta: number) {
+async function bumpDivision(ctx: MutationCtx, clanId: Id<"clans">, delta: number) {
   const clan = await ctx.db.get(clanId);
   if (!clan) return;
   const idx = Math.min(
@@ -225,9 +228,11 @@ export const getMyTreasury = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    const all = await ctx.db.query("clans").collect();
-    const mine = all.find((c: any) => c.members.includes(userId));
+    const all = await ctx.db.query("clans").take(200);
+    const mine = all.find((c) => c.members.includes(userId));
     if (!mine) return null;
+    // ⚔️ ميزة رتبة العشيرة: خصم على ترقيات الخزينة
+    const discountPct = clanPerks(mine.clanLevel ?? 1).treasuryDiscountPct;
     const treasury = await ctx.db
       .query("clanTreasury")
       .withIndex("by_clan", (q) => q.eq("clanId", mine._id))
@@ -240,10 +245,13 @@ export const getMyTreasury = query({
     return {
       clanId: mine._id,
       isOwner: mine.ownerId === userId,
+      discountPct,
+      power: mine.power ?? 0,
+      clanLevel: mine.clanLevel ?? 1,
       coins: treasury?.coins ?? 0,
       upgrades: upgrades
-        .filter((u: any) => !u.expiresAt || u.expiresAt > now)
-        .map((u: any) => ({ key: u.key, expiresAt: u.expiresAt ?? null })),
+      .filter((u) => !u.expiresAt || u.expiresAt > now)
+      .map((u) => ({ key: u.key, expiresAt: u.expiresAt ?? null })),
     };
   },
 });
@@ -258,17 +266,24 @@ export const buyClanUpgrade = mutation({
     if (!item) throw new Error("الترقية غير موجودة");
     const now = Date.now();
 
-    const all = await ctx.db.query("clans").collect();
-    const mine = all.find((c: any) => c.members.includes(userId));
+    const all = await ctx.db.query("clans").take(200);
+    const mine = all.find((c) => c.members.includes(userId));
     if (!mine) throw new Error("لست في عشيرة");
     if (mine.ownerId !== userId) throw new Error("قائد العشيرة فقط يشتري الترقيات");
+    if (mine.frozen) throw new Error("العشيرة مُجمَّدة بقرار الإدارة — الشراء موقوف مؤقتاً");
+
+    // ⚔️ خصم رتبة العشيرة يُطبَّق فعلاً على السعر
+    const discountPct = clanPerks(mine.clanLevel ?? 1).treasuryDiscountPct;
+    const cost = Math.max(0, Math.round(item.cost * (1 - discountPct / 100)));
 
     const treasury = await ctx.db
       .query("clanTreasury")
       .withIndex("by_clan", (q) => q.eq("clanId", mine._id))
       .first();
-    if (!treasury || treasury.coins < item.cost) {
-      throw new Error(`الخزينة تحتاج ${item.cost} عملة حرب — اربحوا الحروب!`);
+    if (!treasury || treasury.coins < cost) {
+      throw new Error(
+        `الخزينة تحتاج ${cost} عملة حرب — اربحوا الحروب!${discountPct ? ` (سعركم بعد خصم الرتبة ${discountPct}%)` : ""}`,
+      );
     }
 
     const owned = await ctx.db
@@ -279,7 +294,7 @@ export const buyClanUpgrade = mutation({
       throw new Error("العشيرة تملك هذه الترقية بالفعل");
     }
 
-    await ctx.db.patch(treasury._id, { coins: treasury.coins - item.cost, updatedAt: now });
+    await ctx.db.patch(treasury._id, { coins: treasury.coins - cost, updatedAt: now });
     const expiresAt = key === "morale" ? now + WEEK_MS : undefined;
     if (owned) {
       await ctx.db.patch(owned._id, { expiresAt });
@@ -300,16 +315,16 @@ export const getMyWar = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    const all = await ctx.db.query("clans").collect();
-    const mine = all.find((c: any) => c.members.includes(userId));
+    const all = await ctx.db.query("clans").take(CLAN_SCAN);
+    const mine = all.find((c) => c.members.includes(userId));
     if (!mine) return null;
     const week = weekKey(Date.now());
     const wars = await ctx.db
       .query("clanWars")
       .withIndex("by_week", (q) => q.eq("week", week))
-      .collect();
+      .take(WAR_SCAN);
     const war = wars.find(
-      (w: any) => w.status === "active" && (w.clanAId === mine._id || w.clanBId === mine._id),
+      (w) => w.status === "active" && (w.clanAId === mine._id || w.clanBId === mine._id),
     );
     if (!war) return { hasWar: false as const, division: WAR_DIVISIONS[(mine.warDivision ?? 0) as number] ?? "برونز" };
     const isA = war.clanAId === mine._id;

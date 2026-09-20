@@ -10,7 +10,7 @@ import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import React, { StrictMode, useEffect, lazy, Suspense, useState, useSyncExternalStore } from "react";
+import React, { StrictMode, useEffect, Suspense, useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { AlertTriangle, RotateCcw } from "lucide-react";
@@ -94,13 +94,18 @@ function PlayGate() {
   const [waitedTooLong, setWaitedTooLong] = useState(false);
 
   // حدّ زمني صارم: لا يمكن للسبينر أن يستمر أكثر من هذا أبداً.
+  // التصفير مؤجّل إلى مهمة مجهرية — لا setState متزامناً داخل التأثير،
+  // ونفس السلوك تماماً بلا تحديثات متتالية غير ضرورية.
   useEffect(() => {
+    const reset = window.setTimeout(() => setWaitedTooLong(false), 0);
     if (!isLoading) {
-      setWaitedTooLong(false);
-      return;
+      return () => window.clearTimeout(reset);
     }
     const t = window.setTimeout(() => setWaitedTooLong(true), PLAY_FALLBACK_MS);
-    return () => window.clearTimeout(t);
+    return () => {
+      window.clearTimeout(reset);
+      window.clearTimeout(t);
+    };
   }, [isLoading]);
 
   // خادم معطّل، أو انتظار بلا نتيجة → الساحة المحلية الكاملة فوراً.

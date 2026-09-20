@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { MindNexusPanel } from "@/components/owner/MindNexusPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -123,6 +124,9 @@ export function MindsControlRoom() {
 
   return (
     <div dir="rtl" className="space-y-4">
+      {/* ── نكسس العقول: عقل كل لاعب حقيقي — نبضة ومنح وعقوبات ── */}
+      <MindNexusPanel />
+
       {/* ── الرأس: الحرية الكاملة + الأحصنة ── */}
       <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-l from-violet-500/10 via-card to-sky-500/10 p-4">
         <div className="flex flex-wrap items-center gap-3">

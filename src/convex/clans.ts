@@ -10,11 +10,18 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, internalMutation } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalMutation,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 import { isUserBanned } from "./owner";
+import { guardClanMessage } from "./clanNexus";
 
 export const MAX_CLAN_MEMBERS = 20;
 const MAX_NAME = 24;
@@ -28,10 +35,49 @@ const WAR_POINTS = {
   highScore: 1, // لكل 100 نقطة في الجولة (تقريب)
 };
 
-type DbCtx = { db: any };
-
 function weekKey(t: number): number {
   return Math.floor(t / WEEK_MS) * WEEK_MS;
+}
+
+/** سقف مسح العشائر — يمنع أي استعلام غير محدود على جدول في نمو. */
+const CLAN_SCAN = 200;
+
+/** العشيرة التي ينتمي إليها اللاعب (قراءة واحدة بالفهرس). */
+/**
+ * العشيرة التي ينتمي إليها اللاعب — قراءة واحدة بالفهرس.
+ * ومع عشيرة قديمة بلا ربط عضوية، نعود بمسح مقيّد حتى لا يُحبس أحد خارج عشيرته.
+ */
+async function clanOfUser(ctx: QueryCtx, userId: Id<"users">) {
+  const link = await ctx.db
+    .query("clanMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+  if (link) return await ctx.db.get(link.clanId);
+  const clans = await ctx.db
+    .query("clans")
+    .withIndex("by_points", (q) => q.gte("pointsThisWeek", 0))
+    .order("desc")
+    .take(CLAN_SCAN);
+  return clans.find((c) => c.members.includes(userId)) ?? null;
+}
+
+/** يربط عضواً بعشيرته بالفهرس (يُستدعى عند الإنشاء/الانضمام). */
+async function linkMember(ctx: MutationCtx, clanId: Id<"clans">, userId: Id<"users">) {
+  const existing = await ctx.db
+    .query("clanMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+  if (existing) return;
+  await ctx.db.insert("clanMembers", { clanId, userId, joinedAt: Date.now() });
+}
+
+/** يزيل ربط عضو (عند الخروج أو الطرد). */
+async function unlinkMember(ctx: MutationCtx, userId: Id<"users">) {
+  const existing = await ctx.db
+    .query("clanMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+  if (existing) await ctx.db.delete(existing._id);
 }
 
 /** عشيرتي + هل أنا مالك + نقاط الأسبوع. */
@@ -40,8 +86,7 @@ export const getMyClan = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    const all = await ctx.db.query("clans").collect();
-    const mine = all.find((c: any) => c.members.includes(userId));
+    const mine = await clanOfUser(ctx, userId);
     if (!mine) return null;
     const now = Date.now();
     const resetDue = now - mine.weeklyResetAt >= WEEK_MS;
@@ -70,7 +115,7 @@ export const getClanLeaderboard = query({
       .order("desc")
       .take(take);
     const now = Date.now();
-    return rows.map((c: any, i: number) => ({
+    return rows.map((c, i: number) => ({
       rank: i + 1,
       id: c._id,
       name: c.name,
@@ -96,8 +141,8 @@ export const browseClans = query({
       .order("desc")
       .take(30);
     return rows
-      .filter((c: any) => !c.members.includes(userId))
-      .map((c: any) => ({
+      .filter((c) => !c.members.includes(userId))
+      .map((c) => ({
         id: c._id,
         name: c.name,
         emoji: c.emoji,
@@ -121,7 +166,7 @@ export const getClanChat = query({
       .withIndex("by_clan", (q) => q.eq("clanId", clanId))
       .order("desc")
       .take(Math.min(Math.max(limit ?? 40, 1), 100));
-    return msgs.reverse().map((m: any) => ({
+    return msgs.reverse().map((m) => ({
       id: m._id,
       senderId: m.senderId,
       senderName: m.senderName,
@@ -147,11 +192,11 @@ export const createClan = mutation({
     const clean = name.trim().replace(/\s+/g, " ").slice(0, MAX_NAME);
     if (clean.length < 3) throw new Error("اسم العشيرة قصير جداً (3 أحرف على الأقل)");
 
-    const all = await ctx.db.query("clans").collect();
-    if (all.some((c: any) => c.name === clean)) {
+    const all = await ctx.db.query("clans").take(CLAN_SCAN);
+    if (all.some((c) => c.name === clean)) {
       throw new Error("اسم العشيرة مستخدم — اختر اسماً آخر");
     }
-    if (all.some((c: any) => c.members.includes(userId))) {
+    if (await clanOfUser(ctx, userId)) {
       throw new Error("أنت في عشيرة بالفعل — اتركها أولاً");
     }
 
@@ -164,7 +209,13 @@ export const createClan = mutation({
       totalPoints: 0,
       weeklyResetAt: weekKey(Date.now()),
       createdAt: Date.now(),
+      // ⚔️ العشائر الفكرية: القوة تُحسب من عقول الأعضاء (تبدأ صفراً)
+      power: 0,
+      clanLevel: 1,
+      powerUpdatedAt: 0,
+      frozen: false,
     });
+    await linkMember(ctx, id, userId);
     return { id, name: clean };
   },
 });
@@ -180,11 +231,11 @@ export const joinClan = mutation({
     if (clan.members.length >= MAX_CLAN_MEMBERS) {
       throw new Error("العشيرة ممتلئة (20 عضواً)");
     }
-    const all = await ctx.db.query("clans").collect();
-    if (all.some((c: any) => c.members.includes(userId))) {
+    if (await clanOfUser(ctx, userId)) {
       throw new Error("أنت في عشيرة بالفعل — اتركها أولاً");
     }
-    await ctx.db.patch(clanId, { members: [...clan.members, userId] });
+    await ctx.db.patch(clanId, { members: [...clan.members, userId], powerUpdatedAt: 0 });
+    await linkMember(ctx, clanId, userId);
     await ctx.db.insert("clanMessages", {
       clanId,
       senderId: userId,
@@ -205,6 +256,7 @@ export const leaveClan = mutation({
     if (!clan || !clan.members.includes(userId)) throw new Error("لست في هذه العشيرة");
 
     const remaining = clan.members.filter((m) => m !== userId);
+    await unlinkMember(ctx, userId);
     if (remaining.length === 0) {
       // آخر عضو — حُلّت العشيرة
       await ctx.db.delete(clanId);
@@ -238,7 +290,9 @@ export const kickMember = mutation({
     if (!clan.members.includes(targetUserId)) throw new Error("العضو ليس في العشيرة");
     await ctx.db.patch(clanId, {
       members: clan.members.filter((m) => m !== targetUserId),
+      powerUpdatedAt: 0,
     });
+    await unlinkMember(ctx, targetUserId);
     await ctx.db.insert("clanMessages", {
       clanId,
       senderId: userId,
@@ -257,16 +311,24 @@ export const sendClanMessage = mutation({
     if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
     const clan = await ctx.db.get(clanId);
     if (!clan || !clan.members.includes(userId)) throw new Error("غير مصرح");
+    if (clan.frozen) throw new Error("العشيرة مُجمَّدة بقرار الإدارة — الدردشة موقوفة مؤقتاً");
     const clean = content.trim().slice(0, 300);
     if (!clean) throw new Error("الرسالة فارغة");
     const me = await ctx.db.get(userId);
+    const senderName = me?.name ?? "مجهول";
+
+    // 🛡️ رقابة ذكية مُفسَّرة: تحذير يمرّ، ومخالفة صريحة تُرفض وتُسجَّل للقائد والعرش
+    const decision = await guardClanMessage(ctx, { clanId, userId, userName: senderName, text: clean });
+    if (decision.verdict === "flag") throw new Error(decision.message);
+
     await ctx.db.insert("clanMessages", {
       clanId,
       senderId: userId,
-      senderName: me?.name ?? "مجهول",
+      senderName,
       content: clean,
       createdAt: Date.now(),
     });
+    return { verdict: decision.verdict, message: decision.verdict === "warn" ? decision.message : null };
   },
 });
 
@@ -309,9 +371,9 @@ export const recordWarRound = internalMutation({
     score: v.number(),
   },
   handler: async (ctx, { userId, won, correctRatio, score }) => {
-    const clans = await ctx.db.query("clans").collect();
-    const clan = clans.find((c: any) => c.members.includes(userId));
+    const clan = await clanOfUser(ctx, userId);
     if (!clan) return;
+    if (clan.frozen) return; // العشيرة مُجمَّدة — لا نقاط ولا مساهمات
 
     const now = Date.now();
     // لو تغيّر الأسبوع والنقاط لم تُصفَّر بعد، صفّرها الآن (احتساب ذاتي)
@@ -325,9 +387,20 @@ export const recordWarRound = internalMutation({
     if (correctRatio >= 1) gained += WAR_POINTS.perfect;
     gained += Math.floor(score / 100) * WAR_POINTS.highScore;
 
+    // ⚔️ تسجيل المساهمة الفردية + تطبيق ميزة رتبة العشيرة على النقاط
+    const ticked = await ctx.runMutation(internal.clanNexus.tickContribution, {
+      clanId: clan._id,
+      userId,
+      rounds: 1,
+      wins: won ? 1 : 0,
+      perfect: correctRatio >= 1 ? 1 : 0,
+      points: gained,
+    });
+    const applied = ticked.points || gained;
+
     await ctx.db.patch(clan._id, {
-      pointsThisWeek: weekly + gained,
-      totalPoints: clan.totalPoints + gained,
+      pointsThisWeek: weekly + applied,
+      totalPoints: clan.totalPoints + applied,
       weeklyResetAt: now - clan.weeklyResetAt >= WEEK_MS ? weekKey(now) : clan.weeklyResetAt,
     });
   },
@@ -338,12 +411,12 @@ export const weeklyCrown = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    const clans = await ctx.db.query("clans").collect();
-    const due = clans.filter((c: any) => now - c.weeklyResetAt >= WEEK_MS);
+    const clans = await ctx.db.query("clans").take(CLAN_SCAN);
+    const due = clans.filter((c) => now - c.weeklyResetAt >= WEEK_MS);
     if (due.length === 0) return;
 
     // صفّر كل عشيرة مستحيلة، وسجّل من كان الأعلى قبل التصفير
-    const sorted = [...due].sort((a: any, b: any) => b.pointsThisWeek - a.pointsThisWeek);
+    const sorted = [...due].sort((a, b) => b.pointsThisWeek - a.pointsThisWeek);
     for (const c of sorted) {
       await ctx.db.patch(c._id, {
         pointsThisWeek: 0,

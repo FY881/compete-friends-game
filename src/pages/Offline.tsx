@@ -3,6 +3,20 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 import { type OfflineQuestion } from "@/lib/offline-bank";
 import {
+  BOSS_ROUNDS,
+  BOSS_TIMER,
+  TOTAL_ROUNDS,
+  forfeitTournament,
+  markQuestionsUsed,
+  prestigeLabel,
+  questionsForRound,
+  rivalAccuracyForRound,
+  roundPrize,
+  settleRound,
+  startTournament,
+  useTournament,
+} from "@/lib/tournament";
+import {
   ACHIEVEMENTS,
   AVATARS,
   BANK_SIZE,
@@ -24,6 +38,18 @@ import {
   type AchievementDef,
   type ModeId,
 } from "@/lib/localEngine";
+import {
+  describeEffect,
+  mindEffect,
+  mindIdentity,
+  mindTierScore,
+  readMind,
+  useEvolvedMind,
+  type MindSessionReport,
+} from "@/lib/evolvedMind";
+import { MindLabPanel } from "@/components/MindLabPanel";
+import { MindCloudPanel } from "@/components/MindCloudPanel";
+import { useMindSync } from "@/lib/mindSync";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -71,7 +97,7 @@ import {
  *   • مواجهة العقول — نزال مباشر ضد خصم ذكاء اصطناعي.
  */
 
-type TabId = "arena" | "board" | "profile";
+type TabId = "arena" | "mind" | "board" | "profile";
 
 const TIMER_BY_MODE: Record<ModeId, number> = {
   quick: 20,
@@ -135,10 +161,15 @@ type RunRequest = {
   label: string;
   questions: OfflineQuestion[];
   rival?: { name: string; avatar: string; accuracy: number };
+  tournament?: { round: number };
 };
 
 export default function Offline() {
   const save = useLocalGame();
+  const tournament = useTournament();
+  // 🧬 جسر العقول: كل جولة تنتهي تبني عقلك محلياً، وهذا الخطاف يرفعه
+  // إلى عالم اللعبة (لوحة الصدارة + نبضة المالك) ويسحب قرارات العرش.
+  useMindSync("arena");
   const [tab, setTab] = useState<TabId>("arena");
   const [run, setRun] = useState<RunRequest | null>(null);
 
@@ -169,6 +200,31 @@ export default function Offline() {
     }
 
     setRun({ mode, label, questions, rival });
+  };
+
+  /** يبدأ جولة البطولة القادمة: أسئلة جديدة + خصم القوس + خريطة الإعدادات. */
+  const startTournamentRound = () => {
+    let t = tournament.currentRound > 0 ? tournament : startTournament();
+    if (t.currentRound === 0) t = startTournament();
+    const round = t.currentRound || 1;
+    const questions = questionsForRound(round, t.usedQuestionIds);
+    if (questions.length === 0) {
+      toast.error("لا توجد أسئلة متاحة لهذه الجولة");
+      return;
+    }
+    markQuestionsUsed(questions);
+    const rival = t.bracket[round - 1];
+    setRun({
+      mode: "duel",
+      label: `بطولة السلطان · الجولة ${round}${rival?.isBoss ? " · ⚔️ معركة زعيم" : ""}`,
+      questions,
+      rival: {
+        name: rival?.name ?? "خصم",
+        avatar: rival?.avatar ?? "🎭",
+        accuracy: rival?.accuracy ?? rivalAccuracyForRound(round),
+      },
+      tournament: { round },
+    });
   };
 
   if (run) {
@@ -212,6 +268,13 @@ export default function Offline() {
           <TabButton active={tab === "arena"} onClick={() => setTab("arena")} icon={<Play className="size-3.5" />}>
             العب
           </TabButton>
+          <TabButton
+            active={tab === "mind"}
+            onClick={() => setTab("mind")}
+            icon={<Brain className="size-3.5" />}
+          >
+            العقل
+          </TabButton>
           <TabButton active={tab === "board"} onClick={() => setTab("board")} icon={<Trophy className="size-3.5" />}>
             التصنيف
           </TabButton>
@@ -223,7 +286,26 @@ export default function Offline() {
 
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         {tab === "arena" && (
-          <ArenaTab save={save} level={level} rank={rank} dailyDone={dailyDone} onStart={startMode} />
+          <ArenaTab
+            save={save}
+            level={level}
+            rank={rank}
+            dailyDone={dailyDone}
+            onStart={startMode}
+            onOpenMind={() => setTab("mind")}
+            tournament={tournament}
+            onTournamentRound={startTournamentRound}
+            onTournamentForfeit={() => {
+              forfeitTournament();
+              toast.info("استُلمت مكافآت الجولات المجزوزة واعتُرف بعمق وصولك");
+            }}
+          />
+        )}
+        {tab === "mind" && (
+          <div className="space-y-4">
+            <MindCloudPanel />
+            <MindLabPanel />
+          </div>
         )}
         {tab === "board" && <BoardTab save={save} />}
         {tab === "profile" && <ProfileTab save={save} level={level} />}
@@ -270,14 +352,25 @@ function ArenaTab({
   rank,
   dailyDone,
   onStart,
+  onOpenMind,
+  tournament,
+  onTournamentRound,
+  onTournamentForfeit,
 }: {
   save: ReturnType<typeof useLocalGame>;
   level: ReturnType<typeof levelInfo>;
   rank: ReturnType<typeof myRank>;
   dailyDone: boolean;
   onStart: (mode: ModeId, category?: string) => void;
+  onOpenMind: () => void;
+  tournament: ReturnType<typeof useTournament>;
+  onTournamentRound: () => void;
+  onTournamentForfeit: () => void;
 }) {
   const [showCategories, setShowCategories] = useState(false);
+  const mind = useEvolvedMind();
+  const identity = mindIdentity(mind);
+  const mindEffects = describeEffect(mindEffect(mind));
   const accuracy =
     save.stats.answered > 0 ? Math.round((save.stats.correct / save.stats.answered) * 100) : 0;
 
@@ -316,12 +409,124 @@ function ArenaTab({
             <Progress value={level.progress * 100} className="h-2" />
           </div>
 
+          {/* 🧬 العقل المتطور — مدخل مباشر لقلب التقدّم الشخصي */}
+          <button
+            type="button"
+            onClick={onOpenMind}
+            className="mt-4 flex w-full items-center gap-2.5 rounded-2xl border border-violet-500/25 bg-violet-500/5 px-3 py-2.5 text-start transition-colors hover:bg-violet-500/10"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-card text-lg">
+              {identity.icon}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold">{identity.title}</p>
+              <p className="truncate text-[10px] text-muted-foreground">
+                مستوى العقل {mindTierScore(mind)}/72 ·{" "}
+                {mindEffects.length > 0 ? mindEffects.slice(0, 2).join(" · ") : "العب لتكسب قواك الأولى"}
+              </p>
+            </div>
+            <ChevronLeft className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <MiniStat icon={<Zap className="size-3.5" />} label="نقاط الخبرة" value={save.stats.xp.toLocaleString("ar-EG")} />
             <MiniStat icon={<Flame className="size-3.5" />} label="أفضل سلسلة" value={String(save.stats.bestStreak)} />
             <MiniStat icon={<Target className="size-3.5" />} label="الدقة" value={`${accuracy}%`} />
             <MiniStat icon={<Swords className="size-3.5" />} label="جولات" value={String(save.stats.matches)} />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* 👑 بطولة السلطان */}
+      <Card className="overflow-hidden border-amber-500/30 shadow-sm">
+        <div className="h-1.5 w-full bg-gradient-to-l from-amber-500/80 via-amber-400/40 to-transparent" />
+        <CardHeader className="flex-row items-center justify-between gap-2 pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Crown className="size-4 text-amber-500" />
+            بطولة السلطان
+            {tournament.crowns > 0 && (
+              <Badge variant="outline" className="rounded-full border-amber-500/40 bg-amber-500/10 text-[9px] text-amber-600">
+                {tournament.crowns} تتويج
+              </Badge>
+            )}
+          </CardTitle>
+          {tournament.currentRound > 0 && (
+            <Button variant="ghost" size="sm" className="text-[11px] text-muted-foreground" onClick={onTournamentForfeit}>
+              استسلام
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="pt-0">
+          {tournament.currentRound > 0 ? (
+            <>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                الجولة {tournament.currentRound} من {TOTAL_ROUNDS}
+                {BOSS_ROUNDS.includes(tournament.currentRound) && (
+                  <span className="ms-1 font-bold text-rose-500"> · ⚔️ معركة زعيم (١٤ ثانية للسؤال)</span>
+                )}
+                {tournament.bankedCoins > 0 && ` · مجمّز حتى الآن: ${tournament.bankedCoins} عملة`}
+              </p>
+              <div className="mt-2.5 flex items-center gap-1.5">
+                {Array.from({ length: TOTAL_ROUNDS }, (_, i) => i + 1).map((r) => (
+                  <span
+                    key={r}
+                    className={cn(
+                      "flex h-7 flex-1 items-center justify-center rounded-lg text-[10px] font-black tabular-nums",
+                      r < tournament.currentRound
+                        ? "bg-emerald-500/15 text-emerald-600"
+                        : r === tournament.currentRound
+                          ? BOSS_ROUNDS.includes(r)
+                            ? "bg-rose-500/15 text-rose-600 ring-1 ring-rose-500/40"
+                            : "bg-primary/15 text-primary ring-1 ring-primary/40"
+                          : "bg-muted/40 text-muted-foreground",
+                    )}
+                  >
+                    {BOSS_ROUNDS.includes(r) ? "👑" : r}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-xl">
+                  {tournament.bracket[tournament.currentRound - 1]?.avatar ?? "🎭"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold">{tournament.bracket[tournament.currentRound - 1]?.name ?? "خصم"}</p>
+                  <p className="text-[10px] text-muted-foreground tabular-nums">
+                    دقة خصمك: {Math.round((tournament.bracket[tournament.currentRound - 1]?.accuracy ?? 0) * 100)}% · مكافأة الجولة: {roundPrize(tournament.currentRound)} عملة
+                  </p>
+                </div>
+                <Button size="sm" className="shrink-0" onClick={onTournamentRound}>
+                  <Swords className="size-3.5" />
+                  خُض الجولة
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  قوس إقصائي من {TOTAL_ROUNDS} جولات · خسارة واحدة تُنهي الحلم ·
+                  {tournament.bestRun > 0
+                    ? ` أفضل وصول لك: ${prestigeLabel(tournament.bestRun)} (الجولة ${tournament.bestRun})`
+                    : " لم تخض البطولة بعد"}
+                </p>
+              </div>
+              <Button size="sm" onClick={onTournamentRound}>
+                <Crown className="size-3.5" />
+                ابدأ البطولة
+              </Button>
+            </div>
+          )}
+          {tournament.log.length > 0 && (
+            <p className="mt-2.5 text-[10px] text-muted-foreground">
+              آخر البطولات:{" "}
+              {tournament.log.slice(0, 3).map((l, i) => (
+                <span key={l.at} className="ms-1 tabular-nums">
+                  {i > 0 && "· "}وصلت للجولة {l.reached}{l.crowned ? " 👑" : ""}
+                </span>
+              ))}
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -761,9 +966,18 @@ type RunQuestion = {
 
 function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => void }) {
   const total = request.questions.length;
-  const timerSeconds = TIMER_BY_MODE[request.mode];
+  // 🧬 تأثيرات «العقل المتطور» تُثبَّت لحظة بدء الجولة — كل رقم هنا مقيس فعلاً
+  const [perks] = useState(() => mindEffect(readMind()));
+  // جولة البطولة الزعيم تُلعب بعدّاد أقصر (١٤ ثانية) — البقية على قياسها المعتاد
+  const baseTimer =
+    request.tournament && BOSS_ROUNDS.includes(request.tournament.round) ? BOSS_TIMER : TIMER_BY_MODE[request.mode];
+  // ثواني العقل تُضاف على العدّاد فعلياً (قوة السرعة + التخصصات)
+  const timerSeconds = baseTimer + perks.timeSec;
   const isMarathon = request.mode === "marathon";
   const isDuel = request.mode === "duel";
+  const isTournament = request.tournament !== undefined;
+  // دقة الخصم بعد إضعاف العقل (حضورك يربكه فعلاً)
+  const rivalAccuracy = Math.max(0.25, (request.rival?.accuracy ?? 0.6) + perks.rivalAccuracy);
 
   const [run] = useState<RunQuestion[]>(() =>
     request.questions.map((q) => {
@@ -780,30 +994,35 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
   const [correctCount, setCorrectCount] = useState(0);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
+  // 🛡 دروع السلسلة الممنوحة من العقل — خطأ واحد لا ينهي سلسلتك
+  const [shields, setShields] = useState(perks.streakShields);
+  const [shieldsUsed, setShieldsUsed] = useState(0);
   const [timeLeft, setTimeLeft] = useState(timerSeconds);
   const [rivalScore, setRivalScore] = useState(0);
   const [rivalPick, setRivalPick] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
-  const [summary, setSummary] = useState<{ xpGained: number; unlocked: AchievementDef[] } | null>(null);
+  const [summary, setSummary] = useState<{
+    xpGained: number;
+    unlocked: AchievementDef[];
+    mind: MindSessionReport;
+    tournament?: { won: boolean; prize: number; crowned: boolean; rivalScore: number };
+  } | null>(null);
 
   const current = run[index];
   const answersRef = useRef<number[]>([]);
+  const timesRef = useRef<number[]>([]);
+  const questionStartRef = useRef<number>(0);
   const finishedRef = useRef(false);
 
-  // ⏱ العدّاد التنازلي — يتوقف عند الكشف أو الإنهاء
+  // ⏱ بداية زمن السؤال — يُقاس داخل مؤثر لا أثناء الرسم (نقاء المكوّن)
   useEffect(() => {
-    if (revealed || finished) return;
-    if (timeLeft <= 0) {
-      submit(-1);
-      return;
-    }
-    const t = window.setTimeout(() => setTimeLeft((v) => v - 1), 1000);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, revealed, finished]);
+    questionStartRef.current = Date.now();
+  }, [index]);
 
   const submit = (choice: number) => {
     if (revealed || finishedRef.current || !current) return;
+    const startedAt = questionStartRef.current || Date.now();
+    const elapsed = Math.min(timerSeconds * 1000, Math.max(0, Date.now() - startedAt));
     const isCorrect = choice === current.correctIndex;
     let nextStreak = streak;
     let gained = 0;
@@ -814,23 +1033,45 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
       setCorrectCount((c) => c + 1);
       setScore((s) => s + gained);
       setBestStreak((b) => Math.max(b, nextStreak));
+    } else if (shields > 0) {
+      // 🛡 درع السلسلة: الخطأ يُستَلك الدرع ولا تكسر سلسلتك
+      setShields((v) => Math.max(0, v - 1));
+      setShieldsUsed((v) => v + 1);
+      if (isMarathon) setLives((l) => Math.max(0, l - 1));
     } else {
       nextStreak = 0;
       if (isMarathon) setLives((l) => Math.max(0, l - 1));
     }
     setStreak(nextStreak);
 
-    // خصم المواجهة: يجيب بنسبة دقة مشتقة من قوته
+    // خصم المواجهة: يجيب بنسبة دقته بعد إضعاف العقل
     if (isDuel && request.rival) {
-      const rivalRight = Math.random() < request.rival.accuracy;
+      const rivalRight = Math.random() < rivalAccuracy;
       setRivalPick(rivalRight ? current.correctIndex : (current.correctIndex + 1) % current.options.length);
       if (rivalRight) setRivalScore((s) => s + current.q.reward);
     }
 
     answersRef.current = [...answersRef.current, choice];
+    timesRef.current = [...timesRef.current, elapsed];
     setPicked(choice === -1 ? null : choice);
     setRevealed(true);
   };
+
+  // ⏱ العدّاد التنازلي — يتوقف عند الكشف أو الإنهاء، ويُسلّم الإجابة عند الصفر
+  // (التسليم يقع داخل مؤقت لا داخل جسم المؤثر، فلا يحدث رندر تتابعي)
+  useEffect(() => {
+    if (revealed || finished) return;
+    const t = window.setTimeout(() => {
+      if (timeLeft <= 1) {
+        setTimeLeft(0);
+        submit(-1);
+      } else {
+        setTimeLeft((v) => v - 1);
+      }
+    }, 1000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, revealed, finished]);
 
   const finish = (finalAnswers: number[]) => {
     if (finishedRef.current) return;
@@ -842,8 +1083,22 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
       answers: finalAnswers,
       score,
       bestStreak,
+      timesMs: timesRef.current,
+      timerSeconds,
     });
-    setSummary({ xpGained: outcome.xpGained, unlocked: outcome.unlocked });
+    // تسوية مصير جولة البطولة: فوز = تقدّم + مكافأة، خسارة = إقصاء
+    let tResult: ReturnType<typeof settleRound> | null = null;
+    if (isTournament) {
+      tResult = settleRound(score > rivalScore);
+    }
+    setSummary({
+      xpGained: outcome.xpGained,
+      unlocked: outcome.unlocked,
+      mind: outcome.mind,
+      tournament: tResult
+        ? { won: tResult.won, prize: tResult.prize, crowned: tResult.crowned, rivalScore }
+        : undefined,
+    });
     setFinished(true);
   };
 
@@ -863,6 +1118,8 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
   const restart = () => {
     finishedRef.current = false;
     answersRef.current = [];
+    timesRef.current = [];
+    questionStartRef.current = Date.now();
     setIndex(0);
     setPicked(null);
     setRevealed(false);
@@ -871,6 +1128,8 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
     setCorrectCount(0);
     setScore(0);
     setLives(3);
+    setShields(perks.streakShields);
+    setShieldsUsed(0);
     setTimeLeft(timerSeconds);
     setRivalScore(0);
     setRivalPick(null);
@@ -937,9 +1196,111 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
               )}
 
               <div className="flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
-                <p className="text-xs font-bold text-muted-foreground">نقاط الخبرة المكتسبة</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-muted-foreground">نقاط الخبرة المكتسبة</p>
+                  {perks.xpPct > 0 && (
+                    <p className="text-[10px] font-bold text-violet-600 dark:text-violet-400">
+                      🧬 مكافأة العقل المتطور +{Math.round(perks.xpPct)}%
+                    </p>
+                  )}
+                </div>
                 <p className="text-lg font-black tabular-nums text-primary">+{summary?.xpGained ?? 0} XP</p>
               </div>
+
+              {summary?.mind && summary.mind.totalGained > 0 && (
+                <div className="space-y-2 rounded-2xl border border-violet-500/30 bg-violet-500/5 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-400">
+                      <Brain className="size-3.5" /> تطوّر عقلك في هذه الجولة
+                    </p>
+                    <span className="shrink-0 text-[10px] font-bold tabular-nums text-muted-foreground">
+                      +{summary.mind.totalGained} نقطة عقل
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {summary.mind.gains.map((g) => (
+                      <span
+                        key={g.id}
+                        className="rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-bold tabular-nums"
+                      >
+                        {g.icon} {g.name} +{g.gained}
+                        {g.leveledUp && (
+                          <span className="ms-1 text-emerald-600 dark:text-emerald-400">→ م{g.level}</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  {shieldsUsed > 0 && (
+                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
+                      🛡 أنقذت دروع العقل سلسلتك {shieldsUsed} مرة في هذه الجولة
+                    </p>
+                  )}
+                  {summary.mind.unlockedSpecs.length > 0 && (
+                    <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-2">
+                      <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                        🔓 تخصص جديد: {summary.mind.unlockedSpecs.map((s) => `${s.icon} ${s.name}`).join(" · ")}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        جهّزه من تبويب «العقل» ليؤثر في جولاتك فعلماً
+                      </p>
+                    </div>
+                  )}
+                  {summary.mind.masteryUps.length > 0 && (
+                    <div className="space-y-0.5">
+                      {summary.mind.masteryUps.map((m, i) => (
+                        <p key={`${m.category}-${i}`} className="text-[11px] text-muted-foreground">
+                          {m.tierIcon} وصلت إلى <span className="font-bold">{m.tierName}</span> في {m.category} · +
+                          {m.reward} عملة
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {summary.mind.identity.top && (
+                    <p className="text-[10px] text-muted-foreground">
+                      هوية عقلك:{" "}
+                      <span className="font-bold text-foreground">
+                        {summary.mind.identity.icon} {summary.mind.identity.title}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {summary?.tournament && (
+                <div
+                  className={cn(
+                    "space-y-1 rounded-2xl border p-3",
+                    summary.tournament.crowned
+                      ? "border-amber-500/50 bg-amber-500/10"
+                      : summary.tournament.won
+                        ? "border-emerald-500/40 bg-emerald-500/10"
+                        : "border-rose-500/40 bg-rose-500/10",
+                  )}
+                >
+                  {summary.tournament.crowned ? (
+                    <>
+                      <p className="text-sm font-black text-amber-600 dark:text-amber-400">👑 أصبحت سلطان العقول!</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        هزمت مقام السلطان وتوّجت باللقب · مكافأة التتويج: {summary.tournament.prize} عملة
+                      </p>
+                    </>
+                  ) : summary.tournament.won ? (
+                    <>
+                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">✅ جولة البطولة محسومة لصالحك</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        +{summary.tournament.prize} عملة · تتقدّم للجولة التالية في القوس
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold text-rose-600 dark:text-rose-400">⚔️ أُقصيت من البطولة</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        نقاط خصمك: {summary.tournament.rivalScore} — تبدأ قوساً جديداً من الجولة الأولى
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
 
               {summary && summary.unlocked.length > 0 && (
                 <div className="space-y-1.5 rounded-2xl border border-amber-500/40 bg-amber-500/5 p-3">
@@ -1010,6 +1371,12 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
             <Timer className="size-3.5" />
             {timeLeft}s
           </span>
+          {perks.timeSec > 0 && (
+            <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold tabular-nums text-violet-600 dark:text-violet-400">
+              <Brain className="size-3.5" />
+              +{perks.timeSec}s
+            </span>
+          )}
         </div>
         <div className="mx-auto max-w-3xl px-4 pb-2 sm:px-6">
           <Progress
@@ -1023,6 +1390,28 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        {(perks.xpPct > 0 || shields > 0) && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-violet-500/25 bg-violet-500/5 px-3 py-2">
+            <span className="flex items-center gap-1 text-[10px] font-bold text-violet-700 dark:text-violet-400">
+              <Brain className="size-3.5" /> العقل المتطور يعمل
+            </span>
+            {perks.xpPct > 0 && (
+              <Badge variant="outline" className="rounded-full text-[10px]">
+                +{Math.round(perks.xpPct)}% خبرة
+              </Badge>
+            )}
+            {perks.coinsPct > 0 && (
+              <Badge variant="outline" className="rounded-full text-[10px]">
+                +{Math.round(perks.coinsPct)}% عملات
+              </Badge>
+            )}
+            {shields > 0 && (
+              <Badge variant="outline" className="rounded-full border-rose-500/40 bg-rose-500/10 text-[10px] text-rose-700 dark:text-rose-400">
+                🛡 {shields} درع سلسلة
+              </Badge>
+            )}
+          </div>
+        )}
         {isDuel && request.rival && (
           <div className="mb-4 flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
             <span className="flex size-9 items-center justify-center rounded-xl bg-card text-lg">{request.rival.avatar}</span>

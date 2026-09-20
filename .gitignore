@@ -15,3 +15,11 @@ src/assets/*.apk
 
 # Native Android project is generated fresh by the CI workflow (cap add android)
 android
+
+# 💥 كرّات انهيار النواة (core dumps) — إعداد النواة هنا core_pattern=core،
+# فانهيار واحد كتب ملفاً بحجم 1.1 جيجا في جذر المشروع وأوقف البيئة. احذفها ولا ترفعها.
+core
+core.*
+*.core
+# مجلد الحماية core/ نفسه مقصود ولا يجب تجاهله
+!core/

@@ -8,6 +8,33 @@ const ALIEN = /[\u0400-\u04FF\u0590-\u05FF\u0370-\u03FF\u3040-\u30FF\u4E00-\u9FF
 /** أسئلة تستخدم مصطلحات أجنبية عن قصد — مستثناة من فحـص التشوّه. */
 const INTENTIONAL = new Set(["o11", "o74"]);
 
+/** بصمات التلوّث المرصودة في المصدر — يجب ألّا تصل للاعب إطلاقاً. */
+const CORRUPT_FINGERPRINTS = [
+  "ال Geek",
+  "(vol)",
+  "adults?",
+  "فيزتنا",
+  "Speed + Time",
+  "yAxis",
+  "living organism",
+  "telephone",
+  "hacked",
+  "threw",
+  "المالم",
+  "فراشات",
+  "pongo",
+  "alan shepard",
+  "ريدينغ",
+  "العاجين",
+  "ikipedia",
+  "الdictionary",
+  "الcarbon",
+  "أُسSEE",
+  "الkerja",
+  "ثانيأكسيد",
+  "الم threw",
+];
+
 describe("بنك الأسئلة الأوفلاين — التنقية", () => {
   it("لا يترك أي نص مشوّه (خلط حروف أو أبجدية غريبة)", () => {
     const offenders: string[] = [];
@@ -16,6 +43,18 @@ describe("بنك الأسئلة الأوفلاين — التنقية", () => {
       const texts = [q.question, ...q.options];
       for (const t of texts) {
         if (CORRUPT.test(t) || ALIEN.test(t)) offenders.push(`${q.id}: ${t}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("لا تسرّب أي بصمة من بصمات التلوّث المرصودة", () => {
+    const offenders: string[] = [];
+    for (const q of OFFLINE_BANK) {
+      for (const text of [q.question, q.category, ...q.options]) {
+        for (const f of CORRUPT_FINGERPRINTS) {
+          if (text.includes(f)) offenders.push(`${q.id}: ${text} ← «${f}»`);
+        }
       }
     }
     expect(offenders).toEqual([]);
@@ -49,6 +88,34 @@ describe("بنك الأسئلة الأوفلاين — التنقية", () => {
     expect(q.options[q.correctIndex]).toContain("ألفا سنتوري");
     expect(q.options).toContain("منكب الجوزاء");
     expect(q.options).toContain("رجل الجبار");
+  });
+
+  it("يصحّح إجابة سؤال الرياضة o326 (الكريكيت) ويستعيد o142", () => {
+    const byId = new Map(OFFLINE_BANK.map((q) => [q.id, q]));
+    expect(byId.get("o326")?.options[byId.get("o326")!.correctIndex]).toBe("الكريكيت");
+    expect(byId.get("o142")?.options).toEqual(["بخارى", "أصفهان", "باميان", "همدان"]);
+  });
+
+  it("نظيف تماماً: بلا مسافات طرفية وبلا تصنيف بحروف لاتينية", () => {
+    const offenders: string[] = [];
+    for (const q of OFFLINE_BANK) {
+      if (q.question !== q.question.trim()) offenders.push(`${q.id}: سؤال بمسافة طرفية`);
+      if (q.category !== q.category.trim()) offenders.push(`${q.id}: تصنيف بمسافة طرفية`);
+      for (const o of q.options) {
+        if (o !== o.trim()) offenders.push(`${q.id}: خيار بمسافة طرفية «${o}»`);
+      }
+      if (/[A-Za-z]/.test(q.category)) offenders.push(`${q.id}: تصنيف لاتيني «${q.category}»`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("لا يستبعد أي سؤال بعد التنقية الكاملة، ويعرض الـ360 كاملة", () => {
+    expect(OFFLINE_DROPPED).toBe(0);
+    expect(OFFLINE_BANK.length).toBe(OFFLINE_QUESTION_BANK.length);
+    expect(OFFLINE_BANK.length).toBe(360);
+    const ids = OFFLINE_BANK.map((q) => q.id);
+    expect(ids).toContain("o93"); // كان مشوّهاً (Computer Pزيموفal Unit)
+    expect(ids).toContain("o142"); // كان بخيار مكرّر
   });
 
   it("لا يحذف إلا الأسئلة المعطوبة فعلاً", () => {

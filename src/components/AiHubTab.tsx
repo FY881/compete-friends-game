@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useMemo, useState } from "react";
+import { AiRoofPanel } from "@/components/owner/AiRoofPanel";
 import {
   BrainCircuit,
   Loader2,
@@ -145,6 +146,9 @@ export function AiHubTab() {
 
   return (
     <div dir="rtl" className="space-y-5">
+      {/* ═══ سقف الذكاء الموحّد: حساسية حقيقية + سياق حيّ + خلافات تُحسم ═══ */}
+      <AiRoofPanel />
+
       {/* ═══ الترويسة + المفتاح الرئيسي ═══ */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 /**
@@ -39,8 +39,24 @@ interface JobDef {
   /** مفعّلة افتراضياً؟ (الافتراضي محافظ: مهمة الصيانة فقط) */
   enabled: boolean;
   /** التنفيذ الفعلي — يستدعي دالة داخلية حقيقية */
-  run: (ctx: any) => Promise<unknown>;
+  run: (ctx: MutationCtx) => Promise<unknown>;
 }
+
+/**
+ * حقول صف المهمة القابلة للتعديل — مشتقّة من مخطط جدول `aiCronJobs`
+ * (بدل `Record<string, unknown>` الذي يُفقد الفحص النوعي على الكتابات).
+ */
+type JobPatch = Partial<{
+  enabled: boolean;
+  intervalMinutes: number;
+  lastRunAt: number;
+  lastDurationMs: number;
+  lastStatus: string;
+  lastResult: string;
+  runCount: number;
+  errorCount: number;
+  updatedAt: number;
+}>;
 
 const JOB_DEFS: JobDef[] = [
   {
@@ -135,6 +151,16 @@ const JOB_DEFS: JobDef[] = [
     run: (ctx) => ctx.runMutation(internal.crownDeck.expireLocks, {}),
   },
   {
+    key: "ai_roof_conflicts",
+    name: "كشف خلافات وحدات الذكاء",
+    description:
+      "يمسح أحداث السقف الموحّد ويكشف تضارب الوحدات حول نفس الهدف ويعرضه على العرش للحسم.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: false,
+    run: (ctx) => ctx.runMutation(internal.aiRoof.scanConflicts, {}),
+  },
+  {
     key: "clans_crown",
     name: "تاج العصابات الأسبوعي",
     description: "يصفر نقاط العصابات وينصّب الأعلى تاجاً في نهاية الأسبوع.",
@@ -158,7 +184,7 @@ const PAUSE_KEY = "aiCronPaused";
 // ═══════════════════════════════════════════════════════════════════════
 
 /** غرفة المالك فقط — نفس نمط التحقق المستخدم في بقية وحدات الإدارة. */
-async function requireOwner(ctx: any) {
+async function requireOwner(ctx: QueryCtx | MutationCtx) {
   const userId = await getAuthUserId(ctx);
   if (userId === null) throw new Error("يجب تسجيل الدخول.");
   const me = (await ctx.db.get(userId)) as { role?: string; email?: string } | null;
@@ -169,11 +195,11 @@ async function requireOwner(ctx: any) {
 }
 
 /** يُنشئ الصف أو يحدّثه — مصدر الحقيقة لحالة كل مهمة. */
-async function upsert(ctx: any, key: string, patch: Record<string, unknown>) {
+async function upsert(ctx: MutationCtx, key: string, patch: JobPatch) {
   const def = JOB_BY_KEY.get(key);
   const existing = await ctx.db
     .query("aiCronJobs")
-    .withIndex("by_key", (q: any) => q.eq("key", key))
+    .withIndex("by_key", (q) => q.eq("key", key))
     .first();
   if (existing) {
     await ctx.db.patch(existing._id, { ...patch, updatedAt: Date.now() });
@@ -195,11 +221,11 @@ async function upsert(ctx: any, key: string, patch: Record<string, unknown>) {
 }
 
 /** هل مفتاح الإيقاف الشامل مُفعَّل؟ */
-async function isPaused(ctx: any): Promise<boolean> {
+async function isPaused(ctx: QueryCtx | MutationCtx): Promise<boolean> {
   try {
     const row = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q: any) => q.eq("key", PAUSE_KEY))
+      .withIndex("by_key", (q) => q.eq("key", PAUSE_KEY))
       .first();
     if (!row) return false;
     return JSON.parse(row.value as string) === true;
@@ -212,14 +238,14 @@ async function isPaused(ctx: any): Promise<boolean> {
  * قلب المُوزِّع: يقرأ الحالة، ويُنفّذ المهام المفعّلة المستحقة فقط.
  * `force` = تشغيل كل المفعّلات فوراً بغضّ النظر عن موعدها (أمر المالك).
  */
-async function dispatchBody(ctx: any, opts: { force?: boolean } = {}) {
+async function dispatchBody(ctx: MutationCtx, opts: { force?: boolean } = {}) {
   if (await isPaused(ctx)) {
     return { paused: true, ran: 0, skipped: JOB_DEFS.length, results: [] as unknown[] };
   }
 
   const now = Date.now();
   const rows = await ctx.db.query("aiCronJobs").collect();
-  const byKey = new Map<string, any>(rows.map((r: any) => [r.key, r]));
+  const byKey = new Map(rows.map((r) => [r.key, r] as const));
 
   let ran = 0;
   const results: { key: string; status: string; ms?: number; note?: string }[] = [];
@@ -277,7 +303,7 @@ export const listJobs = query({
   handler: async (ctx) => {
     await requireOwner(ctx);
     const rows = await ctx.db.query("aiCronJobs").collect();
-    const byKey = new Map<string, any>(rows.map((r: any) => [r.key, r]));
+    const byKey = new Map(rows.map((r) => [r.key, r] as const));
 
     const jobs = JOB_DEFS.map((def) => {
       const row = byKey.get(def.key);
@@ -362,7 +388,7 @@ export const runJobNow = mutation({
 
     const row = await ctx.db
       .query("aiCronJobs")
-      .withIndex("by_key", (q: any) => q.eq("key", key))
+      .withIndex("by_key", (q) => q.eq("key", key))
       .first();
 
     const started = Date.now();
@@ -410,7 +436,7 @@ export const setGlobalPause = mutation({
     await requireOwner(ctx);
     const existing = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q: any) => q.eq("key", PAUSE_KEY))
+      .withIndex("by_key", (q) => q.eq("key", PAUSE_KEY))
       .first();
     const value = JSON.stringify(paused);
     if (existing) {
@@ -470,7 +496,7 @@ export const ensureSeeded = internalMutation({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("aiCronJobs").collect();
-    const have = new Set(rows.map((r: any) => r.key));
+    const have = new Set(rows.map((r) => r.key));
     let created = 0;
     for (const def of JOB_DEFS) {
       if (have.has(def.key)) continue;
@@ -558,6 +584,8 @@ export const purgeAiData = mutation({
 
     for (const table of AI_DATA_TABLES) {
       try {
+        // اسم جدول متغيّر (قائمة ديناميكية) — وConvex يطلب اسماً حرفياً.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- جدول ديناميكي
         const rows = await ctx.db.query(table as any).take(cap);
         for (const row of rows) {
           await ctx.db.delete(row._id);
@@ -585,6 +613,7 @@ export const aiDataLeft = query({
     const nonEmpty: string[] = [];
     for (const table of AI_DATA_TABLES) {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- جدول ديناميكي
         const one = await ctx.db.query(table as any).take(1);
         if (one.length > 0) nonEmpty.push(table);
       } catch {

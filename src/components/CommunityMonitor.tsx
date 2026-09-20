@@ -12,8 +12,8 @@ import {
   ShieldAlert,
   Loader2,
   Trash2,
-  Ban,
 } from "lucide-react";
+import { ClanNexusPanel } from "@/components/owner/ClanNexusPanel";
 
 /**
  * 💬 مراقب المجتمع الحي — الغرف النشطة + الرسائل المُعلَّمة + إجراء فوري
@@ -48,6 +48,9 @@ export function CommunityMonitor() {
 
   return (
     <div dir="rtl" className="space-y-5">
+      {/* ⚔️ نكسس العشائر — العشائر صارت قوة ذهنية جماعية حقيقية */}
+      <ClanNexusPanel />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">

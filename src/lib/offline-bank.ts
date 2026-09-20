@@ -15,9 +15,12 @@ import {
  * أو حروف من أبجديات أخرى (صينية/عبرية/كورية) دخلت داخل الكلمة العربية.
  *
  * التصحيح مُعلَن هنا صراحةً — لا كتابة عشوائية على البيانات الأصلية:
- *   1) خريطة استبدال للنصوص المشوّهة المعروفة.
+ *   1) خريطة استبدال للنصوص المشوّهة المعروفة (شملت حتى الكلمات التي
+ *      فصلها فراغ مثل «ال Geek» أو «فيزتنا» أو «yAxis»).
  *   2) تصحيح فهارس إجابات خاطئة علمياً (معرّفة بالمعرّف `id`).
- *   3) شبكة أمان: أي سؤال يبقى مشوّهاً بعد ذلك يُستبعد من العرض نهائياً،
+ *   3) تجاوز كامل لخيارات سؤال بعينه عند الحاجة (`OPTION_OVERRIDES`).
+ *   4) تقليم المسافات الطرفية من السؤال والخيارات والتصنيف.
+ *   5) شبكة أمان: أي سؤال يبقى مشوّهاً بعد ذلك يُستبعد من العرض نهائياً،
  *      فلا يرى اللاعب نصاً مكسوراً أبداً.
  *
  * المصدر يبقى كما هو (`src/convex/offlineQuestions.ts`)، والتشغيل نظيف.
@@ -36,8 +39,35 @@ const TEXT_FIXES: Record<string, string> = {
   "ب桕د": "رجل الجبار",
   "الandro": "أندروميدا",
   "المgénta": "الماجلان",
-  " ISAAC أerson": "إسحاق أزيموف",
+  "ISAAC أerson": "إسحاق أزيموف",
   "الkerja": "الظل",
+  // ── تلوّث التحق بمسافة أو شوّه الكلمة كاملاً (لا يلتقطه فحص الالتصاق) ──
+  "ال Geek": "الإنجليزية",
+  "Computer Pزيموفal Unit": "Computer Personal Unit",
+  "ما هي نظرية أينشتاين الشهيرة المعادلة(vol) E=mc²؟": "ما هي نظرية أينشتاين الشهيرة E=mc²؟",
+  "كم عدد عظام جسم الإنسان adults?": "كم عدد عظام جسم الإنسان البالغ؟",
+  "كم فيزتنا من الأرض إلى القمر؟": "كم تبلغ المسافة من الأرض إلى القمر؟",
+  ".Speed + Time = Distance. إذا كان المسافة تضاعفت والسرعة ثابتة، ماذا يحدث للوقت؟":
+    "إذا تضاعفت المسافة والسرعة ثابتة، ماذا يحدث للوقت؟",
+  "ما هو أكبر عدد أولي واحد yAxis 50؟": "ما هو أكبر عدد أولي أصغر من 50؟",
+  "ما هي الوحدة الأصغر في الم living organism?": "ما هي الوحدة الأصغر في الكائن الحي؟",
+  "ما هو مخترع telephone؟": "من هو مخترع الهاتف؟",
+  "إذا كان 2 hacked = 4 و 3 hacked = 9، فما هو 5 hacked؟":
+    "إذا كان مربع 2 هو 4 ومربع 3 هو 9، فما هو مربع 5؟",
+  "ما العدد الذي يضربك في الرأس ويُنقذ حياتك؟": "ما هو الشيء الذي يضربك في الرأس ويُنقذ حياتك؟",
+  "الم threw": "المشط",
+  "المالم": "المنديل",
+  "المظل": "المظلة",
+  "كم عدد فراشات الدماغ البشرية (neurons) تقريباً؟":
+    "كم عدد الخلايا العصبية في الدماغ البشري تقريباً؟",
+  "pongo": "بومبو",
+  "ريدينغ": "ريدلي سكوت",
+  "العاجين": "الملاط",
+  "ثانيأكسيد الكربون": "ثاني أكسيد الكربون",
+  "من هو مخترع Algebra في العالم الإسلامي؟": "من هو مؤسس علم الجبر في العالم الإسلامي؟",
+  "alan shepard": "آلان شيبرد",
+  "الحلزوني": "درب التبانة",
+  "ikipedia": "معلومات عامة",
   "تاي‌슨 غاي": "تايسون غاي",
   "الמ‌لح": "الملح",
 };
@@ -51,9 +81,24 @@ const INDEX_FIXES: Record<string, number> = {
   o341: 2,
 };
 
-/** يطبّق التصحيحات النصية على سؤال واحد. */
-function clean(value: string): string {
-  return TEXT_FIXES[value] ?? value;
+/**
+ * تجاوز كامل لخيارات سؤال بعينه — للحالات التي لا يكفي فيها استبدال نص واحد:
+ *   o142: خيار مكرّر («باميان» مرتين) يجعل السؤال معطوباً → خيار بديل سليم.
+ *   o326: مصلح «Declaration» في الكريكيت لا الغولف، والخيار الرابع كان مشوّهاً
+ *         («أُسSEE») → تصحيح الإجابة والخيارات معاً.
+ */
+const OPTION_OVERRIDES: Record<string, { options: string[]; correctIndex: number }> = {
+  o142: { options: ["بخارى", "أصفهان", "باميان", "همدان"], correctIndex: 0 },
+  o326: { options: ["التنس", "الكريكيت", "السباحة", "الهوكي"], correctIndex: 1 },
+};
+
+/**
+ * ينظّف النص: يزيل المسافات الطرفية ثم يطبّق التصحيحات المعروفة.
+ * (المفاتيح في `TEXT_FIXES` مكتوبة بلا مسافات طرفية — فالتقليم أولاً.)
+ */
+function normalize(value: string): string {
+  const trimmed = value.trim();
+  return TEXT_FIXES[trimmed] ?? trimmed;
 }
 
 /** هل يحتوي النص على خلط حروف عربية/لاتينية (دليل تشوّه)؟ */
@@ -78,13 +123,15 @@ function isCorrupt(text: string, id?: string): boolean {
  * (شبكة الأمان: نص مكسور لا يصل للاعب أبداً.)
  */
 function sanitize(q: OfflineQuestion): OfflineQuestion | null {
-  const question = clean(q.question);
-  const options = q.options.map(clean);
-  const fixedIndex = INDEX_FIXES[q.id];
-  const correctIndex = fixedIndex ?? q.correctIndex;
+  const question = normalize(q.question);
+  const category = normalize(q.category);
+  const override = OPTION_OVERRIDES[q.id];
+  const options = (override?.options ?? q.options).map(normalize);
+  const correctIndex = override?.correctIndex ?? INDEX_FIXES[q.id] ?? q.correctIndex;
 
   if (
     !question ||
+    !category ||
     options.length < 2 ||
     correctIndex < 0 ||
     correctIndex >= options.length
@@ -95,7 +142,7 @@ function sanitize(q: OfflineQuestion): OfflineQuestion | null {
   // خيارات مكرّرة = سؤال معطوب (يُحذف الأخير المكرر عبر الاستبعاد)
   if (new Set(options).size !== options.length) return null;
 
-  return { ...q, question, options, correctIndex };
+  return { ...q, category, question, options, correctIndex };
 }
 
 /** البنك النظيف الجاهز للعرض — كل سؤال فيه اجتاز التنقية. */

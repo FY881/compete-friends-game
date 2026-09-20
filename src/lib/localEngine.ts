@@ -19,6 +19,13 @@
 
 import { useSyncExternalStore } from "react";
 import { OFFLINE_BANK, type OfflineQuestion } from "@/lib/offline-bank";
+import {
+  mindEffect,
+  readMind,
+  recordMindSession,
+  resetEvolvedMind,
+  type MindSessionReport,
+} from "@/lib/evolvedMind";
 
 // ═══════════════════════════════════════════════════════════════════════
 // الأنواع
@@ -80,6 +87,10 @@ export interface SessionOutcome {
   answers: number[];
   score: number;
   bestStreak: number;
+  /** زمن الإجابة الفعلي بالمللي ثانية لكل سؤال — يغذّي قوة «السرعة» */
+  timesMs?: number[];
+  /** مدة عدّاد الجولة بالثواني — مرجع قياس السرعة */
+  timerSeconds?: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -319,9 +330,19 @@ export function isDailyDone(s: SaveState): boolean {
   return s.stats.lastDaily === todayKey();
 }
 
-/** ينهي جولة: يحدّث كل الإحصاءات ويعيد الإنجازات الجديدة. */
-export function finishSession(outcome: SessionOutcome): { unlocked: AchievementDef[]; xpGained: number } {
+/**
+ * ينهي جولة: يحدّث كل الإحصاءات، يبني «العقل المتطور»، ويعيد الإنجازات الجديدة.
+ * مكافآت العقل (خبرة/عملات) تُطبَّق فعلاً على نتيجة الجولة لا على الشاشة فقط.
+ */
+export function finishSession(outcome: SessionOutcome): {
+  unlocked: AchievementDef[];
+  xpGained: number;
+  /** تقرير العقل المتطور: ما الذي بنته هذه الجولة فعلاً */
+  mind: MindSessionReport;
+} {
   const { questions, answers } = outcome;
+  // تأثيرات العقل تُقرأ **قبل** تسجيل الجولة — فالترقيات تنفع من الجولة التالية
+  const perks = mindEffect(readMind());
 
   let correct = 0;
   let answeredCount = 0;
@@ -357,6 +378,9 @@ export function finishSession(outcome: SessionOutcome): { unlocked: AchievementD
   const duelBonus = outcome.mode === "duel" && correct > total / 2 ? 300 : 0;
 
   xpGained += streakBonus + perfectBonus + dailyBonus + duelBonus;
+  // مكافأة العقل: تُطبَّق على خبرة الجولة (مقيسة لا معلنة)
+  xpGained = Math.round(xpGained * (1 + perks.xpPct / 100));
+  const coinGain = Math.round((outcome.score / 8) * (1 + perks.coinsPct / 100));
 
   const isDaily = outcome.mode === "daily";
   let dailyStreak = state.stats.dailyStreak;
@@ -383,7 +407,7 @@ export function finishSession(outcome: SessionOutcome): { unlocked: AchievementD
   const nextStats: Stats = {
     ...state.stats,
     xp: state.stats.xp + xpGained,
-    coins: state.stats.coins + Math.round(outcome.score / 8),
+    coins: state.stats.coins + coinGain,
     answered: state.stats.answered + answeredCount,
     correct: state.stats.correct + correct,
     bestStreak: Math.max(state.stats.bestStreak, outcome.bestStreak),
@@ -398,18 +422,35 @@ export function finishSession(outcome: SessionOutcome): { unlocked: AchievementD
 
   const { stats: evaluated, unlocked } = evaluateAchievements(nextStats);
 
+  // بناء العقل المتطور من هذه الجولة (قوى + تخصصات + إتقان مجالات حقيقي)
+  const mind = recordMindSession({
+    mode: outcome.mode,
+    questions,
+    answers,
+    timesMs: outcome.timesMs,
+    timerSeconds: outcome.timerSeconds ?? 20,
+    bestStreak: outcome.bestStreak,
+    perfect,
+    domains: categories,
+  });
+
+  // مكافآت الإتقان تُضاف للعملات (لا تتأثر بنسبة العقل — مكافأة ثابتة)
+  const finalStats: Stats =
+    mind.masteryCoins > 0 ? { ...evaluated, coins: evaluated.coins + mind.masteryCoins } : evaluated;
+
   // ترقية الرتبة تلقائياً إن ارتقى المستوى وظلّت الرتبة الحالية متأخرة
-  const titles = unlockedTitles(evaluated.xp);
+  const titles = unlockedTitles(finalStats.xp);
   const profile =
     titles.length > 0 && !titles.includes(state.profile.title)
       ? { ...state.profile, title: titles[titles.length - 1] }
       : state.profile;
 
-  commit({ ...state, profile, stats: evaluated });
-  return { unlocked, xpGained };
+  commit({ ...state, profile, stats: finalStats });
+  return { unlocked, xpGained, mind };
 }
 
 export function resetAll(): void {
+  resetEvolvedMind();
   commit(defaultState());
 }
 

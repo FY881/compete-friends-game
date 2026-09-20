@@ -192,6 +192,30 @@ const schema = defineSchema(
       .index("by_unit_at", ["unit", "at"])
       .index("by_at", ["at"]),
 
+    // ═══ خلافات وحدات الذكاء — عندما تختلف وحدتان على نفس الهدف ═══
+    // يُكشف آلياً (aiCore.detectConflicts) ويُحلّ بقرار المالك، فتصير
+    // الوحدات تتعلّم من قراراته الحقيقية بدل أن تتصادم بصمت.
+    aiConflicts: defineTable({
+      key: v.string(), // بصمة تمنع تكرار نفس الخلاف
+      target: v.string(),
+      unitA: v.string(),
+      unitB: v.string(),
+      stanceA: v.string(),
+      stanceB: v.string(),
+      severity: v.string(),
+      summaryA: v.string(),
+      summaryB: v.string(),
+      status: v.string(), // pending | resolved | dismissed
+      winner: v.optional(v.string()),
+      resolution: v.optional(v.string()),
+      resolvedBy: v.optional(v.string()),
+      resolvedAt: v.optional(v.number()),
+      at: v.number(),
+    })
+      .index("by_key", ["key"])
+      .index("by_status", ["status", "at"])
+      .index("by_at", ["at"]),
+
     // ضبط حساسية/تفعيل كل وحدة من غرفة المالك
     aiHubUnits: defineTable({
       unit: v.string(), // معرّف فريد للوحدة
@@ -218,6 +242,54 @@ const schema = defineSchema(
     })
       .index("by_user", ["userId"])
       .index("by_user_cat", ["userId", "category"]),
+
+    // ═══ نكسس العقول (Mind Nexus) ═══
+    // سجل حيّ لعقل كل لاعب: القوى الست + التخصصات + الإتقان + الرتبة.
+    // مصدره اللعب الحقيقي (المحرك المحلي)، ويخدم ثلاثة أغراض معاً:
+    //   ١) لوحة صدارة العقول (منافسة حقيقية بين الأصدقاء)
+    //   ٢) نبضة المالك الحيّة عن الصحة الذهنية للمجتمع
+    //   ٣) قدرة العرش على المنح والتجميد — تغيير حقيقي لا محاكاة
+    mindProfiles: defineTable({
+      userId: v.id("users"),
+      name: v.string(),
+      avatar: v.optional(v.string()),
+      tierScore: v.number(), // مجموع مستويات القوى الست (0-72) — محسوب على الخادم
+      rankLevel: v.number(), // 1..8 — فهرس سلّم رتب العقول
+      identityTitle: v.string(),
+      identityIcon: v.string(),
+      faculties: v.object({
+        logic: v.number(),
+        knowledge: v.number(),
+        speed: v.number(),
+        memory: v.number(),
+        focus: v.number(),
+        intuition: v.number(),
+      }),
+      equipped: v.array(v.string()),
+      unlocked: v.array(v.string()),
+      mastery: v.array(v.object({ category: v.string(), score: v.number(), tier: v.number() })),
+      sessions: v.number(),
+      signature: v.string(), // بصمة تمنع الكتابة الزائدة (حماية استخدام)
+      frozen: v.boolean(), // العرش يجمّد المزامنة — عقوبة حقيقية توقف التقدّم
+      note: v.optional(v.string()), // رسالة العرش للاعب (تُقرأ في تبويب العقل)
+      updatedAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_rank", ["tierScore"])
+      .index("by_updated", ["updatedAt"]),
+
+    // منح العرش: كل منحة تُطبَّق مرة واحدة على عقل اللاعب — بلا تكرار
+    mindGrants: defineTable({
+      userId: v.id("users"),
+      kind: v.string(), // xp (منحة خبرة) أو reset (قرار تصفير العقل)
+      faculty: v.string(), // FacultyKey أو "all"
+      amount: v.number(),
+      reason: v.string(),
+      actorName: v.string(),
+      at: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_created", ["at"]),
 
     // 🛡️ الاعتراضات — اللاعب المعاقب يستطيع الاعتراض على العقوبة
     appeals: defineTable({
@@ -976,9 +1048,73 @@ const schema = defineSchema(
       weeklyResetAt: v.number(), // متى أُعيد ضبط النقاط آخر مرة
       warDivision: v.optional(v.number()), // قسم الحرب 0=برونز 1=فضي 2=ذهبي 3=ماسي
       createdAt: v.number(),
+
+      // ═══ العشائر الفكرية 2.0 — القوة من عقول الأعضاء ═══
+      power: v.optional(v.number()), // مجموع قوة عقول الأعضاء (يُحسب في clanCore)
+      clanLevel: v.optional(v.number()), // 1..8 — رتبة العشيرة
+      powerUpdatedAt: v.optional(v.number()),
+      frozen: v.optional(v.boolean()), // قرار العرش: تجميد العشيرة (تعليق المزايا والمكافآت)
+      note: v.optional(v.string()), // رسالة العرش إلى العشيرة
     })
       .index("by_name", ["name"])
-      .index("by_points", ["pointsThisWeek"]),
+      .index("by_points", ["pointsThisWeek"])
+      .index("by_power", ["power"]),
+
+    // ═══ فهرس عضوية العشائر — قراءة واحدة بدل مسح كل العشائر ═══
+    clanMembers: defineTable({
+      clanId: v.id("clans"),
+      userId: v.id("users"),
+      joinedAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_clan", ["clanId"]),
+
+    // ═══ مساهمات أعضاء العشيرة أسبوعياً — أساس المكافآت العادلة ═══
+    // تُحدَّث تزايدياً بعد كل جولة (بلا أي مسح ثقيل) ⇒ صفر استعلامات غير محدودة.
+    clanContributions: defineTable({
+      clanId: v.id("clans"),
+      userId: v.id("users"),
+      weekKey: v.number(),
+      rounds: v.number(),
+      wins: v.number(),
+      perfect: v.number(),
+      points: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_clan_week", ["clanId", "weekKey"])
+      .index("by_user_week", ["userId", "weekKey"]),
+
+    // ═══ أهداف العشيرة الأسبوعية المشتركة + من استلم ماذا ═══
+    clanGoals: defineTable({
+      clanId: v.id("clans"),
+      weekKey: v.number(),
+      goalId: v.string(), // rounds | wins | perfect | points
+      target: v.number(),
+      reward: v.number(),
+      progress: v.number(),
+      claimedAt: v.optional(v.number()),
+      claimedBy: v.optional(
+        v.array(v.object({ userId: v.id("users"), name: v.string(), amount: v.number(), weight: v.number() })),
+      ),
+      updatedAt: v.number(),
+    })
+      .index("by_clan_week", ["clanId", "weekKey"])
+      .index("by_week", ["weekKey"]),
+
+    // ═══ سجل رقابة العشائر — كل قرار رقابي مُفسَّر ومؤرَّخ ═══
+    clanModeration: defineTable({
+      clanId: v.id("clans"),
+      userId: v.id("users"),
+      userName: v.string(),
+      kind: v.string(), // abuse | link | flood | repeat | caps | empty | other
+      verdict: v.string(), // warn | flag
+      reason: v.string(),
+      preview: v.string(),
+      at: v.number(),
+    })
+      .index("by_clan", ["clanId", "at"])
+      .index("by_created", ["at"])
+      .index("by_user", ["userId", "at"]),
 
     // رسائل دردشة العشيرة الداخلية
     clanMessages: defineTable({
