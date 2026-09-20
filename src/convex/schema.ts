@@ -228,6 +228,48 @@ const schema = defineSchema(
       eventCount: v.optional(v.number()),
     }).index("by_unit", ["unit"]),
 
+    // ═══ v12.0 — سيطرة العرش على كل وكيل/ذكاء (غرفة الوكلاء) ═══
+    // صف لكل ذكاء في سجل aiRegistry: حالة، إيقاف حتى وقت يكتبه المالك،
+    // حصص استهلاك بنوافذ متجددة، قدرات ممنوحة/مسحوبة، أوامر نصية، وأشياء موقوفة.
+    aiControls: defineTable({
+      key: v.string(),
+      enabled: v.boolean(),
+      disabledUntil: v.number(), // 0 = بلا انتهاء
+      capPerHour: v.number(), // 0 = بلا حد
+      capPerDay: v.number(),
+      orders: v.array(v.object({ id: v.string(), text: v.string(), at: v.number() })),
+      granted: v.array(v.string()),
+      revoked: v.array(v.string()),
+      stopped: v.array(v.string()),
+      note: v.string(),
+      counters: v.object({
+        hourStart: v.number(),
+        hourCount: v.number(),
+        dayStart: v.number(),
+        dayCount: v.number(),
+      }),
+      totalRuns: v.number(),
+      totalErrors: v.number(),
+      lastRunAt: v.number(),
+      lastResult: v.string(),
+      updatedAt: v.number(),
+    }).index("by_key", ["key"]),
+
+    // سجل موحّد لكل ما يفعله الوكلاء وكل قرار العرش عليهم — «الحبل» الذي لا يُقطع
+    aiLedger: defineTable({
+      key: v.string(), // مفتاح الذكاء في السجل
+      name: v.string(),
+      emoji: v.string(),
+      /** control | run | skip | error | order | grant | revoke | stop | start */
+      kind: v.string(),
+      actor: v.string(), // owner | system | auto
+      detail: v.string(),
+      at: v.number(),
+    })
+      .index("by_key", ["key", "at"])
+      .index("by_at", ["at"])
+      .index("by_kind", ["kind", "at"]),
+
     // 🧬 تخصصات العقل المتطور — إتقان حقيقي لكل حقل معرفي (بريميوم)
     // يُحدَّث آلياً من كل جولة، ويُستخدم لاختيار أسئلة حسب تخصص اللاعب
     // وحساب ألقاب التخصص في ملفه الشخصي.

@@ -1,6 +1,15 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { guardGroup } from "./aiControlGuard";
+import { entriesForJob } from "./aiRegistry";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 
 /**
@@ -259,6 +268,15 @@ async function dispatchBody(ctx: MutationCtx, opts: { force?: boolean } = {}) {
     const last = row?.lastRunAt ?? 0;
     if (!opts.force && now - last < interval * 60_000) continue;
 
+    // 🔗 v12.0 — غرفة الوكلاء: قرار العرش يحكم كل تنفيذ (إطفاء/إيقاف مؤقت/حصة).
+    // مهمة واحدة قد يتحكم بها أكثر من ذكاء (حارس + سيادي) — فيجب موافقة الجميع.
+    const linked = entriesForJob(def.key).map((e) => e.key);
+    const gate = await guardGroup(ctx, linked.length > 0 ? linked : [def.key], { countUsage: true });
+    if (!gate.allowed) {
+      results.push({ key: def.key, status: "blocked", note: gate.reason });
+      continue;
+    }
+
     const started = Date.now();
     try {
       await def.run(ctx);
@@ -292,6 +310,47 @@ async function dispatchBody(ctx: MutationCtx, opts: { force?: boolean } = {}) {
 
   return { paused: false, ran, skipped: JOB_DEFS.length - ran, results };
 }
+
+/**
+ * 🔗 v12.0 — تنفيذ مهمة واحدة بالاسم من غرفة الوكلاء.
+ * داخلي حتى يستدعيه خادم السيطرة (التحقق من العرش هناك).
+ */
+export const runSingleInternal = internalMutation({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const def = JOB_BY_KEY.get(key);
+    if (!def) throw new Error(`مهمة غير معروفة: ${key}`);
+    const row = await ctx.db.query("aiCronJobs").withIndex("by_key", (q) => q.eq("key", key)).first();
+    const started = Date.now();
+    await def.run(ctx);
+    const ms = Date.now() - started;
+    await upsert(ctx, key, {
+      lastRunAt: Date.now(),
+      lastDurationMs: ms,
+      lastStatus: "ok",
+      lastResult: "تشغيل يدوي من غرفة الوكلاء",
+      runCount: (row?.runCount ?? 0) + 1,
+      errorCount: row?.errorCount ?? 0,
+    });
+    return { ms, name: def.name };
+  },
+});
+
+/** هل المفتاح الشامل موقوفاً؟ — يقرؤه خادم السيطرة قبل أي تشغيل جماعي. */
+export const isGlobalPaused = internalQuery({
+  args: {},
+  handler: async (ctx) => await isPaused(ctx),
+});
+
+/** قائمة المهام المفعّلة — تُستخدم لتشغيل كل شيء من غرفة الوكلاء. */
+export const enabledJobKeys = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("aiCronJobs").collect();
+    const byKey = new Map(rows.map((r) => [r.key, r] as const));
+    return JOB_DEFS.filter((d) => byKey.get(d.key)?.enabled ?? d.enabled).map((d) => d.key);
+  },
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 // الاستعلامات (غرفة المالك)

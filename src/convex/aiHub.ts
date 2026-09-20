@@ -91,7 +91,14 @@ async function unitIsEnabled(ctx: any, unit: string): Promise<boolean> {
 export const getUnitContext = internalQuery({
   args: { unit: v.string(), hours: v.optional(v.number()), limit: v.optional(v.number()) },
   handler: async (ctx, { unit, hours, limit }) => {
-    if (!(await hubIsLive(ctx))) return { live: false, peers: [], sharedAt: Date.now() };
+    // 🔗 v12.0 — أوامر العرش: تُقرأ في نفس سياق الوحدة قبل أي قرار.
+    // هذا ما يجعل أمر المالك في غرفة الوكلاء فعّالاً لا محفوظاً فقط.
+    const controlRow = await ctx.db
+      .query("aiControls")
+      .withIndex("by_key", (q) => q.eq("key", `unit_${unit}`))
+      .first();
+    const orders = ((controlRow?.orders ?? []) as { text: string }[]).map((o) => o.text).slice(0, 8);
+    if (!(await hubIsLive(ctx))) return { live: false, peers: [], orders, sharedAt: Date.now() };
     const since = Date.now() - (hours ?? 24) * 3600_000;
     const rows = await ctx.db
       .query("aiHubEvents")
@@ -102,7 +109,7 @@ export const getUnitContext = internalQuery({
       .filter((r) => r.unit !== unit && r.unit !== MASTER_UNIT)
       .slice(0, limit ?? 20)
       .map((r) => ({ unit: r.unit, kind: r.kind, severity: r.severity, summary: r.summary, at: r.at }));
-    return { live: true, peers, sharedAt: Date.now() };
+    return { live: true, peers, orders, sharedAt: Date.now() };
   },
 });
 
