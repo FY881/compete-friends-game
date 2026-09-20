@@ -322,6 +322,51 @@ export function evaluateAchievements(stats: Stats): { stats: Stats; unlocked: Ac
   };
 }
 
+/**
+ * ⚔️ منح عملات حقيقي لمحفظة اللاعب — يُستخدم في مكافآت التحدّيات التي
+ * تحقّق منها الخادم. يعيد المقدار الممنوح فعلاً (0 إن كان الطلب غير صالح).
+ */
+export function grantCoins(amount: number): number {
+  const safe = Math.max(0, Math.min(5000, Math.floor(Number.isFinite(amount) ? amount : 0)));
+  if (safe <= 0) return 0;
+  commit({ ...state, stats: { ...state.stats, coins: state.stats.coins + safe } });
+  return safe;
+}
+
+/**
+ * ⚔️ يبني أسئلة تحدٍّ حقيقي: بعدد أسئلة التحدّي وبصعوبته المُعلنة،
+ * وبلا تكرار. وإن ضاق المجمّع يكمل من باقي الصعوبات — فلا تحدٍّ ناقص.
+ */
+export function buildChallengeQuestions(
+  spec: { questionCount: number; difficulty: string },
+  s: SaveState,
+): OfflineQuestion[] {
+  const wanted = Math.max(5, Math.min(30, Math.floor(spec.questionCount || 10)));
+  const tiers: Record<string, string[]> = {
+    easy: ["easy", "medium", "hard"],
+    medium: ["medium", "hard", "easy"],
+    hard: ["hard", "medium", "easy"],
+    expert: ["hard", "medium", "easy"],
+  };
+  const order = tiers[spec.difficulty] ?? tiers.medium;
+  const seen = new Set<string>();
+  const out: OfflineQuestion[] = [];
+  for (const diff of order) {
+    if (out.length >= wanted) break;
+    const pool = OFFLINE_BANK.filter((q) => q.difficulty === diff && !seen.has(q.id));
+    // نبدأ من الأسئلة التي لم يلقّها اللاعب كثيراً — التحدّي يبقى جديداً
+    const fresh = pool.filter((q) => (s.stats.categories[q.category]?.answered ?? 0) < 40);
+    const source = fresh.length >= wanted - out.length ? fresh : pool;
+    for (const q of shuffle(source)) {
+      if (out.length >= wanted) break;
+      if (seen.has(q.id)) continue;
+      seen.add(q.id);
+      out.push(q);
+    }
+  }
+  return out;
+}
+
 export function todayKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

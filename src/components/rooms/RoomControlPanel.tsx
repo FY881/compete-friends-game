@@ -6,6 +6,7 @@
  * تحدٍّ بمكافأة، وسجل إجراءات كامل.
  */
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertTriangle,
+  BarChart3,
   Clock,
   Copy,
   Crown,
@@ -34,6 +36,7 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { RoomPollsPanel } from "@/components/rooms/RoomPollsPanel";
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "👑 مالك الغرفة",
@@ -73,6 +76,9 @@ export function RoomControlPanel({ roomId, onDone }: { roomId: string; onDone?: 
   const moderate = useMutation(api.roomNexus.roomModerate);
   const challenge = useMutation(api.roomNexus.startRoomChallenge);
   const reportRoom = useMutation(api.roomNexus.reportRoom);
+  // ⚔️ تحدّيات الغرفة الحقيقية: حالتها وعدد لاعبيها وكود كل تحدٍّ
+  const roomChallenges = useQuery(api.challenges.getRoomChallenges, { roomId: roomId as never });
+  const [lastChallenge, setLastChallenge] = useState<{ code: string; reward: number; coins: number; difficulty: string } | null>(null);
 
   const profile = details?.profile;
   const [form, setForm] = useState<Record<string, string | number | boolean>>({});
@@ -105,6 +111,9 @@ export function RoomControlPanel({ roomId, onDone }: { roomId: string; onDone?: 
             صلاحياتك: {details.myPerms.map((p) => PERMISSION_LABEL.find((x) => x.id === p)?.label ?? p).join(" · ") || "لا شيء"}
           </p>
         </div>
+        {/* 🗳 v11.0 — الاستطلاعات متاحة لكل عضو (نظام حقيقي لا صلاحية معلّقة) */}
+        <RoomPollsPanel roomId={roomId} />
+
         <Button
           variant="outline"
           className="w-full rounded-xl text-rose-600"
@@ -171,6 +180,7 @@ export function RoomControlPanel({ roomId, onDone }: { roomId: string; onDone?: 
           <TabsTrigger value="roles" className="rounded-xl text-[11px]"><UserCog className="me-1 size-3" /> أدوار وصلاحيات</TabsTrigger>
           <TabsTrigger value="invites" className="rounded-xl text-[11px]"><Link2 className="me-1 size-3" /> دعوات</TabsTrigger>
           <TabsTrigger value="topics" className="rounded-xl text-[11px]"><ScrollText className="me-1 size-3" /> مواضيع</TabsTrigger>
+          <TabsTrigger value="polls" className="rounded-xl text-[11px]"><BarChart3 className="me-1 size-3" /> استطلاعات</TabsTrigger>
           <TabsTrigger value="mod" className="rounded-xl text-[11px]"><Shield className="me-1 size-3" /> إشراف</TabsTrigger>
           <TabsTrigger value="audit" className="rounded-xl text-[11px]"><Clock className="me-1 size-3" /> سجل</TabsTrigger>
         </TabsList>
@@ -211,11 +221,11 @@ export function RoomControlPanel({ roomId, onDone }: { roomId: string; onDone?: 
                 className="rounded-xl"
               />
             </Field>
-            <Field label="مكافأة التحدي (عملات)">
+            <Field label="مكافأة التحدّي (خبرة حقيقية لكل لاعب ناجح)">
               <Input
                 type="number"
-                min={0}
-                max={500}
+                min={10}
+                max={600}
                 value={Number(value("challengeReward", profile.challengeReward))}
                 onChange={(e) => setForm({ ...form, challengeReward: Number(e.target.value) })}
                 className="rounded-xl"
@@ -582,6 +592,10 @@ export function RoomControlPanel({ roomId, onDone }: { roomId: string; onDone?: 
         </TabsContent>
 
         {/* ── الإشراف ── */}
+        <TabsContent value="polls" className="space-y-3 pt-3">
+          <RoomPollsPanel roomId={roomId} />
+        </TabsContent>
+
         <TabsContent value="mod" className="space-y-4 pt-3">
           <div className="space-y-2 rounded-xl border border-rose-500/25 bg-rose-500/[0.03] p-3">
             <p className="flex items-center gap-1.5 text-xs font-bold text-rose-700">
@@ -589,9 +603,10 @@ export function RoomControlPanel({ roomId, onDone }: { roomId: string; onDone?: 
             </p>
             <div className="flex flex-wrap gap-1.5">
               {[
-                { d: "easy", label: "سهل · ١٠ أسئلة" },
-                { d: "medium", label: "متوسط · ١٥ سؤالاً" },
-                { d: "hard", label: "صعب · ٢٠ سؤالاً" },
+                { d: "easy", label: "سهل · ١٠ أسئلة", n: 10 },
+                { d: "medium", label: "متوسط · ١٥ سؤالاً", n: 15 },
+                { d: "hard", label: "صعب · ٢٠ سؤالاً", n: 20 },
+                { d: "expert", label: "خبير · ٢٥ سؤالاً", n: 25 },
               ].map((c) => (
                 <button
                   key={c.d}
@@ -601,10 +616,11 @@ export function RoomControlPanel({ roomId, onDone }: { roomId: string; onDone?: 
                       const res = await challenge({
                         roomId: roomId as never,
                         difficulty: c.d,
-                        questionCount: c.d === "easy" ? 10 : c.d === "medium" ? 15 : 20,
+                        questionCount: c.n,
                         reward: profile.challengeReward,
                       });
-                      toast.success(`انطلق التحدي — كود ${res.code}`);
+                      setLastChallenge({ code: res.code, reward: res.reward, coins: res.coins, difficulty: res.difficulty });
+                      toast.success(`انطلق التحدّي — كود ${res.code}`);
                     } catch (e) {
                       toast.error(e instanceof Error ? e.message : "تعذّر إطلاق التحدي");
                     }
@@ -615,7 +631,48 @@ export function RoomControlPanel({ roomId, onDone }: { roomId: string; onDone?: 
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground">يُنشر التحدي كرسالة مثبّتة لكل الأعضاء بمكافأة معلنة.</p>
+            {lastChallenge && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-2">
+                <span className="text-[11px] font-bold tabular-nums">كود اللعب: {lastChallenge.code}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  مكافأة {lastChallenge.reward} خبرة
+                  {lastChallenge.coins > 0 ? ` + ${lastChallenge.coins} عملة` : ""}
+                </span>
+                <Button asChild size="sm" variant="outline" className="h-6 rounded-lg px-2 text-[10px]">
+                  <Link to={`/arena?challenge=${lastChallenge.code}`}>العب الآن</Link>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 rounded-lg px-2 text-[10px]"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(`${window.location.origin}/arena?challenge=${lastChallenge.code}`);
+                    toast.success("نُسخ رابط التحدّي");
+                  }}
+                >
+                  <Copy className="size-3" /> نسخ الرابط
+                </Button>
+              </div>
+            )}
+            {(roomChallenges ?? []).length > 0 && (
+              <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-2">
+                <p className="text-[11px] font-bold">تحدّيات هذه الغرفة</p>
+                {(roomChallenges ?? []).slice(0, 5).map((c) => (
+                  <div key={c.id} className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                    <Badge variant="outline" className="rounded-full font-mono text-[9px]">{c.code}</Badge>
+                    <span className="tabular-nums">{c.questionCount} أسئلة</span>
+                    <span className="tabular-nums text-muted-foreground">· {c.plays} محاولة · {c.participants} لاعب · {c.rewardedCount} نالوا المكافأة</span>
+                    <span className="text-muted-foreground">· {c.remaining}</span>
+                    <Button asChild size="sm" variant="ghost" className="ms-auto h-5 rounded-md px-1.5 text-[9px]">
+                      <Link to={`/arena?challenge=${c.code}`}>لعب</Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              يُنشر التحدي كرسالة مثبّتة بكود، ويُلعَب فعلياً في الساحة — والمكافأة يدفعها الخادم حسب نتيجتك.
+            </p>
           </div>
 
           <div className="space-y-2">

@@ -681,3 +681,92 @@ export const ROOM_ACTION_LABEL: Record<string, string> = {
 export function actionLabel(action: string): string {
   return ROOM_ACTION_LABEL[action] ?? action;
 }
+
+// ───────────────────────────────────────────────────────────────────────
+// ⑨ v11.0 — منطق استطلاعات الغرفة (نقي ومُختبر)
+// ───────────────────────────────────────────────────────────────────────
+
+export interface PollOption {
+  id: string;
+  label: string;
+  votes: number;
+}
+
+export interface PollChoiceRule {
+  multi: boolean;
+  maxChoices: number;
+  options: readonly PollOption[];
+}
+
+/** الاستطلاع مفتوح؟ (يُحترم الإغلاق اليدوي والانتهاء بالزمن) */
+export function pollIsOpen(poll: { closed: boolean; expiresAt: number }, now: number): boolean {
+  if (poll.closed) return false;
+  if (poll.expiresAt > 0 && now >= poll.expiresAt) return false;
+  return true;
+}
+
+/** وصف المدة المتبقية بلغة مفهومة. */
+export function pollRemaining(poll: { closed: boolean; expiresAt: number }, now: number): string {
+  if (poll.closed) return "أُغلق";
+  if (poll.expiresAt <= 0) return "بلا انتهاء";
+  const ms = poll.expiresAt - now;
+  if (ms <= 0) return "انتهى";
+  const hours = Math.floor(ms / (60 * 60 * 1000));
+  if (hours >= 24) return `يتبقّى ${Math.floor(hours / 24)} يوم`;
+  if (hours >= 1) return `يتبقّى ${hours} ساعة`;
+  return `يتبقّى ${Math.max(1, Math.floor(ms / 60000))} دقيقة`;
+}
+
+/** النسب تُحسب في الخادم — فلا يمكن تزييفها من الواجهة. */
+export function pollTallies(
+  options: readonly PollOption[],
+): { id: string; label: string; votes: number; percent: number }[] {
+  const total = options.reduce((sum, o) => sum + o.votes, 0);
+  return options.map((o) => ({
+    id: o.id,
+    label: o.label,
+    votes: o.votes,
+    percent: total === 0 ? 0 : Math.round((o.votes / total) * 100),
+  }));
+}
+
+/** يتحقق من اختيارات اللاعب مقابل قواعد الاستطلاع. */
+export function validatePollChoices(
+  poll: PollChoiceRule,
+  picked: readonly string[],
+): { ok: boolean; reason: string; choices: string[] } {
+  const valid = new Set(poll.options.map((o) => o.id));
+  const choices = [...new Set(picked.filter((c) => valid.has(c)))];
+  if (choices.length === 0) return { ok: false, reason: "اختر خياراً واحداً على الأقل", choices };
+  if (!poll.multi && choices.length > 1) {
+    return { ok: false, reason: "هذا الاستطلاع يقبل خياراً واحداً", choices };
+  }
+  if (poll.multi && choices.length > Math.max(1, poll.maxChoices)) {
+    return { ok: false, reason: `يمكنك اختيار ${poll.maxChoices} خيارات كحدّ أقصى`, choices };
+  }
+  return { ok: true, reason: "ok", choices };
+}
+
+/**
+ * تطبيق الصوت بفرق التغيير فقط: لا صوت مزدوج ولا صوت ضائع،
+ * وتغيير الرأي ينقل الصوت من خيار إلى آخر بدقة.
+ */
+export function applyPollVote(
+  options: readonly PollOption[],
+  previousChoices: readonly string[],
+  picked: readonly string[],
+): { options: PollOption[]; totalVotes: number; isNewVote: boolean } {
+  const had = new Set(previousChoices);
+  const has = new Set(picked);
+  const next = options.map((o) => {
+    const before = had.has(o.id);
+    const after = has.has(o.id);
+    if (before === after) return o;
+    return { ...o, votes: Math.max(0, o.votes + (after ? 1 : -1)) };
+  });
+  return {
+    options: next,
+    totalVotes: next.reduce((sum, o) => sum + o.votes, 0),
+    isNewVote: previousChoices.length === 0,
+  };
+}

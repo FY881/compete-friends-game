@@ -13,6 +13,8 @@ import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { isOwnerUser } from "./owner";
+import { createChallengeRecord } from "./challenges";
+import { CHALLENGE_DIFFICULTIES } from "./challengeCore";
 import {
   canCreateKind,
   canJoin,
@@ -1134,6 +1136,10 @@ export const startRoomChallenge = mutation({
     difficulty: v.string(),
     questionCount: v.number(),
     reward: v.optional(v.number()),
+    /** عملات إضافية تُمنح للفائزين (تُموَّل خزينة العشيرة إن كانت الغرفة عشائرية) */
+    coins: v.optional(v.number()),
+    title: v.optional(v.string()),
+    hours: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const meId = await getAuthUserId(ctx);
@@ -1145,15 +1151,31 @@ export const startRoomChallenge = mutation({
     const role = resolveRole(profile, room.ownerId as unknown as string, room.admins as unknown as string[], meId as unknown as string);
     if (!hasPermission(profile, role, "challenges")) throw new Error("ليست لديك صلاحية إطلاق تحدٍّ");
 
-    const count = Math.max(5, Math.min(args.questionCount, 30));
-    const reward = Math.max(0, Math.min(args.reward ?? profile?.challengeReward ?? 0, 500));
+    const me = await ctx.db.get(meId);
+    // ⚔️ v11.0: التحدّي يُسجَّل صفّاً حقيقياً بكود يُلعَب في الساحة ويُدفع من الخادم
+    const created = await createChallengeRecord(ctx, {
+      source: "room",
+      title: args.title?.trim() || `تحدٍّ في غرفة ${room.name}`,
+      note: `أطلقه ${me?.name ?? "المالك"} من غرفة ${room.name}`,
+      difficulty: args.difficulty,
+      questionCount: args.questionCount,
+      rewardXp: args.reward ?? profile?.challengeReward ?? 0,
+      rewardCoins: args.coins ?? 0,
+      ttlHours: args.hours ?? 72,
+      roomId: args.roomId,
+      clanId: (profile?.clanId as string | undefined) ?? null,
+      createdBy: meId,
+      createdByName: me?.name ?? "المالك",
+    });
+    const count = created.spec.questionCount;
+    const reward = created.spec.rewardXp;
     const now = Date.now();
-    const code = `ROOM-${generateInviteCode(now).slice(0, 6)}`;
+    const diff = CHALLENGE_DIFFICULTIES.find((d) => d.id === created.spec.difficulty);
     const messageId = await ctx.db.insert("chatMessages", {
       roomId: args.roomId,
       senderId: meId,
-      senderName: (await ctx.db.get(meId))?.name ?? "المالك",
-      content: `⚔️ تحدٍّ ذهني جديد في الغرفة — ${count} أسئلة · صعوبة ${args.difficulty} · مكافأة ${reward} عملة\nادخل من الساحة: /arena?challenge=${code}`,
+      senderName: me?.name ?? "المالك",
+      content: `⚔️ تحدٍّ ذهني جديد${args.title?.trim() ? `: ${args.title.trim()}` : ""} — ${count} أسئلة · صعوبة ${diff?.label ?? created.spec.difficulty} · مكافأة ${reward} خبرة${created.spec.rewardCoins > 0 ? ` + ${created.spec.rewardCoins} عملة` : ""}\nكود اللعب: ${created.code}\n🔥 العب الآن من الساحة: /arena?challenge=${created.code}`,
       type: "system",
       reactions: [],
       pinned: true,
@@ -1169,8 +1191,23 @@ export const startRoomChallenge = mutation({
         updatedAt: now,
       } as never);
     }
-    await writeAudit(ctx, args.roomId as never, { id: meId as never, name: (await ctx.db.get(meId))?.name ?? "المالك", source: "room_owner" }, "challenge_started", `${count} أسئلة · ${args.difficulty} · مكافأة ${reward}`);
-    return { ok: true, code, questionCount: count, reward };
+    await writeAudit(
+      ctx,
+      args.roomId as never,
+      { id: meId as never, name: me?.name ?? "المالك", source: "room_owner" },
+      "challenge_started",
+      `${count} أسئلة · ${created.spec.difficulty} · مكافأة ${reward} خبرة · كود ${created.code}`,
+    );
+    return {
+      ok: true,
+      code: created.code,
+      challengeId: created.challengeId as unknown as string,
+      questionCount: count,
+      reward,
+      coins: created.spec.rewardCoins,
+      difficulty: created.spec.difficulty,
+      expiresAt: created.expiresAt,
+    };
   },
 });
 

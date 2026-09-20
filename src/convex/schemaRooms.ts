@@ -151,6 +151,41 @@ export const roomForumTables = {
     .index("by_target", ["targetId", "createdAt"]),
 
   // ═══════════════════════════════════════════════════════════════════════
+  // ║ ⑥ب v11.0 — استطلاعات الغرف: كانت مجرد صلاحية بلا وظيفة، صارت نظاماً  ║
+  // ═══════════════════════════════════════════════════════════════════════
+  roomPolls: defineTable({
+    roomId: v.id("chatRooms"),
+    question: v.string(),
+    /** { id, label, votes } — الأصوات تُحدَّث في نفس الصف عند كل تصويت */
+    options: v.array(v.object({ id: v.string(), label: v.string(), votes: v.number() })),
+    /** multi = يختار أكثر من خيار (بحدّ maxChoices) */
+    multi: v.boolean(),
+    maxChoices: v.number(),
+    createdBy: v.id("users"),
+    createdByName: v.string(),
+    closed: v.boolean(),
+    expiresAt: v.number(), // 0 = بلا انتهاء
+    totalVotes: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_room", ["roomId", "createdAt"])
+    .index("by_room_open", ["roomId", "closed", "createdAt"])
+    .index("by_closed", ["closed", "updatedAt"]),
+
+  roomPollVotes: defineTable({
+    pollId: v.id("roomPolls"),
+    roomId: v.id("chatRooms"),
+    userId: v.id("users"),
+    userName: v.string(),
+    choices: v.array(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_poll_user", ["pollId", "userId"])
+    .index("by_poll", ["pollId", "updatedAt"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
   // ║ ⑦ ملتقى العقول — أقسام                                                 ║
   // ═══════════════════════════════════════════════════════════════════════
   forumSections: defineTable({
@@ -189,6 +224,8 @@ export const roomForumTables = {
         difficulty: v.string(),
         reward: v.number(),
         questionCount: v.number(),
+        /** كود اللعب الحقيقي في الساحة (/arena?challenge=CODE) */
+        code: v.optional(v.string()),
       }),
     ),
     poll: v.optional(
@@ -307,4 +344,58 @@ export const roomForumTables = {
     autoHighlightScore: v.number(),
     updatedAt: v.number(),
   }).index("by_key", ["key"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ║ ⑮ v11.0 — التحدّيات الحقيقية: غرفة أو ملتقى ⇒ تُلعَب في الساحة       ║
+  // ║ مصدر الحقيقة الواحد: وعدُ المكافأة لا يُصدَّق إلا من هنا              ║
+  // ═══════════════════════════════════════════════════════════════════════
+  challenges: defineTable({
+    code: v.string(),
+    source: v.string(), // room | forum
+    roomId: v.optional(v.id("chatRooms")),
+    postId: v.optional(v.id("forumPosts")),
+    clanId: v.optional(v.string()), // إن كان التحدّي داخل غرفة عشيرة ⇒ خزنتها تُموَّل
+    title: v.string(),
+    note: v.string(),
+    difficulty: v.string(), // easy | medium | hard | expert
+    questionCount: v.number(),
+    rewardXp: v.number(),
+    rewardCoins: v.number(),
+    createdBy: v.id("users"),
+    createdByName: v.string(),
+    status: v.string(), // open | closed
+    expiresAt: v.number(), // 0 = بلا انتهاء
+    plays: v.number(),
+    completions: v.number(),
+    rewardedCount: v.number(),
+    xpGranted: v.number(),
+    bestScore: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_code", ["code"])
+    .index("by_room", ["roomId", "createdAt"])
+    .index("by_source", ["source", "createdAt"])
+    .index("by_status_expiry", ["status", "expiresAt"])
+    .index("by_creator", ["createdBy", "createdAt"]),
+
+  challengeRuns: defineTable({
+    challengeId: v.id("challenges"),
+    code: v.string(),
+    userId: v.id("users"),
+    userName: v.string(),
+    correct: v.number(),
+    total: v.number(),
+    score: v.number(),
+    durationMs: v.number(),
+    suspicious: v.boolean(),
+    xpAwarded: v.number(),
+    coinsAwarded: v.number(),
+    grade: v.string(), // fail | bronze | silver | gold | perfect
+    createdAt: v.number(),
+  })
+    .index("by_challenge", ["challengeId", "createdAt"])
+    .index("by_challenge_user", ["challengeId", "userId"])
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_code", ["code", "createdAt"]),
 };

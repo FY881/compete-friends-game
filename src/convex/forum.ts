@@ -15,6 +15,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { isOwnerUser } from "./owner";
 import { readTier } from "./roomNexus";
+import { createChallengeRecord } from "./challenges";
 import {
   DEFAULT_LIMITS,
   DEFAULT_SECTIONS,
@@ -730,6 +731,28 @@ export const createPost = mutation({
       lastActivityAt: now,
     });
 
+    // ⚔️ v11.0: منشور التحدّي لا يُنشر وعداً — يُنشأ له تحدٍّ حقيقي بكود يُلعَب في الساحة
+    let challengeCodeOut: string | null = null;
+    if (validated.kind.id === "challenge" && validated.challenge) {
+      const created = await createChallengeRecord(ctx, {
+        source: "forum",
+        title: validated.title,
+        note: validated.body.slice(0, 180),
+        difficulty: validated.challenge.difficulty,
+        questionCount: validated.challenge.questionCount,
+        rewardXp: validated.challenge.reward,
+        rewardCoins: 0,
+        ttlHours: 168,
+        postId,
+        createdBy: meId,
+        createdByName: me.name ?? "لاعب",
+      });
+      challengeCodeOut = created.code;
+      await ctx.db.patch(postId, {
+        challenge: { ...validated.challenge, code: created.code },
+      });
+    }
+
     if (sectionRow) await ctx.db.patch(sectionRow._id, { postCount: sectionRow.postCount + 1 });
 
     // إشعار المشرفين المعنيين — إشراف فعّال لا انتظار
@@ -737,7 +760,12 @@ export const createPost = mutation({
       await notify(ctx, m.userId as never, "🧠 منشور جديد في قسمك", `${validated.kind.label}: ${validated.title}`, "info");
     }
 
-    return { postId, highlighted: initialQuality >= limits.autoHighlightScore, kind: validated.kind.id };
+    return {
+      postId,
+      highlighted: initialQuality >= limits.autoHighlightScore,
+      kind: validated.kind.id,
+      challengeCode: challengeCodeOut,
+    };
   },
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { type OfflineQuestion } from "@/lib/offline-bank";
 import {
@@ -22,6 +22,7 @@ import {
   BANK_SIZE,
   CATEGORIES,
   RANKS,
+  buildChallengeQuestions,
   buildQuestions,
   categoryAccuracy,
   finishSession,
@@ -50,6 +51,10 @@ import {
 import { MindLabPanel } from "@/components/MindLabPanel";
 import { MindCloudPanel } from "@/components/MindCloudPanel";
 import { useMindSync } from "@/lib/mindSync";
+import { useChallenge, type ChallengeInfo, type ChallengeSubmitOutcome } from "@/lib/challengeSync";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { ChallengeGateway } from "@/components/ChallengeGateway";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -162,6 +167,9 @@ type RunRequest = {
   questions: OfflineQuestion[];
   rival?: { name: string; avatar: string; accuracy: number };
   tournament?: { round: number };
+  /** ⚔️ تحدٍّ حقيقي: ثواني العدّاد من صعوبة التحدّي + كود يُحتسب بعده */
+  timerOverride?: number;
+  challengeCode?: string;
 };
 
 export default function Offline() {
@@ -170,6 +178,9 @@ export default function Offline() {
   // 🧬 جسر العقول: كل جولة تنتهي تبني عقلك محلياً، وهذا الخطاف يرفعه
   // إلى عالم اللعبة (لوحة الصدارة + نبضة المالك) ويسحب قرارات العرش.
   useMindSync("arena");
+  // ⚔️ جسر التحدّيات: /arena?challenge=CODE قادم من غرفة خاصة أو من الملتقى
+  const [searchParams] = useSearchParams();
+  const challengeSync = useChallenge(searchParams.get("challenge"));
   const [tab, setTab] = useState<TabId>("arena");
   const [run, setRun] = useState<RunRequest | null>(null);
 
@@ -200,6 +211,25 @@ export default function Offline() {
     }
 
     setRun({ mode, label, questions, rival });
+  };
+
+  /** ⚔️ يبدأ تحدّياً حقيقياً بعدد أسئلته وصعوبته المُعلنة — الأسئلة تُبنى على الصعوبة لا على العشوائية. */
+  const startChallengeRun = (challenge: ChallengeInfo) => {
+    const questions = buildChallengeQuestions(
+      { questionCount: challenge.questionCount, difficulty: challenge.difficulty },
+      save,
+    );
+    if (questions.length === 0) {
+      toast.error("لا توجد أسئلة متاحة لهذا التحدّي حالياً");
+      return;
+    }
+    setRun({
+      mode: "quick",
+      label: `⚔️ ${challenge.title} · ${challenge.code}`,
+      questions: questions.slice(0, challenge.questionCount),
+      timerOverride: challenge.seconds,
+      challengeCode: challenge.code,
+    });
   };
 
   /** يبدأ جولة البطولة القادمة: أسئلة جديدة + خصم القوس + خريطة الإعدادات. */
@@ -233,6 +263,7 @@ export default function Offline() {
         key={`${run.mode}-${run.label}-${run.questions.length}`}
         request={run}
         onExit={() => setRun(null)}
+        onChallengeResult={challengeSync.submitRun}
       />
     );
   }
@@ -286,6 +317,16 @@ export default function Offline() {
 
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         {tab === "arena" && (
+          <div className="space-y-4">
+            {challengeSync.code && (
+              <ChallengeGateway
+                challenge={challengeSync.challenge}
+                loading={challengeSync.loading}
+                busy={challengeSync.busy}
+                outcome={challengeSync.outcome}
+                onStart={startChallengeRun}
+              />
+            )}
           <ArenaTab
             save={save}
             level={level}
@@ -296,10 +337,10 @@ export default function Offline() {
             tournament={tournament}
             onTournamentRound={startTournamentRound}
             onTournamentForfeit={() => {
-              forfeitTournament();
-              toast.info("استُلمت مكافآت الجولات المجزوزة واعتُرف بعمق وصولك");
+              forfeitTournament();                toast.info("استُلمت مكافآت الجولات المجزوزة واعتُرف بعمق وصولك");
             }}
           />
+          </div>
         )}
         {tab === "mind" && (
           <div className="space-y-4">
@@ -728,6 +769,44 @@ function BoardTab({ save }: { save: ReturnType<typeof useLocalGame> }) {
 // تبويب الملف
 // ═══════════════════════════════════════════════════════════════════════
 
+/** ⚔️ سجلّ تحدّياتك الحقيقي — يُقرأ من الخادم لا من الذاكرة المحلية. */
+function MyChallengesCard() {
+  const runs = useQuery(api.challenges.getMyChallengeRuns, {});
+  if (runs === undefined || runs.length === 0) return null;
+  const totalXp = runs.reduce((sum, r) => sum + r.xpAwarded, 0);
+  return (
+    <Card className="border-rose-500/25 shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <Swords className="size-4 text-rose-600" /> تحدّياتي
+          <span className="ms-auto text-[10px] font-normal tabular-nums text-muted-foreground">
+            {runs.length} محاولة · {totalXp} خبرة
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1.5">
+        {runs.slice(0, 6).map((r) => (
+          <div key={`${r.code}-${r.createdAt}`} className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-2.5 py-1.5">
+            <Badge variant="outline" className="rounded-full font-mono text-[9px]">{r.code}</Badge>
+            <span className="min-w-0 flex-1 truncate text-[11px] font-bold">{r.title}</span>
+            <span className="text-[10px] tabular-nums text-muted-foreground">
+              {r.correct}/{r.total} · {r.score} نقطة · {r.gradeLabel}
+            </span>
+            <span
+              className={cn(
+                "text-[10px] font-bold tabular-nums",
+                r.xpAwarded > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground",
+              )}
+            >
+              {r.xpAwarded > 0 ? `+${r.xpAwarded} خبرة` : "بلا مكافأة"}
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ProfileTab({
   save,
   level,
@@ -752,6 +831,9 @@ function ProfileTab({
 
   return (
     <div className="space-y-4">
+      {/* ⚔️ تحدّياتي: نتائج حقيقية سجّلها الخادم من جولاتك في تحدّيات الغرف والملتقى */}
+      <MyChallengesCard />
+
       {/* التخصيص */}
       <Card className="border-border/70 shadow-sm">
         <CardHeader className="pb-3">
@@ -964,13 +1046,24 @@ type RunQuestion = {
   correctIndex: number;
 };
 
-function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => void }) {
+function RunScreen({
+  request,
+  onExit,
+  onChallengeResult,
+}: {
+  request: RunRequest;
+  onExit: () => void;
+  /** ⚔️ يُرسل نتيجة التحدّي للخادم — وهو من يقرّر المكافأة */
+  onChallengeResult?: (run: { correct: number; total: number; score: number; durationMs: number }) => Promise<ChallengeSubmitOutcome>;
+}) {
   const total = request.questions.length;
   // 🧬 تأثيرات «العقل المتطور» تُثبَّت لحظة بدء الجولة — كل رقم هنا مقيس فعلاً
   const [perks] = useState(() => mindEffect(readMind()));
   // جولة البطولة الزعيم تُلعب بعدّاد أقصر (١٤ ثانية) — البقية على قياسها المعتاد
+  // ⚔️ وفي التحدّي: العدّاد يأتي من صعوبة التحدّي المُعلنة
   const baseTimer =
-    request.tournament && BOSS_ROUNDS.includes(request.tournament.round) ? BOSS_TIMER : TIMER_BY_MODE[request.mode];
+    request.timerOverride ??
+    (request.tournament && BOSS_ROUNDS.includes(request.tournament.round) ? BOSS_TIMER : TIMER_BY_MODE[request.mode]);
   // ثواني العقل تُضاف على العدّاد فعلياً (قوة السرعة + التخصصات)
   const timerSeconds = baseTimer + perks.timeSec;
   const isMarathon = request.mode === "marathon";
@@ -1001,6 +1094,7 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
   const [rivalScore, setRivalScore] = useState(0);
   const [rivalPick, setRivalPick] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
+  const [challengeResult, setChallengeResult] = useState<ChallengeSubmitOutcome | null>(null);
   const [summary, setSummary] = useState<{
     xpGained: number;
     unlocked: AchievementDef[];
@@ -1099,6 +1193,14 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
         ? { won: tResult.won, prize: tResult.prize, crowned: tResult.crowned, rivalScore }
         : undefined,
     });
+    // ⚔️ نتيجة التحدّي تُرسل للخادم بالنتيجة الحقيقية محسوبة من إجابات اللاعب
+    if (request.challengeCode && onChallengeResult) {
+      const correctFinal = finalAnswers.filter((a, i) => a === run[i]?.correctIndex).length;
+      const durationMs = timesRef.current.reduce((sum, ms) => sum + ms, 0);
+      void onChallengeResult({ correct: correctFinal, total, score, durationMs })
+        .then((res) => setChallengeResult(res))
+        .catch(() => setChallengeResult({ status: "failed", message: "تعذّر إرسال نتيجة التحدّي", result: null, coinsGranted: 0 }));
+    }
     setFinished(true);
   };
 
@@ -1135,6 +1237,7 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
     setRivalPick(null);
     setFinished(false);
     setSummary(null);
+    setChallengeResult(null);
   };
 
   const percent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
@@ -1206,6 +1309,39 @@ function RunScreen({ request, onExit }: { request: RunRequest; onExit: () => voi
                 </div>
                 <p className="text-lg font-black tabular-nums text-primary">+{summary?.xpGained ?? 0} XP</p>
               </div>
+
+              {request.challengeCode && (
+                <div
+                  className={cn(
+                    "space-y-1 rounded-2xl border p-3",
+                    challengeResult?.status === "paid"
+                      ? "border-emerald-500/40 bg-emerald-500/10"
+                      : challengeResult?.status === "queued" || challengeResult?.status === "unauthenticated"
+                        ? "border-amber-500/40 bg-amber-500/10"
+                        : "border-border/70 bg-muted/20",
+                  )}
+                >
+                  <p className="text-xs font-black">
+                    {challengeResult === null
+                      ? "⚔️ نُرسل نتيجتك للتحدّي…"
+                      : challengeResult.status === "paid"
+                        ? `⚔️ مكافأة التحدّي وصلت ${challengeResult.result?.grade.emoji ?? ""}`
+                        : challengeResult.status === "already"
+                          ? "♻️ نلت مكافأة هذا التحدّي سابقاً"
+                          : `⚔️ ${challengeResult.status === "queued" ? "بانتظار الاتصال" : challengeResult.status === "unauthenticated" ? "يلزم تسجيل الدخول للمكافأة" : "لا مكافأة هذه المرة"}`}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {challengeResult?.message ?? `كود التحدّي ${request.challengeCode}`}
+                  </p>
+                  {challengeResult?.status === "paid" && (
+                    <p className="text-[11px] font-bold tabular-nums text-foreground/80">
+                      +{challengeResult.result?.xpAwarded ?? 0} خبرة
+                      {challengeResult.coinsGranted > 0 ? ` · +${challengeResult.coinsGranted} عملة` : ""}
+                      {challengeResult.result?.bestScore !== undefined ? ` · أفضل نتيجة ${challengeResult.result.bestScore}` : ""}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {summary?.mind && summary.mind.totalGained > 0 && (
                 <div className="space-y-2 rounded-2xl border border-violet-500/30 bg-violet-500/5 p-3">

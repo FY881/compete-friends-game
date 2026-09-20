@@ -112,6 +112,8 @@ export default function Forum() {
   const me = useQuery(api.forum.getMyForumProfile);
   const subs = useQuery(api.forum.getMySubscriptions);
   const rooms = useQuery(api.forum.listRoomsShowcase, { limit: 6 });
+  // ⚔️ تحدّيات الملتقى الحقيقية (لكل منشور تحدٍّ كود يُلعَب في الساحة)
+  const forumChallenges = useQuery(api.challenges.getForumChallenges, {}) ?? [];
 
   const [sectionSlug, setSectionSlug] = useState<string | null>(null);
   const [sort, setSort] = useState<string>("new");
@@ -377,6 +379,38 @@ export default function Forum() {
             </Card>
           )}
 
+          {/* ⚔️ تحدّيات الملتقى الحيّة — كل زر يفتح التحدّي الحقيقي في الساحة */}
+          {forumChallenges.length > 0 && (
+            <Card className="border-rose-500/25">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Swords className="size-4 text-rose-600" /> تحدّيات مفتوحة الآن
+                  <Badge variant="outline" className="ms-auto rounded-full text-[9px] tabular-nums">
+                    {forumChallenges.filter((c) => c.status === "open").length} فعّال
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {forumChallenges.slice(0, 4).map((c) => (
+                  <Link
+                    key={c.id}
+                    to={`/arena?challenge=${c.code}`}
+                    className="block rounded-xl border border-border/60 bg-card p-2.5 transition-colors hover:border-rose-500/40"
+                  >
+                    <p className="truncate text-xs font-bold">{c.title}</p>
+                    <p className="flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground">
+                      <span className="font-mono">{c.code}</span>
+                      <span>· {c.questionCount} أسئلة</span>
+                      <span>· مكافأة {c.rewardXp} خبرة</span>
+                      <span>· {c.participants} مشاركة</span>
+                      <span>· {c.remaining}</span>
+                    </p>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* الوسوم الرائجة */}
           {stats && stats.trending.length > 0 && (
             <Card>
@@ -596,14 +630,14 @@ function PostCard({ post, onOpen }: { post: any; onOpen: () => void }) {
                 {post.challenge.questionCount} أسئلة · {post.challenge.difficulty === "easy" ? "سهل" : post.challenge.difficulty === "hard" ? "صعب" : "متوسط"}
               </span>
               <span className="flex items-center gap-1 text-amber-600">
-                <Trophy className="size-3" /> {post.challenge.reward} عملة
+                <Trophy className="size-3" /> {post.challenge.reward} خبرة
               </span>
               <Link
-                to="/arena"
+                to={post.challenge.code ? `/arena?challenge=${post.challenge.code}` : "/arena"}
                 onClick={(e) => e.stopPropagation()}
                 className="ms-auto rounded-lg bg-rose-600 px-2 py-1 font-bold text-white hover:bg-rose-700"
               >
-                العب الآن
+                {post.challenge.code ? "العب التحدّي" : "العب الآن"}
               </Link>
             </div>
           )}
@@ -692,7 +726,11 @@ function ComposerButton({ sections }: { sections: Array<{ slug: string; name: st
         challengeReward: kind === "challenge" ? challengeReward : undefined,
         roomId: kind === "room" && roomId ? (roomId as never) : undefined,
       });
-      toast.success(res.highlighted ? "نُشر — ومحتواك استحق الإبراز التلقائي ✨" : "تم النشر");
+      if (res.challengeCode) {
+        toast.success(`نُشر التحدّي بكود ${res.challengeCode} — صار قابلاً للعب الآن في الساحة ⚔️`);
+      } else {
+        toast.success(res.highlighted ? "نُشر — ومحتواك استحق الإبراز التلقائي ✨" : "تم النشر");
+      }
       setOpen(false);
       setTitle("");
       setBody("");
@@ -800,8 +838,8 @@ function ComposerButton({ sections }: { sections: Array<{ slug: string; name: st
                 <Input type="number" min={5} max={40} value={challengeQuestions} onChange={(e) => setChallengeQuestions(Number(e.target.value))} className="rounded-lg" />
               </div>
               <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-muted-foreground">المكافأة (عملات)</p>
-                <Input type="number" min={0} max={500} value={challengeReward} onChange={(e) => setChallengeReward(Number(e.target.value))} className="rounded-lg" />
+                <p className="text-xs font-semibold text-muted-foreground">المكافأة (خبرة حقيقية — يدفعها الخادم حسب النتيجة)</p>
+                <Input type="number" min={10} max={600} value={challengeReward} onChange={(e) => setChallengeReward(Number(e.target.value))} className="rounded-lg" />
               </div>
             </div>
           )}
@@ -1099,10 +1137,17 @@ function PostView({ postId, onBack, sections }: { postId: string; onBack: () => 
                   {post.challenge.questionCount} أسئلة · {post.challenge.difficulty}
                 </span>
                 <span className="flex items-center gap-1 text-amber-600">
-                  <Trophy className="size-3.5" /> {post.challenge.reward} عملة
+                  <Trophy className="size-3.5" /> {post.challenge.reward} خبرة
                 </span>
+                {post.challenge.code && (
+                  <Badge variant="outline" className="rounded-full font-mono text-[10px]">
+                    {post.challenge.code}
+                  </Badge>
+                )}
                 <Button asChild size="sm" className="ms-auto rounded-xl bg-rose-600 hover:bg-rose-700">
-                  <Link to="/arena">ادخل التحدي</Link>
+                  <Link to={post.challenge.code ? `/arena?challenge=${post.challenge.code}` : "/arena"}>
+                    ادخل التحدّي واقبض المكافأة
+                  </Link>
                 </Button>
               </div>
             )}
