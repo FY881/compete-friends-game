@@ -6,6 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+// 🏛️ v10.0 — لوحة تحكم الغرفة المتقدمة (أدوار · دعوات · مواضيع · قواعد · سجل)
+import { RoomControlPanel } from "@/components/rooms/RoomControlPanel";
+import { CreateRoomDialogV2 } from "@/components/rooms/CreateRoomDialogV2";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -128,9 +132,10 @@ export default function ChatRooms() {
           )}
         </div>
 
-        {/* Create Room Button */}
-        <div className="mt-6 text-center">
+        {/* Create Room Buttons — القديمة (سريعة) + المتقدمة (v10.0) */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           <CreateRoomDialog />
+          <CreateRoomDialogV2 />
         </div>
       </div>
     </div>
@@ -204,6 +209,13 @@ function RoomCard({ room, currentUserId, onClick }: { room: any; currentUserId: 
 function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: () => void; currentUserId: string }) {
   const messages = useQuery(api.chatRooms.getMessages, { roomId: roomId as any });
   const roomStats = useQuery(api.chatRooms.getRoomStats, { roomId: roomId as any });
+  const roomDetails = useQuery(api.roomNexus.getRoomDetails, { roomId: roomId as never });
+  const [showControl, setShowControl] = useState(false);
+  const [activeTopic, setActiveTopic] = useState<string | null>(null);
+  const topicMessages = useQuery(
+    api.roomNexus.getTopicMessages,
+    activeTopic ? { topicId: activeTopic as never, limit: 60 } : "skip",
+  );
   const sendMessage = useMutation(api.chatRooms.sendMessage);
   const toggleReaction = useMutation(api.chatRooms.toggleReaction);
   const togglePin = useMutation(api.chatRooms.togglePin);
@@ -284,6 +296,7 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
         roomId: roomId as any,
         content: text,
         replyTo: replyTo?._id,
+        topicId: activeTopic ? (activeTopic as never) : undefined,
       });
       setInput("");
       setReplyTo(null);
@@ -291,7 +304,7 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
     } catch (err: any) {
       toast.error(err.message || "فشل الإرسال");
     }
-  }, [input, roomId, replyTo, sendMessage]);
+  }, [input, roomId, replyTo, sendMessage, activeTopic]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -371,13 +384,33 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
             <ArrowRight className="size-5" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-sm truncate">💬 غرفة الدردشة</h2>
-            <p className="text-[10px] text-muted-foreground">
-              {displayMessages.length} رسالة
-              {pinnedMessage && " · "}
+            <h2 className="font-bold text-sm truncate">
+              {roomDetails?.profile?.avatar ?? "💬"} {roomDetails?.room.name ?? "غرفة الدردشة"}
+            </h2>
+            <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span>{roomDetails?.kind.label ?? "غرفة"}</span>
+              <span>· {displayMessages.length} رسالة</span>
+              {roomDetails?.profile && roomDetails.profile.memberLimit > 0 && (
+                <span>· {roomDetails.stats.memberCount}/{roomDetails.profile.memberLimit} عضو</span>
+              )}
+              {roomDetails?.state.locked && <span className="text-amber-600">· مقفلة</span>}
+              {roomDetails?.state.closed && <span className="text-rose-600">· مغلقة</span>}
+              {roomDetails?.state.watch && <span className="text-amber-600">· تحت المراقبة</span>}
+              {roomDetails?.profile && roomDetails.profile.slowModeSec > 0 && (
+                <span>· وضع بطيء {roomDetails.profile.slowModeSec}ث</span>
+              )}
               {pinnedMessage && <Pin className="inline size-2.5 text-yellow-500" />}
             </p>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowControl(true)}
+            className="shrink-0"
+            title="إدارة الغرفة"
+          >
+            <Settings className="size-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} className="shrink-0">
             <Search className="size-4" />
           </Button>
@@ -424,6 +457,60 @@ function RoomChat({ roomId, onBack, currentUserId }: { roomId: string; onBack: (
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* 🧵 شريط المواضيع + لوحة تحكم الغرفة */}
+        {roomDetails && roomDetails.topics.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-t bg-muted/30 px-4 py-2">
+            <button
+              type="button"
+              onClick={() => setActiveTopic(null)}
+              className={`rounded-lg px-2 py-1 text-[10px] font-semibold ${activeTopic === null ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+            >
+              النقاش العام
+            </button>
+            {roomDetails.topics.map((t) => (
+              <button
+                key={t._id}
+                type="button"
+                onClick={() => setActiveTopic(t._id)}
+                className={`rounded-lg px-2 py-1 text-[10px] font-semibold ${activeTopic === t._id ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                title={`${t.messageCount} رسالة · ${t.createdByName}`}
+              >
+                {t.pinned ? "📌 " : ""}{t.title}{t.status === "closed" ? " (مغلق)" : ""}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {activeTopic && (
+          <div className="border-t bg-primary/[0.03] px-4 py-2">
+            <p className="mb-1 text-[10px] font-bold text-primary">رسائل الموضوع المحدد — أي رسالة ترسلها الآن تُضاف لهذا الموضوع</p>
+            <div className="max-h-40 space-y-1 overflow-y-auto">
+              {(topicMessages ?? []).map((m) => (
+                <div key={m._id} className="rounded-lg bg-background/70 p-1.5 text-[11px]">
+                  <span className="font-semibold">{m.senderName}</span>
+                  <span className="mx-1 text-muted-foreground">·</span>
+                  <span>{m.content}</span>
+                </div>
+              ))}
+              {topicMessages && topicMessages.length === 0 && (
+                <p className="text-[10px] text-muted-foreground">لا رسائل في هذا الموضوع بعد</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* لوحة إدارة الغرفة المتقدمة */}
+        <Dialog open={showControl} onOpenChange={setShowControl}>
+          <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Settings className="size-4 text-primary" /> إدارة الغرفة
+              </DialogTitle>
+            </DialogHeader>
+            <RoomControlPanel roomId={roomId} />
+          </DialogContent>
+        </Dialog>
 
         {/* Pinned Message Banner */}
         {pinnedMessage && !showSearch && (

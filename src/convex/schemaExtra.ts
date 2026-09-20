@@ -1,6 +1,7 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { sovereignTables } from "./schemaAppend";
+import { roomForumTables } from "./schemaRooms";
 import { tierValidator } from "./tiers";
 
 /**
@@ -302,4 +303,7 @@ export const premiumTables = {
 
   // 👑 الحاكم السيادي — عقوبات ومراسيم بمفعول فعلي
   ...sovereignTables,
+
+  // 🏛️ v10.0 — الغرف الخاصة المتقدمة + ملتقى العقول
+  ...roomForumTables,
 };

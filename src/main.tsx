@@ -50,6 +50,7 @@ const NotFound = lazyRetry(() => import("./pages/NotFound.tsx"));
 const Membership = lazyRetry(() => import("./pages/Membership.tsx"));
 const MiniGames = lazyRetry(() => import("./pages/MiniGames.tsx"));
 const ChatRooms = lazyRetry(() => import("./pages/ChatRooms.tsx"));
+const Forum = lazyRetry(() => import("./pages/Forum.tsx"));
 const Hub = lazyRetry(() => import("./pages/Hub.tsx"));
 const Atlas = lazyRetry(() => import("./pages/Atlas.tsx"));
 const AtlasLogin = lazyRetry(() => import("./components/atlas/AtlasLogin.tsx"));
@@ -519,6 +520,14 @@ function AppShell() {
                 element={
                   <RequireAuth>
                     <ChatRooms />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/forum"
+                element={
+                  <RequireAuth>
+                    <Forum />
                   </RequireAuth>
                 }
               />

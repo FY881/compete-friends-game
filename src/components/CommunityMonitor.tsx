@@ -14,6 +14,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { ClanNexusPanel } from "@/components/owner/ClanNexusPanel";
+import { RoomsNexusPanel } from "@/components/owner/RoomsNexusPanel";
+import { ForumNexusPanel } from "@/components/owner/ForumNexusPanel";
 
 /**
  * 💬 مراقب المجتمع الحي — الغرف النشطة + الرسائل المُعلَّمة + إجراء فوري
@@ -33,6 +35,8 @@ export function CommunityMonitor() {
   const monitor = useQuery(api.commandDeck.getCommunityMonitor, {});
   const deleteMsg = useMutation(api.chatRooms.deleteMessage);
   const [busy, setBusy] = useState<string | null>(null);
+  // 👑 v10.0 — تبويب مراقبة/سيادة: عشائر · غرف خاصة · ملتقى العقول
+  const [board, setBoard] = useState<"clans" | "rooms" | "forum" | "live">("clans");
 
   const del = async (messageId: string) => {
     setBusy(messageId);
@@ -48,9 +52,33 @@ export function CommunityMonitor() {
 
   return (
     <div dir="rtl" className="space-y-5">
-      {/* ⚔️ نكسس العشائر — العشائر صارت قوة ذهنية جماعية حقيقية */}
-      <ClanNexusPanel />
+      {/* 👑 v10.0 — لوحات سيادة المجتمع: العشائر · الغرف الخاصة · ملتقى العقول */}
+      <div className="flex flex-wrap gap-1.5 rounded-2xl border border-border/60 bg-muted/40 p-1">
+        {[
+          { id: "clans" as const, label: "⚔️ العشائر الفكرية" },
+          { id: "rooms" as const, label: "🏛️ الغرف الخاصة" },
+          { id: "forum" as const, label: "🧠 ملتقى العقول" },
+          { id: "live" as const, label: "💬 البث الحي" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setBoard(tab.id)}
+            className={cn(
+              "rounded-xl px-3 py-1.5 text-[11px] font-semibold transition-all",
+              board === tab.id ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:bg-background/60",
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
+      {board === "clans" && <ClanNexusPanel />}
+      {board === "rooms" && <RoomsNexusPanel />}
+      {board === "forum" && <ForumNexusPanel />}
+
+      <div className={cn("space-y-5", board !== "live" && "hidden")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -148,6 +176,7 @@ export function CommunityMonitor() {
             )}
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

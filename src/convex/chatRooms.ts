@@ -8,6 +8,8 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { assertSystemOpen } from "./systemLocks";
+// 🏛️ v10.0 — بوابة الغرف المتقدمة (قفل/تقييد/وضع بطيء/مواضيع)
+import { enforceRoomSend } from "./roomNexus";
 import {
   isDuplicateSpam,
   maxMatchSeverity,
@@ -169,8 +171,9 @@ export const sendMessage = mutation({
     roomId: v.id("chatRooms"),
     content: v.string(),
     replyTo: v.optional(v.string()),
+    topicId: v.optional(v.id("roomTopics")),
   },
-  handler: async (ctx, { roomId, content, replyTo }) => {
+  handler: async (ctx, { roomId, content, replyTo, topicId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("يجب تسجيل الدخول أولاً");
     // 🔒 قفل الدردشة بقرار المالك يمنع أي رسالة جديدة فعلياً
@@ -180,6 +183,10 @@ export const sendMessage = mutation({
     if (!room) throw new Error("الغرفة غير موجودة");
     if (room.archived) throw new Error("الغرفة مُؤرشفة");
     if (!room.members.includes(userId)) throw new Error("أنت لست عضواً في هذه الغرفة");
+
+    // 🏛️ v10.0 — بوابة الغرفة المتقدمة: إغلاق/قفل/تقييد/وضع بطيء + تحديث الإحصاءات
+    const gate = await enforceRoomSend(ctx, roomId, userId);
+    if (!gate.ok) throw new Error(gate.reason);
 
     const user = await ctx.db.get(userId);
 
@@ -198,6 +205,18 @@ export const sendMessage = mutation({
 
     // مراقبة الالتزام بالقوانين — فحص تلقائي فوري لكل رسالة
     const enforcement = await enforceChatMessage(ctx, userId, roomId, content.slice(0, 2000));
+
+    // 🧵 ربط الرسالة بموضوعها إن أُرسلت داخل موضوع — يجعل المواضيع حقيقية
+    if (topicId) {
+      const topic = await ctx.db.get(topicId);
+      if (topic && topic.roomId === roomId && topic.status === "open") {
+        await ctx.db.insert("roomTopicLinks", { roomId, topicId, messageId, at: Date.now() });
+        await ctx.db.patch(topicId, {
+          messageCount: topic.messageCount + 1,
+          lastMessageAt: Date.now(),
+        });
+      }
+    }
 
     return {
       messageId,
@@ -379,6 +398,14 @@ export const joinRoom = mutation({
     const room = await ctx.db.get(roomId);
     if (!room) throw new Error("الغرفة غير موجودة");
     if (room.archived) throw new Error("الغرفة مُؤرشفة");
+    // 🏛️ v10.0 — الغرف المتقدمة غير المفتوحة تُدخل برابط دعوة صالح عبر joinRoomV2
+    const profile = await ctx.db
+      .query("roomProfiles")
+      .withIndex("by_room", (q) => q.eq("roomId", roomId))
+      .first();
+    if (profile && profile.visibility !== "open") {
+      throw new Error("هذه الغرفة بدعوة — ادخل عبر رابط الدعوة");
+    }
     if (room.type === "private") throw new Error("هذه غرفة خاصة");
     if (room.type === "password" && room.password !== password) {
       throw new Error("كلمة المرور خاطئة");

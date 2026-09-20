@@ -51,6 +51,7 @@ import StorePage from "@/components/StorePage";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  BrainCircuit,
   Copy,
   Crown,
   Download,
@@ -753,6 +754,26 @@ export default function Play() {
                   <Link to="/rooms">
                     <MessageSquare className="size-3" />
                     افتح الغرف
+                  </Link>
+                </Button>
+              </div>
+
+              {/* 🧠 ملتقى العقول — الواجهة المجتمعية (نقاشات، تحديات، اقتراحات) */}
+              <div className="mt-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🧠</span>
+                  <p className="text-sm font-bold">ملتقى العقول</p>
+                  <span className="ms-auto rounded-full border border-sky-500/30 px-2 py-0.5 text-[10px] text-sky-600">
+                    جديد
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  نقاشات · تحديات جماعية · اقتراحات تُصوَّت · غرف مميزة — واكتسب سمعة ورتبة في المجتمع
+                </p>
+                <Button asChild size="sm" variant="ghost" className="mt-2 gap-1.5 rounded-xl text-sky-600">
+                  <Link to="/forum">
+                    <BrainCircuit className="size-3" />
+                    ادخل الملتقى
                   </Link>
                 </Button>
               </div>
