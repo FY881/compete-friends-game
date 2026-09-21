@@ -2,6 +2,7 @@ import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { sovereignTables } from "./schemaAppend";
 import { roomForumTables } from "./schemaRooms";
+import { miniGameTables } from "./schemaMiniGames";
 import { tierValidator } from "./tiers";
 
 /**
@@ -306,4 +307,6 @@ export const premiumTables = {
 
   // 🏛️ v10.0 — الغرف الخاصة المتقدمة + ملتقى العقول
   ...roomForumTables,
+  // 🎮 v14.0 — الألعاب المصغّرة: نتائج حقيقية + سقف خبرة يومي
+  ...miniGameTables,
 };

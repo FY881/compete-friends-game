@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,17 +10,15 @@ import { toast } from "sonner";
 import {
   ArrowLeft,
   BrainCircuit,
-  Crown,
   Target,
   Flame,
   Gamepad2,
-  Loader2,
   Sparkles,
   Star,
   Trophy,
   Zap,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { GAME_CATEGORIES, type MiniGameDef } from "@/components/game/MiniGames";
 
 const DIFFICULTY_STYLES: Record<string, string> = {
@@ -36,25 +34,66 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 };
 
 export default function MiniGames() {
-  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeGame, setActiveGame] = useState<MiniGameDef | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
   const myMembership = useQuery(api.memberships.getMyMembership);
+  // 🎮 v14.0 — الربط الحقيقي: النتيجة تذهب للخادم، والخبرة تُدفع فعلاً
+  const board = useQuery(api.miniGames.getMyMiniGameBoard);
+  const hallOfFame = useQuery(api.miniGames.miniGameHallOfFame);
+  const submitResult = useMutation(api.miniGames.submitMiniGameResult);
+
+  const serverGames = board?.signedIn ? board.games : {};
+  const bestFor = (id: string) => serverGames[id]?.bestScore ?? scores[id] ?? 0;
 
   // ترتيب العضويات من الأقل إلى الأعلى
-  const TIER_ORDER = ["bronze", "silver", "gold", "diamond", "exclusive"] as const;
-  const myTierIndex = myMembership ? TIER_ORDER.indexOf(myMembership.tier as any) : -1;
+  const TIER_ORDER: readonly string[] = ["bronze", "silver", "gold", "diamond", "exclusive"];
+  const myTierIndex = myMembership ? TIER_ORDER.indexOf(myMembership.tier) : -1;
 
   const category = GAME_CATEGORIES.find(c => c.id === selectedCategory);
 
-  const handleGameComplete = (gameId: string, score: number, _timeTaken: number) => {
+  /**
+   * 🎮 كل نتيجة صارت تُسجَّل في الخادم وتُدفع خبرتها فعلاً.
+   * الرقم المعروض في التوست هو **ما دفعه الخادم** لا ما وعدت به الواجهة.
+   * ولأن الزمن بالمللي ثانية أصلاً، لا تحويل هنا — فيبقى فحص الزمن صادقاً.
+   */
+  const handleGameComplete = (game: MiniGameDef, score: number, timeTaken: number) => {
     setScores(prev => ({
       ...prev,
-      [gameId]: Math.max(prev[gameId] ?? 0, score),
+      [game.id]: Math.max(prev[game.id] ?? 0, score),
     }));
-    toast.success(`أحسنت! حصلت على ${score} نقطة 🎉`);
     setActiveGame(null);
+
+    const categoryId = GAME_CATEGORIES.find((c) => c.games.some((g) => g.id === game.id))?.id ?? "general";
+
+    if (!board?.signedIn) {
+      toast.message(`نتيجتك ${score} — لكنها لم تُحفظ`, {
+        description: "سجّل الدخول ليُسجَّل رقمك في الصدارة وتُدفع لك الخبرة فعلاً.",
+      });
+      return;
+    }
+
+    void (async () => {
+      try {
+        const res = await submitResult({
+          gameId: game.id,
+          category: categoryId,
+          difficulty: game.difficulty,
+          score,
+          timeMs: Math.max(0, Math.round(timeTaken)),
+          timeLimitSeconds: game.timeLimit,
+        });
+        if (res.xp > 0) {
+          toast.success(`+${res.xp} خبرة حقيقية 🎉`, {
+            description: `${res.reason}${res.isNewBest ? " · رقم قياسي جديد!" : ""} · ترتيبك ${res.rank} · متبقٍ لك اليوم ${res.remainingToday}`,
+          });
+        } else {
+          toast.message(`النتيجة ${score} — بلا خبرة هذه المرة`, { description: res.reason });
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "تعذّر حفظ النتيجة");
+      }
+    })();
   };
 
   // Active game view
@@ -79,7 +118,7 @@ export default function MiniGames() {
         </header>
         <main className="mx-auto max-w-5xl px-5 py-10">
           <GameComponent
-            onComplete={(score, timeTaken) => handleGameComplete(activeGame.id, score, timeTaken)}
+            onComplete={(score, timeTaken) => handleGameComplete(activeGame, score, timeTaken)}
             onExit={() => setActiveGame(null)}
           />
         </main>
@@ -139,10 +178,10 @@ export default function MiniGames() {
                           {game.description}
                         </p>
                       </div>
-                      {scores[game.id] != null && (
+                      {bestFor(game.id) > 0 && (
                         <Badge variant="outline" className="shrink-0 gap-1 text-primary">
                           <Star className="size-3" />
-                          {scores[game.id]}
+                          {bestFor(game.id)}
                         </Badge>
                       )}
                     </div>
@@ -152,7 +191,7 @@ export default function MiniGames() {
                       </Badge>
                       <Badge variant="outline" className="rounded-full text-[10px]">
                         <Zap className="size-3" />
-                        {game.xpReward} XP
+                        خبرة حسب نتيجتك
                       </Badge>
                       <Badge variant="outline" className="rounded-full text-[10px]">
                         ⏱ {game.timeLimit}ث
@@ -235,6 +274,60 @@ export default function MiniGames() {
               </Badge>
             </div>
           </div>
+        </section>
+
+        {/* 🎮 الحقيقة الحيّة: خبرتك اليوم + أفضل اللاعبين — من الخادم لا من الذاكرة */}
+        <section className="mt-8 grid gap-4 lg:grid-cols-2">
+          <Card className="border-border/80">
+            <CardContent className="p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-2 text-sm font-bold tracking-tight">
+                  <Zap className="size-4 text-primary" /> خبرتك اليوم من الألعاب المصغّرة
+                </p>
+                <Badge variant="outline" className="rounded-full text-[10px]">
+                  {board?.signedIn ? `${board.daily.xpEarned} / ${board.cap} XP` : "سجّل الدخول"}
+                </Badge>
+              </div>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${board?.signedIn && board.cap > 0 ? Math.max(2, Math.round((board.daily.xpEarned / board.cap) * 100)) : 2}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {board?.signedIn
+                  ? `متبقٍ لك ${board.daily.remaining} خبرة اليوم · لعبت ${board.daily.plays} جولة. أول لعب لكل لعبة يعطي الخبرة كاملة، ثم تقلّ العوائد، والسقف اليومي ${board.cap} — فلا مزرعة خبرة.`
+                  : "كل نتيجة تُسجَّل في الخادم وتُدفع خبرتها فعلاً بعد تسجيل الدخول — لا شيء يُفقد بالتحديث."}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/80">
+            <CardContent className="p-5">
+              <p className="flex items-center gap-2 text-sm font-bold tracking-tight">
+                <Trophy className="size-4 text-amber-500" /> قاعة مشاهير الألعاب المصغّرة
+              </p>
+              {!hallOfFame || hallOfFame.length === 0 ? (
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  لا نتائج مسجّلة بعد — كن أول من يدخل القاعة بلعبة واحدة.
+                </p>
+              ) : (
+                <ol className="mt-3 space-y-1.5">
+                  {hallOfFame.map((p, i) => (
+                    <li key={p.userId} className="flex items-center gap-2 text-[11px]">
+                      <span className="w-5 shrink-0 text-center font-bold tabular-nums text-muted-foreground">
+                        {i + 1}
+                      </span>
+                      <span className="shrink-0">{p.avatar}</span>
+                      <span className="min-w-0 flex-1 truncate font-bold">{p.name}</span>
+                      <span className="shrink-0 text-muted-foreground tabular-nums">{p.games} لعبة</span>
+                      <span className="shrink-0 font-bold tabular-nums text-primary">{p.score}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
         </section>
 
         {/* Categories Grid */}
