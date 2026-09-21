@@ -18,8 +18,54 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-/** بادئات معرّفات الألعاب المصغّرة الحقيقية (٨ فئات × ١٢ لعبة) */
+/** بادئات معرّفات الألعاب المصغّرة الحقيقية (٨ فئات بإجمالي ٩٩ لعبة) */
 export const MINI_GAME_PREFIXES = ["ch", "exp", "mem", "num", "spd", "stg", "vis", "wrd"] as const;
+
+/**
+ * فضاء المعرّفات الفعلي: كل بادئة وأعلى رقم فيها كما هي في الواجهة.
+ * مُشتقّ من ملف الواجهة الحقيقي، واختبار الانحراف يتحقق من مطابقته له تماماً —
+ * فإن أُضيفت لعبة جديدة في الواجهة ولم تُحدَّث هذه القائمة، يسقط الاختبار.
+ */
+export const MINI_GAME_ID_SPACE: readonly { prefix: string; max: number }[] = [
+  { prefix: "ch", max: 12 },
+  { prefix: "exp", max: 12 },
+  { prefix: "mem", max: 15 },
+  { prefix: "num", max: 12 },
+  { prefix: "spd", max: 12 },
+  { prefix: "stg", max: 12 },
+  { prefix: "vis", max: 12 },
+  { prefix: "wrd", max: 12 },
+];
+
+/** إجمالي الألعاب الحقيقية (٩٩) */
+export const MINI_GAME_TOTAL = MINI_GAME_ID_SPACE.reduce((s, p) => s + p.max, 0);
+
+/** ✅ كل معرّفات الألعاب الحقيقية — مصدر واحد يُبنى منه يوم التحدّي */
+export function allMiniGameIds(): string[] {
+  const out: string[] = [];
+  for (const { prefix, max } of MINI_GAME_ID_SPACE) {
+    for (let i = 1; i <= max; i += 1) out.push(`${prefix}${i}`);
+  }
+  return out;
+}
+
+/** مزية اليوم المميز: مضاعف واحد مطبَّق مرّة واحدة في اليوم */
+export const MINI_GAME_FEATURED_MULTIPLIER = 1.5;
+
+/**
+ * 🗓️ لعبة اليوم — اختيار حتمي من نفس العيّنة لكل اللاعبين في نفس اليوم.
+ * لا عشوائية في الخادم (فلا يختلف لاعبان)، ولا اختيار من الواجهة (فلا تلاعب).
+ */
+export function dailyFeaturedGame(day: string): string {
+  const ids = allMiniGameIds();
+  let hash = 2166136261;
+  for (const ch of day) {
+    hash ^= ch.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const idx = Math.abs(hash) % ids.length;
+  return ids[idx];
+}
 
 /** سقف الخبرة اليومي من الألعاب المصغّرة كلها */
 export const MINI_GAME_DAILY_XP_CAP = 300;
@@ -67,6 +113,8 @@ export interface MiniGameRewardInput {
   timeMs: number;
   /** حدّ اللعبة بالثواني (كما هي معلنة في الواجهة) */
   timeLimitSeconds: number;
+  /** هل هذه هي لعبة اليوم المميزة؟ (مضاعف مطبَّق مرّة واحدة) */
+  featured?: boolean;
 }
 
 export interface MiniGameReward {
@@ -115,7 +163,9 @@ export function rewardForMiniGame(input: MiniGameRewardInput): MiniGameReward {
 
   const freshness = freshnessForPlays(input.playsTodayForGame);
   const base = Math.min(MINI_GAME_MAX_BASE_XP, Math.round(score / 10)) * difficultyMultiplier(input.difficulty);
-  const beforeCap = Math.max(0, Math.round(base * freshness));
+  // 🗓️ لعبة اليوم المميزة: مضاعف واحد، ولا يعمل إلا على أول لعب اليوم لها
+  const featuredBoost = input.featured === true && input.playsTodayForGame === 0 ? MINI_GAME_FEATURED_MULTIPLIER : 1;
+  const beforeCap = Math.max(0, Math.round(base * freshness * featuredBoost));
 
   if (beforeCap === 0) {
     return none("لعبتها كثيراً اليوم — نتيجتك تُسجَّل بلا خبرة، وعُد غداً.", { fatigued: true, freshness: 0 });
@@ -130,6 +180,7 @@ export function rewardForMiniGame(input: MiniGameRewardInput): MiniGameReward {
   const cappedByDaily = xp < beforeCap;
 
   const parts: string[] = [`${score} نقطة × صعوبة ${input.difficulty}`];
+  if (featuredBoost > 1) parts.push(`مكافأة لعبة اليوم ×${featuredBoost}`);
   if (freshness < 1) parts.push(`تكرار اليوم (${Math.round(freshness * 100)}٪)`);
   if (cappedByDaily) parts.push(`السقف اليومي قصّها إلى ${xp}`);
 

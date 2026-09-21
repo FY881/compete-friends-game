@@ -13,6 +13,7 @@ import {
   Target,
   Flame,
   Gamepad2,
+  Loader2,
   Sparkles,
   Star,
   Trophy,
@@ -41,7 +42,18 @@ export default function MiniGames() {
   // 🎮 v14.0 — الربط الحقيقي: النتيجة تذهب للخادم، والخبرة تُدفع فعلاً
   const board = useQuery(api.miniGames.getMyMiniGameBoard);
   const hallOfFame = useQuery(api.miniGames.miniGameHallOfFame);
+  // 🗓️ لعبة اليوم: نفسها لكل اللاعبين، ومضاعفها حقيقي ويُطبَّق مرّة واحدة
+  const featured = useQuery(api.miniGames.miniGameDailyFeatured);
   const submitResult = useMutation(api.miniGames.submitMiniGameResult);
+
+  // كل الألعاب مسطّحة للبحث السريع (لعبة اليوم، وصدارة اللعبة المفتوحة)
+  const ALL_GAMES = GAME_CATEGORIES.flatMap((c) => c.games);
+  const featuredGame = featured ? ALL_GAMES.find((g) => g.id === featured.gameId) ?? null : null;
+  // 🏆 صدارة اللعبة المفتوحة الآن (تُقرأ من الخادم لا من الذاكرة)
+  const gameTop = useQuery(
+    api.miniGames.miniGameTop,
+    activeGame ? { gameId: activeGame.id, limit: 5 } : "skip",
+  );
 
   const serverGames = board?.signedIn ? board.games : {};
   const bestFor = (id: string) => serverGames[id]?.bestScore ?? scores[id] ?? 0;
@@ -85,7 +97,7 @@ export default function MiniGames() {
         });
         if (res.xp > 0) {
           toast.success(`+${res.xp} خبرة حقيقية 🎉`, {
-            description: `${res.reason}${res.isNewBest ? " · رقم قياسي جديد!" : ""} · ترتيبك ${res.rank} · متبقٍ لك اليوم ${res.remainingToday}`,
+            description: `${res.featured ? "🗓️ لعبة اليوم! " : ""}${res.reason}${res.isNewBest ? " · رقم قياسي جديد!" : ""} · ترتيبك ${res.rank} · متبقٍ لك اليوم ${res.remainingToday}`,
           });
         } else {
           toast.message(`النتيجة ${score} — بلا خبرة هذه المرة`, { description: res.reason });
@@ -121,6 +133,46 @@ export default function MiniGames() {
             onComplete={(score, timeTaken) => handleGameComplete(activeGame, score, timeTaken)}
             onExit={() => setActiveGame(null)}
           />
+
+          {/* 🏆 صدارة هذه اللعبة — أفضل ٥ نتائج حقيقية مع أسمائهم */}
+          <section className="mt-8">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Trophy className="size-4 text-amber-500" />
+              <h2 className="text-sm font-bold tracking-tight">صدارة هذه اللعبة</h2>
+              <Badge variant="outline" className="rounded-full text-[10px]">
+                أفضل نتيجة مسجّلة لكل لاعب
+              </Badge>
+              {bestFor(activeGame.id) > 0 && (
+                <Badge variant="outline" className="rounded-full text-[10px] text-primary">
+                  أفضل نتيجتك {bestFor(activeGame.id)}
+                </Badge>
+              )}
+            </div>
+            {gameTop === undefined ? (
+              <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" /> نقرأ الصدارة…
+              </p>
+            ) : gameTop.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                لا نتيجة مسجّلة في هذه اللعبة بعد — كن أول اسم يدخلها.
+              </p>
+            ) : (
+              <ol className="space-y-1.5">
+                {gameTop.map((p, i) => (
+                  <li
+                    key={p.userId}
+                    className="flex items-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2 text-[11px]"
+                  >
+                    <span className="w-5 text-center font-bold tabular-nums text-muted-foreground">{i + 1}</span>
+                    <span className="shrink-0">{p.avatar}</span>
+                    <span className="min-w-0 flex-1 truncate font-bold">{p.name}</span>
+                    <span className="shrink-0 text-muted-foreground tabular-nums">{p.plays} جولة</span>
+                    <span className="shrink-0 font-black tabular-nums text-primary">{p.score}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
         </main>
       </div>
     );
@@ -275,6 +327,64 @@ export default function MiniGames() {
             </div>
           </div>
         </section>
+
+        {/* 🗓️ لعبة اليوم — نفسها لكل اللاعبين، ومضاعف حقيقي يرجعك غداً */}
+        {featured && featuredGame && (
+          <section className="mt-8">
+            <Card className="overflow-hidden border-amber-500/40 bg-amber-500/[0.04]">
+              <CardContent className="p-5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <Badge className="gap-1.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                    <Flame className="size-3.5" /> لعبة اليوم
+                  </Badge>
+                  <h2 className="text-lg font-bold tracking-tight">{featuredGame.name}</h2>
+                  <Badge variant="outline" className="rounded-full text-[10px]">
+                    {DIFFICULTY_LABELS[featuredGame.difficulty]} · ⏱ {featuredGame.timeLimit}ث
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full text-[10px] text-amber-700 dark:text-amber-400">
+                    <Zap className="size-3" /> مضاعف ×{featured.multiplier} على أول لعب لك اليوم
+                  </Badge>
+                  <Button
+                    size="sm"
+                    className="ms-auto rounded-xl"
+                    onClick={() => {
+                      const cat = GAME_CATEGORIES.find((c) => c.games.some((g) => g.id === featuredGame.id));
+                      if (cat) setSelectedCategory(cat.id);
+                      setActiveGame(featuredGame);
+                    }}
+                  >
+                    العب الآن
+                  </Button>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  {featured.why} التبديل اليومي حتمي في الخادم، فلا يختلف لاعبان على نفس اللعبة.
+                </p>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px]">
+                  {featured.mine ? (
+                    <span className={cn("font-bold", featured.mine.multiplierLeft ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+                      {featured.mine.multiplierLeft
+                        ? "المضاعف ما زال بيدك — لم تلعبها اليوم بعد"
+                        : `لعبتها ${featured.mine.playsToday} مرة اليوم · أفضل نتيجة ${featured.mine.bestToday}`}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">سجّل الدخول ليُحتسب مضاعفك ورقمك في صدارة اليوم.</span>
+                  )}
+                  {featured.board.length > 0 && (
+                    <span className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                      <Trophy className="size-3.5 text-amber-500" /> صدارة اليوم:
+                      {featured.board.map((p) => (
+                        <span key={p.userId} className="rounded-lg bg-muted/50 px-2 py-0.5">
+                          {p.name} <b className="tabular-nums">{p.score}</b>
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
 
         {/* 🎮 الحقيقة الحيّة: خبرتك اليوم + أفضل اللاعبين — من الخادم لا من الذاكرة */}
         <section className="mt-8 grid gap-4 lg:grid-cols-2">

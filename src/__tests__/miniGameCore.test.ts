@@ -3,9 +3,13 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   MINI_GAME_DAILY_XP_CAP,
+  MINI_GAME_FEATURED_MULTIPLIER,
   MINI_GAME_MAX_SCORE,
   MINI_GAME_MIN_SCORE,
   MINI_GAME_TIME_SLACK_SECONDS,
+  MINI_GAME_TOTAL,
+  allMiniGameIds,
+  dailyFeaturedGame,
   difficultyMultiplier,
   freshnessForPlays,
   isKnownMiniGameId,
@@ -158,12 +162,73 @@ describe("remainingDailyXp", () => {
  * الغرض: إن أضاف أحدهم لعبة جديدة بمعرّف لا يقبله الخادم، تسقط النتائج
  * بصمت. هذا الاختبار يجعل ذلك مستحيلاً.
  */
+function uiMiniGameIds(): string[] {
+  const raw = readFileSync(resolve(process.cwd(), "src/components/game/MiniGames.tsx"), "utf8");
+  return [...new Set([...raw.matchAll(/\{\s*id:\s*"([a-z]+[0-9]+)"/g)].map((m) => m[1]))];
+}
+
 describe("حرس الانحراف — كل لعبة في الواجهة يقبلها الخادم", () => {
   it("لا معرّف لعبة في الواجهة يرفضه الخادم", () => {
-    const raw = readFileSync(resolve(process.cwd(), "src/components/game/MiniGames.tsx"), "utf8");
-    const ids = [...raw.matchAll(/\{\s*id:\s*"([a-z]+[0-9]+)"/g)].map((m) => m[1]);
+    const ids = uiMiniGameIds();
     expect(ids.length).toBeGreaterThan(50);
-    const unknown = ids.filter((id) => !isKnownMiniGameId(id));
-    expect(unknown).toEqual([]);
+    expect(ids.filter((id) => !isKnownMiniGameId(id))).toEqual([]);
+  });
+
+  it("فضاء معرّفات الخادم يطابق الواجهة تماماً — لا زيادة ولا نقصان", () => {
+    const ui = uiMiniGameIds().sort();
+    const server = allMiniGameIds().sort();
+    expect(server).toEqual(ui);
+    expect(MINI_GAME_TOTAL).toBe(ui.length);
+  });
+});
+
+describe("🗓️ لعبة اليوم — حتمية وتغطي كل الألعاب", () => {
+  it("نفس اليوم ⇒ نفس اللعبة دائماً (لا عشوائية في الخادم)", () => {
+    for (const day of ["2026-09-21", "2026-01-01", "2027-12-31"]) {
+      expect(dailyFeaturedGame(day)).toBe(dailyFeaturedGame(day));
+    }
+  });
+
+  it("لعبة اليوم دائماً من الألعاب الحقيقية", () => {
+    const ids = new Set(allMiniGameIds());
+    for (let d = 1; d <= 28; d += 1) {
+      const day = `2026-01-${String(d).padStart(2, "0")}`;
+      const picked = dailyFeaturedGame(day);
+      expect(ids.has(picked)).toBe(true);
+      expect(isKnownMiniGameId(picked)).toBe(true);
+    }
+  });
+
+  it("يوم مختلف ⇒ لا تتجمّد على لعبة واحدة أبداً", () => {
+    const seen = new Set<string>();
+    for (let d = 1; d <= 60; d += 1) {
+      const day = new Date(Date.UTC(2026, 0, d)).toISOString().slice(0, 10);
+      seen.add(dailyFeaturedGame(day));
+    }
+    expect(seen.size).toBeGreaterThan(5);
+  });
+});
+
+describe("مضاعف لعبة اليوم — حقيقي ومحدود", () => {
+  it("المضاعف يرفع الخبرة فعلاً في أول لعب فقط", () => {
+    const plain = rewardForMiniGame({ ...base, score: 600 });
+    const featuredFirst = rewardForMiniGame({ ...base, score: 600, featured: true, playsTodayForGame: 0 });
+    const featuredRepeat = rewardForMiniGame({ ...base, score: 600, featured: true, playsTodayForGame: 1 });
+    expect(featuredFirst.xp).toBeGreaterThan(plain.xp);
+    expect(featuredFirst.reason).toContain("لعبة اليوم");
+    // إعادة اللعب لا تمنح المضاعف مجدداً
+    expect(featuredRepeat.xp).toBeLessThan(featuredFirst.xp);
+  });
+
+  it("المضاعف لا يخرق السقف اليومي أبداً", () => {
+    const r = rewardForMiniGame({
+      ...base,
+      score: 100000,
+      featured: true,
+      playsTodayForGame: 0,
+      xpEarnedToday: MINI_GAME_DAILY_XP_CAP - 1,
+    });
+    expect(r.xp).toBeLessThanOrEqual(1);
+    expect(MINI_GAME_FEATURED_MULTIPLIER).toBeGreaterThan(1);
   });
 });

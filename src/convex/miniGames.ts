@@ -19,7 +19,10 @@ import type { Id } from "./_generated/dataModel";
 import { isOwnerUser } from "./owner";
 import {
   MINI_GAME_DAILY_XP_CAP,
+  MINI_GAME_FEATURED_MULTIPLIER,
   MINI_GAME_MAX_SCORE,
+  MINI_GAME_TOTAL,
+  dailyFeaturedGame,
   isKnownMiniGameId,
   isMiniGameDifficulty,
   remainingDailyXp,
@@ -98,13 +101,18 @@ export const submitMiniGameResult = mutation({
       .withIndex("by_user_day_game", (q) => q.eq("userId", meId).eq("day", day).eq("gameId", gameId))
       .first();
 
+    const playsTodayForGame = perGame?.plays ?? 0;
+    // 🗓️ لعبة اليوم تُحدَّد هنا في الخادم — لا يقبل ادّعاءً من الواجهة
+    const featured = gameId === dailyFeaturedGame(day);
+
     const reward = rewardForMiniGame({
       score: args.score,
       difficulty: args.difficulty,
-      playsTodayForGame: perGame?.plays ?? 0,
+      playsTodayForGame,
       xpEarnedToday: daily?.xpEarned ?? 0,
       timeMs: args.timeMs,
       timeLimitSeconds: Number.isFinite(args.timeLimitSeconds) ? args.timeLimitSeconds : 0,
+      featured,
     });
 
     // (١) عدّاد تكرار اللعب اليوم — حتى المحاولة بلا خبرة تُحسب (فتصبح العوائد أصدق)
@@ -176,6 +184,8 @@ export const submitMiniGameResult = mutation({
       reason: reward.reason,
       cappedByDaily: reward.cappedByDaily,
       fatigued: reward.fatigued,
+      featured,
+      featuredMultiplier: featured && playsTodayForGame === 0 ? MINI_GAME_FEATURED_MULTIPLIER : 1,
       bestScore,
       isNewBest,
       rank,
@@ -235,6 +245,63 @@ export const getMyMiniGameBoard = query({
       daily: { xpEarned, plays: daily?.plays ?? 0, remaining: remainingDailyXp(xpEarned) },
       games,
       perGameToday,
+    };
+  },
+});
+
+/**
+ * 🗓️ لعبة اليوم — نفس اللعبة لكل اللاعبين في نفس اليوم (حتمية لا عشوائية)،
+ * ومضاعف حقيقي يُطبَّق مرّة واحدة. وهذا يعطي سبباً واضحاً للعودة كل يوم.
+ * ويعيد ترتيب اليوم فيها: أعلى نتيجة سُجّلت **اليوم** لا منذ الأزل.
+ */
+export const miniGameDailyFeatured = query({
+  args: {},
+  handler: async (ctx) => {
+    const day = dayKeyUtc();
+    const gameId = dailyFeaturedGame(day);
+    const dayStart = Date.parse(`${day}T00:00:00.000Z`);
+
+    // أعلى نتائج اليوم لهذه اللعبة — تُفلتر من آخر ٢٠٠ محاولة بفهرس اللعبة
+    const recent = await ctx.db
+      .query("miniGameResults")
+      .withIndex("by_game_score", (q) => q.eq("gameId", gameId))
+      .order("desc")
+      .take(60);
+    const todayRows = recent.filter((r) => r.lastPlayedAt >= dayStart);
+    const board: { userId: string; name: string; score: number }[] = [];
+    for (const r of todayRows.slice(0, 5)) {
+      const u = await ctx.db.get(r.userId);
+      board.push({ userId: r.userId as unknown as string, name: u?.name ?? "لاعب", score: r.lastScore });
+    }
+
+    const meId = await getAuthUserId(ctx);
+    let mine: { bestToday: number; playsToday: number; xpToday: number; multiplierLeft: boolean } | null = null;
+    if (meId) {
+      const mineRow = await ctx.db
+        .query("miniGameResults")
+        .withIndex("by_user_game", (q) => q.eq("userId", meId).eq("gameId", gameId))
+        .first();
+      const perGame = await ctx.db
+        .query("miniGameDailyPerGame")
+        .withIndex("by_user_day_game", (q) => q.eq("userId", meId).eq("day", day).eq("gameId", gameId))
+        .first();
+      const playsToday = perGame?.plays ?? 0;
+      mine = {
+        bestToday: mineRow && mineRow.lastPlayedAt >= dayStart ? mineRow.lastScore : 0,
+        playsToday,
+        xpToday: mineRow && mineRow.lastPlayedAt >= dayStart ? mineRow.xpEarned : 0,
+        multiplierLeft: playsToday === 0,
+      };
+    }
+
+    return {
+      day,
+      gameId,
+      multiplier: MINI_GAME_FEATURED_MULTIPLIER,
+      catalogSize: MINI_GAME_TOTAL,
+      board,
+      mine,
+      why: "لعبة اليوم نفسها لكل اللاعبين، ومضاعفها يُطبَّق على أول لعب لك فيها اليوم فقط.",
     };
   },
 });
