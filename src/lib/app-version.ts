@@ -128,7 +128,12 @@ export function resolveApkUrl(
   const file = fileName ?? APK_FALLBACK_FILE;
   const cleanSite = (siteUrl ?? "").trim().replace(/\/+$/, "");
 
-  if (typeof window !== "undefined" && window.location?.origin && !isNativeApp()) {
+  if (
+    typeof window !== "undefined" &&
+    window.location?.origin &&
+    !isNativeApp() &&
+    apkAssetUrl // الملف المدمج فقط إن كان موجوداً فعلاً — الفراغ يعني «لا يوجد»
+  ) {
     return `${window.location.origin}${apkAssetUrl}`;
   }
 
@@ -168,13 +173,16 @@ export function getApkDownloadCandidates(
   if (isNativeApp()) {
     // الأصلي: الموقع الرسمي أولاً (أحدث نسخة)، ثم الملف المضمّن داخل التطبيق.
     if (isHttpUrl(cleanSite)) push(`${cleanSite}/downloads/${file}`);
-    if (origin) push(`${origin}${apkAssetUrl}`);
+    if (origin && apkAssetUrl) push(`${origin}${apkAssetUrl}`);
     if (origin) push(`${origin}/downloads/${file}`);
   } else {
-    // الويب: مسار الأصول مضمون في كل البيئات، ثم المسار المباشر، ثم الموقع الرسمي.
-    if (origin) push(`${origin}${apkAssetUrl}`);
+    // الويب: الملف المدمج إن وُجد، ثم المسار المباشر، ثم الموقع الرسمي.
+    // ⚠️ لا نضع ${origin} وحيداً أبداً — كان يُجلب HTML الصفحة كملف APK!
+    if (origin && apkAssetUrl) push(`${origin}${apkAssetUrl}`);
     if (origin) push(`${origin}/downloads/${file}`);
     if (isHttpUrl(cleanSite)) push(`${cleanSite}/downloads/${file}`);
+    // المرآة الرسمية أخيراً — مصدر الحقيقة عند غياب الملف على النطاق.
+    push(APK_PRIMARY_DOWNLOAD_URL);
   }
   return candidates;
 }
@@ -342,7 +350,12 @@ export async function downloadApk(
     ...getApkDownloadCandidates(file, siteUrl),
   ];
 
+  // قيم السلامة الرسمية: من الخادم أولاً ثم الثوابت المبنية.
+  const expectedSha = integrity?.sha256 || APK_SHA256;
+  const expectedBytes = integrity?.bytes || APK_BYTES;
+
   // جرّب كل مصدر بالترتيب: fetch + blob (يعمل على كل الأجهزة).
+  let lastDiag: { size: number; hash: string | null } | null = null;
   for (const url of candidates) {
     try {
       const response = await fetch(withCacheBuster(url), {
@@ -352,8 +365,24 @@ export async function downloadApk(
       });
       if (!response.ok) continue;
       const blob = await response.blob();
-      // تأكد أن الملف حجمه معقول (أكبر من 100KB — APK حقيقي).
-      if (blob.size < 100_000) continue;
+      // فحص ١ — الحجم: إن عرفنا الحجم الرسمي فلا يُقبل إلا تطابقه تماماً.
+      if (expectedBytes > 0 && blob.size !== expectedBytes) {
+        lastDiag = { size: blob.size, hash: null };
+        continue;
+      }
+      // حد أدنى احتياطي إن غاب الحجم الرسمي (APK حقيقي أكبر من ١ ميجابايت).
+      if (expectedBytes <= 0 && blob.size < 1_000_000) continue;
+      // فحص ٢ — التوقيع الثنائي: صفحة HTML/خطأ لا تبدأ بـ «PK» ⇒ مرفوضة فوراً.
+      if (!(await looksLikeApk(blob))) {
+        lastDiag = { size: blob.size, hash: null };
+        continue;
+      }
+      // فحص ٣ — البصمة: أي بايت مختلف ⇒ الملف مرفوض قبل وصوله للهاتف.
+      const hash = await sha256Hex(blob);
+      if (hash && hash !== expectedSha) {
+        lastDiag = { size: blob.size, hash };
+        continue;
+      }
       triggerBlobDownload(blob, safeName);
       return;
     } catch {
@@ -362,8 +391,14 @@ export async function downloadApk(
   }
 
   throw new DownloadError(
-    "تعذّر التنزيل — تحقق من اتصال الإنترنت وحاول مرة أخرى.",
-    { sourceUrl: candidates[0] },
+    lastDiag
+      ? `الملف المُنزّل تالف أو مختلف عن النسخة الرسمية (الحجم: ${Math.round(lastDiag.size / 1024)}KB). أُعيد المحاولة من مصدر آخر تلقائياً — وإن تكرر فامسح كاش المتصفح من الإعدادات.`
+      : "تعذّر التنزيل — تحقق من اتصال الإنترنت وحاول مرة أخرى.",
+    {
+      receivedSize: lastDiag?.size,
+      receivedHash: lastDiag?.hash ?? undefined,
+      sourceUrl: candidates[0],
+    },
   );
 }
 
