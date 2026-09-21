@@ -57,7 +57,7 @@ export function DownloadsTab() {
   }
   if (health === null) return null;
 
-  const { official, reports } = health;
+  const { official, reports, sync } = health;
 
   const copyValue = async (label: string, value: string) => {
     try {
@@ -86,6 +86,45 @@ export function DownloadsTab() {
           </p>
         </div>
       </div>
+
+      {/* 🔄 حالة مزامنة الملف — حقيقية من الخادم */}
+      <Card
+        className={cn(
+          "border-border/80 shadow-sm",
+          sync?.lastError ? "border-amber-500/40" : "border-emerald-500/30",
+        )}
+      >
+        <CardContent className="flex flex-wrap items-center gap-3 p-4">
+          {sync?.lastError ? (
+            <>
+              <AlertTriangle className="size-5 shrink-0 text-amber-500" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-amber-700">آخر مزامنة فشلت</p>
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={sync.lastError}>
+                  {sync.lastError}
+                </p>
+              </div>
+            </>
+          ) : sync?.lastSyncAt ? (
+            <>
+              <CheckCircle2 className="size-5 shrink-0 text-emerald-500" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-emerald-700">الملف متزامن مع التخزين الدائم</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  آخر مزامنة ناجحة: {fmtDate(sync.lastSyncAt)} · التخزين: {sync.storageLinked ? "مربوط ✅" : "غير مربوط ⚠️"}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="size-5 shrink-0 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                لم تُسجَّل مزامنة بعد — يعتمد التنزيل حالياً على المرآة والمسار الثابت.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Official values */}
       <Card className="border-border/80 shadow-sm">

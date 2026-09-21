@@ -756,11 +756,11 @@ export const getSettings = query({
     // النظامان المضبوطان في مركز API (Settings) — وليس أي متغير بيئة قديم
     const sysA = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q: any) => q.eq("key", "apiSystemA"))
+      .withIndex("by_key", (q) => q.eq("key", "apiSystemA"))
       .first();
     const sysB = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q: any) => q.eq("key", "apiSystemB"))
+      .withIndex("by_key", (q) => q.eq("key", "apiSystemB"))
       .first();
     return {
       ...settings,
@@ -861,6 +861,12 @@ export const getDownloadHealth = query({
       .order("desc")
       .take(Math.min(limit ?? 15, 50));
 
+    // 🔄 حالة مزامنة الملف الفعلية — من جدول apkRelease (آخر نجاح/فشل)
+    const release = await ctx.db
+      .query("apkRelease")
+      .withIndex("by_key", (q) => q.eq("key", "current"))
+      .first();
+
     return {
       official: {
         fileName: APK_FILE_NAME,
@@ -868,6 +874,11 @@ export const getDownloadHealth = query({
         bytes: APK_BYTES,
         version: CURRENT_VERSION,
         buildId: BUILD_ID,
+      },
+      sync: {
+        lastSyncAt: release?.lastSyncAt ?? null,
+        lastError: release?.lastError ?? null,
+        storageLinked: !!release?.storageId,
       },
       reports: rows.map((r) => ({
         id: r._id,

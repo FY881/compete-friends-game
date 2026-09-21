@@ -5,7 +5,6 @@ import {
   APP_VERSION,
   APP_VERSION_LABEL,
   APK_BYTES,
-  APK_FALLBACK_FILE,
   APK_PRIMARY_DOWNLOAD_URL,
   APK_SHA256,
   APK_VERSION,
@@ -18,7 +17,6 @@ import { UpdateBanner } from "@/components/UpdateBanner";
 import { toast } from "sonner";
 import {
   AlertTriangle,
-  ArrowLeft,
   BrainCircuit,
   Check,
   Download as DownloadIcon,
@@ -43,7 +41,6 @@ export default function Download() {
   const [downloading, setDownloading] = useState(false);
   const [downloadStarted, setDownloadStarted] = useState(false);
 
-  const apkFileName = info?.apkFileName ?? APK_FALLBACK_FILE;
   // إصدار الويب (الملاحظات/اللافتات) وإصدار ملف APK الفعلي — منفصلان عمداً.
   const version = info?.version ?? APP_VERSION;
   const apkVersion = info?.apkVersion ?? APK_VERSION;
@@ -51,6 +48,14 @@ export default function Download() {
   const apkBytes = info?.apkBytes ?? APK_BYTES;
   const apkSha256 = info?.apkSha256 ?? APK_SHA256;
   const apkSizeMB = (apkBytes / (1024 * 1024)).toFixed(1);
+  // المرآة الرسمية: من الخادم (مصدر الحقيقة) مع احتياط الثابت — وإن أرسل
+  // الخادم رابط تخزين دائم فهو الأولوية.
+  const mirrorUrl = info?.apkMirrorUrl ?? APK_PRIMARY_DOWNLOAD_URL;
+  // 🔄 حالة مزامنة الملف — حقيقية من الخادم (متى آخر مزامنة ناجحة وهل فشلت)
+  const syncAt = info?.apkSyncAt ?? null;
+  const syncError = info?.apkSyncError ?? null;
+  // eslint-disable-next-line react-hooks/purity -- عرض لحظي لوقت المزامنة في نص ثابت
+  const syncHoursAgo = syncAt ? Math.floor((Date.now() - syncAt) / 3_600_000) : null;
 
   /** تنزيل فوري عبر <a download> — لا يحمّل الملف في الذاكرة أولاً. */
   const handleDownload = async () => {
@@ -170,11 +175,24 @@ export default function Download() {
                   </p>
                 </div>
               </div>
-              <Badge variant="outline" className="gap-1.5 rounded-full text-primary">
-                <ShieldCheck className="size-3" />
-                موقّع رقمياً
-              </Badge>
-            </div>
+            <Badge variant="outline" className="gap-1.5 rounded-full text-primary">
+              <ShieldCheck className="size-3" />
+              موقّع رقمياً
+            </Badge>
+          </div>
+
+          {/* 🔄 صحة مصدر التنزيل — حقيقية من الخادم لا تقديرية */}
+          {syncError ? (
+            <p className="mt-4 flex items-center gap-2 rounded-xl bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-700">
+              <AlertTriangle className="size-3.5 shrink-0" />
+              تنبيه: آخر مزامنة تلقائية للملف واجهت مشكلة — التنزيل يعمل عبر المصادر الاحتياطية تلقائياً.
+            </p>
+          ) : syncHoursAgo !== null ? (
+            <p className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-2.5 text-xs font-semibold text-emerald-700">
+              <ShieldCheck className="size-3.5 shrink-0" />
+              الملف الرسمي متزامن ومُتحقَّق منه — آخر مزامنة ناجحة: {syncHoursAgo === 0 ? "خلال الساعة الأخيرة" : `قبل ${syncHoursAgo} ساعة`}
+            </p>
+          ) : null}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <Button
@@ -222,14 +240,14 @@ export default function Download() {
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               أو حمّله مباشرة من{" "}
               <a
-                href={APK_PRIMARY_DOWNLOAD_URL}
+                href={mirrorUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold text-primary underline underline-offset-2"
               >
                 رابط التحميل المباشر
               </a>{" "}
-              (tmpfiles.org — يعمل على كل الأجهزة).
+              (المرآة الرسمية — يعمل على كل الأجهزة).
             </p>
             <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground/80" dir="ltr">
               SHA-256: {apkSha256}
