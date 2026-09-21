@@ -18,6 +18,7 @@ import { RoomsNexusPanel } from "@/components/owner/RoomsNexusPanel";
 import { ForumNexusPanel } from "@/components/owner/ForumNexusPanel";
 import { ChallengesNexusPanel } from "@/components/owner/ChallengesNexusPanel";
 import { MiniGamesNexusPanel } from "@/components/owner/MiniGamesNexusPanel";
+import { LiveRoomsNexusPanel } from "@/components/owner/LiveRoomsNexusPanel";
 
 /**
  * 💬 مراقب المجتمع الحي — الغرف النشطة + الرسائل المُعلَّمة + إجراء فوري
@@ -38,7 +39,7 @@ export function CommunityMonitor() {
   const deleteMsg = useMutation(api.chatRooms.deleteMessage);
   const [busy, setBusy] = useState<string | null>(null);
   // 👑 v10.0 — تبويب مراقبة/سيادة: عشائر · غرف خاصة · ملتقى العقول
-  const [board, setBoard] = useState<"clans" | "rooms" | "forum" | "challenges" | "minigames" | "live">("clans");
+  const [board, setBoard] = useState<"clans" | "rooms" | "forum" | "challenges" | "minigames" | "liverooms" | "live">("clans");
 
   const del = async (messageId: string) => {
     setBusy(messageId);
@@ -62,6 +63,7 @@ export function CommunityMonitor() {
           { id: "forum" as const, label: "🧠 ملتقى العقول" },
           { id: "challenges" as const, label: "⚔️ التحدّيات" },
           { id: "minigames" as const, label: "🎮 الألعاب المصغّرة" },
+          { id: "liverooms" as const, label: "🎯 الغرف الحيّة" },
           { id: "live" as const, label: "💬 البث الحي" },
         ].map((tab) => (
           <button
@@ -83,6 +85,7 @@ export function CommunityMonitor() {
       {board === "forum" && <ForumNexusPanel />}
       {board === "challenges" && <ChallengesNexusPanel />}
       {board === "minigames" && <MiniGamesNexusPanel />}
+      {board === "liverooms" && <LiveRoomsNexusPanel />}
 
       <div className={cn("space-y-5", board !== "live" && "hidden")}>
       <div className="flex flex-wrap items-center justify-between gap-3">

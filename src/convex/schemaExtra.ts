@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { sovereignTables } from "./schemaAppend";
 import { roomForumTables } from "./schemaRooms";
 import { miniGameTables } from "./schemaMiniGames";
+import { gameLiveTables } from "./schemaGameLive";
 import { tierValidator } from "./tiers";
 
 /**
@@ -309,4 +310,6 @@ export const premiumTables = {
   ...roomForumTables,
   // 🎮 v14.0 — الألعاب المصغّرة: نتائج حقيقية + سقف خبرة يومي
   ...miniGameTables,
+  // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
+  ...gameLiveTables,
 };
