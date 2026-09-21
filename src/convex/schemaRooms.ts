@@ -351,9 +351,12 @@ export const roomForumTables = {
   // ═══════════════════════════════════════════════════════════════════════
   challenges: defineTable({
     code: v.string(),
-    source: v.string(), // room | forum
+    source: v.string(), // room | forum | twin
     roomId: v.optional(v.id("chatRooms")),
     postId: v.optional(v.id("forumPosts")),
+    // 🧬 التوأم الذهني: الفئة المستهدفة فعلاً — تُفرض على بناء الأسئلة في الساحة
+    // (إن كانت فارغة فالتحدّي عام، وإن وُجدت فالأسئلة تُبنى منها لا من العشوائية).
+    category: v.optional(v.string()),
     clanId: v.optional(v.string()), // إن كان التحدّي داخل غرفة عشيرة ⇒ خزنتها تُموَّل
     title: v.string(),
     note: v.string(),

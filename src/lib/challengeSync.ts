@@ -50,6 +50,8 @@ export interface ChallengeInfo {
   myRank: number;
   mine: { played: boolean; rewarded: boolean; attempts: number; bestScore: number; label: string } | null;
   roomId: string | null;
+  /** 🧬 التوأم الذهني: الفئة المستهدفة (null = تحدٍّ عام) */
+  category: string | null;
 }
 
 export interface ChallengeSubmitResult {

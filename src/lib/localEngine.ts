@@ -338,7 +338,7 @@ export function grantCoins(amount: number): number {
  * وبلا تكرار. وإن ضاق المجمّع يكمل من باقي الصعوبات — فلا تحدٍّ ناقص.
  */
 export function buildChallengeQuestions(
-  spec: { questionCount: number; difficulty: string },
+  spec: { questionCount: number; difficulty: string; category?: string | null },
   s: SaveState,
 ): OfflineQuestion[] {
   const wanted = Math.max(5, Math.min(30, Math.floor(spec.questionCount || 10)));
@@ -351,17 +351,29 @@ export function buildChallengeQuestions(
   const order = tiers[spec.difficulty] ?? tiers.medium;
   const seen = new Set<string>();
   const out: OfflineQuestion[] = [];
-  for (const diff of order) {
+
+  // 🧬 تحدّي التوأم الذهني: الفئة المستهدفة تُفرض فعلاً على بناء الأسئلة.
+  // نبدأ بها، ثم نكمل من بقية البنك فقط إن ضاق المجمّع — فلا تحدٍّ ناقص ولا وعد كاذب.
+  const focus = (spec.category ?? "").trim();
+  const hasFocus = focus.length > 0 && OFFLINE_BANK.some((q) => q.category === focus);
+  const scopes: OfflineQuestion[][] = hasFocus
+    ? [OFFLINE_BANK.filter((q) => q.category === focus), OFFLINE_BANK]
+    : [OFFLINE_BANK];
+
+  for (const scope of scopes) {
     if (out.length >= wanted) break;
-    const pool = OFFLINE_BANK.filter((q) => q.difficulty === diff && !seen.has(q.id));
-    // نبدأ من الأسئلة التي لم يلقّها اللاعب كثيراً — التحدّي يبقى جديداً
-    const fresh = pool.filter((q) => (s.stats.categories[q.category]?.answered ?? 0) < 40);
-    const source = fresh.length >= wanted - out.length ? fresh : pool;
-    for (const q of shuffle(source)) {
+    for (const diff of order) {
       if (out.length >= wanted) break;
-      if (seen.has(q.id)) continue;
-      seen.add(q.id);
-      out.push(q);
+      const pool = scope.filter((q) => q.difficulty === diff && !seen.has(q.id));
+      // نبدأ من الأسئلة التي لم يلقّها اللاعب كثيراً — التحدّي يبقى جديداً
+      const fresh = pool.filter((q) => (s.stats.categories[q.category]?.answered ?? 0) < 40);
+      const source = fresh.length >= wanted - out.length ? fresh : pool;
+      for (const q of shuffle(source)) {
+        if (out.length >= wanted) break;
+        if (seen.has(q.id)) continue;
+        seen.add(q.id);
+        out.push(q);
+      }
     }
   }
   return out;

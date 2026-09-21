@@ -214,9 +214,28 @@ export default function Offline() {
   };
 
   /** ⚔️ يبدأ تحدّياً حقيقياً بعدد أسئلته وصعوبته المُعلنة — الأسئلة تُبنى على الصعوبة لا على العشوائية. */
+  /**
+   * 🧬 التوأم الذهني: `/arena?drill=CATEGORY` يبدأ تدريباً موجّهاً على فئة ضعفك
+   * الحقيقية فعلاً — بنفس فلتر الفئة المستخدم في أنماط الساحة (لا واجهة بلا أثر).
+   */
+  const drillCategory = searchParams.get("drill");
+  const drillStarted = useRef(false);
+  useEffect(() => {
+    if (!drillCategory || drillStarted.current) return;
+    drillStarted.current = true;
+    startMode("category", drillCategory);
+    // يُشغَّل مرة واحدة فقط عند الوصول بالرابط
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drillCategory]);
+
   const startChallengeRun = (challenge: ChallengeInfo) => {
     const questions = buildChallengeQuestions(
-      { questionCount: challenge.questionCount, difficulty: challenge.difficulty },
+      {
+        questionCount: challenge.questionCount,
+        difficulty: challenge.difficulty,
+        // 🧬 تحدّي التوأم: الفئة المستهدفة تُفرض على البناء فلا تُطلب من العشوائية
+        category: challenge.category,
+      },
       save,
     );
     if (questions.length === 0) {

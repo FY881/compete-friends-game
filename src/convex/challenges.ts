@@ -128,8 +128,10 @@ async function notify(
 // ───────────────────────────────────────────────────────────────────────
 
 export interface CreateChallengeArgs {
-  source: "room" | "forum";
+  source: "room" | "forum" | "twin";
   title: string;
+  /** 🧬 التوأم الذهني: الفئة المستهدفة — تُفرض على بناء الأسئلة في الساحة */
+  category?: string | null;
   note?: string;
   difficulty?: string | null;
   questionCount?: number | null;
@@ -173,7 +175,14 @@ export async function createChallengeRecord(
     roomId: args.roomId ?? undefined,
     postId: args.postId ?? undefined,
     clanId: args.clanId ?? undefined,
-    title: safe(args.title, 90) || (args.source === "room" ? "تحدٍّ في الغرفة" : "تحدٍّ جماعي"),
+    category: args.category ? safe(args.category, 40) : undefined,
+    title:
+      safe(args.title, 90) ||
+      (args.source === "room"
+        ? "تحدٍّ في الغرفة"
+        : args.source === "twin"
+          ? "تحدّي التوأم الذهني"
+          : "تحدٍّ جماعي"),
     note: safe(args.note ?? "", 200),
     difficulty: spec.difficulty,
     questionCount: spec.questionCount,
@@ -233,6 +242,8 @@ export const getChallenge = query({
       myRank: meId ? rankOfUser(rows, meId as unknown as string) : 0,
       mine: meId ? myChallengeState(rows, meId as unknown as string) : null,
       roomId: (row.roomId as unknown as string) ?? null,
+      // 🧬 التوأم الذهني: الفئة المستهدفة — تُمرَّر للساحة لتُبنى الأسئلة منها فعلاً
+      category: row.category ?? null,
     };
   },
 });
@@ -515,7 +526,7 @@ export const ownerListChallenges = query({
         if (filter === "open") return status === "open";
         if (filter === "expired") return status === "expired";
         if (filter === "closed") return status === "closed";
-        if (filter === "room" || filter === "forum") return r.source === filter;
+        if (filter === "room" || filter === "forum" || filter === "twin") return r.source === filter;
         return true;
       })
       .slice(0, 30)

@@ -69,6 +69,7 @@ export function ChallengesNexusPanel() {
           <span className="text-muted-foreground">إتمامات ناجحة: <span className="tabular-nums">{pulse.completions}</span></span>
           <span className="text-muted-foreground">من غرف: <span className="tabular-nums">{pulse.bySource.room ?? 0}</span></span>
           <span className="text-muted-foreground">من الملتقى: <span className="tabular-nums">{pulse.bySource.forum ?? 0}</span></span>
+          <span className="text-muted-foreground">من التوأم الذهني: <span className="tabular-nums">{pulse.bySource.twin ?? 0}</span></span>
           <span className="text-muted-foreground">منتهية: <span className="tabular-nums">{pulse.expired}</span> · مغلقة: <span className="tabular-nums">{pulse.closed}</span></span>
         </CardContent>
       </Card>
@@ -79,6 +80,7 @@ export function ChallengesNexusPanel() {
           { id: "open", label: "فعّالة" },
           { id: "room", label: "غرف" },
           { id: "forum", label: "ملتقى" },
+          { id: "twin", label: "توأم ذهني" },
           { id: "expired", label: "منتهية" },
           { id: "closed", label: "مغلقة" },
         ].map((f) => (
@@ -111,7 +113,9 @@ export function ChallengesNexusPanel() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-bold">{c.title}</p>
                 <p className="flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground">
-                  <span>{c.source === "room" ? "🏛️ غرفة" : "🧠 ملتقى"}</span>
+                  <span>
+                    {c.source === "room" ? "🏛️ غرفة" : c.source === "twin" ? "🧬 توأم ذهني" : "🧠 ملتقى"}
+                  </span>
                   <span>· {c.questionCount} أسئلة · {c.difficulty}</span>
                   <span>· مكافأة {c.rewardXp} خبرة{c.rewardCoins > 0 ? ` + ${c.rewardCoins} عملة` : ""}</span>
                   <span>· {c.plays} محاولة · {c.rewarded} مكافأة</span>

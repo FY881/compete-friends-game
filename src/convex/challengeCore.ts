@@ -41,7 +41,7 @@ export const CHALLENGE_MIN_MS_PER_QUESTION = 500;
 export const CHALLENGE_MAX_MS_PER_QUESTION = 120_000;
 
 export type ChallengeDifficulty = "easy" | "medium" | "hard" | "expert";
-export type ChallengeSource = "room" | "forum";
+export type ChallengeSource = "room" | "forum" | "twin";
 export type ChallengeStatus = "open" | "expired" | "closed";
 
 interface DifficultySpec {
