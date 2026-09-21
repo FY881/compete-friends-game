@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { normalizeDisplayName, nameRejection, NAME_MIN } from "./identityCore";
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { dailyRewardXp, dayKey } from "./gameConfig";
 
 const DAILY_BADGE_STEPS = [
@@ -24,15 +25,39 @@ export const setDisplayName = mutation({
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
 
-    const clean = name.trim().replace(/\s+/g, " ").slice(0, 24);
-    if (clean.length < 2) throw new Error("الاسم قصير جداً — 2 أحرف على الأقل");
+    const clean = normalizeDisplayName(name);
+    if (clean.length < NAME_MIN) throw new Error("الاسم قصير جداً — حرفان على الأقل");
 
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("الحساب غير موجود");
     if (user.name === clean) return { ok: true };
 
+    // 🪪 تفرد الهوية: الاسم الظاهر لاعب واحد فقط — يُفحص في الخادم لا في الواجهة
+    const clash = await ctx.db
+      .query("users")
+      .withIndex("by_name", (q) => q.eq("name", clean))
+      .first();
+    if (clash && clash._id !== userId) {
+      throw new Error("هذا الاسم محجوز للاعب آخر — اختر اسماً مميزاً");
+    }
+
     await ctx.db.patch(userId, { name: clean });
     return { ok: true };
+  },
+});
+
+/** 🪪 فحص فوري للاسم أثناء التسجيل — هل متاح؟ */
+export const checkNameAvailability = query({
+  args: { name: v.string() },
+  handler: async (ctx, { name }) => {
+    const clean = normalizeDisplayName(name);
+    if (clean.length < NAME_MIN) return { available: false, reason: "قصير جداً" };
+    const clash = await ctx.db
+      .query("users")
+      .withIndex("by_name", (q) => q.eq("name", clean))
+      .first();
+    const rejection = nameRejection(name, !!clash);
+    return { available: rejection === null, reason: rejection };
   },
 });
 

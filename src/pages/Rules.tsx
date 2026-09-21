@@ -20,7 +20,7 @@ import {
   Swords,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { AppealForm, JusticeSection } from "@/components/Appeals";
+import { JusticeSection } from "@/components/Appeals";
 
 const CATEGORY_META: Record<
   string,

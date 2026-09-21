@@ -25,7 +25,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ArrowLeft, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
@@ -68,6 +68,18 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       return "";
     }
   });
+
+  // 🪪 فحص فوري لتفرّد الاسم أثناء الكتابة (مؤجّل ٥٠٠ مللي ثانية)
+  const [debouncedName, setDebouncedName] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedName(quickName.trim()), 500);
+    return () => clearTimeout(t);
+  }, [quickName]);
+  const nameCheck = useQuery(
+    api.profile.checkNameAvailability,
+    debouncedName.length >= 2 ? { name: debouncedName } : "skip",
+  );
+  const lastCheckedName = debouncedName;
 
   // ── الحساب الذكي (اسم دخول + رمز سري — بدون بريد) ──────────────
   const [accountMode, setAccountMode] = useState<"signUp" | "signIn">("signIn");
@@ -258,6 +270,26 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                           disabled={isLoading}
                           required
                         />
+                        {(() => {
+                          const n = quickName.trim();
+                          if (n.length < 2) return null;
+                          if (nameCheck === undefined && n !== lastCheckedName) return null;
+                          if (nameCheck?.available === false) {
+                            return (
+                              <p className="absolute -bottom-4 right-9 text-[10px] text-rose-600">
+                                ⛔ {nameCheck.reason ?? "غير متاح"}
+                              </p>
+                            );
+                          }
+                          if (nameCheck?.available) {
+                            return (
+                              <p className="absolute -bottom-4 right-9 text-[10px] text-emerald-600">
+                                ✓ الاسم متاح
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                       <Button
                         type="submit"

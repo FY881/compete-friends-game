@@ -76,7 +76,8 @@ const schema = defineSchema(
 
       // ── الهيبة — نقاط ما بعد المستوى الأقصى ──
       prestigePoints: v.optional(v.number()),
-    }).index("email", ["email"]), // index for the email. do not remove or modify
+    }).index("email", ["email"]) // index for the email. do not remove or modify
+    .index("by_name", ["name"]), // 🪪 فهرس الأسماء — فحص تفرد الهوية الظاهرة بكفاءة
 
     // The site laws: essential rules, prohibitions and the punishment ladder.
     // Editable by the owner, shown publicly on /rules.
