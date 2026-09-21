@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Loader2, Scale, Send, CheckCircle2, XCircle, ShieldQuestion } from "lucide-react";
+import { Loader2, Scale, Send, CheckCircle2, XCircle, ShieldQuestion, ShieldCheck } from "lucide-react";
 
 /**
  * 🛡️ لوحة الاعتراضات — للمالك في غرفة المالك:
@@ -99,6 +99,30 @@ export function AppealsPanel() {
       )}
     </div>
   );
+}
+
+/** مركز العدالة الكامل — يُخفى ذاتياً إن لم يكن لدى اللاعب أي عقوبة أو سجل اعتراض */
+export function JusticeSection() {
+  const status = useQuery(api.appeals.getMyAppealStatus, {});
+  if (status === undefined) {
+    return (
+      <div className="rounded-2xl border border-border/60 bg-card p-5 text-center text-sm text-muted-foreground">
+        جارٍ فحص سجلّك العدلي…
+      </div>
+    );
+  }
+  if (status === null || (!status.canPunished && status.history.length === 0)) {
+    return (
+      <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5 text-center">
+        <ShieldCheck className="mx-auto size-6 text-emerald-500" />
+        <p className="mt-2 text-sm font-bold">سجلّك نظيف — لا عقوبات قائمة ولا اعتراضات</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          إن عُوقبت يوماً وترى العقوبة ظالمة، سيظهر نموذج الاعتراض هنا تلقائياً.
+        </p>
+      </div>
+    );
+  }
+  return <AppealForm />;
 }
 
 /** نموذج اللاعب — يظهر في صفحة اللعب لمن عوقب */

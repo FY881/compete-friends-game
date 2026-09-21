@@ -20,6 +20,7 @@ import {
   Swords,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
+import { AppealForm, JusticeSection } from "@/components/Appeals";
 
 const CATEGORY_META: Record<
   string,
@@ -210,6 +211,22 @@ export default function Rules() {
             )}
           </div>
         )}
+
+        {/* مركز العدالة — حالة عقوبتك وحقك في الاعتراض (يظهر تلقائياً للمعاقَب فقط) */}
+        <section className="mt-10">
+          <div className="flex items-center gap-3">
+            <span className="flex size-11 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-600">
+              <Scale className="size-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-bold">مركز العدالة</h2>
+              <p className="text-xs text-muted-foreground">حالة عقوبتك، وسجل اعتراضاتك، وحقك في المراجعة</p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <JusticeSection />
+          </div>
+        </section>
 
         {/* Anti-cheat notice */}
         <Card className="mt-10 border-rose-500/25 bg-rose-500/5 shadow-sm">
