@@ -574,8 +574,8 @@ export function AiControlRoom() {
                       >
                         <Power className="size-3.5" /> إيقاف لمدة أكتبها
                       </Button>
-                      {row.jobKey && (
-                        <span className="text-[10px] text-muted-foreground">مرتبط بالمهمة: <span className="font-mono">{row.jobKey}</span></span>
+                      {Boolean(row.entry?.jobKey) && (
+                        <span className="text-[10px] text-muted-foreground">مرتبط بالمهمة: <span className="font-mono">{row.entry.jobKey}</span></span>
                       )}
                       <Button
                         size="sm"
