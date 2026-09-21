@@ -126,6 +126,7 @@ import { SmartInbox } from "@/components/SmartInbox";
 import { OwnerBrief } from "@/components/OwnerBrief";
 import { ContentQuality } from "@/components/ContentQuality";
 import { CommunityMonitor } from "@/components/CommunityMonitor";
+import { AiControlRoom } from "@/components/owner/AiControlRoom";
 import { AppealsPanel } from "@/components/Appeals";
 import { EconomyWarRoom } from "@/components/EconomyWarRoom";
 import { AiHubTab } from "@/components/AiHubTab";

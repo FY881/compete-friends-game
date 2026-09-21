@@ -31,6 +31,7 @@ import {
   AI_REGISTRY,
   aiEntry,
   censusStats,
+  coverageReport,
   searchAi,
   type AiCapability,
 } from "./aiRegistry";
@@ -277,6 +278,12 @@ export const getAgentRoom = query({
     return {
       summary,
       census: censusStats(),
+      // 🪢 «حبل الرقبة»: مقارنة السجل بمسارات التنفيذ الحقيقية في قاعدة البيانات.
+      // أي فرق = ذكاء يعمل بلا رقابة، أو رابط ميت يوهم الواجهة بأنه موصول.
+      coverage: coverageReport(
+        jobRows.map((r) => r.key),
+        unitRows.map((r) => r.unit),
+      ),
       rows,
       ledger: ledger.map((l) => ({ key: l.key, name: l.name, emoji: l.emoji, kind: l.kind, actor: l.actor, detail: l.detail, at: l.at })),
       engine: {

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { AiCronCenter } from "@/components/owner/AiCronCenter";
+import { AiControlRoom } from "@/components/owner/AiControlRoom";
 import {
   Sparkles,
   Send,
@@ -93,6 +94,9 @@ export function AiControlTab() {
 
   return (
     <div className="space-y-6" dir="rtl">
+      {/* 🤖 غرفة الوكلاء — تحكم فوري حقيقي في كل ذكاء داخل اللعبة */}
+      <AiControlRoom />
+
       {/* ⏱️ مركز التحكم بمهام AI المجدولة — أولاً لأنه يحكم كل شيء آخر */}
       <AiCronCenter />
 

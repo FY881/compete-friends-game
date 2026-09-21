@@ -23,6 +23,7 @@ import {
   Ban,
   Check,
   Gauge,
+  Link2,
   Loader2,
   Play,
   Power,
@@ -197,6 +198,61 @@ export function AiControlRoom() {
           </div>
         ))}
       </div>
+
+      {/* ── 🪢 حبل الرقبة: لا ذكاء خارج الغرفة ── */}
+      <Card
+        className={cn(
+          "border-2",
+          room.coverage.covered && !room.coverage.hasDeadLinks
+            ? "border-emerald-500/40 bg-emerald-500/[0.04]"
+            : "border-rose-500/40 bg-rose-500/[0.04]",
+        )}
+      >
+        <CardContent className="space-y-2 p-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            <span className="flex items-center gap-1.5 font-bold">
+              <Link2 className={cn("size-3.5", room.coverage.covered && !room.coverage.hasDeadLinks ? "text-emerald-600" : "text-rose-600")} />
+              حبل الرقبة
+            </span>
+            <span className="text-muted-foreground">
+              السجل يحوي <span className="font-bold tabular-nums text-foreground">{room.coverage.total}</span> ذكاءً
+            </span>
+            <span className="text-muted-foreground">
+              مهام حقيقية: <span className="font-bold tabular-nums text-foreground">{room.coverage.realJobs}</span> · وحدات حقيقية:{" "}
+              <span className="font-bold tabular-nums text-foreground">{room.coverage.realUnits}</span>
+            </span>
+            {room.coverage.covered && !room.coverage.hasDeadLinks ? (
+              <span className="font-bold text-emerald-600">✅ لا ذكاء واحد خارج الغرفة — وكل رابط حي</span>
+            ) : (
+              <span className="font-bold text-rose-600">⚠️ يوجد كشف يحتاج قرارك (أسفله)</span>
+            )}
+          </div>
+
+          {room.coverage.unregisteredJobs.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-rose-700">
+              ⛔ <b>تعمل بلا رقابة</b> — مهام مجدولة ليست في السجل:{" "}
+              <span className="font-mono">{room.coverage.unregisteredJobs.join(" · ")}</span>
+            </p>
+          )}
+          {room.coverage.unregisteredUnits.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-rose-700">
+              ⛔ <b>وحدات ذكاء خارج الغرفة</b>: <span className="font-mono">{room.coverage.unregisteredUnits.join(" · ")}</span>
+            </p>
+          )}
+          {room.coverage.deadJobLinks.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-amber-700">
+              🪦 رابط ميت (مهمة غير مُسجّلة فعلاً في المُوزِّع):{" "}
+              <span className="font-mono">{room.coverage.deadJobLinks.join(" · ")}</span>{" "}
+              — اضغط «تحقق من السجل» أدناه لإنشاء صفوف المهام، فيُصلَح الرابط.
+            </p>
+          )}
+          {room.coverage.deadUnitLinks.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-amber-700">
+              🪦 رابط وحدة ميت: <span className="font-mono">{room.coverage.deadUnitLinks.join(" · ")}</span>
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── المحرك + الاستهلاك ── */}
       <Card className={cn("border-2", room.engine.agentsCount === 0 ? "border-amber-500/40 bg-amber-500/5" : "border-primary/25 bg-primary/[0.03]")}>
