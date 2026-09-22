@@ -1634,7 +1634,7 @@ const schema = defineSchema(
       read: v.boolean(),
       actionUrl: v.optional(v.string()),
       createdAt: v.number(),
-    }).index("by_user", ["userId"]).index("by_read", ["read"]),
+    }).index("by_user", ["userId"]).index("by_read", ["read"]).index("by_created", ["createdAt"]), // 🧹 حصاد آلي
 
     // ═══════════════════════════════════════════════════════════════════════
     // ║ التوكنات المؤقتة للصلاحيات ║

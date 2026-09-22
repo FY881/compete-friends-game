@@ -212,6 +212,10 @@ async function pruneBody(ctx: any) {
     stats.assistantLogs = await pruneByIndex(ctx, "assistantLogs", "by_created", "at", opsBefore);
     stats.apiCallLogs = await pruneByIndex(ctx, "apiCallLogs", "by_created", "createdAt", opsBefore);
 
+    // ── الإشعارات (أقدم من 14 يوماً) — الجدول الذي يكتب فيه ١٧ نظاماً ──
+    // كان بلا أي حصاد: ينمو للأبد بينما قراءة العميل تقصر على آخر 50 فقط.
+    stats.notifications = await pruneByIndex(ctx, "notifications", "by_created", "createdAt", cutoff(14));
+
     // ── مقاييس الأداء (أقدم من 24 ساعة) — تفريغ عميق ──
     // أكبر جدول حقيقي متنامٍ: كل تبويب مفتوح كان يكتب فيه كل ٣٠ ثانية.
     // التنظيف هنا (مرة واحدة يومياً) بدلاً من داخل كل كتابة — يوفّر
