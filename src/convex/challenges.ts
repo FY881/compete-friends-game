@@ -16,6 +16,7 @@
 
 import { query, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { isOwnerUser } from "./owner";
@@ -112,14 +113,15 @@ async function notify(
   body: string,
   actionUrl?: string,
 ): Promise<void> {
-  await ctx.db.insert("notifications", {
+  // 🚦 عبر المسار الموحّد: كتم «المبارزات» وساعات الهدوء تُحترم فعلاً
+  await ctx.runMutation(internal.notify.push, {
     userId,
     title: safe(title, 80),
     body: safe(body, 300),
     type: "info",
-    read: false,
+    category: "duels",
+    priority: "important",
     actionUrl,
-    createdAt: Date.now(),
   });
 }
 

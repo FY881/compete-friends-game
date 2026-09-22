@@ -88,6 +88,8 @@ export const managePacks = internalMutation({
       title: "📦 حزمة أسئلة جديدة!",
       body: `حزمة «${def.name}» متاحة لمدة أسبوع — ${def.description}`,
       type: "update",
+      category: "events",
+      priority: "important",
       actionUrl: "/play",
     });
 

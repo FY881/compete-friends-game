@@ -201,13 +201,13 @@ export const membershipAudit = internalMutation({
       const user = (await ctx.db.get(m.userId as any)) as { name?: string } | null;
       const name = user?.name ?? "لاعب";
       const remain = Math.max(1, Math.ceil(((m.expiresAt as number) - now) / DAY));
-      await ctx.db.insert("notifications", {
+      await ctx.runMutation(internal.notify.push, {
         userId: m.userId as any,
         title: `تنتهي عضويتك ${tierLabel(m.tier)} قريباً 🕒`,
         body: `لديك ${remain} يوم (أو أقل) قبل انتهاء عضويتك. جدّدها لتواصل امتيازاتك.`,
         type: "info",
-        read: false,
-        createdAt: now,
+        category: "membership",
+        priority: "important",
       });
       await ctx.db.insert("membershipLogs", {
         actor, actorName, action: "reminder", targetUserId: m.userId as any,

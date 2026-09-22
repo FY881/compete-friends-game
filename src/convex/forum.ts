@@ -11,6 +11,7 @@
 
 import { query, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { isOwnerUser } from "./owner";
@@ -108,14 +109,14 @@ async function logMod(
 }
 
 async function notify(ctx: MutationCtx, userId: never, title: string, body: string, type: "info" | "warning" | "system") {
-  await ctx.db.insert("notifications", {
+  // 🚦 عبر المسار الموحّد: كتم «المجتمع» وساعات الهدوء تُحترم فعلاً
+  await ctx.runMutation(internal.notify.push, {
     userId,
     title,
     body,
     type,
-    read: false,
-    createdAt: Date.now(),
-  } as never);
+    category: "social",
+  });
 }
 
 async function authorKarma(ctx: QueryCtx | MutationCtx, userId: Id<"users">) {

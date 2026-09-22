@@ -1,9 +1,11 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { query, mutation } from "./_generated/server";
 import { getCurrentUser } from "./users";
 import { OWNER_EMAIL } from "./owner";
+import { isAccountNotice, normalizeCategory } from "./notifyCore";
 
 function isOwnerEmail(email?: string | null): boolean {
   return email === OWNER_EMAIL;
@@ -130,25 +132,34 @@ export const sendNotification = mutation({
     type: v.union(v.literal("info"), v.literal("warning"), v.literal("ban"), v.literal("update"), v.literal("system")),
     actionUrl: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ ok: true }> => {
     await requireOwner(ctx);
-    await ctx.db.insert("notifications", {
+    // 🚦 إشعار المالك يمرّ عبر المسار الموحّد أيضاً — لا كتابة متجاوزة للسياسة
+    await ctx.runMutation(internal.notify.push, {
       userId: args.userId,
       title: args.title,
       body: args.body,
       type: args.type,
-      read: false,
       actionUrl: args.actionUrl,
-      createdAt: Date.now(),
     });
     return { ok: true };
   },
 });
 
+/**
+ * جرس الإشعارات (المسار القديم) — الآن يحترم الكتم بقواعد النواة الموحّدة.
+ * قبل ذلك كان يعرض كل صف بلا استثناء، فيكتم اللاعب فئةً ويظل يراها هنا —
+ * أي أن إعدادًا حقيقياً في الخادم كان بلا أثر في هذه الواجهة.
+ */
 export const getMyNotifications = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    const pref = await ctx.db
+      .query("notificationPrefs")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    const enabledMap = (pref?.enabled as Record<string, boolean> | undefined) ?? {};
     const specific = await ctx.db
       .query("notifications")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -160,6 +171,12 @@ export const getMyNotifications = query({
       .order("desc")
       .take(50);
     return [...specific, ...all]
+      // 🚦 الفئة المكتومة لا تظهر هنا أيضاً — وإشعار العقوبة يظهر دائماً
+      .filter((n) => {
+        const cat = normalizeCategory((n as { category?: string }).category);
+        if (isAccountNotice({ type: n.type })) return true;
+        return enabledMap[cat] !== false;
+      })
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 50);
   },

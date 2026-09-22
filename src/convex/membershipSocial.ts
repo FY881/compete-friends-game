@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { DAY, TIER_META, tierIndex, type Tier } from "./tiers";
@@ -238,13 +239,13 @@ export const shareWithName = mutation({
     });
 
     // إشعار حقيقي للطرف الآخر
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId: beneficiary._id,
       title: `${TIER_META[resolved.tier].emoji} حصلت على امتياز من ${ownerName}!`,
       body: `رفعك إلى مستوى ${TIER_META[resolved.tier].name} لمدة ${clampedDays} يوم. استمتع بالمزايا!`,
       type: "info",
-      read: false,
-      createdAt: now,
+      category: "membership",
+      priority: "important",
     });
 
     return {
@@ -340,13 +341,13 @@ export const grantBoostByOwner = mutation({
       expiresAt,
     });
 
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId: target._id,
       title: `${TIER_META[tier].emoji} ترقية مؤقتة من الإدارة`,
       body: `حصلت على مستوى ${TIER_META[tier].name} لمدة ${clampedHours} ساعة.`,
       type: "info",
-      read: false,
-      createdAt: now,
+      category: "membership",
+      priority: "important",
     });
 
     return { ok: true, tier, expiresAt, hours: clampedHours };
@@ -516,13 +517,13 @@ export const claimMembershipQuest = mutation({
       expiresAt,
     });
 
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId,
       title: `🎯 أنجزت مهمة «${quest.title}»`,
       body: `مكافأتك: مستوى ${TIER_META[quest.rewardTier].name} لمدة ${hours} ساعة.`,
       type: "info",
-      read: false,
-      createdAt: now,
+      category: "membership",
+      priority: "important",
     });
 
     return {

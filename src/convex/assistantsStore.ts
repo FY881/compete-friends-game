@@ -3,6 +3,7 @@
 // كل دالة هنا تنفّذ تأثيراً حقيقياً على بيانات اللعبة الفعلية.
 // ═══════════════════════════════════════════════════════════════════════
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { ASSISTANT_MINDS } from "../lib/assistantMinds";
 
@@ -262,14 +263,14 @@ export const grantBadge = internalMutation({
 
 export const sendAnnouncement = internalMutation({
   args: { title: v.string(), body: v.string(), byName: v.string() },
-  handler: async (ctx, args) => {
-    await ctx.db.insert("notifications", {
+  handler: async (ctx, args): Promise<{ ok: true }> => {
+    // 🚦 عبر المسار الموحّد — إعلان عام يخضع لنفس سياسة التسليم
+    await ctx.runMutation(internal.notify.push, {
       userId: "__all__",
       title: args.title,
       body: args.body,
       type: "system",
-      read: false,
-      createdAt: Date.now(),
+      category: "system",
     });
     return { ok: true };
   },

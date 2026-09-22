@@ -14,7 +14,14 @@ import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 
-/** أدخل إشعاراً للاعب (أو الكل بـ "__all__") — الاستخدام الداخلي فقط. */
+/**
+ * أدخل إشعاراً للاعب (أو الكل بـ "__all__") — الاستخدام الداخلي فقط.
+ *
+ * ⚠️ لم يعد يكتب في القاعدة مباشرةً: يمرّ عبر `smartNotifications.smartPush`
+ * ليخضع لنفس السياسة الموحدة (الكتم · ساعات الهدوء · الأولوية · السقف الساعي).
+ * قبل هذا التغيير كان كل إشعار يمرّ من هنا يتجاوز تفضيلات اللاعب تماماً،
+ * فيكتم اللاعب «المبارزات» وتصله دعوة مبارزة فوراً — زر الكتم كان يكذب.
+ */
 export const push = internalMutation({
   args: {
     userId: v.union(v.literal("__all__"), v.id("users")),
@@ -27,17 +34,23 @@ export const push = internalMutation({
       v.literal("update"),
       v.literal("system"),
     ),
+    /** فئة الإشعار الحقيقية — تُسند تلقائياً إلى system إن غابت. */
+    category: v.optional(v.string()),
+    priority: v.optional(
+      v.union(v.literal("critical"), v.literal("important"), v.literal("normal")),
+    ),
     actionUrl: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    await ctx.db.insert("notifications", {
+  handler: async (ctx, args): Promise<void> => {
+    // النتيجة لا تُستهلك هنا: القرار (تسليم/تأجيل/إسقاط) يُسجَّل في مركز الذكاء
+    await ctx.runMutation(internal.smartNotifications.smartPush, {
       userId: args.userId,
       title: args.title,
       body: args.body,
       type: args.type,
-      read: false,
+      category: args.category ?? "system",
+      priority: args.priority,
       actionUrl: args.actionUrl,
-      createdAt: Date.now(),
     });
   },
 });
@@ -58,6 +71,8 @@ export const duelChallenge = internalMutation({
       title: "⚔️ تحدٍّ جديد!",
       body: `${challengerName} أرسلك إلى مبارزة حلبة — الغرفة جاهزة الآن!`,
       type: "info",
+      category: "duels",
+      priority: "important",
       actionUrl: `/game/${gameCode}`,
     });
   },
@@ -89,6 +104,8 @@ export const duelResult = internalMutation({
       title: "نتيجة مبارزة الحلبة",
       body: `${p.playerBName} — ${lineA}`,
       type: "info",
+      category: "duels",
+      priority: "important",
       actionUrl: "/play",
     });
     await ctx.runMutation(internal.notify.push, {
@@ -96,6 +113,8 @@ export const duelResult = internalMutation({
       title: "نتيجة مبارزة الحلبة",
       body: `${p.playerAName} — ${lineB}`,
       type: "info",
+      category: "duels",
+      priority: "important",
       actionUrl: "/play",
     });
   },
@@ -113,6 +132,8 @@ export const tournamentStarted = internalMutation({
       title: "🏆 بطولة جديدة انطلقت!",
       body: `بطولة «${name}» مفتوحة الآن — انضم قبل اكتمال المقاعد!`,
       type: "update",
+      category: "events",
+      priority: "important",
       actionUrl: "/play",
     });
   },
@@ -160,6 +181,9 @@ export const streakRiskSweep = internalMutation({
           title: "🔥 سلسلتك اليومية مهددة!",
           body: `سلسلة ${pr.dailyStreak} يوم ستنقطع في منتصف الليل — العب جولة واحدة الآن لتحفظها!`,
           type: "warning",
+          category: "streaks",
+          // مهمة لا حرجة: سلوك «عد والعب» يجب أن يحترم ساعات الهدوء والكتم
+          priority: "important",
           actionUrl: "/play",
         });
         warned++;

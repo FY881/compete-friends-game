@@ -14,44 +14,29 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import {
+  NOTIF_CATEGORIES as CATEGORIES,
+  NOTIF_CATEGORY_LABELS as CATEGORY_LABELS,
+  NOTIF_LIMITS,
+  TIER_DEFAULTS,
+  decideDelivery,
+  inRange,
+  isNotifPriority,
+  normalizeCategory,
+  priorityOf,
+  quietEndsAt,
+  survivesQueue,
+  type NotifCategory,
+} from "./notifyCore";
 
-const CATEGORIES = [
-  "duels",
-  "streaks",
-  "membership",
-  "events",
-  "social",
-  "economy",
-  "system",
-] as const;
-export type NotifCategory = (typeof CATEGORIES)[number];
-
-const CATEGORY_LABELS: Record<NotifCategory, string> = {
-  duels: "⚔️ المبارزات والتحديات",
-  streaks: "🔥 السلاسل والإنجازات",
-  membership: "💎 العضوية والمميزات",
-  events: "🎪 الأحداث والمواسم",
-  social: "👥 المجتمع والعشيرة",
-  economy: "💰 الاقتصاد والمتجر",
-  system: "🛠️ النظام والحساب",
-};
+export type { NotifCategory };
+export { TIER_DEFAULTS };
 
 // ─────────────────────────── التفضيلات ───────────────────────────
 
 // ═══════════════ طبقات الإشعارات الذكية — الأساس ═══════════════
-
-const PRIORITY_RANK: Record<string, number> = { normal: 0, important: 1, critical: 2 };
-
-export const TIER_DEFAULTS = { minPriority: "normal", quietDefer: true, maxPerHour: 12, digestHour: 9 };
-
-/** متى تنتهي ساعات الهدوء الحالية (أقرب وقت مسموح للتسليم) */
-function quietEndsAt(q: { from: number; to: number }): number {
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(q.to, 0, 0, 0);
-  if (end.getTime() <= now.getTime()) end.setDate(end.getDate() + 1);
-  return end.getTime();
-}
+// ⚠️ كل السياسة (الكتم · الهدوء · العتبة · السقف) تعيش في `notifyCore.ts`
+//    وحده. لا تُكرَّر هنا، ولا في أي ملف آخر، حتى لا تنحرف مسارات الإرسال.
 
 /** إدراج إشعار في طابور التأجيل — لم يُلغَ، بل ينتظر اللحظة المناسبة */
 async function deferNotification(
@@ -132,14 +117,14 @@ export const updateTiers = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("غير مصرح");
-    if (args.minPriority !== undefined && !(args.minPriority in PRIORITY_RANK)) {
+    if (args.minPriority !== undefined && !isNotifPriority(args.minPriority)) {
       throw new Error("أدنى أولوية غير معروفة");
     }
-    if (args.maxPerHour !== undefined && (args.maxPerHour < 0 || args.maxPerHour > 60)) {
-      throw new Error("السقف الساعي بين 0 و 60");
+    if (args.maxPerHour !== undefined && !inRange(args.maxPerHour, NOTIF_LIMITS.maxPerHour)) {
+      throw new Error(`السقف الساعي بين ${NOTIF_LIMITS.maxPerHour.min} و ${NOTIF_LIMITS.maxPerHour.max}`);
     }
-    if (args.digestHour !== undefined && (args.digestHour < 0 || args.digestHour > 23)) {
-      throw new Error("ساعة الملخص بين 0 و 23");
+    if (args.digestHour !== undefined && !inRange(args.digestHour, NOTIF_LIMITS.digestHour)) {
+      throw new Error(`ساعة الملخص بين ${NOTIF_LIMITS.digestHour.min} و ${NOTIF_LIMITS.digestHour.max}`);
     }
     const existing = await ctx.db
       .query("notificationTiers")
@@ -223,17 +208,39 @@ export const deliverDigests = internalMutation({
     let delivered = 0;
     let players = 0;
 
-    for (const [key, items] of byUser) {
+    let droppedMuted = 0;
+
+    for (const [, items] of byUser) {
       const userId = items[0].userId;
       const tiers = await ctx.db
         .query("notificationTiers")
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .first();
+      const pref = await ctx.db
+        .query("notificationPrefs")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      const enabledMap = (pref?.enabled as Record<string, boolean> | undefined) ?? {};
       const digestHour = tiers?.digestHour ?? TIER_DEFAULTS.digestHour;
-      const forced = items.some((i) => now - i.deliverAfter > 12 * 3600_000);
+      const forced = items.some((i) => now - i.deliverAfter > NOTIF_LIMITS.maxDeferMs);
       if (!forced && hour < digestHour) continue; // ما زال مبكراً على الملخص
 
+      // 🔇 الكتم يسري حتى على الطابور: من كتم فئةً وهو ينتظر لا تصله عند التسليم
+      const alive: typeof items = [];
       for (const d of items) {
+        const cat = normalizeCategory(d.category);
+        const stillWanted = survivesQueue({
+          type: d.type,
+          category: cat,
+          muted: enabledMap[cat] === false,
+        });
+        if (stillWanted) alive.push(d);
+        else droppedMuted += 1;
+        await ctx.db.delete(d._id);
+      }
+      if (alive.length === 0) continue;
+
+      for (const d of alive) {
         await ctx.db.insert("notifications", {
           userId,
           title: d.title,
@@ -248,11 +255,11 @@ export const deliverDigests = internalMutation({
         delivered += 1;
       }
       players += 1;
-      if (items.length > 1) {
+      if (alive.length > 1) {
         await ctx.db.insert("notifications", {
           userId,
-          title: `🧾 ملخص ما فاتك (${items.length})`,
-          body: `جمعنا لك ${items.length} إشعاراً انتظرت ساعات الهدوء بدل أن تضيع — راجعها الآن.`,
+          title: `🧾 ملخص ما فاتك (${alive.length})`,
+          body: `جمعنا لك ${alive.length} إشعاراً انتظرت ساعات الهدوء بدل أن تضيع — راجعها الآن.`,
           type: "info",
           read: false,
           actionUrl: "/play",
@@ -263,8 +270,12 @@ export const deliverDigests = internalMutation({
       if (tiers) await ctx.db.patch(tiers._id, { lastDigestAt: now });
     }
 
-    await logNotifier(ctx, `سلّم ${delivered} إشعاراً مؤجلاً لـ ${players} لاعباً في الملخص`);
-    return { delivered, players };
+    await logNotifier(
+      ctx,
+      `سلّم ${delivered} إشعاراً مؤجلاً لـ ${players} لاعباً في الملخص` +
+        (droppedMuted > 0 ? ` — وأُسقط ${droppedMuted} لأن فئتها كُتمت بعد التأجيل` : ""),
+    );
+    return { delivered, players, droppedMuted };
   },
 });
 
@@ -369,13 +380,7 @@ export const setBrowserPush = mutation({
 
 // ─────────────────────────── الصندوق الذكي ───────────────────────────
 
-/** أولوية محسوبة: حرج (2) / مهم (1) / عادي (0) */
-function computePriority(n: { type: string; category?: string }): number {
-  if (n.type === "ban" || n.type === "warning") return 2;
-  if (n.category === "duels" || n.category === "streaks") return 1;
-  if (n.type === "update") return 1;
-  return 0;
-}
+// الأولوية تُحسب في النواة (`priorityOf`) — مصدر واحد للعرض وللقرار معاً.
 
 export const getMyInbox = query({
   handler: async (ctx) => {
@@ -406,8 +411,8 @@ export const getMyInbox = query({
         return enabledMap[cat] !== false;
       })
       .sort((a, b) => {
-        const pa = computePriority(a as any);
-        const pb = computePriority(b as any);
+        const pa =        priorityOf(a as any);
+        const pb =        priorityOf(b as any);
         if (pa !== pb) return pb - pa; // الأعلى أولوية أولاً
         return b.createdAt - a.createdAt;
       })
@@ -416,7 +421,7 @@ export const getMyInbox = query({
         ...n,
         category: ((n as any).category ?? "system") as NotifCategory,
         categoryLabel: CATEGORY_LABELS[((n as any).category ?? "system") as NotifCategory],
-        priority: computePriority(n as any),
+        priority:        priorityOf(n as any),
       }));
 
     return merged;
@@ -481,7 +486,7 @@ export const smartPush = internalMutation({
     actionUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const category = (args.category ?? "system") as NotifCategory;
+    const category = normalizeCategory(args.category);
 
     // احترام تفضيلات اللاعب المحدد (لا تُطبَّق على إشعارات الكل)
     if (args.userId !== "__all__") {
@@ -493,51 +498,50 @@ export const smartPush = internalMutation({
         .query("notificationTiers")
         .withIndex("by_user", (q) => q.eq("userId", args.userId as any))
         .first();
-      const minPriority = tiers?.minPriority ?? "normal";
-      const quietDefer = tiers?.quietDefer ?? true;
-      const maxPerHour = tiers?.maxPerHour ?? 12;
-      const rank = PRIORITY_RANK[args.priority ?? "normal"] ?? 0;
-      const isCritical = rank >= 2 || args.type === "ban";
 
-      if (pref) {
-        const enabledMap = (pref.enabled as Record<string, boolean>) ?? {};
-        // الفئة المكتومة تبقى مكتومة تماماً — قرار اللاعب الصريح
-        if (enabledMap[category] === false) return { skipped: true as const, reason: "category muted" };
-        // ساعات الهدوء: الحرجة تتجاوزها، وغيرها يُؤجَّل (لا يُلغى)
-        if (pref.quietHours && !isCritical) {
-          const hour = new Date().getHours();
-          const { from, to } = pref.quietHours;
-          const inQuiet = from <= to ? hour >= from && hour < to : hour >= from || hour < to;
-          if (inQuiet) {
-            if (!quietDefer) return { skipped: true as const, reason: "quiet hours" };
-            const id = await deferNotification(ctx, args, category, "quiet_hours", quietEndsAt(pref.quietHours));
-            await logNotifier(ctx, `أجّل إشعاراً واحداً بسبب ساعات الهدوء (فئة ${category})`);
-            return { deferred: true as const, id, reason: "quiet_hours" };
-          }
-        }
-      }
+      const enabledMap = (pref?.enabled as Record<string, boolean> | undefined) ?? {};
+      const muted = enabledMap[category] === false;
+      const maxPerHour = tiers?.maxPerHour ?? TIER_DEFAULTS.maxPerHour;
 
-      // ⛔ دون أدنى أولوية يقبلها اللاعب ← يُؤجَّل إلى الملخص بدل الإزعاج
-      if (!isCritical && rank < (PRIORITY_RANK[minPriority] ?? 0)) {
-        const id = await deferNotification(ctx, args, category, "below_threshold", Date.now() + 3600_000);
-        await logNotifier(ctx, `أجّل إشعاراً لسبب: أدنى أولوية مقبولة ${minPriority}`);
-        return { deferred: true as const, id, reason: "below_threshold" };
-      }
-
-      // 🚦 سقف الإشعارات الفورية في الساعة — الحرجة تتجاوزه دائماً
-      if (!isCritical && maxPerHour > 0) {
+      // 🚦 نعدّ ما وُجّه لهذا اللاعب خلال الساعة المنقضية — فقط عند الحاجة إليه
+      let recentCount = 0;
+      if (!muted && args.type !== "ban" && maxPerHour > 0) {
         const hourAgo = Date.now() - 3600_000;
         const recent = await ctx.db
           .query("notifications")
           .withIndex("by_user", (q) => q.eq("userId", args.userId as any))
           .order("desc")
           .take(60);
-        const count = recent.filter((n) => n.createdAt >= hourAgo).length;
-        if (count >= maxPerHour) {
-          const id = await deferNotification(ctx, args, category, "rate_limited", Date.now() + 3600_000);
-          await logNotifier(ctx, `أجّل إشعاراً لبلوغ السقف الساعي (${maxPerHour}/ساعة)`);
-          return { deferred: true as const, id, reason: "rate_limited" };
-        }
+        recentCount = recent.filter((n) => n.createdAt >= hourAgo).length;
+      }
+
+      // ⚖️ القرار كله يُحسب في النواة النقية المختبرة — لا سياسة مبعثرة هنا
+      const decision = decideDelivery({
+        type: args.type,
+        category,
+        priority: args.priority,
+        muted,
+        quietHours: pref?.quietHours,
+        quietDefer: tiers?.quietDefer ?? TIER_DEFAULTS.quietDefer,
+        minPriority: tiers?.minPriority ?? TIER_DEFAULTS.minPriority,
+        maxPerHour,
+        nowHour: new Date().getHours(),
+        recentCount,
+      });
+
+      if (decision.action === "drop") {
+        await logNotifier(ctx, `أسقط إشعاراً (${category}): ${decision.explain}`);
+        return { skipped: true as const, reason: decision.reason };
+      }
+
+      if (decision.action === "defer") {
+        const deliverAfter =
+          decision.reason === "quiet_hours"
+            ? quietEndsAt(Date.now(), pref?.quietHours)
+            : Date.now() + 3600_000;
+        const id = await deferNotification(ctx, args, category, decision.reason, deliverAfter);
+        await logNotifier(ctx, `أجّل إشعاراً (${category}): ${decision.explain}`);
+        return { deferred: true as const, id, reason: decision.reason };
       }
     }
 

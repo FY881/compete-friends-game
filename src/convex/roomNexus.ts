@@ -10,6 +10,7 @@
 
 import { query, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { isOwnerUser } from "./owner";
@@ -983,14 +984,13 @@ export const roomModerate = mutation({
       if (args.action === "mute") {
         await ctx.db.patch(args.targetUserId, { mutedUntil: now + minutes * 60 * 1000 } as never);
       }
-      await ctx.db.insert("notifications", {
+      await ctx.runMutation(internal.notify.push, {
         userId: args.targetUserId,
         title: args.action === "mute" ? "🔇 كتم في الغرفة" : "⚠️ تحذير في الغرفة",
         body: `${reason}${args.action === "mute" ? ` — لمدة ${minutes} دقيقة` : ""}`,
         type: args.action === "mute" ? ("ban" as const) : ("warning" as const),
-        read: false,
-        createdAt: now,
-      } as never);
+        category: "social",
+      });
     } else {
       throw new Error("إجراء غير معروف");
     }
@@ -1237,14 +1237,13 @@ export const reportRoom = mutation({
       status: "open",
     } as never);
     await writeAudit(ctx, args.roomId as never, { id: meId as never, name: me?.name ?? "لاعب", source: "member" }, "room_reported", cleanText(args.reason, 120));
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId: room.ownerId,
       title: "🚩 بلاغ ضد غرفتك",
       body: `${me?.name ?? "لاعب"} أبلغ عن الغرفة: ${cleanText(args.reason, 80)} — راجع قوانين الغرفة`,
       type: "warning" as const,
-      read: false,
-      createdAt: Date.now(),
-    } as never);
+      category: "social",
+    });
     return { ok: true };
   },
 });

@@ -1194,6 +1194,9 @@ export const selfDeveloper = internalMutation({
             title: "👑 السجلات اشتاقت إليك",
             body: `غبت ${awayDays} أيام — الحاكم وثّق غيابك في السجل. جولة واحدة تعيدك للحساب: سلسلتك وترتيبك بانتظارك.`,
             type: "info",
+            category: "streaks",
+            // عادية عن قصد: رسالة استرجاع لا يجوز أن تكسر ساعات هدوء اللاعب
+            priority: "normal",
             actionUrl: "/play",
           });
           invited++;
