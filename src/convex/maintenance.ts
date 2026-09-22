@@ -1,5 +1,4 @@
 import { internalMutation, mutation, action } from "./_generated/server";
-import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 // eslint-disable-next-line no-restricted-imports
@@ -195,6 +194,35 @@ export const pruneNowByOwner = mutation({
   },
 });
 
+/** أفكار أطلس: تحذف المحسومة/المرفوضة فقط — المفتوحة قيمة حية تبقى. */
+async function pruneInsights(ctx: any, before: number): Promise<number> {
+  let n = 0;
+  const rows = await ctx.db
+    .query("atlasInsights")
+    .withIndex("by_created", (q: any) => q.lt("createdAt", before))
+    .take(500);
+  for (const r of rows) {
+    if (r.status !== "open") {
+      await ctx.db.delete(r._id);
+      n++;
+    }
+  }
+  return n;
+}
+
+/** جلسات أطلس المنتهية (لها logoutAt) الأقدم من الحد — المفتوحة تبقى. */
+async function pruneSessions(ctx: any, before: number): Promise<number> {
+  let n = 0;
+  const rows = await ctx.db.query("atlasSessions").take(500);
+  for (const r of rows) {
+    if (r.logoutAt !== undefined && r.loginAt < before) {
+      await ctx.db.delete(r._id);
+      n++;
+    }
+  }
+  return n;
+}
+
 async function pruneBody(ctx: any) {
   {
     const opsBefore = cutoff(OPS_RETENTION_DAYS);
@@ -279,6 +307,14 @@ async function pruneBody(ctx: any) {
 
     // ── سجل الولاء القديم (يبقى ٤ أشهر كاملة للشفافية) ──
     stats.loyaltyLedger = await pruneByIndex(ctx, "loyaltyLedger", "by_at", "at", cutoff(LEDGER_RETENTION_DAYS));
+
+    // ── جداول لوحة أطلس — كانت بلا أي حصاد تنمو للأبد ──
+    // سجل أوامر أطلس (يُقرأ آخر 100 فقط): يحتفظ بشهر كامل للتدقيق.
+    stats.atlasCommands = await pruneByIndex(ctx, "atlasCommands", "by_created", "createdAt", cutoff(30));
+    // أفكار الأنظمة الحرة المحسومة/المرفوضة (المفتوحة فقط هي القيمة الحية): أسبوعان.
+    stats.atlasInsights = await pruneInsights(ctx, cutoff(14));
+    // جلسات دخول أطلس: تُستخدم للعدّ فقط — شهران كافيان.
+    stats.atlasSessions = await pruneSessions(ctx, cutoff(60));
 
     // ── أخطاء العميل ──
     stats.clientErrors = await pruneByIndex(ctx, "clientErrors", "by_last", "lastSeen", errBefore);

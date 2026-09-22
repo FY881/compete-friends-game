@@ -90,16 +90,24 @@ export function PlayersSystem() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Id<"users"> | null>(null);
   const [reason, setReason] = useState("");
+  const [picked, setPicked] = useState<Id<"users">[]>([]);
   const { busy, run } = useRunner();
 
   const players = useQuery(api.atlas.searchPlayers, { q: q.trim() || undefined, limit: 60 });
   const file = useQuery(api.atlas.getPlayerFile, selected ? { userId: selected } : "skip");
+  // سجل التدقيق الكامل — كان موجوداً في الخادم بلا واجهة (getAuditTrail)
+  const auditTrail = useQuery(api.atlas.getAuditTrail, { limit: 100 });
 
   const punish = useMutation(api.atlas.atlasPunish);
   const pardon = useMutation(api.atlas.atlasPardon);
   const editPlayer = useMutation(api.atlas.atlasEditPlayer);
   const resetProgress = useMutation(api.atlas.atlasResetProgress);
   const broadcast = useMutation(api.atlas.atlasBroadcast);
+  // الإجراء الجماعي — كان موجوداً في الخادم بلا واجهة (atlasBulkAction)
+  const bulk = useMutation(api.atlas.atlasBulkAction);
+
+  const togglePicked = (id: Id<"users">) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -117,15 +125,22 @@ export function PlayersSystem() {
         <div className="max-h-[460px] space-y-2 overflow-y-auto pl-1">
           {players === undefined && <Loading />}
           {players?.map((p) => (
-            <button
+            <div
               key={p._id}
-              onClick={() => setSelected(p._id)}
-              className={`flex w-full items-center justify-between gap-2 rounded-xl border p-3 text-start transition-colors ${
+              className={`flex items-center gap-2 rounded-xl border p-3 transition-colors ${
                 selected === p._id
                   ? "border-violet-500/60 bg-violet-500/10"
                   : "border-slate-800 bg-slate-900/40 hover:bg-slate-800/50"
               }`}
             >
+              <input
+                type="checkbox"
+                checked={picked.includes(p._id)}
+                onChange={() => togglePicked(p._id)}
+                className="size-4 shrink-0 accent-violet-500"
+                aria-label="تحديد للإجراء الجماعي"
+              />
+              <button onClick={() => setSelected(p._id)} className="flex min-w-0 flex-1 items-center justify-between gap-2 text-start">
               <div className="min-w-0">
                 <div className="truncate text-sm font-bold text-slate-100">{p.name}</div>
                 <div className="truncate text-[11px] text-slate-500">{p.email}</div>
@@ -136,7 +151,8 @@ export function PlayersSystem() {
                 {p.muted && <Badge className="bg-orange-500/15 text-orange-300">مكتوم</Badge>}
                 {p.warnings > 0 && <Badge variant="secondary">⚠ {p.warnings}</Badge>}
               </div>
-            </button>
+              </button>
+            </div>
           ))}
           {players?.length === 0 && <div className="py-8 text-center text-sm text-slate-500">لا نتائج</div>}
         </div>
@@ -252,6 +268,66 @@ export function PlayersSystem() {
             )}
           </div>
         )}
+      </Panel>
+
+      {/* الإجراء الجماعي الحقيقي — atlasBulkAction من الخادم (c6) */}
+      <Panel
+        title={`الإجراء الجماعي (c6) — ${picked.length} محدد`}
+        icon={Users}
+        accent={ATLAS_COLORS.crimson}
+      >
+        {picked.length === 0 ? (
+          <div className="py-4 text-center text-sm text-slate-500">حدّد لاعبين من القائمة أعلاه (مربعات الاختيار)</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <Button size="sm" variant="outline" disabled={busy}
+              onClick={() => void run(
+                () => bulk({ userIds: picked, action: "warn", reason }).then(() => setPicked([])),
+                `تحذير جماعي لـ ${picked.length} لاعباً`,
+              )}
+              className="border-amber-500/40 text-amber-300">⚠ تحذير جماعي</Button>
+            <Button size="sm" variant="outline" disabled={busy}
+              onClick={() => void run(
+                () => bulk({ userIds: picked, action: "mute", reason, durationHours: 1 }).then(() => setPicked([])),
+                `كتم جماعي ساعة`,
+              )}
+              className="border-orange-500/40 text-orange-300">🔇 كتم 1س</Button>
+            <Button size="sm" variant="outline" disabled={busy}
+              onClick={() => void run(
+                () => bulk({ userIds: picked, action: "ban_temp", reason, durationHours: 24 }).then(() => setPicked([])),
+                `حظر جماعي 24س`,
+              )}
+              className="border-rose-500/40 text-rose-300">🔒 حظر 24س</Button>
+            <Button size="sm" variant="outline" disabled={busy}
+              onClick={() => void run(
+                () => bulk({ userIds: picked, action: "pardon" }).then(() => setPicked([])),
+                `عفو جماعي`,
+              )}
+              className="border-emerald-500/40 text-emerald-300">🕊 عفو جماعي</Button>
+          </div>
+        )}
+      </Panel>
+
+      {/* سجل التدقيق الكامل — getAuditTrail من الخادم (كان بلا واجهة) */}
+      <Panel
+        title="سجل التدقيق الكامل — كل أمر نُفّذ من اللوحة (x4)"
+        icon={Activity}
+        accent={ATLAS_COLORS.cyan}
+        action={<Badge variant="secondary">{auditTrail?.length ?? 0}</Badge>}
+      >
+        <div className="max-h-64 space-y-1 overflow-y-auto">
+          {auditTrail === undefined && <Loading />}
+          {auditTrail?.length === 0 && <div className="py-6 text-center text-sm text-slate-500">لا أوامر مسجّلة بعد</div>}
+          {auditTrail?.map((a) => (
+            <div key={a._id} className="flex items-center gap-2 rounded-lg bg-slate-900/40 px-3 py-1.5 text-[11px]">
+              <span className={a.ok ? "text-emerald-400" : "text-rose-400"}>{a.ok ? "✓" : "✗"}</span>
+              <span className="shrink-0 text-slate-500">{a.system}/{a.feature}</span>
+              <span className="truncate text-slate-300">{a.command}</span>
+              <span className="shrink-0 text-slate-600">{a.executedBy}</span>
+              <span className="ms-auto shrink-0 text-slate-500">{atlasMinutes(Date.now() - a.createdAt)}</span>
+            </div>
+          ))}
+        </div>
       </Panel>
     </div>
   );

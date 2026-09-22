@@ -262,14 +262,13 @@ export const getOverview = query({
     await requireAtlasOwner(ctx);
 
     const now = Date.now();
-    const [users, games, rooms, memberships, reports, chatMessages, errors, profiles] =
+    const [users, games, rooms, memberships, reports, errors, profiles] =
       await Promise.all([
         ctx.db.query("users").collect(),
         ctx.db.query("games").collect(),
         ctx.db.query("chatRooms").collect(),
         ctx.db.query("memberships").collect(),
         ctx.db.query("reports").collect(),
-        ctx.db.query("chatMessages").collect(),
         ctx.db.query("errorLogs").collect(),
         ctx.db.query("profiles").collect(),
       ]);
@@ -283,8 +282,16 @@ export const getOverview = query({
     const finishedToday = games.filter(
       (g) => g.status === "finished" && now - g.createdAt < 24 * 60 * 60_000,
     ).length;
-    const msgsLastHour = chatMessages.filter((m) => now - m.createdAt < 60 * 60_000).length;
-    const msgsLast24h = chatMessages.filter((m) => now - m.createdAt < 24 * 60 * 60_000).length;
+    // عدّ الرسائل مفهرساً بدلاً من تحميل جدول chatMessages كاملاً
+    const countMsgs = async (since: number): Promise<number> => {
+      const rows = await ctx.db
+        .query("chatMessages")
+        .withIndex("by_created", (q) => q.gte("createdAt", since))
+        .take(5000);
+      return rows.length;
+    };
+    const msgsLastHour = await countMsgs(now - 60 * 60_000);
+    const msgsLast24h = await countMsgs(now - 24 * 60 * 60_000);
     const openReports = reports.filter((r) => r.status === "open").length;
     const totalXp = profiles.reduce((s, p) => s + p.xp, 0);
     const totalGames = profiles.reduce((s, p) => s + p.gamesPlayed, 0);
@@ -1538,7 +1545,7 @@ export const emergencyAdminData = query({
         .withIndex("by_created")
         .order("desc")
         .take(60),
-      ctx.db.query("atlasSessions").collect(),
+      ctx.db.query("atlasSessions").take(200),
     ]);
     const bySeverity: Record<string, number> = {};
     for (const e of errors) {
@@ -1569,6 +1576,7 @@ export const emergencyAdminData = query({
         createdAt: c.createdAt,
       })),
       sessions: sessions.length,
+      sessionsCapped: sessions.length >= 200,
     };
   },
 });
