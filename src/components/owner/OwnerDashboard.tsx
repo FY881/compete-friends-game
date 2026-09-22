@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -327,20 +327,12 @@ export function OwnerDashboard({
   const dashboard = useQuery(api.owner.getDashboard);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Generate fake sparkline data based on real values (simulated trend)
-  const sparkData = useMemo(() => {
-    if (!dashboard) return { users: [], games: [], reports: [] };
-    const base = dashboard.userCount;
+  // سلاسل حقيقية من الخادم — بلا أي توليد عشوائي
+  const series = useMemo(() => {
+    if (!dashboard) return null;
     return {
-      users: Array.from({ length: 7 }, (_, i) =>
-        Math.max(0, base - 10 + Math.floor(Math.random() * 20)),
-      ),
-      games: Array.from({ length: 7 }, (_, i) =>
-        Math.max(0, dashboard.gameCount - 5 + Math.floor(Math.random() * 15)),
-      ),
-      reports: Array.from({ length: 7 }, (_, i) =>
-        Math.max(0, dashboard.openReports - 2 + Math.floor(Math.random() * 5)),
-      ),
+      rounds: dashboard.roundsSeries,
+      players: dashboard.newPlayersSeries,
     };
   }, [dashboard, refreshKey]);
 
@@ -365,6 +357,72 @@ export function OwnerDashboard({
             <RefreshCw className="size-3.5" />
             تحديث
           </Button>
+        </div>
+      </div>
+
+      {/* ── رأس الصحة الحديث — درجة كبيرة حية + شريط مركّب ── */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-bl from-card via-card to-primary/5 p-6 shadow-lg shadow-primary/5 sm:p-8">
+        <div aria-hidden className="pointer-events-none absolute -top-20 end-8 h-40 w-64 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-center gap-6">
+          {/* دائرة الدرجة */}
+          <div className="relative flex size-28 shrink-0 items-center justify-center sm:size-32">
+            <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
+              <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted" />
+              <circle
+                cx="50" cy="50" r="42" fill="none" strokeWidth="8" strokeLinecap="round"
+                stroke={dashboard.healthScore >= 80 ? "#10b981" : dashboard.healthScore >= 60 ? "#f59e0b" : "#f43f5e"}
+                strokeDasharray={`${(dashboard.healthScore / 100) * 264} 264`}
+                className="transition-all duration-700"
+              />
+            </svg>
+            <div className="text-center">
+              <div className="text-3xl font-black tabular-nums tracking-tight">{dashboard.healthScore}</div>
+              <div className="text-[10px] font-bold text-muted-foreground">من 100</div>
+            </div>
+          </div>
+          {/* الحالة والتنبيهات */}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-black tracking-tight">صحة اللعبة</h2>
+              <Badge
+                className={cn(
+                  "rounded-full",
+                  dashboard.healthScore >= 80 && "bg-emerald-500/15 text-emerald-600",
+                  dashboard.healthScore >= 60 && dashboard.healthScore < 80 && "bg-amber-500/15 text-amber-600",
+                  dashboard.healthScore < 60 && "bg-rose-500/15 text-rose-600",
+                )}
+              >
+                {dashboard.healthLabel}
+              </Badge>
+            </div>
+            {dashboard.healthAlerts.length > 0 ? (
+              <ul className="mt-2.5 space-y-1">
+                {dashboard.healthAlerts.slice(0, 3).map((a, i) => (
+                  <li key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />
+                    {a}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2.5 text-xs text-emerald-600">كل المؤشرات ضمن النطاق الصحي ✓</p>
+            )}
+          </div>
+          {/* نبضات سريعة */}
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            <div className="text-center">
+              <div className="text-lg font-black tabular-nums text-primary">{dashboard.aiDecisionsToday}</div>
+              <div className="text-[10px] text-muted-foreground">قرارات AI اليوم</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-black tabular-nums text-emerald-600">{dashboard.gamesToday}</div>
+              <div className="text-[10px] text-muted-foreground">جولات اليوم</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-black tabular-nums">{dashboard.roundsLast7d}</div>
+              <div className="text-[10px] text-muted-foreground">جولات 7 أيام</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -393,7 +451,7 @@ export function OwnerDashboard({
       {/* ── مركز الإعلانات المركزي (موجة 1.3) — واجهة سريعة من القيادة ── */}
       <AnnouncementCenter />
 
-      {/* ── Stat Cards Grid ── */}
+      {/* ── بطاقات حية على سلاسل زمنية حقيقية من الخادم ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="إجمالي اللاعبين"
@@ -401,17 +459,16 @@ export function OwnerDashboard({
           subtitle={`${dashboard.bannedUsers} محظور`}
           icon={Users}
           color="primary"
-          sparkData={sparkData.users}
-          trend={{ value: 12, positive: true }}
+          sparkData={series?.players ?? []}
+          trend={undefined}
         />
         <StatCard
-          label="الألعاب المكتملة"
-          value={dashboard.gameCount}
-          subtitle="منذ البداية"
+          label="جولات اليوم"
+          value={dashboard.gamesToday}
+          subtitle={`${dashboard.roundsLast7d} جولة آخر 7 أيام`}
           icon={Gamepad2}
           color="emerald"
-          sparkData={sparkData.games}
-          trend={{ value: 8, positive: true }}
+          sparkData={series?.rounds ?? []}
         />
         <StatCard
           label="بلاغات مفتوحة"
@@ -423,7 +480,6 @@ export function OwnerDashboard({
           }
           icon={AlertTriangle}
           color={dashboard.openReports > 5 ? "rose" : "amber"}
-          sparkData={sparkData.reports}
           pulse={dashboard.openReports > 5}
         />
         <StatCard
@@ -434,6 +490,34 @@ export function OwnerDashboard({
           color="rose"
         />
       </div>
+
+      {/* ── مخطط نشاط الجولات 14 يوماً — حقيقي 100% ── */}
+      {series && series.rounds.some((n) => n > 0) && (
+        <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-sm font-bold">
+              <TrendingUp className="size-4 text-primary" />
+              نشاط الجولات — آخر 14 يوماً
+            </h3>
+            <span className="text-[11px] text-muted-foreground">من أرشيف الجولات الحقيقي</span>
+          </div>
+          <div className="flex h-24 items-end gap-1.5">
+            {series.rounds.map((n, i) => {
+              const max = Math.max(...series.rounds, 1);
+              return (
+                <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                  <div
+                    className="w-full rounded-t-md bg-gradient-to-t from-primary/40 to-primary transition-all"
+                    style={{ height: `${Math.max(4, (n / max) * 80)}px` }}
+                    title={`${n} جولة`}
+                  />
+                  <span className="text-[9px] tabular-nums text-muted-foreground">{n}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Quick Actions Grid ── */}
       <div>

@@ -428,6 +428,12 @@ export type DashboardData = {
   advisors: DashboardAdvisor[];
   suggestions: string[];
   aiDecisionsToday: number;
+  // ── سلاسل زمنية حقيقية 14 يوماً (بديل البيانات المزيفة سابقاً) ──
+  roundsSeries: number[]; // جولات كل يوم
+  newPlayersSeries: number[]; // تسجيلات جديدة كل يوم
+  reportsSeries: number[]; // بلاغات كل يوم
+  gamesToday: number; // جولات اليوم
+  roundsLast7d: number; // جولات آخر 7 أيام
 };
 
 export const getDashboard = query({
@@ -541,6 +547,30 @@ export const getDashboard = query({
       .withIndex("by_created", (q) => q.gte("createdAt", now - 24 * 60 * 60 * 1000))
       .collect();
 
+    // ── سلاسل زمنية حقيقية 14 يوماً — كل نقطة من أرشيف الجولات الفعلي ──
+    const dayMs = 86_400_000;
+    const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+    const since14d = startOfToday - 13 * dayMs;
+    const recentRounds = await ctx.db
+      .query("gameHistory")
+      .withIndex("by_played", (q) => q.gte("playedAt", since14d))
+      .take(5000);
+    const roundsSeries = Array.from({ length: 14 }, () => 0);
+    for (const r of recentRounds) {
+      const dayIdx = 13 - Math.floor((startOfToday - r.playedAt) / dayMs);
+      if (dayIdx >= 0 && dayIdx < 14) roundsSeries[dayIdx] += 1;
+    }
+    const newPlayersSeries = Array.from({ length: 14 }, () => 0);
+    for (const u of users) {
+      const ct = (u as { _creationTime?: number })._creationTime ?? 0;
+      if (ct >= since14d) {
+        const dayIdx = 13 - Math.floor((startOfToday - ct) / dayMs);
+        if (dayIdx >= 0 && dayIdx < 14) newPlayersSeries[dayIdx] += 1;
+      }
+    }
+    const gamesToday = roundsSeries[13] ?? 0;
+    const roundsLast7d = roundsSeries.slice(7).reduce((s, n) => s + n, 0);
+
     return {
       userCount: users.length,
       gameCount: games.length,
@@ -551,6 +581,11 @@ export const getDashboard = query({
       aiAutoApply: settings.aiAutoApply,
       antiCheatEnabled: settings.antiCheatEnabled,
       siteLocked: settings.siteLocked,
+      roundsSeries,
+      newPlayersSeries,
+      reportsSeries: Array.from({ length: 14 }, () => 0), // البلاغات بلا فهرس زمني — تُعرض كقيمة لحظية
+      gamesToday,
+      roundsLast7d,
       recentActivity: logs.map((l) => ({
         id: l._id,
         actorType: l.actorType,

@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
+  Brain,
   Check,
   Eraser,
   Flame,
@@ -69,7 +70,6 @@ function CountdownRing({
   const radius = 30;
   const circumference = 2 * Math.PI * radius;
   const urgent = fraction < 0.25;
-  const veryUrgent = fraction < 0.1;
 
   return (
     <div className="relative size-20 shrink-0">
@@ -282,35 +282,63 @@ export function QuestionStage({
     return null;
   }
 
-  // ── 3-2-1 countdown before the first question ────────────────────────
+  // ── 3-2-1 countdown before the first question — شاشة بدء حديثة كاملة ──
   if (isCountdown) {
     return (
-      <div className="flex w-full flex-col items-center justify-center gap-8 py-16 text-center sm:py-24">
-        <Badge variant="outline" className="gap-1.5 rounded-full text-primary">
-          <Sparkles className="size-3.5" />
-          استعدوا للمعركة…
+      <div className="relative flex w-full flex-col items-center justify-center gap-10 overflow-hidden rounded-3xl border border-border/80 bg-card py-20 text-center shadow-xl shadow-primary/5 sm:py-28">
+        {/* توهجات خلفية حية */}
+        <div aria-hidden className="pointer-events-none absolute -top-32 start-1/2 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-40 end-0 h-64 w-64 rounded-full bg-violet-500/10 blur-3xl" />
+
+        <Badge variant="outline" className="relative gap-1.5 rounded-full border-primary/40 bg-primary/5 text-primary">
+          <Brain className="size-3.5" />
+          استعدوا لمعركة العقول
         </Badge>
-        <div className="relative flex size-44 items-center justify-center">
+
+        <div className="relative flex size-52 items-center justify-center">
+          {/* حلقة نابضة مزدوجة */}
+          <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-primary/10" style={{ animationDuration: "1.6s" }} />
           <CountdownRing remainingMs={countdownLeft} totalMs={COUNTDOWN_MS} />
-          <span className="absolute text-7xl font-bold tabular-nums tracking-tight">
+          <span
+            key={countdownNumber}
+            className="absolute bg-gradient-to-b from-primary to-primary/60 bg-clip-text text-8xl font-black tabular-nums tracking-tight text-transparent"
+            style={{ animation: "countdown-pop 0.5s cubic-bezier(0.22,1,0.36,1)" }}
+          >
             {countdownNumber}
           </span>
         </div>
-        <div>
-          <p className="text-lg font-bold">السؤال الأول بعد {countdownNumber} ثانية</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+
+        <div className="relative">
+          <p className="text-xl font-black tracking-tight">تحميل الأسئلة اكتمل — جاهز؟</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             نفس السؤال · نفس الوقت · أسرع عقل يفوز
           </p>
         </div>
-        <div className="flex gap-1.5">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="size-2 animate-bounce rounded-full bg-primary"
-              style={{ animationDelay: `${i * 0.15}s` }}
-            />
-          ))}
+
+        {/* شريط تجهيز المشاركين */}
+        <div className="relative flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-4 py-2">
+          <Users className="size-3.5 text-primary" />
+          <span className="text-xs font-semibold tabular-nums">
+            {totalPlayers} عقل في الحلبة
+          </span>
+          <span className="flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="size-1.5 animate-bounce rounded-full bg-primary"
+                style={{ animationDelay: `${i * 0.15}s` }}
+              />
+            ))}
+          </span>
         </div>
+
+        <style>{`
+          @keyframes countdown-pop {
+            0% { transform: scale(1.6); opacity: 0; }
+            60% { transform: scale(0.95); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+        `}</style>
       </div>
     );
   }
@@ -409,15 +437,34 @@ export function QuestionStage({
   };
 
   const progress = Math.round((answeredCount / Math.max(1, totalPlayers)) * 100);
+  const timeFraction = Math.max(0, Math.min(1, remaining / timePerQuestion));
 
   return (
     <div className="grid w-full items-start gap-6 lg:grid-cols-[1fr_20rem]">
-      {/* Question card */}
-      <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-card p-7 shadow-sm sm:p-9">
+      {/* Question card — تصميم حديث: خلفية حية + شريط زمن علوي عريض */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-card shadow-lg shadow-primary/5 sm:shadow-xl">
+        {/* شريط الوقت الحي أعلى البطاقة — يشحب مع اقتراب النهاية */}
+        <div aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-muted/60">
+          <div
+            className={cn(
+              "h-full transition-[width] duration-200 ease-linear",
+              timeFraction > 0.5 && "bg-gradient-to-r from-emerald-400 to-emerald-500",
+              timeFraction <= 0.5 && timeFraction > 0.25 && "bg-gradient-to-r from-amber-400 to-amber-500",
+              timeFraction <= 0.25 && "bg-gradient-to-r from-rose-400 to-rose-500",
+            )}
+            style={{ width: `${isRevealing ? 100 : timeFraction * 100}%` }}
+          />
+        </div>
+        {/* توهج خلفي حي يشتد مع الوقت الحرِج */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-24 start-1/2 h-48 w-[28rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+          className={cn(
+            "pointer-events-none absolute -top-24 start-1/2 h-48 w-[28rem] -translate-x-1/2 rounded-full blur-3xl transition-opacity duration-500",
+            timeFraction <= 0.25 && !isRevealing ? "bg-rose-500/20 opacity-100" : "bg-primary/10 opacity-70",
+          )}
+          style={{ animation: timeFraction <= 0.25 && !isRevealing ? "pulse 1.2s ease-in-out infinite" : undefined }}
         />
+        <div className="p-7 pt-9 sm:p-9 sm:pt-11">
 
         {/* Top bar */}
         <div className="relative flex items-center justify-between gap-4">
@@ -541,13 +588,14 @@ export function QuestionStage({
                 onClick={() => submit(i)}
                 disabled={state !== "selectable" || submitting || timeUp}
                 className={cn(
-                  "group flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-start text-base font-medium transition-all",
+                  "group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border px-5 py-4 text-start text-base font-medium transition-all duration-200",
+                  "hover:shadow-md active:scale-[0.995]",
                   state === "selectable" &&
-                    "border-border/80 bg-background text-foreground hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 hover:shadow-md",
+                    "border-border/80 bg-background text-foreground hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 hover:shadow-lg hover:shadow-primary/10",
                   state === "picked" &&
-                    "border-primary/60 bg-primary/10 text-primary shadow-sm",
+                    "border-primary/60 bg-primary/10 text-primary shadow-md shadow-primary/15 ring-1 ring-primary/30",
                   state === "correct" &&
-                    "border-emerald-500/60 bg-emerald-500/10 text-emerald-700",
+                    "border-emerald-500/60 bg-emerald-500/10 text-emerald-700 shadow-md shadow-emerald-500/10",
                   state === "wrong" &&
                     "border-rose-500/60 bg-rose-500/10 text-rose-700",
                   state === "idle" && "border-border/60 bg-muted/40 text-muted-foreground",
@@ -555,6 +603,10 @@ export function QuestionStage({
                     "border-dashed border-border/60 bg-muted/30 text-muted-foreground/40",
                 )}
               >
+                {/* شريط حرف سفلي للخيار الصحيح عند الكشف */}
+                {state === "correct" && (
+                  <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-400" />
+                )}
                 <span
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-xl border text-sm font-bold transition-colors",
@@ -699,14 +751,18 @@ export function QuestionStage({
           </div>
         </div>
       </div>
+      </div>
 
       {/* Live leaderboard */}
       <div className="lg:sticky lg:top-6">
         <Leaderboard players={game.players} compact />
         {isRevealing && (
-          <div className="mt-4 rounded-2xl border border-border/80 bg-card p-5 text-center shadow-sm">
-            <p className="text-sm font-bold">استعد للسؤال التالي…</p>
-            <div className="mt-2 flex justify-center gap-1.5">
+          <div className="relative mt-4 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/8 to-transparent p-5 text-center shadow-sm">
+            <div aria-hidden className="pointer-events-none absolute -top-10 start-1/2 h-20 w-48 -translate-x-1/2 rounded-full bg-primary/15 blur-2xl" />
+            <p className="relative text-sm font-bold">
+              {index + 1 >= g.questionCount ? "جارٍ احتساب النتائج النهائية…" : `السؤال ${index + 2} من ${g.questionCount} قادم…`}
+            </p>
+            <div className="relative mt-2 flex justify-center gap-1.5">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
