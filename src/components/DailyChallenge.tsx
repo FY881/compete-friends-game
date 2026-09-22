@@ -17,11 +17,14 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Flame,
   Loader2,
+  Medal,
   Sparkles,
   Star,
   Trophy,
   X,
+  Zap,
 } from "lucide-react";
 
 type DailyQuestion = {
@@ -67,7 +70,7 @@ export function DailyChallengeCard() {
   }
   if (challenge === null) return null;
 
-  const { questions, completed, completedDays, bestScoreEver } = challenge;
+  const { questions, completed, completedDays, bestScoreEver, streak, myRank, boardSize, maxXp } = challenge;
 
   return (
     <motion.div
@@ -108,6 +111,25 @@ export function DailyChallengeCard() {
               <span className="flex items-center gap-1">
                 <Trophy className="size-3 text-amber-500" />
                 أفضل نتيجة: {bestScoreEver} نقطة
+              </span>
+              {/* 🔥 سلسلة الأيام الحقيقية — من الخادم */}
+              {streak.current > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-0.5 font-bold text-orange-600">
+                  <Flame className="size-3" />
+                  سلسلة {streak.current} {streak.current === 1 ? "يوم" : "أيام"}
+                </span>
+              )}
+              {/* 🏅 رتبتك اليومية الحية */}
+              {myRank != null && boardSize > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 font-bold text-violet-600">
+                  <Medal className="size-3" />
+                  ترتيبك اليوم: #{myRank} من {boardSize}
+                </span>
+              )}
+              {/* المكافأة القصوى */}
+              <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 font-bold text-amber-600">
+                <Zap className="size-3" />
+                حتى {maxXp} XP
               </span>
             </div>
           </div>

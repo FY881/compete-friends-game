@@ -1,4 +1,5 @@
 import { ZakaLogo } from "@/components/ZakaLogo";
+import { DailyChallengeCard } from "@/components/DailyChallenge";
 import { OWNER_ROOM_ENABLED } from "@/lib/buildFlags";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -110,7 +111,6 @@ export default function Play() {
   const createGame = useMutation(api.games.createGame);
   const getAiHint = useAction(api.openRouter.getAiHint);
   const analyzePerformance = useAction(api.openRouter.analyzePlayerPerformance);
-  const [dailyChallengeLoading, setDailyChallengeLoading] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const joinGame = useMutation(api.games.joinGame);
   const setDisplayName = useMutation(api.profile.setDisplayName);
@@ -154,20 +154,6 @@ export default function Play() {
     setDisplayName({ name: clean }).catch(() => {
       // الاسم محفوظ محلياً على أي حال — يُزامَن لاحقاً عند الدخول.
     });
-  };
-
-  const handleDailyChallenge = async () => {
-    if (dailyChallengeLoading) return;
-    setDailyChallengeLoading(true);
-    try {
-      // التحدي اليومي يتولّد عبر نظامي مركز API (خادمياً) — لا حاجة لمفتاح من المتصفح
-      toast.success("🎯 جاري تحميل التحدي اليومي بالذكاء الاصطناعي...");
-      navigate("/games");
-    } catch (e) {
-      toast.error("خطأ في تحميل التحدي");
-    } finally {
-      setDailyChallengeLoading(false);
-    }
   };
 
   const handleAnalyze = async () => {
@@ -695,33 +681,9 @@ export default function Play() {
                 </div>
               )}
 
-              {/* Daily Challenge Card - AI Powered */}
-              <div className="mt-4 rounded-xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5 p-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🎯</span>
-                  <p className="text-sm font-bold">تحدي اليوم</p>
-                  <Badge className="ml-auto gap-1 rounded-full bg-amber-500/10 text-amber-600 text-[10px]">
-                    <Flame className="size-2.5" />
-                    +50 XP
-                  </Badge>
-                </div>
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  سؤال واحد فقط — أسرع إجابة صحيحة تكسب مكافأة إضافية!
-                </p>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="mt-2.5 gap-1.5 rounded-xl"
-                  onClick={handleDailyChallenge}
-                  disabled={dailyChallengeLoading}
-                >
-                  {dailyChallengeLoading ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : (
-                    <Zap className="size-3" />
-                  )}
-                  العب بالـ AI
-                </Button>
+              {/* 🎯 التحدي اليومي الحقيقي — daily.ts الكامل: 10 أسئلة · محاولة واحدة · سلسلة أيام · صدارة اليوم */}
+              <div className="mt-4">
+                <DailyChallengeCard />
               </div>
 
               {/* Mini-Games Quick Access */}
