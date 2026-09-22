@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { GameData } from "@/convex/games";
 import { cn } from "@/lib/utils";
@@ -8,14 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   Trophy,
   Flame,
-  Zap,
-  Medal,
   RotateCcw,
   Loader2,
   Crown,
-  Star,
   Target,
   ArrowLeft,
+  Brain,
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -25,6 +23,9 @@ export function ResultsStage({ game }: { game: GameData }) {
   const rematch = useMutation(api.games.rematch);
   const [rematching, setRematching] = useState(false);
   const [rematchCode, setRematchCode] = useState<string | null>(null);
+
+  // 🧠 عقلك الحي بعد الجولة — يتغذى فعلياً على الخادم من إجاباتك (mindFeed)
+  const myMind = useQuery(api.minds.getMyMind, {});
 
   const sorted = [...game.players].sort((a, b) => b.score - a.score);
   const totalQuestions = game.game.questionCount;
@@ -182,6 +183,52 @@ export function ResultsStage({ game }: { game: GameData }) {
           })}
         </ul>
       </div>
+
+      {/* 🧠 عقلك بعد الجولة — بناء تراكمي حقيقي من إجاباتك */}
+      {myMind?.profile && !myMind.profile.frozen && (
+        <div className="mt-6 rounded-2xl border border-violet-500/25 bg-violet-500/5 p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
+              <Brain className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">
+                عقلك {myMind.profile.rankIcon} {myMind.profile.rankName}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                كل جولة تبني عقلك من إجاباتك الحقيقية — الترتيب: #{myMind.position.rank} من{" "}
+                {myMind.position.total}
+              </p>
+            </div>
+            <Badge variant="secondary" className="shrink-0 tabular-nums">
+              {myMind.profile.tierScore}/{myMind.maxTierScore}
+            </Badge>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {(
+              [
+                ["logic", "🧩"],
+                ["knowledge", "📚"],
+                ["speed", "⚡"],
+                ["memory", "🗂️"],
+                ["focus", "🎯"],
+                ["intuition", "🔮"],
+              ] as const
+            ).map(([key, icon]) => (
+              <div
+                key={key}
+                className="rounded-lg bg-background/60 px-2 py-1.5 text-center"
+                title={`مستوى ${key}: ${myMind.profile!.faculties[key]}`}
+              >
+                <div className="text-base">{icon}</div>
+                <div className="text-[10px] font-bold tabular-nums text-muted-foreground">
+                  {myMind.profile!.faculties[key]}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">

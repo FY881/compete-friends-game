@@ -1651,6 +1651,38 @@ export const finishGame = internalMutation({
       /* إحصائيات التنافس اختيارية — لا تعطل تسجيل الجولة */
     }
 
+    // 🧠 تغذية العقل المتطور — مكاسب القوى الست من إجابات الجولة الحقيقية
+    // كانت تُبنى في الأوفلاين فقط؛ الآن كل جولة أونلاين تبني عقل لاعبيها فعلاً.
+    try {
+      const timerSeconds = Math.round((game.settings?.timePerQuestionMs ?? 20000) / 1000);
+      const qDifficulties: { id: string; difficulty: string }[] = [];
+      for (const qid of game.questionIds) {
+        const q = await resolveQuestion(ctx, qid);
+        if (q) qDifficulties.push({ id: q.id, difficulty: q.difficulty });
+      }
+      for (const p of sorted) {
+        try {
+          const fed: { updated: boolean; rankUp: boolean; rankLevelAfter: number } =
+            await ctx.runMutation(internal.mindFeed.feedFromGame, {
+              userId: p.userId,
+              answers: p.answers as never,
+              questionDifficulties: qDifficulties,
+              timerSeconds,
+            });
+          if (fed.rankUp) {
+            await ctx.runMutation(internal.mindFeed.notifyRankUp, {
+              userId: p.userId,
+              rankLevel: fed.rankLevelAfter,
+            });
+          }
+        } catch {
+          /* تغذية عقل لاعب واحد لا تعطل البقية */
+        }
+      }
+    } catch {
+      /* تغذية العقل اختيارية — لا تعطل تسجيل الجولة */
+    }
+
     // موجّة 11 — مبارزة حلبة: حدّث تصنيف ELO للطرفين (مرة واحدة للجولة)
     if (game.arenaDuel) {
       try {
