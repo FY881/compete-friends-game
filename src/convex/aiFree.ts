@@ -156,9 +156,13 @@ export const warnPlayer = mutation({
 export const notifyAll = mutation({
   args: { title: v.string(), body: v.string() },
   handler: async (ctx, args) => {
-    await ctx.db.insert("notifications", {
-      userId: "__all__" as any, title: args.title, body: args.body,
-      type: "system", read: false, createdAt: Date.now(),
+    await ctx.runMutation(internal.notify.push, {
+      userId: "__all__" as any,
+      title: args.title,
+      body: args.body,
+      type: "system",
+      category: "system",
+      priority: "normal",
     });
     return { success: true, message: "تم إرسال إشعار للجميع" };
   },

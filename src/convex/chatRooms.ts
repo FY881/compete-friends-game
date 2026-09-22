@@ -5,6 +5,7 @@
  */
 
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { assertSystemOpen } from "./systemLocks";
@@ -83,17 +84,14 @@ async function enforceChatMessage(
   }
   await ctx.db.patch(userId, patch);
 
-  await ctx.db.insert("notifications", {
-    userId,
-    title: action === "mute" ? "🔇 كتم تلقائي" : "⚠️ تنبيه تلقائي",
-    body:
-      action === "mute"
-        ? `كُتمت لمدة ساعة بعد رصد مخالفة: ${titles.join("، ")}`
-        : `رصدنا رسالة تخالف القوانين (${titles.join("، ")}). تكررها يقود لكتم تلقائي.`,
-    type: action === "mute" ? ("ban" as const) : ("warning" as const),
-    read: false,
-    createdAt: now,
-  });
+  await ctx.runMutation(internal.notify.push, {
+      userId: "__all__",
+      title: action === "mute" ? "🔇 كتم تلقائي" : "⚠️ تنبيه تلقائي",
+      body: action === "mute",
+      type: action === "mute" ? ("ban") : ("warning"),
+      category: "moderation",
+      priority: "important",
+    });
 
   await ctx.db.insert("aiLogs", {
     action: "auto_moderation",

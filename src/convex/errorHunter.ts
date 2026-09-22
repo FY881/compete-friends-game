@@ -9,6 +9,7 @@
 
 import { v } from "convex/values";
 import { query, mutation, action, internalMutation, internalAction } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { callLlm } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
 
@@ -120,14 +121,14 @@ export const logError = mutation({
 
     // إذا الخطأ حرج، أرسل إشعار فوري للمالك
     if (severity === "critical") {
-      await ctx.db.insert("notifications", {
-        userId: "__all__",
-        title: "🚨 خطأ حرج جديد",
-        body: `صياد الأخطاء اكتشف: ${args.message.slice(0, 100)}`,
-        type: "warning",
-        read: false,
-        createdAt: now,
-      });
+      await ctx.runMutation(internal.notify.push, {
+      userId: "__all__",
+      title: "🚨 خطأ حرج جديد",
+      body: `صياد الأخطاء اكتشف: ${args.message.slice(0, 100)}`,
+      type: "warning",
+      category: "system",
+      priority: "important",
+    });
     }
 
     return { id, isNew: true, needsAutopsy: true };
@@ -786,13 +787,13 @@ export const escalateErrorReport = mutation({
     }
 
     // إشعار فوري لغرفة المالك بالتقرير المنظم
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId: "__all__",
       title: `📋 تقرير خطأ لم يُصلَح تلقائياً${repairPasses ? ` (${repairPasses} جولات مطاردة)` : ""}`,
       body: report.slice(0, 900),
       type: "warning",
-      read: false,
-      createdAt: now,
+      category: "system",
+      priority: "important",
     });
 
     return { ok: true, matched: !!match };
@@ -881,14 +882,14 @@ export const detectAnomalies = internalMutation({
           await ctx.db.patch(health._id, { lastAutoFix: now });
         }
       }
-      await ctx.db.insert("notifications", {
-        userId: "__all__",
-        title: `🩺 تنبؤ قبل العطل: ${a.kind}`,
-        body: a.detail,
-        type: a.severity === "critical" ? "system" : "warning",
-        read: false,
-        createdAt: now,
-      });
+      await ctx.runMutation(internal.notify.push, {
+      userId: "__all__",
+      title: `🩺 تنبؤ قبل العطل: ${a.kind}`,
+      body: a.detail,
+      type: a.severity === "critical" ? "system" : "warning",
+      category: "system",
+      priority: "important",
+    });
     }
 
     return { anomalies, checked: perf.length, at: now };

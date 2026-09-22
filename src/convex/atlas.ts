@@ -22,6 +22,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { isOwnerUser } from "./owner";
 import { QUESTION_BANK, CATEGORIES } from "./questions";
 import { ALL_ITEMS, STORE_SECTIONS, STORE_BUNDLES } from "./store";
@@ -1623,13 +1624,13 @@ export const atlasBroadcast = mutation({
   },
   handler: async (ctx, args) => {
     const owner = await requireAtlasOwnerMutation(ctx);
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId: args.targetUserId ?? "__all__",
       title: args.title,
       body: args.body,
       type: args.type,
-      read: false,
-      createdAt: Date.now(),
+      category: "system",
+      priority: "normal",
     });
     await logAudit(ctx, {
       system: "control",

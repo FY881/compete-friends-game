@@ -1409,14 +1409,14 @@ export const ownerSetRoomState = mutation({
     const room = await ctx.db.get(args.roomId);
     if (room) {
       await postSystem(ctx, args.roomId as never, meId as never, me.name ?? "الحاكم", `قرار إداري على الغرفة: ${args.state === "normal" ? "رفع القيود" : args.state === "watch" ? "المراقبة" : args.state === "locked" ? "قفل مؤقت" : "إغلاق"}${note ? ` — ${note}` : ""}`);
-      await ctx.db.insert("notifications", {
+      await ctx.runMutation(internal.notify.push, {
         userId: room.ownerId,
         title: "⚖️ قرار على غرفتك",
         body: `حالة غرفتك الآن: ${args.state}${note ? ` — ${note}` : ""}`,
-        type: "system" as const,
-        read: false,
-        createdAt: Date.now(),
-      } as never);
+        type: "system",
+        category: "moderation",
+        priority: "important",
+      });
     }
     await writeAudit(ctx, args.roomId as never, { id: meId as never, name: me.name ?? "الحاكم", source: "owner" }, "owner_state_changed", `${args.state}${note ? ` — ${note}` : ""}`);
     return { ok: true };
@@ -1453,14 +1453,14 @@ export const ownerTransferRoom = mutation({
       members: [...members] as unknown as typeof room.members,
       admins: [...admins] as unknown as typeof room.admins,
     });
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId: args.targetUserId,
       title: "👑 أصبحت مالك غرفة",
       body: `نقل إليك الحاكم السيادي ملكية الغرفة «${room.name}»`,
-      type: "system" as const,
-      read: false,
-      createdAt: Date.now(),
-    } as never);
+      type: "system",
+      category: "social",
+      priority: "important",
+    });
     await writeAudit(ctx, args.roomId as never, { id: meId as never, name: me.name ?? "الحاكم", source: "owner" }, "ownership_transferred", `بقرار سيادي إلى ${target.name ?? "لاعب"}`);
     return { ok: true };
   },
@@ -1487,14 +1487,14 @@ export const ownerDeleteRoom = mutation({
     await ctx.db.patch(args.roomId, { archived: true });
     const profiles = await ctx.db.query("roomProfiles").withIndex("by_room", (q) => q.eq("roomId", args.roomId)).first();
     if (profiles) await ctx.db.patch(profiles._id, { moderationState: "closed", featured: false, updatedAt: Date.now() } as never);
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId: room.ownerId,
       title: "🚫 أُغلقت غرفتك",
       body: cleanText(args.reason, 200) || "بقرار إداري",
-      type: "ban" as const,
-      read: false,
-      createdAt: Date.now(),
-    } as never);
+      type: "ban",
+      category: "moderation",
+      priority: "critical",
+    });
     await writeAudit(ctx, args.roomId as never, { id: meId as never, name: me.name ?? "الحاكم", source: "owner" }, "owner_deleted", cleanText(args.reason, 200) || "بقرار إداري");
     return { ok: true };
   },

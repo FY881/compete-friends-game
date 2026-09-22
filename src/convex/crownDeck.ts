@@ -513,26 +513,27 @@ export const broadcast = mutation({
     if (!me) throw new Error("غير مصرح — للمالك فقط");
     const now = Date.now();
 
-    const row = (name: string, userId: string | "__all__") => ({
-      userId: userId as any,
-      title: title.trim().slice(0, 100),
-      body: body.trim().slice(0, 500),
-      type: kind,
-      read: false,
-      createdAt: now,
-    });
+    const row = (userId: string | "__all__") =>
+      ctx.runMutation(internal.notify.push, {
+        userId: userId as any,
+        title: title.trim().slice(0, 100),
+        body: body.trim().slice(0, 500),
+        type: kind,
+        category: "events",
+        priority: "important",
+      });
 
     let delivered = 0;
     let audienceLabel = "الجميع";
 
     if (audience === "user") {
       if (!targetUserId) throw new Error("حدد اللاعب المستهدف");
-      await ctx.db.insert("notifications", row("", targetUserId));
+      await row(targetUserId);
       delivered = 1;
       const u = await ctx.db.get(targetUserId);
       audienceLabel = u?.name ?? "لاعب محدد";
     } else if (audience === "all") {
-      await ctx.db.insert("notifications", row("", "__all__"));
+      await row("__all__");
       delivered = 1; // إشعار عام واحد يصل للجميع
     } else if (audience === "active" || audience === "dormant") {
       const cutoff = audience === "active" ? now - 7 * 86_400_000 : now - 14 * 86_400_000;
@@ -543,7 +544,7 @@ export const broadcast = mutation({
         const isActive = active.has(String(u._id));
         if (audience === "active" && !isActive) continue;
         if (audience === "dormant" && isActive) continue;
-        await ctx.db.insert("notifications", row("", u._id));
+        await row(u._id);
         delivered++;
       }
       audienceLabel = audience === "active" ? "النشطون آخر 7 أيام" : "النائمون +14 يوماً";
@@ -552,7 +553,7 @@ export const broadcast = mutation({
       const tier = audience.split(":")[1];
       const ms = await ctx.db.query("memberships").withIndex("by_tier" as any, (q: any) => q.eq("tier", tier)).collect();
       for (const m of ms) {
-        await ctx.db.insert("notifications", row("", m.userId));
+        await row(m.userId);
         delivered++;
       }
       audienceLabel = `عضوية ${tier}`;

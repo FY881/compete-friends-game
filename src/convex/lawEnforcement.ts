@@ -9,6 +9,7 @@
  */
 
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
@@ -258,28 +259,28 @@ export const processReport = mutation({
         await ctx.db.patch(targetId, {
           warnings: targetWarnings + 1,
         });
-        await ctx.db.insert("notifications", {
-          userId: targetId,
-          title: "⚠️ تحذير رسمي",
-          body: `تم تحذيرك بسبب مخالفة قوانين اللعبة. تحذيرك رقم ${targetWarnings + 1}.`,
-          type: "warning",
-          read: false,
-          createdAt: Date.now(),
-        });
+        await ctx.runMutation(internal.notify.push, {
+      userId: targetId,
+      title: "⚠️ تحذير رسمي",
+      body: `تم تحذيرك بسبب مخالفة قوانين اللعبة. تحذيرك رقم ${targetWarnings + 1}.`,
+      type: "warning",
+      category: "moderation",
+      priority: "critical",
+    });
         autoExecuted = true;
       } else if (analysis.suggestedAction === "mute" && targetUser) {
         const duration = analysis.suggestedDurationMs || 60 * 60 * 1000;
         await ctx.db.patch(targetId, {
           mutedUntil: Date.now() + duration,
         });
-        await ctx.db.insert("notifications", {
-          userId: targetId,
-          title: "🔇 تم كتمك مؤقتاً",
-          body: `تم كتمك لمدة ${Math.round(duration / 3600000)} ساعة بسبب مخالفة القوانين.`,
-          type: "warning",
-          read: false,
-          createdAt: Date.now(),
-        });
+        await ctx.runMutation(internal.notify.push, {
+      userId: targetId,
+      title: "🔇 تم كتمك مؤقتاً",
+      body: `تم كتمك لمدة ${Math.round(duration / 3600000)} ساعة بسبب مخالفة القوانين.`,
+      type: "warning",
+      category: "moderation",
+      priority: "critical",
+    });
         autoExecuted = true;
       } else if (analysis.suggestedAction === "ban" && targetUser) {
         const duration = analysis.suggestedDurationMs || 7 * 24 * 60 * 60 * 1000;
@@ -287,14 +288,14 @@ export const processReport = mutation({
           bannedUntil: Date.now() + duration,
           banReason: `AI auto-enforced: ${analysis.matchedRules.map((r) => RULES.find((ru) => ru.id === r)?.title).join(", ")}`,
         });
-        await ctx.db.insert("notifications", {
-          userId: targetId,
-          title: "🚫 تم حظرك مؤقتاً",
-          body: `تم حظرك لمدة ${Math.round(duration / 3600000)} ساعة بسبب مخالفة القوانين.`,
-          type: "ban",
-          read: false,
-          createdAt: Date.now(),
-        });
+        await ctx.runMutation(internal.notify.push, {
+      userId: targetId,
+      title: "🚫 تم حظرك مؤقتاً",
+      body: `تم حظرك لمدة ${Math.round(duration / 3600000)} ساعة بسبب مخالفة القوانين.`,
+      type: "ban",
+      category: "moderation",
+      priority: "critical",
+    });
         autoExecuted = true;
       }
     }

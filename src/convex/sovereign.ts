@@ -13,7 +13,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation, type MutationCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 import { isOwnerUser } from "./owner";
@@ -50,15 +50,15 @@ async function logDecision(
 }
 
 /** إشعار عام موقّع بخطاب السيادة */
-async function notifyAll(ctx: { db: any }, title: string, body: string, type: "info" | "warning" | "system" | "update") {
-  await ctx.db.insert("notifications", {
-    userId: "__all__" as const,
-    title,
-    body,
-    type,
-    read: false,
-    createdAt: Date.now(),
-  });
+async function notifyAll(ctx: MutationCtx, title: string, body: string, type: "info" | "warning" | "system" | "update") {
+  await ctx.runMutation(internal.notify.push, {
+      userId: "__all__" as const,
+      title,
+      body,
+      type,
+      category: "moderation",
+      priority: "critical",
+    });
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -281,14 +281,14 @@ export const releaseQuarantine = mutation({
     if (!d || d.kind !== "quarantine") throw new Error("مرسوم غير صالح");
     await ctx.db.patch(args.decreeId, { active: false });      await logDecision(ctx, "رفع العزل", `أُعيد ${d.label.replace("🧊 عزل اللاعب: ", "")} إلى اللعب الطبيعي`, "medium");
     if (d.targetUserId) {
-      await ctx.db.insert("notifications", {
-        userId: d.targetUserId,
-        title: "🕊️ رُفع العزل عنك",
-        body: "قرار من الحاكم السيادي: عُدت إلى اللعب الطبيعي. لِعَ نزيهة.",
-        type: "info",
-        read: false,
-        createdAt: Date.now(),
-      });
+      await ctx.runMutation(internal.notify.push, {
+      userId: d.targetUserId,
+      title: "🕊️ رُفع العزل عنك",
+      body: "قرار من الحاكم السيادي: عُدت إلى اللعب الطبيعي. لِعَ نزيهة.",
+      type: "info",
+      category: "moderation",
+      priority: "critical",
+    });
     }
   },
 });
@@ -323,14 +323,14 @@ export const confirmDecree = mutation({
         "warning",
       );
     } else if (d.kind === "quarantine" && d.targetUserId) {
-      await ctx.db.insert("notifications", {
-        userId: d.targetUserId,
-        title: "🧊 تم عزلك مؤقتاً",
-        body: `بقرار من الحاكم السيادي: ${d.reason}. سيُراجع وضعك قريباً.`,
-        type: "ban",
-        read: false,
-        createdAt: now,
-      });
+      await ctx.runMutation(internal.notify.push, {
+      userId: d.targetUserId,
+      title: "🧊 تم عزلك مؤقتاً",
+      body: `بقرار من الحاكم السيادي: ${d.reason}. سيُراجع وضعك قريباً.`,
+      type: "ban",
+      category: "moderation",
+      priority: "critical",
+    });
     }
   },
 });

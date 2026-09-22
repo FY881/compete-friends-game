@@ -5,6 +5,7 @@ import {
   mutation,
   internalMutation,
 } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -408,14 +409,14 @@ export const executeOwnerCommand = mutation({
       }
       case "broadcast": {
         if (!params) throw new Error("يجب كتابة رسالة الإذاعة");
-        await ctx.db.insert("notifications", {
-          userId: "__all__",
-          title: "إذاعة من الإدارة",
-          body: params,
-          type: "info",
-          read: false,
-          createdAt: now,
-        });
+        await ctx.runMutation(internal.notify.push, {
+      userId: "__all__",
+      title: "إذاعة من الإدارة",
+      body: params,
+      type: "info",
+      category: "system",
+      priority: "normal",
+    });
         result = `تم إرسال الإذاعة: ${params.slice(0, 50)}...`;
         break;
       }
@@ -556,13 +557,13 @@ export const sendTelegramNotification = mutation({
     });
 
     // Also send as in-app notification
-    await ctx.db.insert("notifications", {
+    await ctx.runMutation(internal.notify.push, {
       userId: "__all__",
       title: `تنبيه [${priority}]`,
       body: message,
       type: priority === "high" ? "warning" : "info",
-      read: false,
-      createdAt: Date.now(),
+      category: "system",
+      priority: "normal",
     });
 
     return { success: true, queued: true };
