@@ -36,6 +36,7 @@ import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
+  Brain,
   Check,
   Crown,
   Copy,
@@ -480,6 +481,12 @@ export function Lobby({
   const [savingSettings, setSavingSettings] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null);
 
+  // 🧠 ملفات عقول اللاعبين — عمق التقدم الحقيقي يظهر في بوابة اللعب
+  const mindProfiles = useQuery(
+    api.games.getRoomMindProfiles,
+    { userIds: game.players.map((p) => p.id as never) },
+  );
+
   const host = game.players.find((p) => p.isHost);
   const isHost = me?.isHost ?? false;
   const code = game.game.code;
@@ -633,6 +640,25 @@ export function Lobby({
           </span>
         </div>
 
+        {/* 🧠 قوة الغرفة الذهنية — متوسط نقاط القوى الحقيقي لمن انضم */}
+        {(() => {
+          const scores = mindProfiles?.map((m) => m.tierScore) ?? [];
+          if (scores.length === 0) return null;
+          const avg = Math.round(scores.reduce((s, n) => s + n, 0) / scores.length);
+          const top = Math.max(...scores);
+          return (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-violet-500/8 px-3.5 py-2 text-[11px] text-violet-700 dark:text-violet-300">
+              <Brain className="size-3.5 shrink-0" />
+              <span>
+                متوسط قوة الغرفة: <strong className="tabular-nums">{avg}</strong>
+              </span>
+              <span className="text-violet-600/70 dark:text-violet-400/70">
+                · الأقوى {top} · بناءً على عقول {scores.length} لاعبين متزامنة
+              </span>
+            </div>
+          );
+        })()}
+
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {game.players.map((player, i) => (
             <li
@@ -640,14 +666,31 @@ export function Lobby({
               className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/40 px-3.5 py-3"
             >
               <GameAvatar name={player.name} index={i} />
-              <span className="flex-1 truncate text-sm font-semibold text-foreground">
-                {player.name}
-                {player.isMe && (
-                  <span className="ms-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-                    أنت
-                  </span>
-                )}
-              </span>
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-foreground">
+                  {player.name}
+                  {player.isMe && (
+                    <span className="ms-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                      أنت
+                    </span>
+                  )}
+                </span>
+                {/* 🧠 الهوية العقلية الحقيقية — من ملفات العقول المتزامنة */}
+                {(() => {
+                  const mp = mindProfiles?.find((m) => m.userId === player.id);
+                  if (!mp) return null;
+                  return (
+                    <span
+                      className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground"
+                      title={`عقل ${mp.rankName} — ${mp.tierScore} نقطة قوى من ${mp.sessions} جولة`}
+                    >
+                      <span>{mp.rankIcon}</span>
+                      <span className="font-semibold">{mp.rankName}</span>
+                      <span className="tabular-nums">· {mp.tierScore}</span>
+                    </span>
+                  );
+                })()}
+              </div>
               {player.isHost && (
                 <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
                   <Crown className="size-3.5" />

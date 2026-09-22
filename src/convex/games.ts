@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { assertSystemOpen } from "./systemLocks";
+import { MIND_RANKS } from "./mindCore";
 import {
   internalMutation,
   mutation,
@@ -1907,11 +1908,6 @@ export const smartMatch = mutation({
         )
         .first();
       if (!existing) {
-        const playerCount = (await ctx.db
-          .query("gamePlayers")
-          .withIndex("by_game", (q) => q.eq("gameId", bestGame._id))
-          .collect()).length;
-        
         await ctx.db.insert("gamePlayers", {
           gameId: bestGame._id,
           userId,
@@ -1933,3 +1929,39 @@ export const smartMatch = mutation({
 });
 
 
+
+// ---------------------------------------------------------------------------
+// 🧠 ملفات عقول الغرفة — بوابة اللعب تعرض عمق تقدم كل لاعب حقيقياً
+// ---------------------------------------------------------------------------
+
+/** ملفات عقل مصغّرة لقائمة معرّفات لاعبين (تُستهلك في لوبّي الغرفة). */
+export const getRoomMindProfiles = query({
+  args: { userIds: v.array(v.id("users")) },
+  handler: async (ctx, args) => {
+    // مقيّد: 12 لاعباً كحد أقصى لغرفة واحدة (اقتصاد قراءات)
+    const ids = args.userIds.slice(0, 12);
+    const out: {
+      userId: string;
+      rankIcon: string;
+      rankName: string;
+      tierScore: number;
+      sessions: number;
+    }[] = [];
+    for (const id of ids) {
+      const row = await ctx.db
+        .query("mindProfiles")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .first();
+      if (!row) continue;
+      const rank = MIND_RANKS.find((r) => r.level === row.rankLevel) ?? MIND_RANKS[0];
+      out.push({
+        userId: id,
+        rankIcon: rank.icon,
+        rankName: rank.name,
+        tierScore: row.tierScore,
+        sessions: row.sessions,
+      });
+    }
+    return out;
+  },
+});
