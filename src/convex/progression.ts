@@ -497,19 +497,26 @@ export const getAnalytics = query({
       7,
     );
 
-    // عينات الإجابات من أرشيف الأسئلة (آخر 800)
-    const archive = await ctx.db
+    // عينات الإجابات من أرشيف الأسئلة — قراءة مفهرسة بالزمن (بلا collect كامل)
+    // ملاحظة: الصعوبة غير مخزّنة في الأرشيف — تُشتق من بنك الأسئلة الثابت.
+    const archiveRows = await ctx.db
       .query("questionArchive")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .collect();
-    const samples = [...archive]
-      .sort((a: any, b: any) => b.createdAt - a.createdAt)
-      .slice(0, 800)
-      .map((a: any) => ({
-        category: a.category ?? "عام",
-        difficulty: a.difficulty ?? "easy",
-        wasCorrect: Boolean(a.wasCorrect),
-      }));
+      .order("desc")
+      .take(800);
+    const samples = archiveRows.map((a: any) => ({
+      category: a.category ?? "عام",
+      difficulty: "medium" as "easy" | "medium" | "hard", // تُستكمل من البنك أدناه
+      wasCorrect: Boolean(a.wasCorrect),
+    }));
+    // إثراء الصعوبة من البنك الثابت حيثما وُجد السؤال
+    for (let i = 0; i < archiveRows.length && i < 800; i += 1) {
+      const qid = archiveRows[i].questionId;
+      const bankQ = (QUESTION_BANK as { id: string; difficulty: string }[]).find(
+        (bq) => bq.id === qid,
+      );
+      if (bankQ) samples[i].difficulty = bankQ.difficulty as "easy" | "medium" | "hard";
+    }
 
     const categories = categoryBreakdown(samples);
     const difficulties = difficultyBreakdown(samples);

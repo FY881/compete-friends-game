@@ -1695,7 +1695,7 @@ const schema = defineSchema(
       wasCorrect: v.boolean(),
       favorited: v.boolean(),
       createdAt: v.number(),
-    }).index("by_user", ["userId"]).index("by_fav", ["userId", "favorited"]),
+    }).index("by_user", ["userId"]).index("by_fav", ["userId", "favorited"]).index("by_created", ["createdAt"]),
 
     // ═══════════════════════════════════════════════════════════════════════
     // ║ نظام الهدايا ║

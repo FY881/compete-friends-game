@@ -210,6 +210,22 @@ async function pruneInsights(ctx: any, before: number): Promise<number> {
   return n;
 }
 
+/** أرشيف الأسئلة: يحذف غير المفضلة القديم فقط — المفضلة والحديث يبقيان. */
+async function pruneArchive(ctx: any, before: number): Promise<number> {
+  let n = 0;
+  const rows = await ctx.db
+    .query("questionArchive")
+    .withIndex("by_created", (q: any) => q.lt("createdAt", before))
+    .take(1000);
+  for (const r of rows) {
+    if (!r.favorited) {
+      await ctx.db.delete(r._id);
+      n++;
+    }
+  }
+  return n;
+}
+
 /** جلسات أطلس المنتهية (لها logoutAt) الأقدم من الحد — المفتوحة تبقى. */
 async function pruneSessions(ctx: any, before: number): Promise<number> {
   let n = 0;
@@ -319,6 +335,9 @@ async function pruneBody(ctx: any) {
     // ── أخطاء العميل ──
     stats.clientErrors = await pruneByIndex(ctx, "clientErrors", "by_last", "lastSeen", errBefore);
     stats.errorLogs = await pruneByIndex(ctx, "errorLogs", "by_created", "createdAt", errBefore);
+
+    // ── أرشيف الأسئلة الشخصي: غير المفضلة فقط (المفضلة قيمة اللاعب تبقى) — 90 يوماً ──
+    stats.questionArchive = await pruneArchive(ctx, cutoff(90));
 
     // ═══════════════════════════════════════════════════════════════════
     // 🧠 جداول العقول الحية ووحدة الـ AI — أكبر مصادر التضخم المقيسة

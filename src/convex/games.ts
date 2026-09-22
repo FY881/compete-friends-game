@@ -1503,6 +1503,40 @@ export const finishGame = internalMutation({
         /* سجل الفئات اختياري — لا يعطل الجولة */
       }
 
+      // 📚 أرشيف الأسئلة التلقائي — كان الجدول بلا أي كتابة فعّالة فبقي
+      // أرشيف اللاعب فارغاً للأبد. الآن كل إجابة جولة حقيقية تُؤرشف.
+      try {
+        const archiveEntries: {
+          questionId: string;
+          category: string;
+          question: string;
+          options: string[];
+          correctIndex: number;
+          wasCorrect: boolean;
+        }[] = [];
+        for (const a of p.answers) {
+          if (!a) continue;
+          const qd = await resolveQuestion(ctx, a.questionId);
+          if (!qd) continue;
+          archiveEntries.push({
+            questionId: qd.id,
+            category: qd.category,
+            question: qd.question,
+            options: [...qd.options],
+            correctIndex: qd.correctIndex,
+            wasCorrect: a.correct,
+          });
+        }
+        if (archiveEntries.length > 0) {
+          await ctx.runMutation(internal.questionArchiveFeed.archiveFromGame, {
+            userId: p.userId,
+            entries: archiveEntries,
+          });
+        }
+      } catch {
+        /* الأرشفة اختيارية — لا تعطل الجولة */
+      }
+
       // موجّة 5 — إن كانت جولة داخل نافذة بطولة نشطة، احتسبها تلقائياً
       try {
         await ctx.runMutation(internal.tournaments.recordRound, { historyId });
