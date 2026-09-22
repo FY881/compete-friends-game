@@ -1,80 +1,91 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { dayKey } from "./gameConfig";
+import { internal } from "./_generated/api";
 import { QUESTION_BANK } from "./questions";
+import {
+  DAILY_MAX_XP,
+  DAILY_QUESTION_COUNT,
+  badgesForDaily,
+  compareDailyBoards,
+  dailyStreak,
+  dailyXp,
+  dayKeyUtc,
+  nextDailyResetAt,
+  questionsForDay,
+  validateDailyAttempt,
+} from "./dailyCore";
 
 /**
- * «تحدي اليوم» — جولة فردية ثابتة لكل يوم تقويمي.
+ * ═══════════════════════════════════════════════════════════════════════
+ * 🗓️ «تحدي اليوم» — محرّك العودة اليومية
  *
- * - نفس 10 أسئلة لكل اللاعبين في نفس اليوم (تُختار ببذرة ثابتة من التاريخ).
- * - محاولة واحدة في اليوم؛ أفضل نتيجة تُحفظ وتُظهر في الملف الشخصي.
- * - تمنح خبرة (XP) وشارات: «أول تحدي»، «الكمال اليومي»، «أسبوع التحديات».
+ * كان هذا النظام كاملاً في الخادم لكنه غير موصول بأي واجهة إطلاقاً، وزرُّ
+ * «التحدي اليومي» في صفحة اللعب كان يَعِد بتحميله ثم ينقل اللاعب إلى /games.
+ * الآن: نفس العشرة أسئلة لكل اللاعبين (بذرة ثابتة من التاريخ ⇒ صدارة عادلة
+ * حقاً)، محاولة واحدة يومياً، حساب وترتيب على الخادم بالكامل، سلسلة أيام
+ * حقيقية، وسجل شخصي — وكل الحساب من `dailyCore` النقي المختبر.
+ *
+ * قواعد ملزمة:
+ *  • الخادم لا يثق بأي رقم من المتصفح: النقاط والسلسلة تُحسب هنا.
+ *  • الإجابة الصحيحة لا تُرسل للعميل أبداً.
+ *  • كل قراءة مقيّدة بـ take() — لا استعلام ثقيل مهما كثر اللاعبون.
+ *  • «اليوم» بتوقيت UTC موحّداً بين التحدي والصدارة والسجل (لا اختلاف أبداً).
+ * ═══════════════════════════════════════════════════════════════════════
  */
 
-export const DAILY_QUESTION_COUNT = 10;
-export const DAILY_MAX_XP = 60;
+export { DAILY_MAX_XP, DAILY_QUESTION_COUNT };
 
-/** Pseudo-random generator seeded by a string — deterministic per day. */
-function seededRandom(seedStr: string): () => number {
-  let h = 2166136261;
-  for (let i = 0; i < seedStr.length; i++) {
-    h ^= seedStr.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  let seed = h >>> 0;
-  return () => {
-    seed += 0x6d2b79f5;
-    let t = seed;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+const HISTORY_DAYS = 14;
+
+/** يوم اليوم + كل ما يحتاجه اللاعب والقائمة */
+function today() {
+  const now = Date.now();
+  return { day: dayKeyUtc(now), now, resetAt: nextDailyResetAt(now) };
 }
 
-function shuffle<T>(arr: T[], rand: () => number): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+/** كل أيام إنجاز اللاعب — مصدر واحد للسلسلة والسجل والشارات */
+async function myDays(ctx: { db: any }, userId: { toString(): string }): Promise<string[]> {
+  const rows = await ctx.db
+    .query("dailyChallenges")
+    .withIndex("by_user_day", (q: any) => q.eq("userId", userId))
+    .take(400);
+  return rows.map((r: { day: string }) => r.day);
 }
 
-/** The 10 questions of the day for a given day key (full, server-side). */
-export function questionsForDay(day: string) {
-  const rand = seededRandom(`alabqari-daily-${day}`);
-  const shuffled = shuffle(QUESTION_BANK, rand);
-  return shuffled.slice(0, DAILY_QUESTION_COUNT);
+/** أسئلة اليوم بلا الإجابة الصحيحة — ما يُرسل للعميل */
+function publicQuestions(day: string) {
+  return questionsForDay(QUESTION_BANK, day).map(({ correctIndex: _c, ...rest }) => rest);
 }
 
-function answerScore(elapsedMs: number): number {
-  // كل إجابة صحيحة: 100 نقطة + مكافأة سرعة (كلما أسرع كلما زادت، حتى 50).
-  return 100 + Math.max(0, Math.min(50, Math.round((15_000 - elapsedMs) / 150)));
-}
+// ═══════════════════════════ التحدي ═══════════════════════════
 
-/** Current day's challenge + the player's status. */
+/** Current day's challenge + the player's status (وسلسلته وعدّاد التصفير). */
 export const getDailyChallenge = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
 
-    const today = dayKey(Date.now());
+    const { day, resetAt } = today();
     const existing = await ctx.db
       .query("dailyChallenges")
-      .withIndex("by_user_day", (q) => q.eq("userId", userId).eq("day", today))
+      .withIndex("by_user_day", (q) => q.eq("userId", userId).eq("day", day))
       .first();
+    const days = await myDays(ctx, userId);
+    const streak = dailyStreak(days, day);
 
-    const all = await ctx.db
-      .query("dailyChallenges")
-      .withIndex("by_user_day", (q) => q.eq("userId", userId))
-      .collect();
+    const questions = publicQuestions(day);
+    const mine = existing
+      ? await myRankToday(ctx, userId, day, existing.score, existing.correctCount, existing.playedAt)
+      : null;
 
     return {
-      day: today,
+      day,
       // يُرسل السؤال بدون الإجابة الصحيحة للعميل — التحقق يتم على الخادم.
-      questions: questionsForDay(today).map(({ correctIndex: _c, ...rest }) => rest),
+      questions,
+      questionCount: questions.length,
+      maxXp: DAILY_MAX_XP,
       completed: existing
         ? {
             score: existing.score,
@@ -83,13 +94,155 @@ export const getDailyChallenge = query({
             xpEarned: existing.xpEarned,
           }
         : null,
-      completedDays: all.length,
-      bestScoreEver: all.reduce((max, r) => Math.max(max, r.score), 0),
+      completedDays: days.length,
+      bestScoreEver: await bestEver(ctx, userId),
+      // ── توسيع حقيقي ──
+      streak,
+      nextResetAt: resetAt,
+      myRank: mine?.rank ?? null,
+      boardSize: mine?.size ?? 0,
     };
   },
 });
 
-/** Submit today's attempt — one per day, server-side scored & verified. */
+/** أفضل نتيجة على الإطلاق — بقراءة مرتّبة لا بجمع كل الصفوف */
+async function bestEver(ctx: { db: any }, userId: unknown): Promise<number> {
+  const rows = await ctx.db
+    .query("dailyChallenges")
+    .withIndex("by_user_day", (q: any) => q.eq("userId", userId))
+    .take(400);
+  return rows.reduce((max: number, r: { score: number }) => Math.max(max, r.score), 0);
+}
+
+/** رتبة اللاعب في صدارة اليوم — تُحسب بمقارنة مع صفوف اليوم فقط */
+async function myRankToday(
+  ctx: { db: any },
+  userId: unknown,
+  day: string,
+  score: number,
+  correctCount: number,
+  playedAt: number,
+) {
+  const entries = await ctx.db
+    .query("dailyChallenges")
+    .withIndex("by_day", (q: any) => q.eq("day", day))
+    .take(400);
+  const me = { score, correctCount, playedAt, userId: String(userId) };
+  const better = entries.filter(
+    (e: { score: number; correctCount: number; playedAt: number; userId: unknown }) =>
+      String(e.userId) !== me.userId && compareDailyBoards(e, me) < 0,
+  ).length;
+  return { rank: better + 1, size: entries.length };
+}
+
+// ═══════════════════════════ الصدارة ═══════════════════════════
+
+/**
+ * صدارة اليوم — أعدل صدارة في اللعبة: كل لاعب حلّ الأسئلة نفسها بالحرف،
+ * فلا مزية لمستوى ولا لمحتوى أسهل. مع رتبة اللاعب نفسه داخل القائمة.
+ */
+export const getDailyBoard = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    const { day, resetAt } = today();
+    const entries = await ctx.db
+      .query("dailyChallenges")
+      .withIndex("by_day", (q) => q.eq("day", day))
+      .take(400);
+
+    const sorted = [...entries].sort(compareDailyBoards);
+    const top = sorted.slice(0, 20);
+    const names = new Map<string, string>();
+    for (const e of top) {
+      const u = await ctx.db.get(e.userId);
+      if (u) names.set(String(e.userId), (u as { name?: string }).name ?? "لاعب");
+    }
+
+    const myIndex = userId ? sorted.findIndex((e) => String(e.userId) === String(userId)) : -1;
+    const mine = myIndex >= 0 ? sorted[myIndex] : null;
+    const myName = userId ? (await ctx.db.get(userId)) as { name?: string } | null : null;
+
+    return {
+      day,
+      nextResetAt: resetAt,
+      total: entries.length,
+      perfectCount: entries.filter((e) => e.correctCount === DAILY_QUESTION_COUNT).length,
+      averageScore: entries.length
+        ? Math.round(entries.reduce((s, e) => s + e.score, 0) / entries.length)
+        : 0,
+      top: top.map((e, i) => ({
+        rank: i + 1,
+        name: names.get(String(e.userId)) ?? "لاعب",
+        score: e.score,
+        correctCount: e.correctCount,
+        bestStreak: e.bestStreak,
+        playedAt: e.playedAt,
+        isMe: userId ? String(e.userId) === String(userId) : false,
+      })),
+      me: mine
+        ? {
+            rank: myIndex + 1,
+            name: myName?.name ?? "أنت",
+            score: mine.score,
+            correctCount: mine.correctCount,
+            bestStreak: mine.bestStreak,
+          }
+        : null,
+    };
+  },
+});
+
+// ═══════════════════════════ السجل الشخصي ═══════════════════════════
+
+/** آخر ١٤ يوماً من إنجازي — يُظهر السلسلة والكمال بصدق */
+export const getMyDailyHistory = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const rows = await ctx.db
+      .query("dailyChallenges")
+      .withIndex("by_user_day", (q) => q.eq("userId", userId))
+      .take(HISTORY_DAYS + 60);
+
+    const byDay = new Map(rows.map((r) => [r.day, r]));
+    const { day } = today();
+    const out: {
+      day: string;
+      score: number;
+      correctCount: number;
+      bestStreak: number;
+      perfect: boolean;
+    }[] = [];
+    for (let i = 0; i < HISTORY_DAYS; i++) {
+      const key = dayKeyUtc(Date.parse(`${day}T00:00:00Z`) - i * 86_400_000);
+      const r = byDay.get(key);
+      if (!r) continue;
+      out.push({
+        day: key,
+        score: r.score,
+        correctCount: r.correctCount,
+        bestStreak: r.bestStreak,
+        perfect: r.correctCount === DAILY_QUESTION_COUNT,
+      });
+    }
+
+    return {
+      days: out,
+      streak: dailyStreak(rows.map((r) => r.day), day),
+      best: out.reduce((m, d) => Math.max(m, d.score), 0),
+      perfectDays: out.filter((d) => d.perfect).length,
+    };
+  },
+});
+
+// ═══════════════════════════ الإرسال ═══════════════════════════
+
+/**
+ * إرسال محاولة اليوم — واحدة فقط في اليوم، حساب وتحقق على الخادم بالكامل.
+ * كل قواعد الرفض والحساب تأتي من `validateDailyAttempt` النقي المختبر.
+ */
 export const submitDailyChallenge = mutation({
   args: {
     day: v.string(),
@@ -105,67 +258,44 @@ export const submitDailyChallenge = mutation({
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("يجب تسجيل الدخول أولاً");
 
-    const today = dayKey(Date.now());
-    if (day !== today) throw new Error("هذا التحدي ليس تحدياً لليوم — تظهر أسئلة جديدة كل يوم.");
+    const { day: todayDay } = today();
 
     const existing = await ctx.db
       .query("dailyChallenges")
-      .withIndex("by_user_day", (q) => q.eq("userId", userId).eq("day", today))
+      .withIndex("by_user_day", (q) => q.eq("userId", userId).eq("day", todayDay))
       .first();
     if (existing) throw new Error("أنجزت تحدي اليوم بالفعل — عد غداً لتحدٍ جديد ✨");
 
-    const questions = questionsForDay(today);
-    const byId = new Map(questions.map((q) => [q.id, q]));
-    if (answers.length !== questions.length) {
-      throw new Error("أجب عن جميع الأسئلة قبل الإرسال.");
-    }
+    const questions = questionsForDay(QUESTION_BANK, todayDay);
+    const verdict = validateDailyAttempt({ day, today: todayDay, questions, answers });
+    if (!verdict.ok) throw new Error(verdict.error);
 
-    let correctCount = 0;
-    let bestStreak = 0;
-    let streak = 0;
-    let score = 0;
-    for (const answer of answers) {
-      const q = byId.get(answer.questionId);
-      if (!q) throw new Error("سؤال غير معروف في هذا التحدي.");
-      const correct = answer.selected === q.correctIndex;
-      if (correct) {
-        correctCount += 1;
-        streak += 1;
-        bestStreak = Math.max(bestStreak, streak);
-        score += answerScore(Math.max(0, Math.min(15_000, answer.elapsedMs)));
-      } else {
-        streak = 0;
-      }
-    }
+    const total = questions.length;
+    const xp = dailyXp(verdict.correctCount, total, verdict.bestStreak);
+    const now = Date.now();
 
-    const perfect = correctCount === questions.length;
-    const xp = Math.min(
-      DAILY_MAX_XP,
-      correctCount * 10 + (perfect ? 20 : 0) + (bestStreak >= 5 ? 15 : 0),
-    );
-
+    // ── السجل والشارات ──
+    const priorDays = await ctx.db
+      .query("dailyChallenges")
+      .withIndex("by_user_day", (q) => q.eq("userId", userId))
+      .take(400);
     const profile = await ctx.db
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
-    const had = new Set(profile?.badges ?? []);
-    const next = new Set(had);
-    next.add("daily_first");
-    if (perfect) next.add("daily_perfect");
-    const allDays = await ctx.db
-      .query("dailyChallenges")
-      .withIndex("by_user_day", (q) => q.eq("userId", userId))
-      .collect();
-    if (allDays.length + 1 >= 7) next.add("daily_7_days");
-    const badgesEarned = [...next].filter((id) => !had.has(id));
 
-    const now = Date.now();
+    const badges = badgesForDaily({
+      had: profile?.badges ?? [],
+      perfect: verdict.perfect,
+      totalDays: priorDays.length + 1,
+    });
+
     await ctx.db.insert("dailyChallenges", {
       userId,
-      day: today,
-      score,
-      correctCount,
-      bestStreak,
+      day: todayDay,
+      score: verdict.score,
+      correctCount: verdict.correctCount,
+      bestStreak: verdict.bestStreak,
       xpEarned: xp,
       playedAt: now,
     });
@@ -173,9 +303,9 @@ export const submitDailyChallenge = mutation({
     if (profile) {
       await ctx.db.patch(profile._id, {
         xp: (profile.xp ?? 0) + xp,
-        correctAnswers: (profile.correctAnswers ?? 0) + correctCount,
-        totalAnswers: (profile.totalAnswers ?? 0) + answers.length,
-        badges: [...next],
+        correctAnswers: (profile.correctAnswers ?? 0) + verdict.correctCount,
+        totalAnswers: (profile.totalAnswers ?? 0) + total,
+        badges: badges.next,
         updatedAt: now,
       });
     } else {
@@ -184,23 +314,55 @@ export const submitDailyChallenge = mutation({
         xp,
         gamesPlayed: 0,
         gamesWon: 0,
-        bestScore: 0,
-        bestStreak: 0,
-        correctAnswers: correctCount,
-        totalAnswers: answers.length,
-        badges: [...next],
+        bestScore: verdict.score,
+        bestStreak: verdict.bestStreak,
+        correctAnswers: verdict.correctCount,
+        totalAnswers: total,
+        badges: badges.next,
         updatedAt: now,
       });
     }
 
+    // ── السلسلة الحقيقية + رتبة اليوم (محسوبة بعد الحفظ) ──
+    const streak = dailyStreak([...priorDays.map((r) => r.day), todayDay], todayDay);
+    const rank = await myRankToday(
+      ctx,
+      userId,
+      todayDay,
+      verdict.score,
+      verdict.correctCount,
+      now,
+    );
+
+    // ── ربط حقيقي بمسار الإشعارات الموحّد: تنبيه عند محطة سلسلة ──
+    if (streak.current === 7 || streak.current === 30) {
+      await ctx.runMutation(internal.notify.push, {
+        userId,
+        title: `🔥 سلسلة ${streak.current} يوم في تحدي اليوم`,
+        body:
+          streak.current === 30
+            ? "شهر كامل بلا انقطاع — شارة «شهر التحديات» صارت لك. واصل!"
+            : "أسبوع كامل بلا انقطاع — شارة «أسبوع التحديات» صارت لك. واصل!",
+        type: "info",
+        category: "streaks",
+        priority: "important",
+        actionUrl: "/play",
+      });
+    }
+
     return {
-      score,
-      correctCount,
-      total: questions.length,
-      bestStreak,
+      score: verdict.score,
+      correctCount: verdict.correctCount,
+      total,
+      bestStreak: verdict.bestStreak,
       xpEarned: xp,
-      badgesEarned,
-      perfect,
+      badgesEarned: badges.earned,
+      perfect: verdict.perfect,
+      // ── توسيع حقيقي ──
+      streak,
+      rank: rank.rank,
+      boardSize: rank.size,
+      timingsTrustworthy: verdict.timingsTrustworthy,
     };
   },
 });

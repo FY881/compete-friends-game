@@ -36,6 +36,7 @@ export const BADGES: Badge[] = [
   { id: "daily_first", name: "فتّاحة التحدي", description: "أنجز تحدي اليوم لأول مرة", emoji: "🌅" },
   { id: "daily_perfect", name: "الكمال اليومي", description: "أجب عن جميع أسئلة تحدي اليوم بشكل صحيح", emoji: "💯" },
   { id: "daily_7_days", name: "أسبوع التحديات", description: "أنجز تحدي اليوم في 7 أيام مختلفة", emoji: "📆" },
+  { id: "daily_30_days", name: "شهر التحديات", description: "أنجز تحدي اليوم في 30 يوماً — سلسلة الشهر الذهبية", emoji: "🏆" },
   { id: "games_25", name: "محارب الحلبة", description: "شارك في 25 جولة", emoji: "⚔️" },
   { id: "wins_10", name: "العقل المدبّر", description: "اربح 10 جولات في المجمل", emoji: "🧠" },
   { id: "level_20", name: "الذكاء الخارق", description: "صل إلى المستوى 20", emoji: "🔮" },
