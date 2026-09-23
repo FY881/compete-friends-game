@@ -109,6 +109,7 @@ export default function Play() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const createGame = useMutation(api.games.createGame);
+  const smartMatch = useMutation(api.games.smartMatch);
   const getAiHint = useAction(api.openRouter.getAiHint);
   const analyzePerformance = useAction(api.openRouter.analyzePlayerPerformance);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
@@ -131,6 +132,8 @@ export default function Play() {
   });
   const [code, setCode] = useState("");
   const [creating, setCreating] = useState(false);
+  const [matching, setMatching] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [joining, setJoining] = useState(false);
   const [downloadingApk, setDownloadingApk] = useState(false);
   const [showOwnerLogin, setShowOwnerLogin] = useState(false);
@@ -157,9 +160,10 @@ export default function Play() {
   };
 
   const handleAnalyze = async () => {
-    if (!profile) return;
+    if (!profile || analyzing) return;
+    setAnalyzing(true);
     try {
-      // التحليل يجري عبر نظامي مركز API على الخادم — لا مفتاح من المتصفح
+      // التحليل يجري عبر مركز API على الخادم — لا مفتاح من المتصفح
       const stats = JSON.stringify({
         gamesPlayed: profile.gamesPlayed,
         gamesWon: profile.gamesWon,
@@ -170,7 +174,41 @@ export default function Play() {
       setAiAnalysis(res.overallRating + ": " + (res.suggestions?.join(", ") ?? ""));
       toast.success("🤖 تم تحليل أدائك بالحرب العقول الاصطناعي!");
     } catch (e) {
-      toast.error("خطأ في التحليل");
+      const msg = e instanceof Error ? e.message : "";
+      // رسالة واضحة بدل خطأ غامض: مشكلة إعداد مزوّد AI وليست عطلاً في اللعبة
+      if (/provider|api|key|llm|model/i.test(msg)) {
+        toast.error("تحليل AI يحتاج إعداد مزوّد الذكاء من غرفة المالك ← مركز API");
+      } else {
+        toast.error("خطأ في التحليل، حاول مجدداً");
+      }
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  /** 🎯 المطابقة الذكية الحقيقية: ينضم لغرفة مناسبة لمستواه أو يُنشئ غرفة جديدة فوراً. */
+  const handleSmartMatch = async () => {
+    if (matching) return;
+    setMatching(true);
+    try {
+      syncAccountName(nickname);
+      toast.info("🔍 جاري البحث عن منافس مناسب...");
+      const result = await smartMatch({ name: nickname.trim() });
+      if (result.code) {
+        toast.success(result.matched ? "⚔️ عُثر على منافس — انطلق!" : "🎮 لا منافس الآن — أُنشئت لك غرفة جديدة");
+        navigate(`/game/${result.code}`);
+      } else {
+        // لا غرفة مناسبة — أنشئ غرفة جديدة فوراً (نفس مسار handleCreate)
+        const { code: roomCode } = await createGame({ name: nickname.trim() });
+        navigate(`/game/${roomCode}`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "تعذّرت المطابقة، حاول مجدداً.",
+      );
+    } finally {
+      setMatching(false);
     }
   };
 
@@ -546,17 +584,14 @@ export default function Play() {
                 size="lg"
                 variant="secondary"
                 className="gap-2 rounded-xl px-7 text-base bg-gradient-to-l from-primary/10 to-amber-500/10"
-                onClick={async () => {
-                  try {
-                    const smartMatch = (await import("@/convex/_generated/api")).api.games.smartMatch;
-                    // Will use smart match mutation
-                    toast.info("🔍 جاري البحث عن منافس مناسب...");
-                  } catch {
-                    toast.error("خطأ في المطابقة الذكية");
-                  }
-                }}
+                onClick={handleSmartMatch}
+                disabled={creating || banned}
               >
-                <Swords className="size-4.5" />
+                {matching ? (
+                  <Loader2 className="size-4.5 animate-spin" />
+                ) : (
+                  <Swords className="size-4.5" />
+                )}
                 مطابقة ذكية
               </Button>
             </motion.div>
