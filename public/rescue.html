@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>إنقاذ حرب العقول</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: "IBM Plex Sans Arabic", system-ui, sans-serif;
+        min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, #050a18 0%, #0B1121 40%, #1E3A5F 80%, #2563EB 100%);
+        color: #fff; padding: 24px;
+      }
+      .card {
+        width: 100%; max-width: 420px; text-align: center;
+        background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+        border-radius: 24px; padding: 32px 24px; backdrop-filter: blur(12px);
+      }
+      .icon { font-size: 44px; }
+      h1 { font-size: 22px; margin: 14px 0 8px; }
+      p  { font-size: 13px; color: rgba(255,255,255,.7); line-height: 1.8; }
+      button {
+        margin-top: 20px; width: 100%; padding: 14px; border: 0; border-radius: 14px;
+        font-size: 15px; font-weight: 700; cursor: pointer;
+        background: linear-gradient(120deg, #2563EB, #F59E0B); color: #fff;
+      }
+      button:active { transform: scale(.98); }
+      .log { margin-top: 18px; text-align: right; font-size: 11px; color: rgba(255,255,255,.55);
+             max-height: 140px; overflow: auto; line-height: 1.9; }
+      .ok  { color: #4ade80; }
+      .back { margin-top: 12px; font-size: 12px; color: rgba(255,255,255,.6); text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">🧤</div>
+      <h1>غرفة إنقاذ حرب العقول</h1>
+      <p>
+        إذا فتحت اللعبة وظهرت شاشة بيضاء أو لم تُفتح، اضغط الزر أدناه.
+        سيتم تنظيف نسخ التخزين القديمة على جهازك فقط —
+        <b>حسابك وتقدمك محفوظان على الخادم ولن يتأثرا إطلاقاً</b>.
+      </p>
+      <button id="go">🧹 تنظيف جهازي والعودة للعبة</button>
+      <div class="log" id="log"></div>
+      <a class="back" href="/">تجربة الدخول مباشرة ←</a>
+    </div>
+
+    <script>
+      var logEl = document.getElementById("log");
+      function log(msg, ok) {
+        var d = document.createElement("div");
+        d.textContent = (ok ? "✓ " : "• ") + msg;
+        if (ok) d.className = "ok";
+        logEl.appendChild(d);
+      }
+
+      document.getElementById("go").addEventListener("click", function () {
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = "جارٍ التنظيف…";
+
+        // 1) عمال الخدمة القديمون — السبب الأول للشاشة البيضاء العنيدة
+        var step1 = navigator.serviceWorker && navigator.serviceWorker.getRegistrations
+          ? navigator.serviceWorker.getRegistrations().then(function (rs) {
+              rs.forEach(function (r) { r.unregister(); });
+              return "أُوقِف " + rs.length + " عامل خدمة قديم";
+            }).catch(function () { return "تعذّر الوصول لعمال الخدمة (طبيعي إن لم يوجد)"; })
+          : Promise.resolve("لا يوجد دعم لعمال الخدمة — سليم");
+
+        // 2) كل الكاشات المخزنة (نسخ JS/CSS الميتة)
+        var step2 = (window.caches && caches.keys
+          ? caches.keys().then(function (ks) {
+              return Promise.all(ks.map(function (k) { return caches.delete(k); }))
+                .then(function () { return "حُذف " + ks.length + " كاش قديم"; });
+            }).catch(function () { return "لا كاشات لحذفها"; })
+          : Promise.resolve("لا يوجد دعم للكاش — سليم"));
+
+        // 3) التخزين المحلي — مع الحفاظ على جلسة الدخول والتخصيصات
+        var PRESERVE = ["convex-auth-token", "theme", "lang"];
+        var step3 = Promise.resolve().then(function () {
+          try {
+            var kept = 0, cleared = 0;
+            for (var i = localStorage.length - 1; i >= 0; i--) {
+              var k = localStorage.key(i);
+              var keep = PRESERVE.some(function (p) { return k.indexOf(p) !== -1; });
+              if (keep) { kept++; continue; }
+              localStorage.removeItem(k); cleared++;
+            }
+            sessionStorage.clear();
+            return "تم تنظيف " + cleared + " مفتاحاً · حُفظت الجلسة والإعدادات (" + kept + ")";
+          } catch (e) { return "تعذّر تنظيف التخزين: " + e.message; }
+        });
+
+        Promise.all([step1, step2, step3]).then(function (results) {
+          results.forEach(function (r) { log(r, true); });
+          log("اكتمل — العودة للعبة خلال لحظات…", true);
+          setTimeout(function () {
+            location.replace("/?_rescued=" + Date.now());
+          }, 900);
+        });
+      });
+    </script>
+  </body>
+</html>

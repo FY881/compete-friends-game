@@ -32,6 +32,44 @@
     rel="stylesheet"
   />
   <title>حرب العقول</title>
+  <script>
+    /* ═══ 🧤 حارس الإقلاع الذاتي (Boot Rescue Guard) ═══
+     * الشاشة البيضاء = React لم يُركّب إطلاقاً (كاش/عامل خدمة قديم متعنّت
+     * يمنع تحميل وحدات التطبيق). هذا الحارس يعمل بلا أي وحدة خارجية:
+     * إن بقي #root فارغاً 8 ثوانٍ → يمسح الكاش ويسجّل خروج كل عمال
+     * الخدمة القديمين ويعيد التحميل مرة واحدة (مزلاج يمنع الحلقات).
+     * عند نجاح الإقلاع يُرفع المزلاج تلقائياً ليعمل الحارس مستقبلاً.
+     */
+    (function () {
+      try {
+        var K = "boot_rescue_v1";
+        setTimeout(function () {
+          try {
+            var root = document.getElementById("root");
+            var empty = !root || root.childElementCount === 0;
+            if (empty && !sessionStorage.getItem(K)) {
+              sessionStorage.setItem(K, String(Date.now()));
+              if (window.caches && caches.keys) {
+                caches.keys().then(function (ks) {
+                  ks.forEach(function (k) { caches.delete(k); });
+                }).catch(function () {});
+              }
+              if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                navigator.serviceWorker.getRegistrations().then(function (rs) {
+                  rs.forEach(function (r) { r.unregister(); });
+                }).catch(function () {});
+              }
+              setTimeout(function () {
+                location.replace(location.pathname + "?_bootrescue=" + Date.now());
+              }, 700);
+            } else if (!empty) {
+              sessionStorage.removeItem(K);
+            }
+          } catch (e) {}
+        }, 8000);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 
 <body>
