@@ -152,11 +152,13 @@ function hostOf(baseUrl: string): string {
 // ③ تطبيع الرابط — يقبل ما يكتبه المالك حرفياً
 // ═══════════════════════════════════════════════════════════════════════
 
-/** يضيف https:// إن نُسي، ويشذّب الفراغات والشرطة الأخيرة */
+/** يضيف https:// إن نُسي، ويصحّح http:// إلى https (كل مزوّدي الذكاء يشترطون التشفير)، ويشذّب الفراغات والشرطة الأخيرة */
 export function ensureScheme(raw: string): string {
   const trimmed = (raw ?? "").trim().replace(/\/+$/, "");
   if (!trimmed) return "";
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // 🔒 http:// يفشل مع كل مزوّدي الذكاء (MiniMax يرد 404 على غير المشفر) — نجمّعه لـhttps دائماً
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  if (/^http:\/\//i.test(trimmed)) return `https://${trimmed.slice(7)}`;
   return `https://${trimmed}`;
 }
 
