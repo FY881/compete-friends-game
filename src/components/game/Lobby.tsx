@@ -376,7 +376,7 @@ function ReportPlayerDialog({
   target,
   onClose,
 }: {
-  target: { id: string; name: string } | null;
+  target: { id: string; userId: string; name: string } | null;
   onClose: () => void;
 }) {
   const submitReport = useMutation(api.owner.submitReport);
@@ -389,7 +389,7 @@ function ReportPlayerDialog({
     setBusy(true);
     try {
       await submitReport({
-        targetId: target.id as never,
+        targetId: target.userId as never,
         reason,
         details: details.trim() || undefined,
       });
@@ -479,12 +479,12 @@ export function Lobby({
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ id: string; userId: string; name: string } | null>(null);
 
   // 🧠 ملفات عقول اللاعبين — عمق التقدم الحقيقي يظهر في بوابة اللعب
   const mindProfiles = useQuery(
     api.games.getRoomMindProfiles,
-    { userIds: game.players.map((p) => p.id as never) },
+    { userIds: game.players.map((p) => p.userId as never) },
   );
 
   const host = game.players.find((p) => p.isHost);
@@ -677,7 +677,7 @@ export function Lobby({
                 </span>
                 {/* 🧠 الهوية العقلية الحقيقية — من ملفات العقول المتزامنة */}
                 {(() => {
-                  const mp = mindProfiles?.find((m) => m.userId === player.id);
+                  const mp = mindProfiles?.find((m) => m.userId === player.userId);
                   if (!mp) return null;
                   return (
                     <span
@@ -707,7 +707,7 @@ export function Lobby({
                   onClick={async () => {
                     setKicking(player.id);
                     try {
-                      await kickPlayer({ code, userId: player.id as never });
+                      await kickPlayer({ code, userId: player.userId as never });
                       toast.success(`تم طرد ${player.name} من الغرفة.`);
                     } catch (error) {
                       console.error(error);
@@ -732,7 +732,7 @@ export function Lobby({
                   title="الإبلاغ عن اللاعب"
                   aria-label={`الإبلاغ عن ${player.name}`}
                   className="rounded-lg p-1.5 text-muted-foreground/50 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
-                  onClick={() => setReportTarget({ id: player.id, name: player.name })}
+                  onClick={() => setReportTarget({ id: player.id, userId: player.userId, name: player.name })}
                 >
                   <Flag className="size-3.5" />
                 </button>

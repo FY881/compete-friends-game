@@ -91,7 +91,10 @@ export type MyResult = {
 };
 
 export type PlayerInfo = {
+  /** معرّف سجل اللاعب في الغرفة (gamePlayers) — للعمليات داخل الغرفة */
   id: string;
+  /** معرّف الحساب الحقيقي (users) — للربط بأنظمة الحساب (العضوية/العقل/الصورة) */
+  userId: string;
   name: string;
   score: number;
   answers: (AnswerInfo | null)[];
@@ -1779,6 +1782,7 @@ export const getGame = query({
     const playerInfos: PlayerInfo[] = players
       .map((p) => ({
         id: p._id,
+        userId: p.userId,
         name: p.name,
         score: p.score,
         answers: p.answers,
