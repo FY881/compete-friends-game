@@ -1,4 +1,4 @@
-/* حرب العقول — service worker v2
+/* حرب العقول — service worker v3
  *
  * STRATEGY: Network-first for EVERYTHING (HTML, JS, CSS, chunks).
  * Only fall back to cache when offline.
@@ -16,7 +16,7 @@
  * - Dev server (daytonaproxy) is never cached.
  */
 
-const CACHE = "war-v2";
+const CACHE = "war-v3";
 
 self.addEventListener("install", (event) => {
   // Skip old caches
