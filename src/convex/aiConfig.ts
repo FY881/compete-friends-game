@@ -1,271 +1,648 @@
 /**
- * ═══════════════════════════════════════════════════════════════
- * AI Configuration — محرك الاستدعاء الحقيقي الوحيد في اللعبة
- * ═══════════════════════════════════════════════════════════════
+ * ═══════════════════════════════════════════════════════════════════════
+ * 🧠 محرك الذكاء الموحّد — مركز API هو المتحكّم الوحيد
+ * ═══════════════════════════════════════════════════════════════════════
  *
- * النظام المطلوب: نظامان فقط، لا ثالث لهما.
+ * لا يوجد أي مسار بديل: كل استدعاء AI في اللعبة يمرّ من هنا حصراً.
  *
- *  ⚙️ النظام الأول (System A): مفتاح API + رابط المزود (URL).
- *     يُستخدم مع أي مزوّد يعطي رابطاً خاصاً (توافقي مع OpenAI).
+ *  ⚙️ المحرّك يقرأ من مركز API أربعة أشياء قبل كل طلب:
+ *     ① المزوّدون المضبوطون (مفتاح + رابط، أو مفتاح فقط).
+ *     ② مصفوفة التوجيه: أي وحدة تستخدم أي نموذج وبأي حرارة وطول.
+ *     ③ الحدود: سقف يومي، حد الدقيقة، الكاش، قاطع الدائرة.
+ *     ④ النماذج المُكتشَفة فعلياً من المزوّد.
  *
- *  🔑 النظام الثاني (System B): مفتاح API فقط (بدون URL).
- *     يُستخدم عبر البوابة الافتراضية الثابتة (OpenRouter) للأنظمة
- *     التي تدعم هذا النمط.
+ * وأثناء الطلب:
+ *     • يطبّع الرابط (يقبل `api.minimax.io/v1` كما يكتبه المالك).
+ *     • يجرّب سلسلة نماذج مرتّبة بالسرعة، ويتنقّل بين المزوّدين عند الفشل.
+ *     • يحترم اختلاف المزوّدين (JSON mode / فصل التفكير / <think>).
+ *     • يُسجّل كل طلب: الوحدة، النموذج، الزمن، التوكنات، سبب الفشل.
  *
- * كل استدعاء هو طلب شبكة حقيقي (fetch). إن فشل الاتصال يُرمى خطأ
- * واضح لا يُكتم (لا نتائج وهمية أبداً).
- *
- * يعمل محركاً وحيداً: كل أنظمة AI في اللعبة تمر عبر callLlm هنا.
- * ═══════════════════════════════════════════════════════════════
+ * لا نتائج وهمية أبداً: إن فشل كل شيء يُرمى خطأ واضح وصريح.
+ * ═══════════════════════════════════════════════════════════════════════
  */
+import { internal } from "./_generated/api";
+import {
+  DEFAULT_GUARD,
+  DEFAULT_TASK_KEY,
+  MAX_MODEL_CANDIDATES,
+  decideCall,
+  estimateTokens,
+  getPreset,
+  matchTaskFromLabel,
+  modelCandidates,
+  normalizeChatUrl,
+  normalizeModelsUrl,
+  promptFingerprint,
+  stripThinking,
+  type ApiGuardConfig,
+} from "./apiCenterCore";
 
-// ── النظامان الفعّالان في الذاكرة (يُضبطان من apiCore عبر setRuntimeConfig) ──
-export type RuntimeSystem = {
-  /** "key_url" = النظام الأول (مفتاح + رابط) | "key_only" = النظام الثاني (مفتاح فقط) */
+// ═══════════════════════════════════════════════════════════════════════
+// حالة المحرك — تُضبط من apiCore.ensureAiRuntime قبل كل استدعاء
+// ═══════════════════════════════════════════════════════════════════════
+
+export type EngineProvider = {
+  id: string; // A | B | env
   kind: "key_url" | "key_only";
   apiKey: string;
-  baseUrl?: string; // النظام الأول فقط
+  baseUrl?: string;
+  presetId: string;
+  model?: string | null;
+  enabled: boolean;
 };
 
-// الحالة الحية في هذا الـ runtime — لا تُخزَّن بين الجلسات.
-// تُملأ من واجهة النظامين عبر دالة setRuntimeConfig وتُقرأ من env كمصدر احتياطي.
-let runtimeSystems: RuntimeSystem[] = [];
+export type EngineRoute = {
+  task: string;
+  label: string;
+  model: string | null;
+  temperature: number | null;
+  maxTokens: number;
+  needsJson: boolean;
+  enabled: boolean;
+  /** مدة صلاحية الكاش لهذه الوحدة (٠ = بلا كاش) — من سجل الوحدات */
+  cacheTtlMs: number;
+};
 
-/** ضبط النظامين الفعّالين في هذا الـ runtime (يُستدعى من apiCore عند الحفظ/الحذف) */
-export function setRuntimeConfig(systems: RuntimeSystem[]): void {
-  runtimeSystems = Array.isArray(systems) ? systems : [];
+export type EngineState = {
+  providers: EngineProvider[];
+  guard: ApiGuardConfig;
+  routes: Record<string, EngineRoute>;
+  discovered: Record<string, string[]>;
+};
+
+let engine: EngineState = {
+  providers: [],
+  guard: DEFAULT_GUARD,
+  routes: {},
+  discovered: { A: [], B: [] },
+};
+
+// سياق الإجراء الحالي — يُستخدم لتسجيل الأدلة في قاعدة البيانات فقط.
+// التوثيق لا يُسقط استدعاءً أبداً، وأسوأ احتمال هو سطر منسوب لوحدة مجاورة.
+let activeCtx: unknown = null;
+
+export function setEngineReporter(ctx: unknown): void {
+  activeCtx = ctx ?? null;
 }
 
-/** قراءة النظامين المضبوطين حالياً */
-export function getRuntimeConfig(): RuntimeSystem[] {
-  return [...runtimeSystems];
+export function setEngineConfig(partial: Partial<EngineState>): void {
+  engine = {
+    providers: partial.providers ?? engine.providers,
+    guard: partial.guard ?? engine.guard,
+    routes: partial.routes ?? engine.routes,
+    discovered: partial.discovered ?? engine.discovered,
+  };
 }
 
-// البوابة الافتراضية للنظام الثاني (مفتاح فقط) — OpenRouter
-const DEFAULT_GATEWAY = "https://openrouter.ai/api/v1/chat/completions";
+export function getEngineConfig(): EngineState {
+  return engine;
+}
 
-// النموذج الافتراضي (أسماء نماذج OpenRouter — تُستخدم مع البوابة الافتراضية فقط)
+/** توافق مع الشكل القديم (نظامان بمفتاح ورابط) */
+export function setRuntimeConfig(systems: Array<{ kind: "key_url" | "key_only"; apiKey: string; baseUrl?: string }>): void {
+  setEngineConfig({
+    providers: systems.map((s, i) => ({
+      id: i === 0 ? "A" : "B",
+      kind: s.kind,
+      apiKey: s.apiKey,
+      baseUrl: s.baseUrl,
+      presetId: "generic",
+      model: null,
+      enabled: true,
+    })),
+  });
+}
+
+export function getRuntimeConfig() {
+  return engine.providers;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ثوابت عامة
+// ═══════════════════════════════════════════════════════════════════════
+
 export const DEFAULT_MODEL = "openrouter/auto";
-export const FREE_MODELS = [DEFAULT_MODEL, "openrouter/free"];
-export const FALLBACK_MODELS = [
-  "openai/gpt-4o-mini",
-  "meta-llama/llama-3.3-70b-instruct",
-];
+export const FREE_MODELS = [DEFAULT_MODEL];
+export const FALLBACK_MODELS = ["gpt-4o-mini", "deepseek-chat"];
+/** مهلة الطلب الواحد — ذكاء لعبة يجب أن يعود بسرعة أو يتراجع */
+const REQUEST_TIMEOUT_MS = 25_000;
 
-// نماذج احتياطية للمزوّدات المخصّصة (النظام الأول — رابط خاص) تُجرَّب عند تعذّر الاكتشاف
-const CUSTOM_FALLBACK_MODELS = [
-  "deepseek-v4-flash-lr",
-  "deepseek-v4-flash",
-  "deepseek-chat",
-  "gpt-4o-mini",
-  "gpt-5.6-new",
-];
+const DEFAULT_ROUTE: EngineRoute = {
+  task: DEFAULT_TASK_KEY,
+  label: "أي وحدة أخرى",
+  model: null,
+  temperature: null,
+  maxTokens: 0,
+  needsJson: false,
+  enabled: true,
+  cacheTtlMs: 0,
+};
 
-// ذاكرة مؤقتة لاكتشاف نماذج المزوّد المخصّص (النظام الأول)
-let customModelsCache: { origin: string; models: string[]; at: number } | null = null;
+// ═══════════════════════════════════════════════════════════════════════
+// حلّ المزوّدين والوحدات
+// ═══════════════════════════════════════════════════════════════════════
 
-/** هل النظام الأول (مفتاح + رابط خاص) مفعّل حالياً؟ */
+function usableProviders(): EngineProvider[] {
+  return engine.providers.filter((p) => {
+    if (!p.enabled) return false;
+    if (!p.apiKey || p.apiKey.trim().length < 10) return false;
+    if (p.kind === "key_only") return true;
+    return (p.baseUrl ?? "").trim().startsWith("http");
+  });
+}
+
+export function resolveRoute(task: string): EngineRoute {
+  return engine.routes[task] ?? engine.routes[DEFAULT_TASK_KEY] ?? DEFAULT_ROUTE;
+}
+
+/** نقطة الاتصال الفعلية لمزوّد — يقبل كل ما يكتبه المالك */
+export function providerChatUrl(p: EngineProvider): string {
+  if (p.kind === "key_only") return "https://openrouter.ai/api/v1/chat/completions";
+  return normalizeChatUrl(p.baseUrl ?? "", p.presetId);
+}
+
+export function providerModelsUrl(p: EngineProvider): string {
+  if (p.kind === "key_only") return "https://openrouter.ai/api/v1/models";
+  return normalizeModelsUrl(p.baseUrl ?? "", p.presetId);
+}
+
+/** هل المزوّد الأول (مفتاح + رابط) مفعّل؟ — للتوافق القديم */
 export function isCustomEndpoint(): boolean {
-  const sysA = runtimeSystems.find((s) => s.kind === "key_url");
-  return !!(
-    sysA &&
-    sysA.apiKey.trim().length > 10 &&
-    sysA.baseUrl &&
-    sysA.baseUrl.trim().startsWith("http")
-  );
+  return usableProviders().some((p) => p.kind === "key_url");
 }
 
-/**
- * 🔍 اكتشاف حقيقي لنموذج يعمل عند مزوّد مخصّص (النظام الأول):
- * يستدعي {origin}/v1/models بالمفتاح الحقيقي ويعيد قائمة نماذج،
- * مع تفضيل النماذج السريعة/الرخيصة. عند الفشل يرجع قائمة احتياطية عامة.
- */
-export async function pickCustomModels(baseUrl: string, key: string): Promise<string[]> {
-  let origin = baseUrl.trim();
-  try {
-    origin = new URL(baseUrl).origin;
-  } catch {
-    // أبقه كما هو
-  }
-  const cacheKey = origin;
-  if (customModelsCache && customModelsCache.origin === cacheKey && Date.now() - customModelsCache.at < 5 * 60_000) {
-    return customModelsCache.models;
-  }
-  const fallback = CUSTOM_FALLBACK_MODELS;
-  try {
-    const res = await fetch(`${origin}/v1/models`, { headers: { Authorization: `Bearer ${key}` } });
-    if (res.ok) {
-      const json = (await res.json()) as { data?: Array<{ id?: string }> };
-      const ids = (json.data ?? []).map((m) => m.id).filter((x): x is string => !!x && x.trim().length > 0);
-      if (ids.length) {
-        const preferred =
-          ids.find((m) => /flash-lr/i.test(m)) ??
-          ids.find((m) => /flash/i.test(m)) ??
-          ids.find((m) => /mini|light|fast|small/i.test(m)) ??
-          ids[0];
-        const models = [preferred, ...fallback.filter((m) => m !== preferred), ...ids.filter((m) => m !== preferred)];
-        customModelsCache = { origin: cacheKey, models, at: Date.now() };
-        return models;
-      }
-    }
-  } catch {
-    // تجاهل — سنعتمد القائمة الاحتياطية
-  }
-  return fallback;
+export function pickCustomModels(baseUrl: string, key: string): Promise<string[]> {
+  void baseUrl;
+  void key;
+  const p = usableProviders()[0];
+  if (!p) return Promise.resolve(FALLBACK_MODELS);
+  return Promise.resolve(modelCandidates(p.presetId, engine.discovered[p.id] ?? [], p.model));
 }
 
-/**
- * 🔍 حلّ نقطة الاتصال الحقيقية:
- *  1. إن ضُبط النظام الأول (key_url) → استخدم رابطه ومفتاحه.
- *  2. وإلا إن ضُبط النظام الثاني (key_only) → استخدم بوابته الافتراضية ومفتاحه.
- *  3. وإلا خطأ واضح وصريح: لا يوجد أي نظام مُفعّل — لا مسارات خلفية ولا env.
- */
-function resolveEndpoint(): { url: string; key: string } {
-  const sysA = runtimeSystems.find((s) => s.kind === "key_url");
-  if (sysA && sysA.apiKey.trim().length > 10 && sysA.baseUrl && sysA.baseUrl.trim().startsWith("http")) {
-    return { url: sysA.baseUrl.trim(), key: sysA.apiKey.trim() };
-  }
-  const sysB = runtimeSystems.find((s) => s.kind === "key_only");
-  if (sysB && sysB.apiKey.trim().length > 10) {
-    return { url: DEFAULT_GATEWAY, key: sysB.apiKey.trim() };
-  }
-  throw new Error(
-    "لا يوجد نظام API مُفعّل. فعّل النظام الأول (مفتاح + رابط) أو النظام الثاني (مفتاح فقط) من مركز API.",
-  );
-}
-
-/**
- * 🔑 استخراج المفتاح الفعّال الحالي (نظام A ثم نظام B ثم env) — للتوافق القديم.
- */
 export function getOpenRouterKey(providedKey?: string | null): string {
   if (providedKey && providedKey.trim().length > 10) return providedKey.trim();
-  const sysA = runtimeSystems.find((s) => s.kind === "key_url");
-  if (sysA && sysA.apiKey.trim().length > 10) return sysA.apiKey.trim();
-  const sysB = runtimeSystems.find((s) => s.kind === "key_only");
-  if (sysB && sysB.apiKey.trim().length > 10) return sysB.apiKey.trim();
-  return "";
+  const p = usableProviders()[0];
+  return p?.apiKey?.trim() ?? "";
 }
 
-/**
- * ⚡ الاستدعاء الموحّد الحقيقي — عبر النظامين فقط (A ثم B ثم env).
- * طلب شبكة فعلي مع إعادة محاولة تلقائية عند الفشل والانتقال للنموذج البديل.
- */
-export async function callLlm(
-  messages: Array<{ role: string; content: string }>,
-  maxTokens = 900,
-  temperature = 0.9,
-  label = "Zaka AI",
-  _apiKey?: string | null,
-  jsonMode = false,
-): Promise<string> {
-  const { url, key } = resolveEndpoint();
-  const models = isCustomEndpoint()
-    ? await pickCustomModels(url, key)
-    : [DEFAULT_MODEL, ...FALLBACK_MODELS.filter((m) => m !== DEFAULT_MODEL)];
-  let lastErr = "فشل استدعاء AI";
-
-  for (const model of models) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${key}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://zaka.app",
-            "X-Title": label,
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            max_tokens: maxTokens,
-            temperature,
-            ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
-          }),
-        });
-        if (!response.ok) {
-          const err = await response.text();
-          if (response.status === 429) {
-            lastErr = "تجاوز حد الاستخدام (429) — أُوقف مؤقتاً.";
-            break;
-          }
-          lastErr = `AI Gateway error (${response.status}): ${err.slice(0, 200)}`;
-          continue;
-        }
-        const data = (await response.json()) as {
-          choices?: Array<{ message?: { content?: string | null; reasoning?: string | null } }>;
-        };
-        const msg = data.choices?.[0]?.message;
-        const text =
-          typeof msg?.content === "string" && msg.content.trim().length > 0
-            ? msg.content
-            : typeof msg?.reasoning === "string" && msg.reasoning.trim().length > 0
-              ? msg.reasoning
-              : "";
-        if (text.trim()) return text;
-        lastErr = "AI أعاد رداً فارغاً";
-      } catch (e) {
-        lastErr = e instanceof Error ? e.message : "خطأ شبكة";
-      }
-    }
-  }
-  throw new Error(`${lastErr}`);
+export function getAdminKeyPreview(): string {
+  const n = usableProviders().length;
+  return n > 0 ? `${n} مزوّد مفعّل (مركز API)` : "لا مزوّد مفعّل — اضبطه من مركز API";
 }
 
-/** توافق مع الملفات القديمة — نفس الاستدعاء الموحّد */
-export async function callOpenRouterDirect(
-  messages: Array<{ role: string; content: string }>,
-  maxTokens: number,
-  temperature: number,
-  label: string,
-  apiKey?: string | null,
-): Promise<string> {
-  return callLlm(messages, maxTokens, temperature, label, apiKey);
+export function ensureWorkingModel(model?: string | null): string {
+  return model && model.trim() ? model : DEFAULT_MODEL;
+}
+
+export function getSystemInfo() {
+  const providers = usableProviders();
+  return {
+    providers: providers.map((p) => ({ id: p.id, kind: p.kind, presetId: p.presetId })),
+    hasEnvKey: providers.length > 0,
+    envKeyPreview: getAdminKeyPreview(),
+    models: FREE_MODELS,
+    defaultModel: DEFAULT_MODEL,
+    guard: engine.guard,
+    deputyOnline,
+  };
 }
 
 // ── بوابة الحرية — الأنظمة الحرة تنتظر تفعيل نائب المالك ──
 let deputyOnline = false;
 let deputyOnlineAt = 0;
-
 export function markDeputyOnline(): void {
   deputyOnline = true;
   deputyOnlineAt = Date.now();
 }
-
 export function isDeputyOnline(): boolean {
   return deputyOnline;
 }
-
 export function getDeputyStatus() {
   return { online: deputyOnline, onlineAt: deputyOnlineAt };
 }
-
 export function requireDeputyOnline(): void {
-  if (!deputyOnline) {
-    throw new Error("أنظمة AI الحرة معطّلة — انتظر نجاح نائب المالك أولاً.");
+  if (!deputyOnline) throw new Error("أنظمة AI الحرة معطّلة — انتظر نجاح نائب المالك أولاً.");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// بناء الطلب ومطابقة استجابة المزوّد
+// ═══════════════════════════════════════════════════════════════════════
+
+type ChatMessage = { role: string; content: string };
+
+type BuiltRequest = {
+  url: string;
+  headers: Record<string, string>;
+  body: Record<string, unknown>;
+};
+
+export function buildRequest(input: {
+  provider: EngineProvider;
+  model: string;
+  messages: ChatMessage[];
+  maxTokens: number;
+  temperature: number;
+  jsonMode: boolean;
+  label: string;
+}): BuiltRequest {
+  const preset = getPreset(input.provider.presetId);
+  const body: Record<string, unknown> = {
+    model: input.model,
+    messages: input.messages,
+    max_tokens: input.maxTokens,
+    temperature: input.temperature,
+  };
+  if (input.jsonMode && preset.supportsJsonMode) body.response_format = { type: "json_object" };
+  if (preset.reasoningSplit) body.reasoning_split = true;
+  if (
+    preset.thinkingToggle &&
+    preset.thinkingTogglePrefixes.some((pre) => input.model.startsWith(pre))
+  ) {
+    body.thinking = { type: "disabled" };
+  }
+  return {
+    url: providerChatUrl(input.provider),
+    headers: {
+      Authorization: `Bearer ${input.provider.apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://minds-war.app",
+      "X-Title": input.label,
+    },
+    body,
+  };
+}
+
+/** يستخرج نصّ الرد من كل أشكال استجابات المزوّدين المعروفة */
+export function readCompletion(data: unknown): { text: string; tokensIn: number; tokensOut: number } {
+  const d = data as {
+    choices?: Array<{
+      message?: {
+        content?: string | null;
+        reasoning?: string | null;
+        reasoning_content?: string | null;
+        reasoning_details?: Array<{ text?: string }>;
+      };
+    }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
+  const msg = d?.choices?.[0]?.message;
+  const direct = typeof msg?.content === "string" ? stripThinking(msg.content) : "";
+  const details = Array.isArray(msg?.reasoning_details)
+    ? msg!.reasoning_details!.map((r) => r?.text ?? "").join(" ")
+    : "";
+  const reasoning =
+    (typeof msg?.reasoning_content === "string" && msg.reasoning_content) ||
+    (typeof msg?.reasoning === "string" && msg.reasoning) ||
+    details;
+  const text = direct.trim().length > 0 ? direct : stripThinking(String(reasoning ?? ""));
+  return {
+    text,
+    tokensIn: Number(d?.usage?.prompt_tokens ?? 0) || 0,
+    tokensOut: Number(d?.usage?.completion_tokens ?? 0) || 0,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// التوثيق — لا يُسقط استدعاءً أبداً
+// ═══════════════════════════════════════════════════════════════════════
+
+type ReportInput = {
+  ok: boolean;
+  provider: string;
+  providerKind: string;
+  task: string;
+  label: string;
+  model: string;
+  latencyMs: number;
+  tokensIn: number;
+  tokensOut: number;
+  cached: boolean;
+  attempt: number;
+  error?: string;
+  promptChars: number;
+  cacheFp?: string;
+  cacheReply?: string;
+  cacheTtlMs: number;
+};
+
+async function report(input: ReportInput): Promise<void> {
+  const ctx = activeCtx as { runMutation?: (...a: unknown[]) => Promise<unknown> } | null;
+  if (!ctx?.runMutation) return;
+  try {
+    await ctx.runMutation(internal.apiCenterStore.recordCall, {
+      ...input,
+      at: Date.now(),
+      failureThreshold: engine.guard.failureThreshold,
+      guardOn: engine.guard.enabled,
+    });
+  } catch {
+    // التوثيق نفسه لا يجوز أن يُسقط الاستدعاء
   }
 }
 
-export function getAdminKeyPreview(): string {
-  return "نظامان مفعّلان (مركز API)";
+// ═══════════════════════════════════════════════════════════════════════
+// الاستدعاء الموحّد
+// ═══════════════════════════════════════════════════════════════════════
+
+export type LlmResult = {
+  text: string;
+  task: string;
+  provider: string;
+  model: string;
+  latencyMs: number;
+  tokensIn: number;
+  tokensOut: number;
+  cached: boolean;
+  attempts: number;
+};
+
+export type LlmOptions = {
+  messages: ChatMessage[];
+  maxTokens: number;
+  temperature: number;
+  label: string;
+  jsonMode: boolean;
+  /** تجاوز الوحدة صراحةً (اختياري) */
+  task?: string;
+};
+
+export async function callLlmDetailed(opts: LlmOptions): Promise<LlmResult> {
+  const started = Date.now();
+  const label = opts.label || "Zaka AI";
+  const task = opts.task ?? matchTaskFromLabel(label);
+  const route = resolveRoute(task);
+  const promptChars = opts.messages.reduce((s, m) => s + (m.content?.length ?? 0), 0);
+
+  if (!route.enabled) {
+    throw new Error(`وحدة «${route.label}» موقوفة من مركز API — فعّلها أو غيّر التوجيه.`);
+  }
+
+  const providers = usableProviders();
+  if (providers.length === 0) {
+    throw new Error("لا يوجد مزوّد AI مفعّل. اضبط المفتاح والرابط من مركز API في غرفة المالك.");
+  }
+
+  const temperature = typeof route.temperature === "number" ? route.temperature : opts.temperature;
+  const maxTokens = route.maxTokens > 0 ? Math.min(opts.maxTokens, route.maxTokens) : opts.maxTokens;
+  const jsonMode = opts.jsonMode || route.needsJson;
+  const cacheTtlMs = route.cacheTtlMs;
+
+  const head = providers[0];
+  const fp =
+    cacheTtlMs > 0 && engine.guard.cacheEnabled
+      ? promptFingerprint(opts.messages, route.model ?? head.model ?? head.presetId, temperature)
+      : "";
+
+  // ① فحص واحد: الكاش + لقطة الحدود
+  if (activeCtx && (fp || engine.guard.enabled)) {
+    const ctx = activeCtx as { runQuery?: (...a: unknown[]) => Promise<unknown> } | null;
+    if (ctx?.runQuery) {
+      try {
+        const snap = (await ctx.runQuery(internal.apiCenterStore.preflight, {
+          fp: fp || undefined,
+          now: Date.now(),
+        })) as {
+          cache: { reply: string } | null;
+          minuteCalls: number;
+          dayCalls: number;
+          dayTokens: number;
+          circuitOpen: boolean;
+          circuitOpenedAt: number | null;
+          failures: number;
+        };
+        const decision = decideCall({
+          guard: engine.guard,
+          snapshot: {
+            minuteCalls: snap.minuteCalls,
+            dayCalls: snap.dayCalls,
+            dayTokens: snap.dayTokens,
+            circuitOpen: Boolean(snap.circuitOpen),
+            circuitOpenedAt: snap.circuitOpenedAt,
+            failures: snap.failures,
+          },
+          cacheReply: snap.cache?.reply ?? null,
+          cacheAllowed: cacheTtlMs > 0,
+          now: Date.now(),
+        });
+
+        if (decision.outcome === "cache") {
+          await report({
+            ok: true,
+            provider: head.id,
+            providerKind: "cached",
+            task,
+            label,
+            model: route.model ?? head.model ?? "—",
+            latencyMs: Date.now() - started,
+            tokensIn: 0,
+            tokensOut: 0,
+            cached: true,
+            attempt: 0,
+            promptChars,
+            cacheFp: fp,
+            cacheTtlMs: 0,
+          });
+          return {
+            text: decision.reply,
+            task,
+            provider: head.id,
+            model: route.model ?? head.model ?? "—",
+            latencyMs: Date.now() - started,
+            tokensIn: 0,
+            tokensOut: 0,
+            cached: true,
+            attempts: 0,
+          };
+        }
+
+        if (decision.outcome === "block") {
+          await report({
+            ok: false,
+            provider: head.id,
+            providerKind: head.kind,
+            task,
+            label,
+            model: route.model ?? head.model ?? "—",
+            latencyMs: Date.now() - started,
+            tokensIn: 0,
+            tokensOut: 0,
+            cached: false,
+            attempt: 0,
+            error: decision.reason,
+            promptChars,
+            cacheTtlMs: 0,
+          });
+          throw new Error(`مركز API أوقف الطلب: ${decision.reason}`);
+        }
+      } catch (e) {
+        // أوقفه القرار صراحةً ⇒ يخرج. أي خطأ آخر في الفحص لا يمنع الاستدعاء.
+        if (e instanceof Error && e.message.startsWith("مركز API أوقف الطلب:")) throw e;
+      }
+    }
+  }
+
+  // ② سلسلة المحاولات: مزوّد ← سلسلة نماذج ← محاولتان
+  let lastErr = "فشل استدعاء AI";
+  let attempts = 0;
+  let lastModel = route.model ?? head.model ?? "—";
+
+  for (const provider of providers) {
+    const chain = modelCandidates(
+      provider.presetId,
+      engine.discovered[provider.id] ?? [],
+      route.model ?? provider.model ?? null,
+    ).slice(0, MAX_MODEL_CANDIDATES);
+
+    for (const model of chain) {
+      lastModel = model;
+      let dropped = false;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        attempts += 1;
+        const built = buildRequest({ provider, model, messages: opts.messages, maxTokens, temperature, jsonMode, label });
+        if (dropped) {
+          delete built.body.response_format;
+          delete built.body.reasoning_split;
+          delete built.body.thinking;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const at = Date.now();
+        try {
+          const response = await fetch(built.url, {
+            method: "POST",
+            headers: built.headers,
+            body: JSON.stringify(built.body),
+            signal: controller.signal,
+          });
+          const latencyMs = Date.now() - at;
+          const raw = await response.text().catch(() => "");
+
+          if (!response.ok) {
+            lastErr = `خطأ المزوّد (${response.status}): ${raw.slice(0, 220)}`;
+            const unsupportedExtra =
+              response.status === 400 &&
+              /response_format|reasoning_split|thinking|max_tokens/i.test(raw) &&
+              !dropped;
+            if (unsupportedExtra) {
+              dropped = true;
+              continue; // نفس النموذج بلا إضافات اختيارية
+            }
+            await report({
+              ok: false,
+              provider: provider.id,
+              providerKind: provider.kind,
+              task,
+              label,
+              model,
+              latencyMs,
+              tokensIn: 0,
+              tokensOut: 0,
+              cached: false,
+              attempt,
+              error: lastErr,
+              promptChars,
+              cacheTtlMs: 0,
+            });
+            if (response.status === 429) break; // لا نُهدر بقية المحاولات على نفس المزوّد
+            if (response.status === 401 || response.status === 403) break;
+            continue;
+          }
+
+          let parsed: unknown = null;
+          try {
+            parsed = JSON.parse(raw);
+          } catch {
+            parsed = null;
+          }
+          const { text, tokensIn, tokensOut } = parsed
+            ? readCompletion(parsed)
+            : { text: stripThinking(raw.slice(0, 4000)), tokensIn: 0, tokensOut: 0 };
+
+          if (!text.trim()) {
+            lastErr = "المزوّد أعاد رداً فارغاً";
+            continue;
+          }
+
+          const msgText = opts.messages.map((m) => m.content).join(" ");
+          await report({
+            ok: true,
+            provider: provider.id,
+            providerKind: provider.kind,
+            task,
+            label,
+            model,
+            latencyMs,
+            tokensIn: tokensIn || estimateTokens(msgText),
+            tokensOut: tokensOut || estimateTokens(text),
+            cached: false,
+            attempt,
+            promptChars,
+            cacheFp: fp || undefined,
+            cacheReply: fp ? text : undefined,
+            cacheTtlMs,
+          });
+
+          return {
+            text,
+            task,
+            provider: provider.id,
+            model,
+            latencyMs,
+            tokensIn,
+            tokensOut,
+            cached: false,
+            attempts,
+          };
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : "خطأ شبكة";
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+    }
+  }
+
+  await report({
+    ok: false,
+    provider: head.id,
+    providerKind: head.kind,
+    task,
+    label,
+    model: lastModel,
+    latencyMs: Date.now() - started,
+    tokensIn: 0,
+    tokensOut: 0,
+    cached: false,
+    attempt: attempts,
+    error: lastErr,
+    promptChars,
+    cacheTtlMs: 0,
+  });
+  throw new Error(lastErr);
 }
 
-export function ensureWorkingModel(model?: string | null): string {
-  if (!model || model.includes(":free") || model === "openrouter/auto") return DEFAULT_MODEL;
-  return model;
+/** ⚡ الواجهة المستخدمة في كل اللعبة — نفس التوقيع القديم حرفياً */
+export async function callLlm(
+  messages: ChatMessage[],
+  maxTokens = 900,
+  temperature = 0.9,
+  label = "Zaka AI",
+  _apiKey?: string | null,
+  jsonMode = false,
+  task?: string,
+): Promise<string> {
+  void _apiKey; // مُهمَل بالقصد — المصدر الوحيد للمفاتيح هو مركز API
+  const res = await callLlmDetailed({ messages, maxTokens, temperature, label, jsonMode, task });
+  return res.text;
 }
 
-export function getSystemInfo() {
-  const systems = getRuntimeConfig();
-  const active = systems.find((s) => s.apiKey && s.apiKey.trim().length > 10);
-  return {
-    systems,
-    hasEnvKey: Boolean(active),
-    envKeyPreview: active
-      ? `${active.apiKey.slice(0, 6)}••••${active.apiKey.slice(-4)}`
-      : "غير مضبوط",
-    models: FREE_MODELS,
-    defaultModel: DEFAULT_MODEL,
-    deputyOnline,
-  };
+export async function callOpenRouterDirect(
+  messages: ChatMessage[],
+  maxTokens: number,
+  temperature: number,
+  label: string,
+  _apiKey?: string | null,
+): Promise<string> {
+  void _apiKey; // مُهمَل بالقصد — المصدر الوحيد للمفاتيح هو مركز API
+  return callLlm(messages, maxTokens, temperature, label);
 }

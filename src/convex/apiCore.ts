@@ -1,174 +1,132 @@
 /**
- * ═══════════════════════════════════════════════════════════════
- * مركز API — التحقق الحقيقي (Node runtime — actions فقط)
- * ═══════════════════════════════════════════════════════════════
+ * ═══════════════════════════════════════════════════════════════════════
+ * 🔌 جسر الربط — يحقن مركز API في محرك الذكاء قبل كل استدعاء
+ * ═══════════════════════════════════════════════════════════════════════
  *
- *  ⚙️ النظام الأول (System A): مفتاح API + رابط المزود (URL).
- *  🔑 النظام الثاني (System B): مفتاح API فقط (بوابة افتراضية).
+ *  `ensureAiRuntime(ctx)` هي النقطة الوحيدة التي تُشحن المحرك:
+ *    • المزوّدون المضبوطون من غرفة المالك (مفتاح + رابط / مفتاح فقط).
+ *    • مصفوفة التوجيه لكل وحدة AI.
+ *    • الحدود (سقف يومي، حد الدقيقة، الكاش، قاطع الدائرة).
+ *    • النماذج المُكتشَفة فعلياً من /models.
  *
- * كل تحقق هو طلب شبكة حقيقي (fetch). الدليل (نجاح/فشل + زمن +
- * الحالة + الرد) يُسجَّل في apiCallLogs + apiEvents — قابل للتحقق.
- * ═══════════════════════════════════════════════════════════════
+ *  وتُشحن أيضاً سياق الإجراء حتى يُسجَّل كل استدعاء دليلاً حقيقياً.
+ *
+ *  تشغيل احتياطي: إن لم يُضبط أي مزوّد في المركز وكانت الحدود تسمح،
+ *  يُقرأ المفتاح من متغيّرات بيئة الخادم — بلا كتابة أي مفتاح في الكود.
+ * ═══════════════════════════════════════════════════════════════════════
  */
 "use node";
 
-import { action } from "./_generated/server";
-import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { DEFAULT_MODEL, pickCustomModels, setRuntimeConfig } from "./aiConfig";
+import { setEngineConfig, setEngineReporter, type EngineProvider, type EngineRoute } from "./aiConfig";
+
+/** متغيّرات البيئة المدعومة للتشغيل الاحتياطي، بالأولوية */
+const ENV_SOURCES: Array<{ keys: string[]; presetId: string; baseUrl: string; urlKeys: string[] }> = [
+  {
+    keys: ["MINIMAX_API_KEY"],
+    presetId: "minimax",
+    baseUrl: "https://api.minimax.io/v1",
+    urlKeys: ["MINIMAX_BASE_URL"],
+  },
+  {
+    keys: ["AI_API_KEY", "LLM_API_KEY", "AI_GATEWAY_KEY"],
+    presetId: "generic",
+    baseUrl: "",
+    urlKeys: ["AI_BASE_URL", "LLM_BASE_URL"],
+  },
+  {
+    keys: ["OPENROUTER_API_KEY"],
+    presetId: "openrouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    urlKeys: ["OPENROUTER_BASE_URL"],
+  },
+];
+
+function envValue(names: string[]): string {
+  for (const name of names) {
+    const v = process.env?.[name];
+    if (typeof v === "string" && v.trim().length > 10) return v.trim();
+  }
+  return "";
+}
+
+/** يقرأ مزوّداً من بيئة الخادم إن وُجد — لا مفتاح مكتوب في الكود أبداً */
+function providerFromEnv(): EngineProvider | null {
+  for (const source of ENV_SOURCES) {
+    const apiKey = envValue(source.keys);
+    if (!apiKey) continue;
+    const baseUrl = envValue(source.urlKeys) || source.baseUrl;
+    if (!baseUrl) continue;
+    return {
+      id: "env",
+      kind: "key_url",
+      apiKey,
+      baseUrl,
+      presetId: source.presetId,
+      model: null,
+      enabled: true,
+    };
+  }
+  return null;
+}
 
 /**
- * 🔌 الربط الحقيقي: يقرأ النظامين من قاعدة البيانات ويحقنهما في محرك
- * الاستدعاء (aiConfig) قبل أي استدعاء AI. تُستدعى من كل الأنظمة
- * التي تستدعي callLlm — فلا يعمل أي استدعاء خارج النظامين أبداً.
+ * 🔌 الحقن الحقيقي: يُستدعى من كل نظام يستدعي AI — فلا يعمل أي استدعاء
+ * خارج إعدادات مركز API.
  */
-export async function ensureAiRuntime(ctx: any): Promise<void> {
+export async function ensureAiRuntime(ctx: unknown): Promise<void> {
+  setEngineReporter(ctx);
   try {
-    const a = (await ctx.runQuery(internal.apiCoreInternal.readStored, { key: "apiSystemA" })) as
-      | { apiKey: string; baseUrl?: string }
-      | null;
-    const b = (await ctx.runQuery(internal.apiCoreInternal.readStored, { key: "apiSystemB" })) as
-      | { apiKey: string }
-      | null;
-    const systems = [];
-    if (a && a.apiKey && a.apiKey.length > 10) {
-      systems.push({ kind: "key_url" as const, apiKey: a.apiKey, baseUrl: a.baseUrl });
+    const cfg = (await (ctx as any).runQuery(internal.apiCenterStore.readEngineConfig, {})) as {
+      providers: EngineProvider[];
+      guard: {
+        enabled: boolean;
+        dailyCallCap: number;
+        dailyTokenCap: number;
+        perMinuteCap: number;
+        cacheEnabled: boolean;
+        circuitEnabled: boolean;
+        failureThreshold: number;
+        cooldownMs: number;
+        allowEnvBootstrap: boolean;
+      };
+      routes: Record<string, EngineRoute>;
+      discovered: { A: string[]; B: string[] };
+    };
+
+    let providers = cfg.providers ?? [];
+    let envUsed = false;
+
+    if (providers.length === 0 && cfg.guard?.allowEnvBootstrap !== false) {
+      const envProvider = providerFromEnv();
+      if (envProvider) {
+        providers = [envProvider];
+        envUsed = true;
+      }
     }
-    if (b && b.apiKey && b.apiKey.length > 10) {
-      systems.push({ kind: "key_only" as const, apiKey: b.apiKey });
+
+    setEngineConfig({
+      providers,
+      guard: cfg.guard,
+      routes: cfg.routes,
+      discovered: {
+        ...(cfg.discovered ?? {}),
+        ...(envUsed ? { env: [] } : {}),
+      },
+    });
+
+    if (envUsed) {
+      try {
+        await (ctx as any).runMutation(internal.apiCenterStore.noteEnvBootstrap, {
+          active: true,
+          presetId: providers[0]?.presetId ?? "generic",
+        });
+      } catch {
+        // ملاحظة التشغيل الاحتياطي لا تُسقط الاستدعاء
+      }
     }
-    setRuntimeConfig(systems);
   } catch {
-    // بلا نظامين مضبوطين — callLlm سيرمي خطأ واضحاً عند الاستدعاء
-    setRuntimeConfig([]);
+    // بلا إعدادات ⇒ المحرك سيرمي خطأً واضحاً عند أول استدعاء
+    setEngineConfig({ providers: [] });
   }
 }
-
-const DEFAULT_GATEWAY = "https://openrouter.ai/api/v1/chat/completions";
-
-type StoredSystem = {
-  apiKey: string;
-  baseUrl?: string;
-  updatedAt: number;
-};
-
-/** قراءة النظام من settings (نسخة داخل action عبر internalQuery) */
-async function readSystem(ctx: any, which: "systemA" | "systemB"): Promise<StoredSystem | null> {
-  const key = which === "systemA" ? "apiSystemA" : "apiSystemB";
-  return (await ctx.runQuery(internal.apiCoreInternal.readStored, { key })) as StoredSystem | null;
-}
-
-/**
- * 🧪 تحقق حقيقي: طلب شبكة فعلي إلى النظام المختار، يكتب دليلاً
- * (نجاح/فشل + زمن + الحالة + الرد) في السجل، ويعيده للواجهة.
- */
-export const verifySystem = action({
-  args: { which: v.union(v.literal("systemA"), v.literal("systemB")) },
-  handler: async (ctx, { which }): Promise<{
-    ok: boolean;
-    system: string;
-    url: string;
-    latencyMs: number;
-    status: number;
-    reply?: string;
-    error?: string;
-    proofLogged: boolean;
-  }> => {
-    const stored = await readSystem(ctx, which);
-    if (!stored) throw new Error("النظام غير مضبوط — احفظه أولاً.");
-    const url = which === "systemA" && stored.baseUrl ? stored.baseUrl : DEFAULT_GATEWAY;
-    const systemName = which === "systemA" ? "systemA" : "systemB";
-
-    // النظام الأول (رابط خاص) قد لا يقبل أسماء نماذج OpenRouter — نكتشف نموذجاً حقيقياً صالحاً.
-    const verifyModel =
-      which === "systemA" ? (await pickCustomModels(url, stored.apiKey))[0] : DEFAULT_MODEL;
-
-    const started = Date.now();
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${stored.apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://zaka.app",
-          "X-Title": "Zaka Verify",
-        },
-        body: JSON.stringify({
-          model: verifyModel,
-          messages: [{ role: "user", content: "قل: جاهز" }],
-          max_tokens: 20,
-        }),
-      });
-      const latencyMs = Date.now() - started;
-      const text = await response.text().catch(() => "");
-
-      if (response.ok) {
-        let reply = "";
-        try {
-          const j = JSON.parse(text);
-          reply = String(j?.choices?.[0]?.message?.content ?? "").slice(0, 200);
-        } catch {
-          reply = text.slice(0, 200);
-        }
-        await ctx.runMutation(internal.apiHubStore.logCall, {
-          ok: true,
-          provider: systemName,
-          model: DEFAULT_MODEL,
-          keyUsed: systemName,
-          latencyMs,
-          tokensIn: 0,
-          tokensOut: 0,
-          taskType: "verify",
-        });
-        await ctx.runMutation(internal.apiHubStore.logApiEvent, {
-          provider: systemName,
-          event: "verify_ok",
-          detail: `تحقق ناجح (${latencyMs}ms): ${reply || "استجابة فارغة"}`,
-          severity: "info",
-          at: Date.now(),
-        });
-        return { ok: true, system: systemName, url, latencyMs, status: response.status, reply, proofLogged: true };
-      }
-
-      await ctx.runMutation(internal.apiHubStore.logCall, {
-        ok: false,
-        provider: systemName,
-        model: DEFAULT_MODEL,
-        keyUsed: systemName,
-        latencyMs,
-        tokensIn: 0,
-        tokensOut: 0,
-        taskType: "verify",
-      });
-      await ctx.runMutation(internal.apiHubStore.logApiEvent, {
-        provider: systemName,
-        event: "verify_fail",
-        detail: `فشل (${response.status}): ${text.slice(0, 200)}`,
-        severity: "warning",
-        at: Date.now(),
-      });
-      return { ok: false, system: systemName, url, latencyMs, status: response.status, error: text.slice(0, 200), proofLogged: true };
-    } catch (e) {
-      const latencyMs = Date.now() - started;
-      const msg = e instanceof Error ? e.message : "خطأ شبكة";
-      await ctx.runMutation(internal.apiHubStore.logCall, {
-        ok: false,
-        provider: systemName,
-        model: DEFAULT_MODEL,
-        keyUsed: systemName,
-        latencyMs,
-        tokensIn: 0,
-        tokensOut: 0,
-        taskType: "verify",
-      });
-      await ctx.runMutation(internal.apiHubStore.logApiEvent, {
-        provider: systemName,
-        event: "verify_fail",
-        detail: `فشل شبكة: ${msg}`,
-        severity: "warning",
-        at: Date.now(),
-      });
-      return { ok: false, system: systemName, url, latencyMs, status: 0, error: msg, proofLogged: true };
-    }
-  },
-});

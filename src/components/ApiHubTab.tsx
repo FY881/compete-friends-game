@@ -1,324 +1,1227 @@
-// ═══════════════════════════════════════════════════════════════
-// مركز API — النظامان الوحيدان (لا ثالث لهما)
-//  ⚙️ النظام الأول: مفتاح API + رابط المزود (URL)
-//  🔑 النظام الثاني: مفتاح API فقط (بوابة افتراضية)
-// كل تحقق طلب شبكة حقيقي، والدليل يُسجَّل في السجل.
-// ═══════════════════════════════════════════════════════════════
-import React, { useState, type ChangeEvent } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
+// ═══════════════════════════════════════════════════════════════════════
+// 🧠 مركز API — لوحة السيطرة الحقيقية على كل ذكاء اللعبة
+// ═══════════════════════════════════════════════════════════════════════
+//  ① المزوّدون      ② مصفوفة التوجيه   ③ النماذج المُكتشَفة   ④ الحدود
+//  ⑤ الاستهلاك      ⑥ الذاكرة          ⑦ القاطع والتبديل     ⑧ الاختبار والسجل
+//
+// كل زر هنا يُغيّر سلوك اللعبة فعلاً — لا عرض شكلي.
+// ═══════════════════════════════════════════════════════════════════════
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Button, Input, Badge, Card, CardHeader, CardTitle, CardContent, Separator } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+  Separator,
+  Switch,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+} from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
+  Activity,
+  AlertTriangle,
+  Ban,
+  CheckCircle2,
+  Coins,
+  Cpu,
+  Database,
+  FlaskConical,
   Globe,
   KeyRound,
-  CheckCircle2,
-  XCircle,
+  Layers,
   Loader2,
-  Trash2,
-  FlaskConical,
-  ShieldCheck,
-  ScrollText,
+  Play,
   Plug,
+  RefreshCw,
+  Route,
+  Save,
+  ScrollText,
+  ShieldCheck,
+  Sparkles,
+  Timer,
+  Trash2,
+  XCircle,
+  Zap,
 } from "lucide-react";
 
-type ProofCall = {
-  ok: boolean;
-  provider: string;
-  latencyMs: number;
-  taskType: string;
-  createdAt: number;
-};
+const PANELS = [
+  { id: "providers", label: "المزوّدون", icon: Plug },
+  { id: "routing", label: "مصفوفة التوجيه", icon: Route },
+  { id: "models", label: "النماذج", icon: Layers },
+  { id: "limits", label: "الحدود", icon: ShieldCheck },
+  { id: "usage", label: "الاستهلاك", icon: Coins },
+  { id: "cache", label: "الذاكرة", icon: Database },
+  { id: "resilience", label: "القاطع والتبديل", icon: Zap },
+  { id: "live", label: "الاختبار والسجل", icon: FlaskConical },
+] as const;
 
-type ProofEvent = {
-  provider: string;
-  event: string;
-  detail: string;
-  severity: string;
-  at: number;
-};
+type PanelId = (typeof PANELS)[number]["id"];
+
+const nf = new Intl.NumberFormat("ar-EG");
+function fmt(n: number | undefined | null): string {
+  return nf.format(Math.round(n ?? 0));
+}
+function ago(ms: number | null | undefined): string {
+  if (!ms) return "—";
+  const diff = Date.now() - ms;
+  if (diff < 60_000) return "قبل لحظات";
+  if (diff < 3_600_000) return `قبل ${Math.floor(diff / 60_000)} دقيقة`;
+  if (diff < 86_400_000) return `قبل ${Math.floor(diff / 3_600_000)} ساعة`;
+  return `قبل ${Math.floor(diff / 86_400_000)} يوم`;
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  tone = "default",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "default" | "good" | "warn" | "bad";
+}) {
+  const toneClass =
+    tone === "good"
+      ? "text-emerald-600"
+      : tone === "warn"
+        ? "text-amber-600"
+        : tone === "bad"
+          ? "text-rose-600"
+          : "text-primary";
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card/60 p-3.5">
+      <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+        <Icon className={cn("size-3.5", toneClass)} />
+        {label}
+      </div>
+      <div className="mt-1.5 text-xl font-black tabular-nums">{value}</div>
+      {hint && <div className="mt-0.5 text-[10px] text-muted-foreground">{hint}</div>}
+    </div>
+  );
+}
 
 export function ApiHubTab() {
-  const systems = useQuery(api.apiCoreStore.getSystems, {});
-  const proof = useQuery(api.apiCoreStore.getProofLog, { limit: 12 });
+  const center = useQuery(api.apiCenterStore.getCenter, {});
+  const saveProvider = useMutation(api.apiCenterStore.saveProvider);
+  const deleteProvider = useMutation(api.apiCenterStore.deleteProvider);
+  const saveRoute = useMutation(api.apiCenterStore.saveRoute);
+  const resetRoutes = useMutation(api.apiCenterStore.resetRoutes);
+  const saveGuard = useMutation(api.apiCenterStore.saveGuard);
+  const flushCache = useMutation(api.apiCenterStore.flushCache);
+  const resetCircuit = useMutation(api.apiCenterStore.resetCircuit);
+  const clearUsage = useMutation(api.apiCenterStore.clearUsage);
+  const verifyProvider = useAction(api.apiCenter.verifyProvider);
+  const discoverModels = useAction(api.apiCenter.discoverModels);
+  const testTask = useAction(api.apiCenter.testTask);
 
-  const saveA = useMutation(api.apiCoreStore.saveSystemA);
-  const saveB = useMutation(api.apiCoreStore.saveSystemB);
-  const deleteSystem = useMutation(api.apiCoreStore.deleteSystem);
-  const verify = useAction(api.apiCore.verifySystem);
+  const [panel, setPanel] = useState<PanelId>("providers");
+  const [busy, setBusy] = useState<string | null>(null);
 
+  // ── ① نموذج المزوّدين ──
   const [keyA, setKeyA] = useState("");
-  const [urlA, setUrlA] = useState("");
+  // مملوء مسبقاً بمزوّد MiniMax: على المالك أن يلصق المفتاح فقط
+  const [urlA, setUrlA] = useState("https://api.minimax.io/v1");
+  const [presetA, setPresetA] = useState("minimax");
+  const [modelA, setModelA] = useState("");
   const [keyB, setKeyB] = useState("");
-  const [busyA, setBusyA] = useState(false);
-  const [busyB, setBusyB] = useState(false);
-  const [verifying, setVerifying] = useState<string | null>(null);
+  const [modelB, setModelB] = useState("");
 
-  const handleSaveA = async () => {
-    if (!keyA.trim() || !urlA.trim()) return toast.error("أدخل المفتاح والرابط معاً");
-    setBusyA(true);
+  // ── ② التوجيه: مسودّات لكل وحدة ──
+  const [draft, setDraft] = useState<
+    Record<string, { model: string; temperature: string; maxTokens: string; needsJson: boolean; enabled: boolean }>
+  >({});
+
+  // ── ④ الحدود ──
+  const guardDraft = useMemo(() => {
+    if (!center) return null;
+    return {
+      enabled: center.guard.enabled,
+      dailyCallCap: String(center.guard.dailyCallCap),
+      dailyTokenCap: String(center.guard.dailyTokenCap),
+      perMinuteCap: String(center.guard.perMinuteCap),
+      cacheEnabled: center.guard.cacheEnabled,
+      circuitEnabled: center.guard.circuitEnabled,
+      failureThreshold: String(center.guard.failureThreshold),
+      cooldownMs: String(Math.round(center.guard.cooldownMs / 1000)),
+      allowEnvBootstrap: center.guard.allowEnvBootstrap,
+    };
+  }, [center]);
+  const [guardEdit, setGuardEdit] = useState<typeof guardDraft>(null);
+  const guard = guardEdit ?? guardDraft;
+
+  // ── ⑧ الاختبار الحي ──
+  const [liveTask, setLiveTask] = useState("questions");
+  const [livePrompt, setLivePrompt] = useState("");
+  const [liveResult, setLiveResult] = useState<Record<string, unknown> | null>(null);
+
+  if (!center) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" /> جارٍ قراءة مركز API…
+      </div>
+    );
+  }
+
+  const run = async (tag: string, fn: () => Promise<unknown>) => {
+    setBusy(tag);
     try {
-      await saveA({ apiKey: keyA.trim(), baseUrl: urlA.trim() });
-      toast.success("حُفظ النظام الأول (مفتاح + رابط)");
-      setKeyA("");
-      setUrlA("");
+      await fn();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "فشل الحفظ");
+      toast.error(e instanceof Error ? e.message : "فشل التنفيذ");
     } finally {
-      setBusyA(false);
+      setBusy(null);
     }
   };
 
-  const handleSaveB = async () => {
-    if (!keyB.trim()) return toast.error("أدخل مفتاح API");
-    setBusyB(true);
-    try {
-      await saveB({ apiKey: keyB.trim() });
-      toast.success("حُفظ النظام الثاني (مفتاح فقط)");
-      setKeyB("");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "فشل الحفظ");
-    } finally {
-      setBusyB(false);
-    }
-  };
-
-  const handleVerify = async (which: "systemA" | "systemB") => {
-    setVerifying(which);
-    try {
-      const res = await verify({ which });
-      if (res.ok) {
-        toast.success(`تحقق ناجح (${res.latencyMs}ms) — دليل مُسجَّل في السجل`);
-      } else {
-        toast.error(`فشل التحقق (${res.status}): ${res.error?.slice(0, 120) ?? ""}`);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "فشل التحقق");
-    } finally {
-      setVerifying(null);
-    }
-  };
-
-  const handleDelete = async (which: "systemA" | "systemB") => {
-    await deleteSystem({ which });
-    toast(`حُذف النظام — لا يوجد أثر`);
-  };
+  const providerHead = center.providers.A ?? center.providers.B;
+  const usage = center.usage.today;
+  const maxSeries = Math.max(1, ...center.usage.series.map((s: { calls: number }) => s.calls));
 
   return (
-    <div className="space-y-6">
-      {/* النظام الأول: مفتاح + رابط */}
-      <Card className="border-primary/30 bg-primary/[0.03]">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            <Globe className="size-4 text-primary" />
-            النظام الأول — مفتاح API + رابط المزود (URL)
-            {systems?.systemA ? (
-              <Badge variant="outline" className="rounded-full text-[10px] text-emerald-600">مضبوط</Badge>
-            ) : (
-              <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">غير مضبوط</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">مفتاح API</label>
-              <Input
-                value={keyA}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setKeyA(e.target.value)}
-                placeholder="sk-... أو مفتاح المزود"
-                className="rounded-xl font-mono text-xs"
-                dir="ltr"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">رابط المزود (URL)</label>
-              <Input
-                value={urlA}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setUrlA(e.target.value)}
-                placeholder="https://api.example.com/v1/chat/completions"
-                className="rounded-xl font-mono text-xs"
-                dir="ltr"
-              />
-            </div>
-          </div>
-          {systems?.systemA && (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/20 p-3 text-xs">
-              <span className="font-mono">{systems.systemA.apiKey}</span>
-              <span className="text-muted-foreground" dir="ltr">{systems.systemA.baseUrl}</span>
-              <span className="ms-auto text-[10px] text-muted-foreground">
-                حُدّث {new Date(systems.systemA.updatedAt).toLocaleString("ar-SA")}
-              </span>
-            </div>
-          )}
+    <div className="space-y-5" dir="rtl">
+      {/* ═══ شريط الحالة العلوي — صورة فورية ═══ */}
+      <Card className="border-primary/25 bg-primary/[0.03]">
+        <CardContent className="space-y-4 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={handleSaveA} disabled={busyA} className="gap-1.5 rounded-xl">
-              {busyA ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
-              {systems?.systemA ? "تحديث النظام الأول" : "حفظ النظام الأول"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleVerify("systemA")}
-              disabled={verifying === "systemA" || !systems?.systemA}
-              className="gap-1.5 rounded-xl"
-            >
-              {verifying === "systemA" ? <Loader2 className="size-4 animate-spin" /> : <FlaskConical className="size-4" />}
-              تحقق حقيقي
-            </Button>
-            {systems?.systemA && (
-              <Button variant="ghost" size="sm" className="gap-1.5 text-rose-600" onClick={() => handleDelete("systemA")}>
-                <Trash2 className="size-3.5" /> حذف
-              </Button>
+            <span className="flex items-center gap-2 text-sm font-black">
+              <Cpu className="size-4 text-primary" /> مركز الذكاء الموحّد
+            </span>
+            {center.providers.A || center.providers.B ? (
+              <Badge className="rounded-full bg-emerald-600/10 text-[10px] text-emerald-700">
+                <CheckCircle2 className="me-1 size-3" /> المزوّد متصل
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="rounded-full text-[10px] text-rose-600">
+                <XCircle className="me-1 size-3" /> لا مزوّد — كل ذكاء اللعبة موقوف
+              </Badge>
+            )}
+            {providerHead && (
+              <Badge variant="outline" className="rounded-full text-[10px]" dir="ltr">
+                {providerHead.baseUrl || "مفتاح فقط"}
+              </Badge>
+            )}
+            {center.circuit.open && (
+              <Badge variant="outline" className="rounded-full border-rose-500/40 text-[10px] text-rose-600">
+                <Ban className="me-1 size-3" /> قاطع الدائرة مفتوح
+              </Badge>
+            )}
+            {center.envBootstrap?.active && (
+              <Badge variant="outline" className="rounded-full text-[10px] text-amber-600">
+                تشغيل احتياطي من متغيّرات البيئة
+              </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
-            يُستخدم هذا النظام مع أي مزوّد يعطي رابطاً خاصاً. عند التحقق يُرسل طلب شبكة فعلي ويُسجَّل الدليل (زمن، حالة، الرد) في السجل.
-          </p>
-        </CardContent>
-      </Card>
 
-      <Separator />
-
-      {/* النظام الثاني: مفتاح فقط */}
-      <Card className="border-violet-500/30 bg-violet-500/[0.04]">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            <KeyRound className="size-4 text-violet-600" />
-            النظام الثاني — مفتاح API فقط (بدون رابط)
-            {systems?.systemB ? (
-              <Badge variant="outline" className="rounded-full text-[10px] text-emerald-600">مضبوط</Badge>
-            ) : (
-              <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">غير مضبوط</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">مفتاح API</label>
-            <Input
-              value={keyB}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setKeyB(e.target.value)}
-              placeholder="sk-or-v1-... (بوابة افتراضية موثوقة)"
-              className="rounded-xl font-mono text-xs"
-              dir="ltr"
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <StatCard icon={Activity} label="استدعاءات اليوم" value={fmt(usage.calls)} hint={`${fmt(usage.cacheHits)} من الذاكرة`} />
+            <StatCard
+              icon={CheckCircle2}
+              label="نسبة النجاح"
+              value={`${usage.successRate}%`}
+              tone={usage.successRate >= 95 ? "good" : usage.successRate >= 80 ? "warn" : "bad"}
+              hint={`${fmt(usage.fail)} فشل`}
+            />
+            <StatCard icon={Timer} label="متوسط الزمن" value={`${fmt(usage.avgLatency)}ms`} hint="لكل استدعاء حقيقي" />
+            <StatCard icon={Coins} label="توكنات اليوم" value={fmt(usage.tokensIn + usage.tokensOut)} hint={`${fmt(usage.tokensIn)} داخل / ${fmt(usage.tokensOut)} خارج`} />
+            <StatCard icon={Database} label="ذاكرة الاستجابة" value={fmt(center.cache.entries)} hint={`وفّرت ${fmt(center.cache.savedCalls)} استدعاء`} tone="good" />
+            <StatCard
+              icon={ShieldCheck}
+              label="الحماية"
+              value={center.guard.enabled ? "مفعّلة" : "معطّلة"}
+              tone={center.guard.enabled ? "good" : "warn"}
+              hint={center.guard.dailyCallCap > 0 ? `سقف ${fmt(center.guard.dailyCallCap)}/يوم` : "بلا سقف يومي"}
             />
           </div>
-          {systems?.systemB && (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/20 p-3 text-xs">
-              <span className="font-mono">{systems.systemB.apiKey}</span>
-              <span className="ms-auto text-[10px] text-muted-foreground">
-                حُدّث {new Date(systems.systemB.updatedAt).toLocaleString("ar-SA")}
-              </span>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={handleSaveB} disabled={busyB} className="gap-1.5 rounded-xl">
-              {busyB ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
-              {systems?.systemB ? "تحديث النظام الثاني" : "حفظ النظام الثاني"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleVerify("systemB")}
-              disabled={verifying === "systemB" || !systems?.systemB}
-              className="gap-1.5 rounded-xl"
-            >
-              {verifying === "systemB" ? <Loader2 className="size-4 animate-spin" /> : <FlaskConical className="size-4" />}
-              تحقق حقيقي
-            </Button>
-            {systems?.systemB && (
-              <Button variant="ghost" size="sm" className="gap-1.5 text-rose-600" onClick={() => handleDelete("systemB")}>
-                <Trash2 className="size-3.5" /> حذف
+        </CardContent>
+      </Card>
+
+      <Tabs value={panel} onValueChange={(v) => setPanel(v as PanelId)}>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-muted/40 p-1.5">
+          {PANELS.map((p) => (
+            <TabsTrigger key={p.id} value={p.id} className="gap-1.5 rounded-xl text-xs">
+              <p.icon className="size-3.5" />
+              {p.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {/* ═══════════════════ ① المزوّدون ═══════════════════ */}
+        <TabsContent value="providers" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+                <Globe className="size-4 text-primary" /> النظام الأول — مفتاح + رابط المزوّد
+                {center.providers.A ? (
+                  <Badge className="rounded-full bg-emerald-600/10 text-[10px] text-emerald-700">مضبوط</Badge>
+                ) : (
+                  <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">غير مضبوط</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-1.5">
+                {center.presets.map((p: { id: string; label: string }) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setPresetA(p.id);
+                      const preset = center.presets.find((x: { id: string }) => x.id === p.id);
+                      if (preset?.baseUrl) setUrlA(preset.baseUrl);
+                    }}
+                    className={cn(
+                      "rounded-xl border px-3 py-1.5 text-[11px] font-bold transition-colors",
+                      presetA === p.id
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/60 text-muted-foreground hover:border-primary/40",
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">مفتاح API</Label>
+                  <Input
+                    value={keyA}
+                    onChange={(e) => setKeyA(e.target.value)}
+                    placeholder={center.providers.A ? `محفوظ: ${center.providers.A.maskedKey} — اكتب الجديد للاستبدال` : "sk-..."}
+                    className="rounded-xl font-mono text-xs"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">رابط المزوّد (URL)</Label>
+                  <Input
+                    value={urlA}
+                    onChange={(e) => setUrlA(e.target.value)}
+                    placeholder="api.minimax.io/v1"
+                    className="rounded-xl font-mono text-xs"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  النموذج المفضّل لهذا المزوّد (اتركه فارغاً ليختار المحرك الأسرع المتاح)
+                </Label>
+                <Input
+                  value={modelA}
+                  onChange={(e) => setModelA(e.target.value)}
+                  placeholder={center.providers.A?.model ?? "MiniMax-M2.7-highspeed"}
+                  className="rounded-xl font-mono text-xs"
+                  dir="ltr"
+                />
+              </div>
+
+              {center.providers.A && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/20 p-3 text-xs">
+                  <KeyRound className="size-3.5 text-muted-foreground" />
+                  <span className="font-mono">{center.providers.A.maskedKey}</span>
+                  <span className="text-muted-foreground" dir="ltr">{center.providers.A.baseUrl || "—"}</span>
+                  <span className="ms-auto text-[10px] text-muted-foreground">حُدّث {ago(center.providers.A.updatedAt)}</span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  className="gap-1.5 rounded-xl"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    run("saveA", async () => {
+                      await saveProvider({
+                        which: "A",
+                        apiKey: keyA.trim() || undefined,
+                        baseUrl: urlA.trim() || undefined,
+                        presetId: presetA,
+                        model: modelA.trim() ? modelA.trim() : null,
+                      });
+                      setKeyA("");
+                      toast.success("حُفظ المزوّد الأول — يعمل فوراً في كل اللعبة");
+                    })
+                  }
+                >
+                  {busy === "saveA" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                  {center.providers.A ? "تحديث المزوّد" : "حفظ المزوّد"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-1.5 rounded-xl"
+                  disabled={busy !== null || !center.providers.A}
+                  onClick={() =>
+                    run("verifyA", async () => {
+                      const r = await verifyProvider({ which: "A" });
+                      if (r.ok) toast.success(`تحقق ناجح (${r.latencyMs}ms) على ${r.model}: ${r.reply || "استجابة فارغة"}`);
+                      else toast.error(`فشل (${r.status}): ${r.error?.slice(0, 160) ?? "سبب غير معروف"}`);
+                    })
+                  }
+                >
+                  {busy === "verifyA" ? <Loader2 className="size-4 animate-spin" /> : <FlaskConical className="size-4" />}
+                  تحقق حقيقي
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-1.5 rounded-xl"
+                  disabled={busy !== null || !center.providers.A}
+                  onClick={() =>
+                    run("discoverA", async () => {
+                      const r = await discoverModels({ which: "A" });
+                      if (r.ok) toast.success(`اكتُشف ${r.models.length} نموذجاً من ${r.url}`);
+                      else toast.error(`تعذّر الاكتشاف: ${r.error ?? "خطأ غير معروف"}`);
+                    })
+                  }
+                >
+                  {busy === "discoverA" ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                  اكتشاف النماذج
+                </Button>
+                {center.providers.A && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 rounded-xl text-rose-600"
+                    disabled={busy !== null}
+                    onClick={() =>
+                      run("delA", async () => {
+                        await deleteProvider({ which: "A" });
+                        toast("حُذف المزوّد الأول نهائياً");
+                      })
+                    }
+                  >
+                    <Trash2 className="size-3.5" /> حذف
+                  </Button>
+                )}
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                اكتب الرابط كما هو — حتى بدون <span dir="ltr">https://</span>. المحرك يطبّعه إلى نقطة الاتصال الصحيحة
+                (<span dir="ltr">/v1/chat/completions</span>) ويكتشف النماذج بنفسه. لا يوجد مفتاح مكتوب في الكود إطلاقاً.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-violet-500/25 bg-violet-500/[0.03]">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+                <KeyRound className="size-4 text-violet-600" /> النظام الثاني — مفتاح فقط (بوابة افتراضية)
+                {center.providers.B ? (
+                  <Badge className="rounded-full bg-emerald-600/10 text-[10px] text-emerald-700">مضبوط</Badge>
+                ) : (
+                  <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">غير مضبوط</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">مفتاح API</Label>
+                  <Input
+                    value={keyB}
+                    onChange={(e) => setKeyB(e.target.value)}
+                    placeholder={center.providers.B ? `محفوظ: ${center.providers.B.maskedKey}` : "sk-or-v1-..."}
+                    className="rounded-xl font-mono text-xs"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">النموذج المفضّل</Label>
+                  <Input
+                    value={modelB}
+                    onChange={(e) => setModelB(e.target.value)}
+                    placeholder={center.providers.B?.model ?? "openrouter/auto"}
+                    className="rounded-xl font-mono text-xs"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  className="gap-1.5 rounded-xl"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    run("saveB", async () => {
+                      await saveProvider({
+                        which: "B",
+                        apiKey: keyB.trim() || undefined,
+                        presetId: "openrouter",
+                        model: modelB.trim() ? modelB.trim() : null,
+                      });
+                      setKeyB("");
+                      toast.success("حُفظ المزوّد الثاني — احتياطي حقيقي عند فشل الأول");
+                    })
+                  }
+                >
+                  {busy === "saveB" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                  حفظ المزوّد الاحتياطي
+                </Button>
+                {center.providers.B && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 rounded-xl text-rose-600"
+                    onClick={() =>
+                      run("delB", async () => {
+                        await deleteProvider({ which: "B" });
+                        toast("حُذف المزوّد الاحتياطي");
+                      })
+                    }
+                  >
+                    <Trash2 className="size-3.5" /> حذف
+                  </Button>
+                )}
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                يُستخدم تلقائياً بعد استنفاد المزوّد الأول: تبديل حقيقي بلا تدخل، فلا يتوقف ذكاء اللعبة عند عطل مزوّد واحد.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══════════════════ ② مصفوفة التوجيه ═══════════════════ */}
+        <TabsContent value="routing" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Route className="size-4 text-primary" /> توجيه كل وحدة AI في اللعبة
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-xl"
+                disabled={busy !== null}
+                onClick={() =>
+                  run("resetRoutes", async () => {
+                    await resetRoutes({});
+                    setDraft({});
+                    toast.success("أُعيدت المصفوفة للافتراضي — كل وحدة عادت لتوجيهها الأصلي");
+                  })
+                }
+              >
+                <RefreshCw className="size-3.5" /> إعادة الكل للافتراضي
               </Button>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            يُستخدم في الأنظمة التي تدعم البوابة الافتراضية. عند التحقق يُرسل طلب شبكة فعلي ويُسجَّل الدليل في السجل.
-          </p>
-        </CardContent>
-      </Card>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <p className="rounded-xl border border-border/60 bg-muted/20 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                كل صف هنا = وحدة ذكاء تستدعي AI في اللعبة فعلاً. غيّر النموذج أو الحرارة أو سقف الطول فتسري على تلك الوحدة وحدها
+                في كل اللعبة من هذه اللحظة. إيقاف الوحدة يجعلها ترفض الاستدعاء برسالة واضحة بدل أن تعمل بالخطأ.
+              </p>
+              {["المحتوى", "الأمان", "اللاعب", "الأحداث", "الإدارة", "عام"].map((group) => {
+                const rows = center.routes.filter((r: { group: string }) => r.group === group);
+                if (rows.length === 0) return null;
+                return (
+                  <div key={group} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="size-3.5 text-primary" />
+                      <span className="text-xs font-black">{group}</span>
+                      <Separator className="flex-1" />
+                    </div>
+                    {rows.map(
+                      (r: {
+                        task: string;
+                        label: string;
+                        what: string;
+                        model: string | null;
+                        temperature: number | null;
+                        maxTokens: number;
+                        needsJson: boolean;
+                        enabled: boolean;
+                        cacheTtlMs: number;
+                      }) => {
+                        const d = draft[r.task] ?? {
+                          model: r.model ?? "",
+                          temperature: r.temperature === null ? "" : String(r.temperature),
+                          maxTokens: String(r.maxTokens),
+                          needsJson: r.needsJson,
+                          enabled: r.enabled,
+                        };
+                        const stats = center.usage.perTask[r.task];
+                        const set = (patch: Partial<typeof d>) => setDraft((p) => ({ ...p, [r.task]: { ...d, ...patch } }));
+                        return (
+                          <div
+                            key={r.task}
+                            className={cn(
+                              "rounded-2xl border p-3 transition-colors",
+                              d.enabled ? "border-border/60 bg-card/50" : "border-amber-500/30 bg-amber-500/[0.04]",
+                            )}
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-bold">{r.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{r.what}</span>
+                              {r.cacheTtlMs > 0 && (
+                                <Badge variant="outline" className="rounded-full text-[9px] text-emerald-600">
+                                  ذاكرة {Math.round(r.cacheTtlMs / 1000)}ث
+                                </Badge>
+                              )}
+                              {stats && (
+                                <Badge variant="outline" className="rounded-full text-[9px] text-muted-foreground">
+                                  {fmt(stats.calls)} اليوم
+                                  {stats.cached > 0 ? ` · ${fmt(stats.cached)} ذاكرة` : ""}
+                                  {stats.fails > 0 ? ` · ${fmt(stats.fails)} فشل` : ""}
+                                </Badge>
+                              )}
+                              <div className="ms-auto flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground">{d.enabled ? "مفعّلة" : "موقوفة"}</span>
+                                <Switch checked={d.enabled} onCheckedChange={(v) => set({ enabled: v })} />
+                              </div>
+                            </div>
+                            <div className="mt-2.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">النموذج (فارغ = الأسرع المتاح)</Label>
+                                <Input
+                                  value={d.model}
+                                  onChange={(e) => set({ model: e.target.value })}
+                                  className="h-8 rounded-lg font-mono text-[11px]"
+                                  dir="ltr"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">الحرارة 0–2 (فارغ = كما يطلب الكود)</Label>
+                                <Input
+                                  value={d.temperature}
+                                  onChange={(e) => set({ temperature: e.target.value })}
+                                  className="h-8 rounded-lg text-[11px]"
+                                  dir="ltr"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">سقف الطول (0 = بلا سقف)</Label>
+                                <Input
+                                  value={d.maxTokens}
+                                  onChange={(e) => set({ maxTokens: e.target.value })}
+                                  className="h-8 rounded-lg text-[11px]"
+                                  dir="ltr"
+                                />
+                              </div>
+                              <div className="flex items-end gap-2">
+                                <div className="flex flex-1 items-center gap-2 pb-1.5">
+                                  <Switch checked={d.needsJson} onCheckedChange={(v) => set({ needsJson: v })} />
+                                  <span className="text-[10px] text-muted-foreground">ردّ JSON</span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="h-8 gap-1 rounded-lg"
+                                  disabled={busy !== null}
+                                  onClick={() =>
+                                    run(`route-${r.task}`, async () => {
+                                      await saveRoute({
+                                        task: r.task,
+                                        model: d.model.trim() ? d.model.trim() : null,
+                                        temperature: d.temperature.trim() === "" ? null : Number(d.temperature),
+                                        maxTokens: Number(d.maxTokens) || 0,
+                                        needsJson: d.needsJson,
+                                        enabled: d.enabled,
+                                      });
+                                      setDraft((p) => {
+                                        const next = { ...p };
+                                        delete next[r.task];
+                                        return next;
+                                      });
+                                      toast.success(`حُفظ توجيه «${r.label}»`);
+                                    })
+                                  }
+                                >
+                                  {busy === `route-${r.task}` ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <Save className="size-3.5" />
+                                  )}
+                                  حفظ
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* الإثبات الحقيقي — آخر عمليات التحقق */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ScrollText className="size-4 text-primary" />
-            دليل التنفيذ الفعلي — آخر عمليات التحقق
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {!proof ? (
-            <div className="flex justify-center py-8"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div>
-          ) : proof.calls.length === 0 && proof.events.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border/70 py-8 text-center text-sm text-muted-foreground">
-              لا توجد عمليات تحقق بعد — اضغط «تحقق حقيقي» على أي نظام وسيظهر الدليل هنا (زمن، حالة، الرد).
-            </p>
-          ) : (
-            <>
-              {proof.events.slice(0, 6).map((e: ProofEvent, i: number) => (
-                <div key={`ev-${i}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-[11px]">
-                  {e.event === "verify_ok" ? (
-                    <CheckCircle2 className="size-3.5 text-emerald-600" />
-                  ) : (
-                    <XCircle className="size-3.5 text-rose-600" />
+        {/* ═══════════════════ ③ النماذج المُكتشَفة ═══════════════════ */}
+        <TabsContent value="models" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Layers className="size-4 text-primary" /> النماذج المتاحة فعلاً على مزوّدك
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="rounded-xl border border-border/60 bg-muted/20 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                نقرأ <span dir="ltr">/v1/models</span> من المزوّد مباشرة. أي مزوّد جديد تضيفه يعمل تلقائياً هنا — بلا تعديل كود.
+                النماذج المرتّبة بالأسرع أولاً لأن ذكاء اللعبة يحتاج ردّاً سريعاً.
+              </p>
+              {(["A", "B"] as const).map((which) => {
+                const p = center.providers[which];
+                if (!p) return null;
+                return (
+                  <div key={which} className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="rounded-full text-[10px]">
+                        المزوّد {which}
+                      </Badge>
+                      <span className="font-mono text-[11px] text-muted-foreground" dir="ltr">
+                        {p.baseUrl || "بوابة افتراضية"}
+                      </span>
+                      {p.discoveredAt ? (
+                        <span className="text-[10px] text-muted-foreground">آخر اكتشاف {ago(p.discoveredAt)}</span>
+                      ) : (
+                        <span className="text-[10px] text-amber-600">لم يُكتشف بعد — نستخدم نماذج القالب</span>
+                      )}
+                    </div>
+                    {p.discoveredModels.length === 0 ? (
+                      <p className="rounded-xl border border-dashed border-border/70 py-4 text-center text-[11px] text-muted-foreground">
+                        اضغط «اكتشاف النماذج» في تبويب المزوّدين — أو استخدم النموذج المفضّل يدوياً في المصفوفة.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.discoveredModels.map((m: string) => {
+                          const isDefault = p.model === m;
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              disabled={busy !== null}
+                              onClick={() =>
+                                run(`setmodel-${which}-${m}`, async () => {
+                                  await saveProvider({ which, presetId: p.presetId, model: isDefault ? null : m });
+                                  toast.success(isDefault ? "أُزيل التفضيل" : `صار «${m}» هو النموذج المفضّل للمزوّد ${which}`);
+                                })
+                              }
+                              className={cn(
+                                "rounded-lg border px-2.5 py-1 font-mono text-[10px] transition-colors",
+                                isDefault
+                                  ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700"
+                                  : "border-border/60 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                              )}
+                              dir="ltr"
+                            >
+                              {m}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══════════════════ ④ الحدود والحماية ═══════════════════ */}
+        <TabsContent value="limits" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="size-4 text-primary" /> الحدود التي تحمي رصيدك واللعبة
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!guard ? null : (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-muted-foreground">سقف الاستدعاءات اليومي (0 = بلا سقف)</Label>
+                      <Input
+                        value={guard.dailyCallCap}
+                        onChange={(e) => setGuardEdit({ ...guard, dailyCallCap: e.target.value })}
+                        className="rounded-xl"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-muted-foreground">سقف التوكنات اليومي (0 = بلا سقف)</Label>
+                      <Input
+                        value={guard.dailyTokenCap}
+                        onChange={(e) => setGuardEdit({ ...guard, dailyTokenCap: e.target.value })}
+                        className="rounded-xl"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-muted-foreground">حد الاستدعاءات في الدقيقة (0 = بلا حد)</Label>
+                      <Input
+                        value={guard.perMinuteCap}
+                        onChange={(e) => setGuardEdit({ ...guard, perMinuteCap: e.target.value })}
+                        className="rounded-xl"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-muted-foreground">عدد الفشل المتتالي لفتح القاطع</Label>
+                      <Input
+                        value={guard.failureThreshold}
+                        onChange={(e) => setGuardEdit({ ...guard, failureThreshold: e.target.value })}
+                        className="rounded-xl"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-muted-foreground">مدة التبريد قبل إعادة المحاولة (ثانية)</Label>
+                      <Input
+                        value={guard.cooldownMs}
+                        onChange={(e) => setGuardEdit({ ...guard, cooldownMs: e.target.value })}
+                        className="rounded-xl"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(
+                      [
+                        ["enabled", "تشغيل الحماية", "السقوف والكاش والقاطع"],
+                        ["cacheEnabled", "ذاكرة الاستجابة", "نفس الطلب لا يُدفع مرتين"],
+                        ["circuitEnabled", "قاطع الدائرة", "يوقف الضرب على مزوّد فاشل"],
+                        ["allowEnvBootstrap", "تشغيل احتياطي من متغيّرات البيئة", "إن لم يُضبط مزوّد في المركز"],
+                      ] as const
+                    ).map(([field, label, hint]) => (
+                      <div key={field} className="flex items-center justify-between rounded-xl border border-border/60 p-3">
+                        <div>
+                          <div className="text-xs font-bold">{label}</div>
+                          <div className="text-[10px] text-muted-foreground">{hint}</div>
+                        </div>
+                        <Switch
+                          checked={Boolean(guard[field])}
+                          onCheckedChange={(v) => setGuardEdit({ ...guard, [field]: v })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      className="gap-1.5 rounded-xl"
+                      disabled={busy !== null}
+                      onClick={() =>
+                        run("saveGuard", async () => {
+                          await saveGuard({
+                            enabled: guard.enabled,
+                            dailyCallCap: Number(guard.dailyCallCap) || 0,
+                            dailyTokenCap: Number(guard.dailyTokenCap) || 0,
+                            perMinuteCap: Number(guard.perMinuteCap) || 0,
+                            cacheEnabled: guard.cacheEnabled,
+                            circuitEnabled: guard.circuitEnabled,
+                            failureThreshold: Number(guard.failureThreshold) || 5,
+                            cooldownMs: (Number(guard.cooldownMs) || 300) * 1000,
+                            allowEnvBootstrap: guard.allowEnvBootstrap,
+                          });
+                          setGuardEdit(null);
+                          toast.success("حُفظت الحدود — تسري على كل استدعاء فوراً");
+                        })
+                      }
+                    >
+                      {busy === "saveGuard" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                      حفظ الحدود
+                    </Button>
+                    {guardEdit && (
+                      <Button variant="ghost" className="rounded-xl" onClick={() => setGuardEdit(null)}>
+                        إلغاء التعديل
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══════════════════ ⑤ الاستهلاك ═══════════════════ */}
+        <TabsContent value="usage" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Coins className="size-4 text-primary" /> استهلاك حقيقي — أرقام مقيسة لا مُقدَّرة
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-xl text-rose-600"
+                disabled={busy !== null}
+                onClick={() =>
+                  run("clearUsage", async () => {
+                    await clearUsage({});
+                    toast("أُفرغت أرقام الاستهلاك والسجل الحي");
+                  })
+                }
+              >
+                {busy === "clearUsage" ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                تصفير العدّادات
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="text-xs font-bold">آخر ٧ أيام</div>
+                <div className="flex h-28 items-end gap-1.5">
+                  {center.usage.series.map((s: { day: string; calls: number; tokens: number; cacheHits: number }) => (
+                    <div key={s.day} className="flex flex-1 flex-col items-center gap-1">
+                      <div className="text-[9px] tabular-nums text-muted-foreground">{s.calls > 0 ? fmt(s.calls) : ""}</div>
+                      <div
+                        className="w-full rounded-t-md bg-primary/70 transition-all"
+                        style={{ height: `${Math.max(3, (s.calls / maxSeries) * 72)}px` }}
+                        title={`${s.day}: ${s.calls} استدعاء · ${s.tokens} توكن · ${s.cacheHits} من الذاكرة`}
+                      />
+                      <div className="text-[8px] text-muted-foreground" dir="ltr">
+                        {s.day.slice(5)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <div className="text-xs font-bold">لكل نموذج (اليوم)</div>
+                {center.usage.byModel.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-border/70 py-6 text-center text-[11px] text-muted-foreground">
+                    لا استدعاءات اليوم بعد. أول استدعاء من أي وحدة AI سيظهر هنا فوراً بأرقامه الحقيقية.
+                  </p>
+                ) : (
+                  center.usage.byModel.map(
+                    (m: { model: string; calls: number; tokens: number; cacheHits: number; avgLatency: number }) => (
+                      <div key={m.model} className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/25 px-3 py-2 text-[11px]">
+                        <Cpu className="size-3.5 text-primary" />
+                        <span className="font-mono" dir="ltr">{m.model}</span>
+                        <span className="text-muted-foreground">{fmt(m.calls)} استدعاء</span>
+                        <span className="text-muted-foreground">{fmt(m.tokens)} توكن</span>
+                        <span className="text-muted-foreground">{fmt(m.avgLatency)}ms متوسط</span>
+                        {m.cacheHits > 0 && <Badge variant="outline" className="rounded-full text-[9px] text-emerald-600">{fmt(m.cacheHits)} من الذاكرة</Badge>}
+                      </div>
+                    ),
+                  )
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <div className="text-xs font-bold">لكل وحدة AI (من السجل الحي)</div>
+                <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {center.routes
+                    .filter((r: { task: string }) => center.usage.perTask[r.task])
+                    .map((r: { task: string; label: string }) => {
+                      const s = center.usage.perTask[r.task];
+                      return (
+                        <div key={r.task} className="flex items-center justify-between rounded-xl bg-muted/25 px-3 py-2 text-[11px]">
+                          <span className="font-bold">{r.label}</span>
+                          <span className="text-muted-foreground tabular-nums">
+                            {fmt(s.calls)} · {fmt(Math.round(s.ms / Math.max(1, s.calls)))}ms
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══════════════════ ⑥ الذاكرة ═══════════════════ */}
+        <TabsContent value="cache" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Database className="size-4 text-primary" /> ذاكرة الاستجابة
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-xl text-rose-600"
+                disabled={busy !== null}
+                onClick={() =>
+                  run("flush", async () => {
+                    await flushCache({});
+                    toast("أُفرغت الذاكرة — الطلبات القادمة ستُدفع من جديد");
+                  })
+                }
+              >
+                {busy === "flush" ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                إفراغ الذاكرة
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <StatCard icon={Database} label="مدخلات محفوظة" value={fmt(center.cache.entries)} />
+                <StatCard icon={Zap} label="إصابات الذاكرة" value={fmt(center.cache.hits)} tone="good" />
+                <StatCard icon={Coins} label="استدعاءات مُوفَّرة" value={fmt(center.cache.savedCalls)} tone="good" />
+              </div>
+              <p className="rounded-xl border border-border/60 bg-muted/20 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                البصمة = النموذج + الحرارة + نص الرسائل كاملاً. نفس الطلب بالحرف لا يُدفع مرتين. الوحدات التي تحتاج محتوى طازجاً
+                (توليد الأسئلة، الرقابة، البلاغات، التعليق) لا تدخل الذاكرة إطلاقاً — الكاش للوحدات المرجعية فقط (الدعم، المساعد، المدرّب).
+                تُنظَّف المداخل القديمة تلقائياً في دورة الصيانة.
+              </p>
+              {center.cache.recent.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-bold">آخر المداخل</div>
+                  {center.cache.recent.map((c: { task: string; model: string; hits: number; createdAt: number }, i: number) => (
+                    <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/25 px-3 py-1.5 text-[10px] text-muted-foreground">
+                      <span className="font-bold text-foreground">{c.task}</span>
+                      <span className="font-mono" dir="ltr">{c.model}</span>
+                      <span>{fmt(c.hits)} إصابة</span>
+                      <span className="ms-auto">{ago(c.createdAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══════════════════ ⑦ القاطع والتبديل ═══════════════════ */}
+        <TabsContent value="resilience" className="mt-4 space-y-4">
+          <Card className={center.circuit.open ? "border-rose-500/30 bg-rose-500/[0.04]" : ""}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Zap className="size-4 text-primary" /> قاطع الدائرة وسلسلة التبديل
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-xl"
+                disabled={busy !== null}
+                onClick={() =>
+                  run("circuit", async () => {
+                    await resetCircuit({});
+                    toast.success("أُعيد ضبط القاطع — الاستدعاء القادم سيُجرّب فوراً");
+                  })
+                }
+              >
+                {busy === "circuit" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+                إعادة الضبط
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <StatCard
+                  icon={center.circuit.open ? Ban : CheckCircle2}
+                  label="حالة القاطع"
+                  value={center.circuit.open ? "مفتوح" : "مغلق"}
+                  tone={center.circuit.open ? "bad" : "good"}
+                  hint={center.circuit.open ? `يُعاد تلقائياً بعد ${fmt(center.circuit.cooldownLeftMs / 1000)}ث` : "الطلبات تمر طبيعياً"}
+                />
+                <StatCard icon={AlertTriangle} label="فشل متتالٍ" value={fmt(center.circuit.failures)} tone={center.circuit.failures > 0 ? "warn" : "default"} />
+                <StatCard icon={Timer} label="مدة التبريد" value={`${fmt(center.guard.cooldownMs / 1000)}ث`} hint={`يُفتح بعد ${fmt(center.guard.failureThreshold)} فشل`} />
+              </div>
+              {center.circuit.open && (
+                <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-[11px] text-rose-700">
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                  <div>
+                    فُتح القاطع تلقائياً لأن المزوّد فشل {fmt(center.circuit.failures)} مرة متتالية — نوقف الضرب عليه حتى يشفى،
+                    ثم نُجرّب مرة واحدة (نصف مفتوح). إن نجحت يُغلق القاطع ويُصفَّر العدّاد تلقائياً.
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-3">
+                <div className="text-xs font-bold">ترتيب التبديل الفعلي</div>
+                {(["A", "B"] as const).map((which, idx) => {
+                  const p = center.providers[which];
+                  if (!p) return null;
+                  const preset = center.presets.find((x: { id: string }) => x.id === p.presetId);
+                  const chain = [p.model, ...(p.discoveredModels ?? []).slice(0, 3), ...(preset?.models ?? []).slice(0, 3)].filter(
+                    (m: string | null | undefined): m is string => Boolean(m),
+                  );
+                  return (
+                    <div key={which} className="rounded-2xl border border-border/60 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="rounded-full text-[10px]">{idx === 0 ? "الأساسي" : "الاحتياطي"}</Badge>
+                        <span className="text-xs font-bold">المزوّد {which}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground" dir="ltr">
+                          {p.baseUrl || "بوابة افتراضية"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {chain.length === 0 ? (
+                          <span className="text-[10px] text-muted-foreground">لا نماذج معروفة — شغّل «اكتشاف النماذج»</span>
+                        ) : (
+                          chain.slice(0, 5).map((m: string, i: number) => (
+                            <span key={`${m}-${i}`} className="rounded-lg bg-muted/40 px-2 py-1 font-mono text-[10px]" dir="ltr">
+                              {i + 1}. {m}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  الترتيب: المزوّد الأساسي ← نماذجه بالأسرع أولاً ← المزوّد الاحتياطي ← نماذجه. عند خطأ 400 يتُعاد الطلب بلا
+                  إضافات غير مدعومة، وعند 429/401 يُتجاوز المزوّد كاملاً إلى التالي — بلا توقف للعبة.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══════════════════ ⑧ الاختبار الحي والسجل ═══════════════════ */}
+        <TabsContent value="live" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FlaskConical className="size-4 text-primary" /> اختبار حي — شغّل وحدة AI واعرف نتيجتها الحقيقية
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-1.5">
+                {center.routes.map((r: { task: string; label: string }) => (
+                  <button
+                    key={r.task}
+                    type="button"
+                    onClick={() => setLiveTask(r.task)}
+                    className={cn(
+                      "rounded-xl border px-2.5 py-1.5 text-[11px] font-bold transition-colors",
+                      liveTask === r.task
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/60 text-muted-foreground hover:border-primary/40",
+                    )}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                value={livePrompt}
+                onChange={(e) => setLivePrompt(e.target.value)}
+                placeholder="اكتب ما تريد تجربته على هذه الوحدة… (فارغ = اختبار جاهزية سريع)"
+                rows={3}
+                className="rounded-xl text-xs"
+              />
+              <Button
+                className="gap-1.5 rounded-xl"
+                disabled={busy !== null}
+                onClick={() =>
+                  run("live", async () => {
+                    const r = await testTask({ task: liveTask, prompt: livePrompt });
+                    setLiveResult(r as unknown as Record<string, unknown>);
+                    if (r.ok) toast.success("نجح الاختبار — الردّ الحقيقي ظاهر بالأسفل");
+                    else toast.error(`فشل: ${r.error?.slice(0, 140) ?? "سبب غير معروف"}`);
+                  })
+                }
+              >
+                {busy === "live" ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
+                تشغيل الاختبار
+              </Button>
+
+              {liveResult && (
+                <div
+                  className={cn(
+                    "space-y-2 rounded-2xl border p-3",
+                    liveResult.ok ? "border-emerald-500/30 bg-emerald-500/[0.05]" : "border-rose-500/30 bg-rose-500/[0.05]",
                   )}
-                  <span className="font-bold">{e.provider}</span>
-                  <span className="text-muted-foreground">{e.detail}</span>
-                  <span className="ms-auto text-[9px] text-muted-foreground">
-                    {new Date(e.at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    {liveResult.ok ? (
+                      <CheckCircle2 className="size-3.5 text-emerald-600" />
+                    ) : (
+                      <XCircle className="size-3.5 text-rose-600" />
+                    )}
+                    <span className="font-bold">{String(liveResult.taskLabel ?? liveResult.taskKey)}</span>
+                    {Boolean(liveResult.model) && <span className="font-mono" dir="ltr">{String(liveResult.model)}</span>}
+                    <span className="text-muted-foreground">{fmt(Number(liveResult.latencyMs))}ms</span>
+                    <span className="text-muted-foreground">
+                      {fmt(Number(liveResult.tokensIn))} داخل · {fmt(Number(liveResult.tokensOut))} خارج
+                    </span>
+                    {Boolean(liveResult.cached) && (
+                      <Badge variant="outline" className="rounded-full text-[9px] text-emerald-600">من الذاكرة</Badge>
+                    )}
+                  </div>
+                  <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-xl bg-background/70 p-3 text-[11px] leading-relaxed">
+                    {liveResult.ok ? String(liveResult.text ?? "") : String(liveResult.error ?? "فشل غير معروف")}
+                  </pre>
                 </div>
-              ))}
-              {proof.calls.slice(0, 6).map((c: ProofCall, i: number) => (
-                <div key={`call-${i}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/20 px-3 py-1.5 text-[10px] text-muted-foreground">
-                  <Plug className="size-3" />
-                  <span className="font-semibold">{c.provider}</span>
-                  <span>{c.ok ? "نجاح" : "فشل"}</span>
-                  <span>{c.latencyMs}ms</span>
-                  <span className="ms-auto">{new Date(c.createdAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
-                </div>
-              ))}
-            </>
-          )}
-        </CardContent>
-      </Card>
+              )}
 
-      {/* حماية وضمانات النظام */}
-      <Card className="border-emerald-500/30 bg-emerald-500/[0.04]">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="size-4 text-emerald-600" />
-            ضمانات النظام
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1.5 text-xs text-muted-foreground">
-          <p>• لا توجد مفاتيح مشفّرة داخل الكود — النظامان فقط هما المصدر.</p>
-          <p>• كل استدعاء AI في اللعبة يمر عبر محرك واحد يقرأ النظامين بالترتيب (الأول ثم الثاني).</p>
-          <p>• عند فشل أي طلب يظهر خطأ واضح وصريح — لا نتائج وهمية أبداً.</p>
-          <p>• كل عملية تحقق تُسجَّل دليلاً قابلاً للتحقق في السجل (زمن + حالة + الرد).</p>
-        </CardContent>
-      </Card>
+              <div className="flex items-center gap-2 pt-1">
+                <ScrollText className="size-3.5 text-muted-foreground" />
+                <span className="text-xs font-bold">السجل الحي — آخر ٤٠ استدعاء من كل اللعبة</span>
+              </div>
+              <div className="space-y-1">
+                {center.events.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-border/70 py-6 text-center text-[11px] text-muted-foreground">
+                    السجل فارغ — أي استدعاء AI في اللعبة سيظهر هنا فوراً بنموذجه وزمنه وتوكناته وسبب فشله إن فشل.
+                  </p>
+                ) : (
+                  center.events.map(
+                    (
+                      e: {
+                        ok: boolean;
+                        provider: string;
+                        taskLabel: string;
+                        model: string;
+                        latencyMs: number;
+                        tokensIn: number;
+                        tokensOut: number;
+                        cached: boolean;
+                        attempt: number;
+                        error?: string;
+                        at: number;
+                      },
+                      i: number,
+                    ) => (
+                      <div key={i} className="rounded-xl bg-muted/25 px-3 py-2 text-[10px]">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {e.cached ? (
+                            <Database className="size-3 text-emerald-600" />
+                          ) : e.ok ? (
+                            <CheckCircle2 className="size-3 text-emerald-600" />
+                          ) : (
+                            <XCircle className="size-3 text-rose-600" />
+                          )}
+                          <span className="font-bold text-foreground">{e.taskLabel}</span>
+                          <span className="font-mono text-muted-foreground" dir="ltr">{e.model}</span>
+                          <span className="text-muted-foreground">مزوّد {e.provider}</span>
+                          <span className="text-muted-foreground">{fmt(e.latencyMs)}ms</span>
+                          {(e.tokensIn > 0 || e.tokensOut > 0) && (
+                            <span className="text-muted-foreground">{fmt(e.tokensIn + e.tokensOut)} توكن</span>
+                          )}
+                          {e.attempt > 1 && <span className="text-amber-600">محاولة {e.attempt}</span>}
+                          <span className="ms-auto">{ago(e.at)}</span>
+                        </div>
+                        {!e.ok && e.error && (
+                          <div className="mt-1 rounded-lg bg-rose-500/10 px-2 py-1 text-[10px] leading-relaxed text-rose-700" dir="ltr">
+                            {e.error}
+                          </div>
+                        )}
+                      </div>
+                    ),
+                  )
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* شرح الترتيب الحقيقي */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Globe className="size-4 text-muted-foreground" />
-            كيف يعمل الربط الحقيقي
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-xs text-muted-foreground">
-          <p>1. عند الحفظ: يُخزَّن النظام في قاعدة البيانات ويُحقن فوراً في محرك الاستدعاء.</p>
-          <p>2. عند أي استدعاء AI في اللعبة: يُستخدم النظام الأول إن وُجد، وإلا النظام الثاني.</p>
-          <p>3. عند الفشل: إعادة محاولة تلقائية + انتقال للنموذج البديل، ثم خطأ واضح إن تعذّر.</p>
-          <p>4. عند التحقق: طلب شبكة فعلي يُقاس زمنه ويُسجَّل دليلاً في السجل — قابل للتحقق دائماً.</p>
-        </CardContent>
-      </Card>
-
-      {/* مساحة إضافية — حماية من النظام القديم */}
-      <Card className={cn("border-dashed")}>
-        <CardContent className="py-4 text-center text-[11px] text-muted-foreground">
-          النظام القديم (مفتاح مشفّر + سجل API متعدد) أُزيل نهائياً — هذه هي البنية الجديدة الكاملة.
+      <Card className="border-emerald-500/25 bg-emerald-500/[0.03]">
+        <CardContent className="space-y-1.5 py-4 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="flex items-center gap-2 font-bold text-foreground">
+            <ShieldCheck className="size-3.5 text-emerald-600" /> ضمانات هذا المركز
+          </p>
+          <p>• كل استدعاء AI في اللعبة يمرّ من محرّك واحد يقرأ هذه الإعدادات — لا مسار خلفي ولا مفتاح في الكود.</p>
+          <p>• ربط كل وحدة يتم من مصفوفة التوجيه: أي قسم في اللعبة يُضبط بدون لمس سطر كود.</p>
+          <p>• أي مزوّد جديد مستقبلاً: أضف رابطاً ومفتاحاً، وسيكتشف نماذجه ويعمل تلقائياً.</p>
+          <p>• كل رقم في هذه اللوحة مقيس من طلبات حقيقية — وإن فشل شيء يظهر نصّ فشله كما ردّه المزوّد.</p>
         </CardContent>
       </Card>
     </div>

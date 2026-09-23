@@ -226,6 +226,16 @@ async function pruneArchive(ctx: any, before: number): Promise<number> {
   return n;
 }
 
+/** استهلاك مركز API اليومي — الفهرس نصي (YYYY-MM-DD) فلا يصلح pruneByIndex الرقمي. */
+async function pruneUsageDays(ctx: any, beforeDay: string): Promise<number> {
+  const rows = await ctx.db
+    .query("apiUsageDaily")
+    .withIndex("by_day", (q: any) => q.lt("day", beforeDay))
+    .take(400);
+  for (const r of rows) await ctx.db.delete(r._id);
+  return rows.length;
+}
+
 /** جلسات أطلس المنتهية (لها logoutAt) الأقدم من الحد — المفتوحة تبقى. */
 async function pruneSessions(ctx: any, before: number): Promise<number> {
   let n = 0;
@@ -255,6 +265,13 @@ async function pruneBody(ctx: any) {
     stats.membershipLogs = await pruneByIndex(ctx, "membershipLogs", "by_created", "at", opsBefore);
     stats.assistantLogs = await pruneByIndex(ctx, "assistantLogs", "by_created", "at", opsBefore);
     stats.apiCallLogs = await pruneByIndex(ctx, "apiCallLogs", "by_created", "createdAt", opsBefore);
+
+    // 🧠 v16.0 — مركز API: سجل الاستدعاءات (٧ أيام) + ذاكرة الاستجابة (٣ أيام).
+    // الذاكرة لا تُفقد قيمةً بحذف القديم: أطول صلاحية فيها ١٠ دقائق فقط.
+    stats.apiCallEvents = await pruneByIndex(ctx, "apiCallEvents", "by_created", "at", opsBefore);
+    stats.apiReplyCache = await pruneByIndex(ctx, "apiReplyCache", "by_created", "createdAt", cutoff(3));
+    // استهلاك يومي بفهرس نصي (سلاسل YYYY-MM-DD) — يحتاج مقارنة نصية.
+    stats.apiUsageDaily = await pruneUsageDays(ctx, new Date(cutoff(30)).toISOString().slice(0, 10));
 
     // ── الإشعارات (أقدم من 14 يوماً) — الجدول الذي يكتب فيه ١٧ نظاماً ──
     // كان بلا أي حصاد: ينمو للأبد بينما قراءة العميل تقصر على آخر 50 فقط.

@@ -5,6 +5,7 @@ import { roomForumTables } from "./schemaRooms";
 import { miniGameTables } from "./schemaMiniGames";
 import { gameLiveTables } from "./schemaGameLive";
 import { tierValidator } from "./tiers";
+import { apiCenterTables } from "./schemaApiCenter";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -302,6 +303,9 @@ export const premiumTables = {
     errorCount: v.number(),
     updatedAt: v.number(),
   }).index("by_key", ["key"]),
+
+  // 🧠 v16.0 — مركز API: مصفوفة التوجيه + الحدود + الاستهلاك اليومي
+  ...apiCenterTables,
 
   // 👑 الحاكم السيادي — عقوبات ومراسيم بمفعول فعلي
   ...sovereignTables,
