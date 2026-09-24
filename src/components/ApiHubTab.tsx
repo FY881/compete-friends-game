@@ -38,6 +38,7 @@ import {
   Database,
   FlaskConical,
   Globe,
+  HeartPulse,
   KeyRound,
   Layers,
   Loader2,
@@ -51,6 +52,7 @@ import {
   Sparkles,
   Timer,
   Trash2,
+  Wrench,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -127,9 +129,44 @@ export function ApiHubTab() {
   const verifyProvider = useAction(api.apiCenter.verifyProvider);
   const discoverModels = useAction(api.apiCenter.discoverModels);
   const testTask = useAction(api.apiCenter.testTask);
+  const healthReport = useAction(api.apiCenter.healthReport);
+  const selfHeal = useAction(api.apiCenter.selfHeal);
 
   const [panel, setPanel] = useState<PanelId>("providers");
   const [busy, setBusy] = useState<string | null>(null);
+  const [liveHealth, setLiveHealth] = useState<
+    Awaited<ReturnType<typeof healthReport>> | null
+  >(null);
+  const [healLog, setHealLog] = useState<string[]>([]);
+
+  const runHealth = async () => {
+    setBusy("health");
+    try {
+      const r = await healthReport({});
+      setLiveHealth(r);
+      toast.success(
+        r.anyOk ? "مزوّد واحد على الأقل يستجيب فعلياً" : "لا مزوّد يستجيب — راجع الأخطاء أدناه",
+      );
+      if (r.circuitReset) toast.info("أُعيد فتح قاطع الدائرة تلقائياً بعد فحص ناجح");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل فحص الصحة");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runSelfHeal = async () => {
+    setBusy("heal");
+    try {
+      const r = await selfHeal({});
+      setHealLog(r.actions);
+      toast.success("انتهى الإصلاح الذاتي — راجع التفاصيل");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل الإصلاح الذاتي");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // ── ① نموذج المزوّدين ──
   const [keyA, setKeyA] = useState("");
@@ -1185,6 +1222,55 @@ export function ApiHubTab() {
 
         {/* ═══════════════════ ⑧ الاختبار الحي والسجل ═══════════════════ */}
         <TabsContent value="live" className="mt-4 space-y-4">
+          {/* ═══ 🩺 الصحة الحية + الإصلاح الذاتي ═══ */}
+          <Card className="border-primary/25 bg-primary/[0.03]">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
+                <ShieldCheck className="size-4 text-primary" /> الصحة الحية والإصلاح الذاتي
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={runHealth} disabled={busy === "health"} className="gap-1.5 rounded-lg">
+                  {busy === "health" ? <Loader2 className="size-3.5 animate-spin" /> : <HeartPulse className="size-3.5" />}
+                  فحص الصحة الآن (طلبات حقيقية)
+                </Button>
+                <Button size="sm" variant="outline" onClick={runSelfHeal} disabled={busy === "heal"} className="gap-1.5 rounded-lg">
+                  {busy === "heal" ? <Loader2 className="size-3.5 animate-spin" /> : <Wrench className="size-3.5" />}
+                  إصلاح ذاتي شامل
+                </Button>
+              </div>
+              {liveHealth && (
+                <div className="space-y-2 rounded-xl border border-border/60 bg-background/60 p-3">
+                  {liveHealth.slots.length === 0 && (
+                    <p className="text-xs text-muted-foreground">لا يوجد مزوّد مضبوط في المركز — يعمل النظام حالياً على {liveHealth.envActive ? "التشغيل الاحتياطي من مفاتيح الخادم (Gemini)" : "لا شيء"}.</p>
+                  )}
+                  {liveHealth.slots.map((s) => (
+                    <div key={s.slot} className="flex flex-wrap items-center gap-2 text-[11px]">
+                      <Badge variant="outline" className={cn("rounded-full", s.ok ? "border-emerald-500/40 text-emerald-600" : "border-rose-500/40 text-rose-600")}>
+                        {s.ok ? "✓ يستجيب" : "✗ لا يستجيب"} {s.slot}
+                      </Badge>
+                      {s.model && <span className="font-mono" dir="ltr">{s.model}</span>}
+                      <span className="text-muted-foreground">{fmt(s.latencyMs)}ms</span>
+                      {s.error && <span className="text-rose-600">{s.error}</span>}
+                    </div>
+                  ))}
+                  {liveHealth.circuitWasOpen && (
+                    <p className="text-[11px] text-amber-600">
+                      {liveHealth.circuitReset ? "🩹 أُعيد فتح القاطع تلقائياً — الشفاء نجح" : "القاطع مفتوح والفحص لم ينجح — أصلح السبب أولاً"}
+                    </p>
+                  )}
+                </div>
+              )}
+              {healLog.length > 0 && (
+                <ul className="space-y-1 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.05] p-3 text-[11px] text-emerald-700">
+                  {healLog.map((a, i) => (
+                    <li key={i}>✓ {a}</li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">

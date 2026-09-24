@@ -737,3 +737,40 @@ export const clearUsage = mutation({
     return { ok: true, clearedUsage: usage.length, clearedEvents: events.length };
   },
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🩺 أدوات الإصلاح الذاتي — تستدعى من أفعال المركز (internal)
+// ═══════════════════════════════════════════════════════════════════════
+
+/** قراءة حالة القاطع داخلياً لاتخاذ قرار الإصلاح الذاتي */
+export const readCircuitInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("apiCircuit").withIndex("by_main", (q) => q.eq("id", "main")).first();
+  },
+});
+
+/** إعادة فتح القاطع داخلياً — الإصلاح الذاتي بعد فحص ناجح */
+export const resetCircuitInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db.query("apiCircuit").withIndex("by_main", (q) => q.eq("id", "main")).first();
+    if (existing) await ctx.db.patch(existing._id, { failures: 0, open: false, openedAt: null });
+    else await ctx.db.insert("apiCircuit", { id: "main", failures: 0, open: false, openedAt: null });
+    return { ok: true };
+  },
+});
+
+/** تقليم الردود المُخزّنة الأقدم من 24 ساعة — يعيد عدد المحذوف */
+export const pruneOldCache = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const old = await ctx.db
+      .query("apiReplyCache")
+      .withIndex("by_created", (q) => q.lt("createdAt", cutoff))
+      .take(300);
+    for (const r of old) await ctx.db.delete(r._id);
+    return old.length;
+  },
+});

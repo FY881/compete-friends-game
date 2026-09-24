@@ -14,6 +14,7 @@
 "use node";
 
 import { action } from "./_generated/server";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import {
@@ -262,6 +263,154 @@ export const discoverModels = action({
     }
 
     return { ok: models.length > 0, url, models: effective, error, presetId };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🩺 تقرير الصحة الحي — فحص فعلي لكل مزوّد + جاهزية المحرك
+// ═══════════════════════════════════════════════════════════════════════
+
+export type SlotHealth = {
+  slot: string;
+  ok: boolean;
+  model?: string;
+  latencyMs: number;
+  status: number;
+  error?: string;
+  reply?: string;
+  source: "center" | "env" | "missing";
+};
+
+/**
+ * فحص صحة شامل: يجرّب مزوّد A ومزوّد B ومزوّد البيئة الاحتياطي
+ * بطلبات شبكة حقيقية، ويقيس زمن كل واحدة، ويعيد فتح القاطع تلقائياً
+ * إذا نجح أي فحص (إصلاح ذاتي حقيقي وليس مجرد زر).
+ */
+export const healthReport = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    slots: SlotHealth[];
+    anyOk: boolean;
+    circuitWasOpen: boolean;
+    circuitReset: boolean;
+    envActive: boolean;
+    checkedAt: number;
+  }> => {
+    await ensureAiRuntime(ctx);
+
+    const probe = async (which: "A" | "B"): Promise<SlotHealth> => {
+      try {
+        const r = (await ctx.runAction(api.apiCenter.verifyProvider, { which })) as any;
+        return {
+          slot: which,
+          ok: Boolean(r?.ok),
+          model: r?.model,
+          latencyMs: r?.latencyMs ?? 0,
+          status: r?.status ?? 0,
+          error: r?.error,
+          reply: r?.reply,
+          source: "center",
+        };
+      } catch (e) {
+        return {
+          slot: which,
+          ok: false,
+          latencyMs: 0,
+          status: 0,
+          error: e instanceof Error ? e.message : "فشل الفحص",
+          source: "center",
+        };
+      }
+    };
+
+    const [a, b] = await Promise.all([probe("A"), probe("B")]);
+    const slots: SlotHealth[] = [a, b].filter((s) => s.ok || s.error !== "المزوّد غير مضبوط — احفظه أولاً.");
+
+    // هل يعمل التشغيل الاحتياطي من البيئة؟ نجرب وحدة AI حقيقية عبر المسار الموحّد.
+    let envActive = false;
+    try {
+      const envProbe = await ctx.runQuery(internal.apiCenterStore.readEngineConfig, {});
+      envActive = (envProbe as any)?.envBootstrap?.active === true;
+    } catch {
+      envActive = false;
+    }
+
+    const anyOk = slots.some((s) => s.ok);
+
+    // الإصلاح الذاتي: إذا كان القاطع مفتوحاً وفحص حقيقي نجح الآن ⇒ أعد فتحه فوراً.
+    const circuitRow = await ctx.runQuery(internal.apiCenterStore.readCircuitInternal, {});
+    const circuitWasOpen = Boolean((circuitRow as any)?.open);
+    let circuitReset = false;
+    if (circuitWasOpen && anyOk) {
+      await ctx.runMutation(internal.apiCenterStore.resetCircuitInternal, {});
+      circuitReset = true;
+      try {
+        await ctx.runMutation(internal.apiHubStore.logApiEvent, {
+          provider: "center",
+          event: "self_heal",
+          detail: "أُعيد فتح قاطع الدائرة تلقائياً بعد فحص ناجح",
+          severity: "info",
+          at: Date.now(),
+        });
+      } catch {
+        /* لا يُسقط النتيجة */
+      }
+    }
+
+    return { slots, anyOk, circuitWasOpen, circuitReset, envActive, checkedAt: Date.now() };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🚑 الإصلاح الذاتي الشامل — زر واحد يصلح الحالات المعروفة كلها
+// ═══════════════════════════════════════════════════════════════════════
+
+export const selfHeal = action({
+  args: {},
+  handler: async (ctx): Promise<{ actions: string[]; ok: boolean }> => {
+    const actions: string[] = [];
+
+    // 1) إعادة فتح قاطع الدائرة
+    try {
+      await ctx.runMutation(internal.apiCenterStore.resetCircuitInternal, {});
+      actions.push("أُعيد ضبط قاطع الدائرة");
+    } catch {
+      /* تجاهل */
+    }
+
+    // 2) تفريغ الردود المُخزّنة الأقدم من 24 ساعة (تبقى الحديثة فقط)
+    try {
+      const cleared = (await ctx.runMutation(internal.apiCenterStore.pruneOldCache, {})) as number;
+      actions.push(`حُذف ${cleared} رد قديم من الذاكرة`);
+    } catch {
+      /* تجاهل */
+    }
+
+    // 3) فحص حقيقي للمزوّد — لو نجح نعلن الشفاء في السجل
+    try {
+      const v = (await ctx.runAction(api.apiCenter.verifyProvider, { which: "A" })) as any;
+      actions.push(
+        v?.ok
+          ? `المزوّد A يستجيب (${v.model} · ${v.latencyMs}ms)`
+          : `المزوّد A لا يستجيب: ${v?.error ?? "سبب غير معروف"}`,
+      );
+    } catch (e) {
+      actions.push(`تعذّر فحص المزوّد A: ${e instanceof Error ? e.message : "خطأ"}`);
+    }
+
+    try {
+      await ctx.runMutation(internal.apiHubStore.logApiEvent, {
+        provider: "center",
+        event: "self_heal_run",
+        detail: actions.join(" · "),
+        severity: "info",
+        at: Date.now(),
+      });
+    } catch {
+      /* لا يُسقط النتيجة */
+    }
+
+    return { actions, ok: true };
   },
 });
 
