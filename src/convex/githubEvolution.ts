@@ -70,7 +70,7 @@ async function requireGovernanceAuthority(ctx: any, proposal: any) {
   const user = await ctx.db.get(userId);
   const deputy = await ctx.db.query("siteRoles").withIndex("by_user", (q: any) => q.eq("userId", userId)).first();
   if (!isOwnerUser(user) && !(deputy?.active && deputy.role === "deputy_owner")) throw new Error("غير مصرح");
-  if (proposal.status !== "joint_approved" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt || !proposal.governorApprovedAt || !proposal.chamberOpenedAt) {
+  if (proposal.status !== "joint_approved" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt || !proposal.ownerApprovedAt || !proposal.governorApprovedAt || !proposal.chamberOpenedAt) {
     throw new Error("الغرفة السرية غير مفتوحة أو مسار الموافقات غير مكتمل");
   }
 }

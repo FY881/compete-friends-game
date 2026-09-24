@@ -192,6 +192,21 @@ export const deputyDecide = action({
   },
 });
 
+export const ownerDecide = action({
+  args: { proposalId: v.id("evolutionProposals") },
+  handler: async (ctx, { proposalId }): Promise<any> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("تسجيل الدخول مطلوب");
+    const actorInfo = await ctx.runQuery(internal.governanceStore.getGovernanceActor, { userId });
+    if (!actorInfo?.isOwner) throw new Error("موافقة المالك متاحة لصاحب اللعبة فقط");
+    const proposal = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
+    if (!proposal || proposal.status !== "awaiting_owner" || !proposal.deputyApprovedAt) throw new Error("الموافقة غير متاحة قبل موافقة نائب المالك");
+    const reason = "موافقة صريحة من المالك على Proposal بعد Court's approval وموافقة نائب المالك";
+    await ctx.runMutation(internal.governanceStore.recordOwnerApproval, { proposalId, reason });
+    return { approved: true, next: "awaiting_governor" };
+  },
+});
+
 export const governorDecide = action({
   args: { proposalId: v.id("evolutionProposals") },
   handler: async (ctx, { proposalId }): Promise<any> => {
@@ -222,7 +237,7 @@ export const runInstrument = action({
   handler: async (ctx, { proposalId }): Promise<any> => {
     const who = await requireAuthority(ctx);
     const proposal: any = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
-    if (!proposal || proposal.status !== "joint_approved" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt || !proposal.governorApprovedAt || !proposal.chamberOpenedAt) throw new Error("الغرفة السرية مغلقة: المسار غير مكتمل");
+    if (!proposal || proposal.status !== "joint_approved" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt || !proposal.ownerApprovedAt || !proposal.governorApprovedAt || !proposal.chamberOpenedAt) throw new Error("الغرفة السرية مغلقة: المسار غير مكتمل");
     await ctx.runMutation(internal.governanceStore.markExecuting, { proposalId });
     try {
       await ensureAiRuntime(ctx);

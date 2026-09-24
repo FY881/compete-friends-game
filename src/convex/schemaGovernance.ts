@@ -42,7 +42,7 @@ export const governanceTables = {
     requestedModule: v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() }),
     status: v.union(
       v.literal("court_review"), v.literal("court_deliberating"), v.literal("court_conditional"), v.literal("court_rejected"), v.literal("awaiting_deputy"),
-      v.literal("awaiting_governor"), v.literal("joint_approved"), v.literal("executing"),
+      v.literal("awaiting_owner"), v.literal("awaiting_governor"), v.literal("joint_approved"), v.literal("executing"),
       v.literal("executed"), v.literal("failed"), v.literal("cancelled"),
     ),
     courtVerdict: v.optional(v.union(v.literal("approved"), v.literal("rejected"), v.literal("conditional"))),
@@ -74,7 +74,7 @@ export const governanceTables = {
 
   secretChamberAudit: defineTable({
     proposalId: v.optional(v.id("evolutionProposals")), actor: v.string(),
-    actorRole: v.union(v.literal("deputy_owner"), v.literal("sovereign_governor"), v.literal("instrument"), v.literal("system")),
+    actorRole: v.union(v.literal("deputy_owner"), v.literal("owner"), v.literal("sovereign_governor"), v.literal("instrument"), v.literal("system")),
     action: v.string(), detail: v.string(), ipHint: v.optional(v.string()), at: v.number(),
   }).index("by_at", ["at"]).index("by_proposal", ["proposalId"]),
 };
