@@ -30,6 +30,8 @@ export type ProviderPreset = {
   baseUrl: string;
   /** مسار المحادثة (يُلحق بالأساس إن لم يكن موجوداً) */
   chatPath: string;
+  /** مسارات محادثة بديلة — تُجرَّب تلقائياً إن ردّ المزوّد 404 على المسار الأساسي */
+  altChatPaths: string[];
   /** مسار قائمة النماذج */
   modelsPath: string;
   /** نماذج معروفة مضمونة، مرتّبة بالأسرع أولاً */
@@ -59,6 +61,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     hostPattern: "minimax",
     baseUrl: "https://api.minimax.io/v1",
     chatPath: "/chat/completions",
+    // المسار الأصلي لـMiniMax (النماذج القديمة) — يُجرَّب تلقائياً إن رفض المزوّد المسار المتوافق
+    altChatPaths: ["/v1/text/chatcompletion_v2", "/v1/text/chatcompletion_pro"],
     modelsPath: "/models",
     // مرتّبة بالأسرع أولاً: ذكاء اللعبة يحتاج زمن استجابة منخفضاً
     models: [
@@ -84,6 +88,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     hostPattern: "openrouter",
     baseUrl: "https://openrouter.ai/api/v1",
     chatPath: "/chat/completions",
+    altChatPaths: [],
     modelsPath: "/models",
     models: ["openrouter/auto", "openai/gpt-4o-mini"],
     authStyle: "bearer",
@@ -99,6 +104,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     hostPattern: "api.openai.com",
     baseUrl: "https://api.openai.com/v1",
     chatPath: "/chat/completions",
+    altChatPaths: [],
     modelsPath: "/models",
     models: ["gpt-4o-mini", "gpt-4o"],
     authStyle: "bearer",
@@ -114,6 +120,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     hostPattern: "",
     baseUrl: "",
     chatPath: "/chat/completions",
+    altChatPaths: [],
     modelsPath: "/models",
     models: [],
     authStyle: "bearer",
@@ -196,6 +203,104 @@ function safePath(url: string): string {
   } catch {
     return "";
   }
+}
+
+/** يحذف تكرار النسخة في المسار: /v1/v1/chat/completions → /v1/chat/completions */
+export function collapseDuplicateVersion(url: string): string {
+  return url.replace(/\/(v\d+)\/\1(?=\/|$)/gi, "/$1");
+}
+
+/** أصل الموقع من أي رابط — أساس بناء المسارات البديلة */
+export function originOf(raw: string): string {
+  const base = ensureScheme(raw);
+  if (!base) return "";
+  try {
+    const u = new URL(base);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return "";
+  }
+}
+
+/** أقصى عدد مسارات نجرّبها للمزوّد الواحد (حماية من الزمن الطويل) */
+export const MAX_URL_CANDIDATES = 4;
+
+/**
+ * 🔎 كل مسارات المحادثة الممكنة لهذا المزوّد، بالترتيب.
+ *
+ * هذا ما يجعل اللعبة تنفذ أوامر المزوّد الحقيقي بدل أن تتوقف:
+ * المسار الأساسي أولاً، ثم المسارات البديلة للقالب، ثم ما يُشتق من أصل الموقع.
+ * فمهما كتب المالك — أو تغيّر مسار المزوّد مستقبلاً — يوجد منفذ يعمل.
+ */
+export function chatUrlCandidates(raw: string, presetId = "generic"): string[] {
+  const preset = getPreset(presetId);
+  const out: string[] = [];
+  const push = (u?: string) => {
+    const v = collapseDuplicateVersion((u ?? "").trim());
+    if (v && !out.includes(v)) out.push(v);
+  };
+
+  push(normalizeChatUrl(raw, presetId));
+  const origin = originOf(raw);
+  if (origin) {
+    push(`${origin}/v1${preset.chatPath}`);
+    for (const alt of preset.altChatPaths) push(`${origin}${alt}`);
+    push(`${origin}${preset.chatPath}`);
+  }
+  return out.slice(0, MAX_URL_CANDIDATES);
+}
+
+/** نفس المنطق لقائمة النماذج — ومزوّد لا يوفّر القائمة (مثل MiniMax) لا يعطّل شيئاً */
+export function modelsUrlCandidates(raw: string, presetId = "generic"): string[] {
+  const preset = getPreset(presetId);
+  const out: string[] = [];
+  const push = (u?: string) => {
+    const v = collapseDuplicateVersion((u ?? "").trim());
+    if (v && !out.includes(v)) out.push(v);
+  };
+
+  push(normalizeModelsUrl(raw, presetId));
+  const origin = originOf(raw);
+  if (origin) {
+    push(`${origin}/v1${preset.modelsPath}`);
+    push(`${origin}${preset.modelsPath}`);
+  }
+  return out.slice(0, MAX_URL_CANDIDATES);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🔬 قراءة الحالة — تمييز «مفتاح مرفوض» من «مسار خاطئ»
+// ═══════════════════════════════════════════════════════════════════════
+
+/** حالات تعني أن المسار نفسه غير موجود (نجرّب غيره) */
+export const PATH_FAILURE_STATUSES = [404, 405, 501] as const;
+
+export function isPathFailure(status: number): boolean {
+  return (PATH_FAILURE_STATUSES as readonly number[]).includes(status);
+}
+
+/** حالات تعني أن المسار موجود لكن المفتاح مرفوض (لا فائدة من تجربة مسارات أخرى) */
+export function isAuthFailure(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+export type ProbeVerdict = {
+  kind: "ok" | "auth" | "path" | "quota" | "server" | "other";
+  label: string;
+};
+
+/**
+ * ترجمة رقم الحالة إلى حكم واضح بلغة الإنسان — هذا ما يميّز تشخيصاً حقيقياً
+ * من رسالة خطأ عمياء. الفشل نفسه يصبح معلومة قابلة للتنفيذ.
+ */
+export function probeVerdict(status: number): ProbeVerdict {
+  if (status >= 200 && status < 300) return { kind: "ok", label: "المسار صحيح والمفتاح مقبول" };
+  if (isAuthFailure(status)) return { kind: "auth", label: "المسار صحيح لكن المزوّد رفض المفتاح" };
+  if (isPathFailure(status)) return { kind: "path", label: "هذا المسار غير موجود عند المزوّد" };
+  if (status === 429) return { kind: "quota", label: "تجاوزت حدود الاستخدام أو لا يوجد رصيد" };
+  if (status === 402 || status === 400) return { kind: "quota", label: "رفض المزوّد الطلب (رصيد أو صيغة)" };
+  if (status >= 500) return { kind: "server", label: "خلل مؤقت في خادم المزوّد" };
+  return { kind: "other", label: "ردّ غير متوقع من المزوّد" };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
