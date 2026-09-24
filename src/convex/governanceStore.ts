@@ -50,6 +50,26 @@ export const listConsole = query({
   },
 });
 
+export const ownerDecide = mutation({
+  args: { proposalId: v.id("evolutionProposals"), approved: v.boolean(), reason: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("تسجيل الدخول مطلوب");
+    const user = await ctx.db.get(userId);
+    if (!user || !isOwnerUser(user)) throw new Error("موافقة المالك مطلوبة");
+    const p = await ctx.db.get(args.proposalId);
+    if (!p || p.status !== "awaiting_governor" || !p.deputyApprovedAt) throw new Error("الموافقة متاحة بعد موافقة نائب المالك فقط");
+    const now = Date.now();
+    if (!args.approved) {
+      await ctx.db.patch(args.proposalId, { status: "cancelled", ownerReason: args.reason, lastError: args.reason, updatedAt: now });
+      await ctx.db.insert("secretChamberAudit", { proposalId: args.proposalId, actor: "المالك", actorRole: "system", action: "owner_rejected", detail: args.reason, at: now });
+      return;
+    }
+    await ctx.db.patch(args.proposalId, { ownerApprovedAt: now, ownerReason: args.reason, updatedAt: now });
+    await ctx.db.insert("secretChamberAudit", { proposalId: args.proposalId, actor: "المالك", actorRole: "system", action: "owner_approved", detail: args.reason, at: now });
+  },
+});
+
 export const getGovernanceActor = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {

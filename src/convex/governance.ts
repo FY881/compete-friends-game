@@ -196,7 +196,7 @@ export const governorDecide = action({
   args: { proposalId: v.id("evolutionProposals") },
   handler: async (ctx, { proposalId }): Promise<any> => {
     const proposal = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
-    if (!proposal || proposal.status !== "awaiting_governor" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt) throw new Error("يلزم موافقة نائب المالك أولاً");
+    if (!proposal || proposal.status !== "awaiting_governor" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt || !proposal.ownerApprovedAt) throw new Error("يلزم موافقة نائب المالك وموافقة المالك أولاً");
     const result = await callLlmDetailed({
       messages: [
         { role: "system", content: "أنت الحاكم السيادي. وافق فقط إذا كان التسلسل صحيحاً والأثر واضحاً والعملية قابلة للتدقيق. أجب DECISION: APPROVE أو DECISION: REJECT ثم سبب." },

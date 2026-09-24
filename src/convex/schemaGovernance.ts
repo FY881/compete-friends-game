@@ -54,6 +54,8 @@ export const governanceTables = {
     courtAt: v.optional(v.number()),
     deputyApprovedAt: v.optional(v.number()),
     deputyReason: v.optional(v.string()),
+    ownerApprovedAt: v.optional(v.number()),
+    ownerReason: v.optional(v.string()),
     governorApprovedAt: v.optional(v.number()),
     governorReason: v.optional(v.string()),
     chamberOpenedAt: v.optional(v.number()),
