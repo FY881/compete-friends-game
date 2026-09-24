@@ -32,7 +32,7 @@ export const governanceTables = {
 
   evolutionProposals: defineTable({
     authorId: v.id("users"),
-    proposerRole: v.union(v.literal("deputy_owner"), v.literal("sovereign_governor")),
+    proposerRole: v.union(v.literal("deputy_owner"), v.literal("sovereign_governor"), v.literal("mind_hub")),
     title: v.string(),
     operation: v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct")),
     targetKey: v.string(),
@@ -56,7 +56,7 @@ export const governanceTables = {
     deputyReason: v.optional(v.string()),
     ownerApprovedAt: v.optional(v.number()),
     ownerReason: v.optional(v.string()),
-    ownerGrantScope: v.optional(v.union(v.literal("deputy_request"), v.literal("governor_request"))),
+    ownerGrantScope: v.optional(v.union(v.literal("deputy_request"), v.literal("governor_request"), v.literal("mind_hub_request"))),
     ownerVerdictAt: v.optional(v.number()),
     governorApprovedAt: v.optional(v.number()),
     governorReason: v.optional(v.string()),
