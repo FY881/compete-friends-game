@@ -17,6 +17,7 @@ export function GovernanceConsole() {
   const deputy = useAction(api.governance.deputyDecide);
   const governor = useAction(api.governance.governorDecide);
   const owner = useAction(api.governance.ownerDecide);
+  const governorSelf = useAction(api.governance.governorSelfReview);
   const instrument = useAction(api.governance.runInstrument);
   const governorPropose = useAction(api.governance.governorPropose);
   const resolveConditions = useAction(api.governance.resolveConditions);
@@ -85,12 +86,39 @@ export function GovernanceConsole() {
     }
   }
 
+  async function ownerDecide(proposalId: Id<"evolutionProposals">, approved: boolean) {
+    let reason = "";
+    if (!approved) {
+      const input = window.prompt("سبب رفض المالك (يُسجل في الغرفة السرية):");
+      if (input === null) return;
+      reason = input.trim();
+      if (reason.length < 10) { toast.error("اكتب سبباً واضحاً لا يقل عن ١٠ أحرف"); return; }
+    }
+    setBusy(`owner:${proposalId}`);
+    try {
+      await owner({ proposalId, approved, reason: reason || undefined });
+      toast.success(approved ? "مُنح إذن المالك — بانتظار الحاكم السيادي" : "رُفض الطلب وأُوقف قبل أي تنفيذ");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر تسجيل قرار المالك"); }
+    finally { setBusy(""); }
+  }
+
+  async function governorSelfReview(proposalId: Id<"evolutionProposals">, action: "amend" | "withdraw") {
+    const reason = window.prompt(action === "withdraw" ? "سبب سحب الحاكم لطلبه:" : "سبب تعديل الحاكم لطلبه:");
+    if (reason === null) return;
+    if (reason.trim().length < 10) { toast.error("اكتب سبباً واضحاً لا يقل عن ١٠ أحرف"); return; }
+    setBusy(`${action}:${proposalId}`);
+    try {
+      await governorSelf({ proposalId, action, reason: reason.trim() });
+      toast.success(action === "withdraw" ? "سُحب طلب الحاكم وسُجل في السجل" : "عُدّل طلب الحاكم وسُجل في السجل");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر تنفيذ قرار الحاكم"); }
+    finally { setBusy(""); }
+  }
+
   async function step(kind: string, proposalId: Id<"evolutionProposals">) {
     setBusy(`${kind}:${proposalId}`);
     try {
       if (kind === "court") await court({ proposalId });
       if (kind === "deputy") await deputy({ proposalId });
-      if (kind === "owner") await owner({ proposalId });
       if (kind === "governor") await governor({ proposalId });
       if (kind === "run") await instrument({ proposalId });
       toast.success("تمت الخطوة وسُجل الدليل");
@@ -130,7 +158,7 @@ export function GovernanceConsole() {
           <p className="text-xs text-muted-foreground">للإنتاج أو الصلاحيات أو قاعدة البيانات أو API أو main: إعداد ومراجعة فقط، ولا يوجد تنفيذ مباشر.</p>
           <div className="grid gap-3 md:grid-cols-2"><Input value={impact.title} onChange={(e) => setImpact({ ...impact, title: e.target.value })} placeholder="عنوان طلب الأثر العالي" /><Input value={impact.targetKey} onChange={(e) => setImpact({ ...impact, targetKey: e.target.value })} placeholder="المفتاح أو النظام المتأثر" /></div>
           <Textarea value={impact.summary} onChange={(e) => setImpact({ ...impact, summary: e.target.value })} placeholder="ملخص التغيير المطلوب" />
-          <Textarea value={impact.rationale} onChange={(e) => setImpact({ ...impact, rationale: e.target.value })} placeholder="سبب necessity والإحداثيات" />
+          <Textarea value={impact.rationale} onChange={(e) => setImpact({ ...impact, rationale: e.target.value })}                    placeholder="سبب الحاجة والأثر المتوقع" />
           <Textarea value={impact.rollback} onChange={(e) => setImpact({ ...impact, rollback: e.target.value })} placeholder="خطة rollback التفصيلية" />
           <Button onClick={submitHighImpactPlan} disabled={busy === "impact"} variant="outline">إرسال مخطط الأثر العالي إلى المحكمة</Button>
         </CardContent>
@@ -142,7 +170,8 @@ export function GovernanceConsole() {
             {p.status === "court_review" && <Button size="sm" onClick={() => step("court", p._id)} disabled={busy === `court:${p._id}`}><Radio className="size-4" />انعقاد المجلس</Button>}
             {p.status === "court_conditional" && <Button size="sm" variant="outline" onClick={() => satisfy(p._id)} disabled={busy === `conditions:${p._id}`}>استيفاء شروط المحكمة</Button>}
             {p.status === "awaiting_deputy" && <Button size="sm" onClick={() => step("deputy", p._id)} disabled={busy === `deputy:${p._id}`}><Bot className="size-4" />قرار نائب المالك</Button>}
-            {p.status === "awaiting_owner" && <Button size="sm" onClick={() => step("owner", p._id)} disabled={busy === `owner:${p._id}`}><ShieldCheck className="size-4" />موافقة المالك</Button>}
+            {p.status === "awaiting_owner" && <><Button size="sm" onClick={() => ownerDecide(p._id, true)} disabled={busy === `owner:${p._id}`}><ShieldCheck className="size-4" />إذن المالك</Button><Button size="sm" variant="destructive" onClick={() => ownerDecide(p._id, false)} disabled={busy === `owner:${p._id}`}>رفض المالك</Button></>}
+            {p.proposerRole === "sovereign_governor" && (p.status === "court_review" || p.status === "court_conditional") && <><Button size="sm" variant="outline" onClick={() => governorSelfReview(p._id, "amend")} disabled={busy === `amend:${p._id}`}>تعديل طلب الحاكم</Button><Button size="sm" variant="outline" onClick={() => governorSelfReview(p._id, "withdraw")} disabled={busy === `withdraw:${p._id}`}>سحب طلب الحاكم</Button></>}
             {p.status === "awaiting_governor" && <Button size="sm" onClick={() => step("governor", p._id)} disabled={busy === `governor:${p._id}`}><ShieldCheck className="size-4" />قرار الحاكم</Button>}
             {p.status === "joint_approved" && <Button size="sm" onClick={() => step("run", p._id)} disabled={busy === `run:${p._id}`}><Play className="size-4" />تشغيل الأداة</Button>}
             {p.status === "joint_approved" && <Button size="sm" variant="outline" onClick={() => openEvolutionPullRequest(p._id)} disabled={busy === `github:${p._id}`}><GitBranch className="size-4" />فتح Pull Request آمن</Button>}

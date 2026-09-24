@@ -170,6 +170,8 @@ export const resolveConditions = action({
 export const deputyDecide = action({
   args: { proposalId: v.id("evolutionProposals") },
   handler: async (ctx, { proposalId }): Promise<any> => {
+    // لا يُسمح لأي زائر بتشغيل قرار نائب المالك: يلزم المالك أو نائب المالك المسجل.
+    await requireAuthority(ctx);
     const proposal = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
     if (!proposal || proposal.status !== "awaiting_deputy" || proposal.courtVerdict !== "approved") throw new Error("المقترح لم يحظَ بموافقة المحكمة");
     const result = await callLlmDetailed({
@@ -193,23 +195,70 @@ export const deputyDecide = action({
 });
 
 export const ownerDecide = action({
-  args: { proposalId: v.id("evolutionProposals") },
-  handler: async (ctx, { proposalId }): Promise<any> => {
+  args: {
+    proposalId: v.id("evolutionProposals"),
+    approved: v.optional(v.boolean()),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, { proposalId, approved, reason }): Promise<any> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("تسجيل الدخول مطلوب");
     const actorInfo = await ctx.runQuery(internal.governanceStore.getGovernanceActor, { userId });
-    if (!actorInfo?.isOwner) throw new Error("موافقة المالك متاحة لصاحب اللعبة فقط");
+    if (!actorInfo?.isOwner) throw new Error("إذن المالك متاح لصاحب اللعبة فقط");
     const proposal = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
     if (!proposal || proposal.status !== "awaiting_owner" || !proposal.deputyApprovedAt) throw new Error("الموافقة غير متاحة قبل موافقة نائب المالك");
-    const reason = "موافقة صريحة من المالك على Proposal بعد Court's approval وموافقة نائب المالك";
-    await ctx.runMutation(internal.governanceStore.recordOwnerApproval, { proposalId, reason });
-    return { approved: true, next: "awaiting_governor" };
+    const decision = approved !== false && approved !== undefined ? true : Boolean(approved);
+    const note = (reason ?? "").trim() || (decision
+      ? "إذن صريح من المالك: موافقة على الطلب بعد قرار المحكمة وموافقة نائب المالك، وأُغلِق التنفيذ حتى موافقة الحاكم السيادي"
+      : "رفض صريح من المالك: أُوقف الطلب ولم يُفتح أي تنفيذ");
+    const result = await ctx.runMutation(internal.governanceStore.recordOwnerDecision, { proposalId, approved: decision, reason: note });
+    return result.approved
+      ? { approved: true, next: "awaiting_governor" }
+      : { approved: false, status: "cancelled" };
+  },
+});
+
+/**
+ * صلاحيات الحاكم السيادي الحقيقية على طلبه:
+ * يستطيع سحب طلبه أو تعديله قبل أن تبدأ جلسة المحكمة، ثم يُسجَّل القرار في
+ * سجل الغرفة العميق. هذا لا يمنحه تجاوز المحكمة أو إذن المالك؛ هو يمنع فقط
+ * أن يظل طلب رديء عالقاً، ويعطي الحاكم حقاً فعلياً في تصحيح مساره.
+ */
+export const governorSelfReview = action({
+  args: {
+    proposalId: v.id("evolutionProposals"),
+    action: v.union(v.literal("amend"), v.literal("withdraw")),
+    reason: v.string(),
+    title: v.optional(v.string()),
+    summary: v.optional(v.string()),
+    rationale: v.optional(v.string()),
+    risk: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("critical"))),
+    requestedModule: v.optional(v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() })),
+  },
+  handler: async (ctx, args): Promise<any> => {
+    await requireAuthority(ctx);
+    if (args.reason.trim().length < 10) throw new Error("سبب قرار الحاكم غير كافٍ — اكتب ما لا يقل عن ١٠ أحرف");
+    if (args.requestedModule?.config) {
+      try { JSON.parse(args.requestedModule.config || "{}"); } catch { throw new Error("إعداد الوحدة يجب أن يكون JSON صالحاً"); }
+    }
+    return await ctx.runMutation(internal.governanceStore.governorSelfDecide, {
+      proposalId: args.proposalId,
+      action: args.action,
+      reason: args.reason.slice(0, 3000),
+      title: args.title,
+      summary: args.summary,
+      rationale: args.rationale,
+      risk: args.risk,
+      requestedModule: args.requestedModule,
+    });
   },
 });
 
 export const governorDecide = action({
   args: { proposalId: v.id("evolutionProposals") },
   handler: async (ctx, { proposalId }): Promise<any> => {
+    // قرار الحاكم لا يُشغّله إلا المالك أو نائب المالك المسجل.
+    await requireAuthority(ctx);
     const proposal = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
     if (!proposal || proposal.status !== "awaiting_governor" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt || !proposal.ownerApprovedAt) throw new Error("يلزم موافقة نائب المالك وموافقة المالك أولاً");
     const result = await callLlmDetailed({
