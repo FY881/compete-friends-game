@@ -28,6 +28,7 @@ import {
   decideCall,
   estimateTokens,
   getPreset,
+  humanizeProviderError,
   matchTaskFromLabel,
   modelCandidates,
   normalizeChatUrl,
@@ -493,7 +494,11 @@ export async function callLlmDetailed(opts: LlmOptions): Promise<LlmResult> {
       route.model ?? provider.model ?? null,
     ).slice(0, MAX_MODEL_CANDIDATES);
 
+    // فشل على مستوى المزوّد كله (مفتاح مرفوض / رصيد منتهٍ) ⇒ لا نُهدر بقية نماذجه
+    let providerFatal = false;
+
     for (const model of chain) {
+      if (providerFatal) break;
       lastModel = model;
       let dropped = false;
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -518,7 +523,8 @@ export async function callLlmDetailed(opts: LlmOptions): Promise<LlmResult> {
           const raw = await response.text().catch(() => "");
 
           if (!response.ok) {
-            lastErr = `خطأ المزوّد (${response.status}): ${raw.slice(0, 220)}`;
+            // تشخيص مفهوم بدل نص خام: رصيد / مفتاح / مسار / حد استخدام.
+            lastErr = humanizeProviderError(response.status, raw);
             const unsupportedExtra =
               response.status === 400 &&
               /response_format|reasoning_split|thinking|max_tokens/i.test(raw) &&
@@ -544,7 +550,11 @@ export async function callLlmDetailed(opts: LlmOptions): Promise<LlmResult> {
               cacheTtlMs: 0,
             });
             if (response.status === 429) break; // لا نُهدر بقية المحاولات على نفس المزوّد
-            if (response.status === 401 || response.status === 403) break;
+            // مفتاح مرفوض أو رصيد منتهٍ = حالة المزوّد كله: انتقل للمزوّد التالي فوراً
+            if (response.status === 401 || response.status === 403 || response.status === 402) {
+              providerFatal = true;
+              break;
+            }
             continue;
           }
 

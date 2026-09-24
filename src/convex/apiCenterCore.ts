@@ -115,6 +115,26 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     notes: "المزوّد الرسمي — يكتشف النماذج المتاحة لحسابك فعلياً.",
   },
   {
+    id: "fireworks",
+    label: "Fireworks AI — طبقة مجانية سريعة",
+    hostPattern: "fireworks",
+    baseUrl: "https://api.fireworks.ai/inference/v1",
+    chatPath: "/chat/completions",
+    altChatPaths: [],
+    modelsPath: "/models",
+    // نماذج معروفة مضمونة — وإن اكتشف المحرك /models فسيضيف كل المتاح لحسابك
+    models: [
+      "accounts/fireworks/models/llama-v3p3-70b-instruct",
+      "accounts/fireworks/models/llama-v3p1-8b-instruct",
+    ],
+    authStyle: "bearer",
+    supportsJsonMode: true,
+    reasoningSplit: false,
+    thinkingToggle: false,
+    thinkingTogglePrefixes: [],
+    notes: "واجهة متوافقة مع OpenAI بطبقة مجانية. ألصق المفتاح والرابط فقط — المحرك يكتشف النماذج بنفسه.",
+  },
+  {
     id: "generic",
     label: "مزوّد مخصّص (متوافق مع OpenAI)",
     hostPattern: "",
@@ -285,22 +305,80 @@ export function isAuthFailure(status: number): boolean {
 }
 
 export type ProbeVerdict = {
-  kind: "ok" | "auth" | "path" | "quota" | "server" | "other";
+  kind: "ok" | "auth" | "balance" | "path" | "quota" | "server" | "other";
   label: string;
 };
+
+/**
+ * هل الفشل بسبب نفاد رصيد/خطة المزوّد؟
+ *
+ * هذا أهمّ تمييز في التشخيص: المفتاح صالح تماماً لكن الحساب لا يملك رصيداً.
+ * بلا هذا التمييز يظنّ المالك أن المفتاح أو الكود خاطئ، فيعيد المحاولة بلا جدوى،
+ * بينما المطلوب خطوة واحدة واضحة: إضافة رصيد أو تبديل المزوّد.
+ */
+export function isBalanceFailure(status: number, raw?: string): boolean {
+  if (status === 402) return true;
+  const text = (raw ?? "").toLowerCase();
+  if (!text) return false;
+  return (
+    /insufficient[_ ]?(balance|quota|funds|credit)/.test(text) ||
+    /(balance|credit)[_ ]?(low|insufficient|not enough|depleted|exhausted)/.test(text) ||
+    /usage[_ ]?limit|quota exceeded|exceeded your current quota|no credits?|out of credits?|credit balance|billing/.test(
+      text,
+    )
+  );
+}
+
+/**
+ * يستخرج رسالة المزوّد الحقيقية من ردّه الخام (JSON مُتداخل أو نص).
+ * يغطّي أشكال OpenAI وMiniMax (`base_resp.status_msg`) وبقيّة المزوّدين.
+ */
+export function providerErrorDetail(raw: string): string {
+  const text = (raw ?? "").trim();
+  if (!text) return "";
+  try {
+    const parsed = JSON.parse(text) as {
+      error?: { message?: string } | string;
+      message?: string;
+      base_resp?: { status_msg?: string };
+    };
+    const msg =
+      (typeof parsed.error === "string" ? parsed.error : parsed.error?.message) ??
+      parsed.message ??
+      parsed.base_resp?.status_msg;
+    if (typeof msg === "string" && msg.trim()) return msg.trim().slice(0, 220);
+  } catch {
+    // ليس JSON — نعرض نصاً مقتطعاً
+  }
+  return text.slice(0, 220);
+}
 
 /**
  * ترجمة رقم الحالة إلى حكم واضح بلغة الإنسان — هذا ما يميّز تشخيصاً حقيقياً
  * من رسالة خطأ عمياء. الفشل نفسه يصبح معلومة قابلة للتنفيذ.
  */
-export function probeVerdict(status: number): ProbeVerdict {
+export function probeVerdict(status: number, raw?: string): ProbeVerdict {
   if (status >= 200 && status < 300) return { kind: "ok", label: "المسار صحيح والمفتاح مقبول" };
   if (isAuthFailure(status)) return { kind: "auth", label: "المسار صحيح لكن المزوّد رفض المفتاح" };
+  if (isBalanceFailure(status, raw))
+    return { kind: "balance", label: "المفتاح صالح لكن رصيد الخطة انتهى — أضف رصيداً أو بدّل المزوّد" };
   if (isPathFailure(status)) return { kind: "path", label: "هذا المسار غير موجود عند المزوّد" };
   if (status === 429) return { kind: "quota", label: "تجاوزت حدود الاستخدام أو لا يوجد رصيد" };
-  if (status === 402 || status === 400) return { kind: "quota", label: "رفض المزوّد الطلب (رصيد أو صيغة)" };
+  if (status === 400) return { kind: "quota", label: "رفض المزوّد الطلب (صيغة غير مقبولة)" };
   if (status >= 500) return { kind: "server", label: "خلل مؤقت في خادم المزوّد" };
   return { kind: "other", label: "ردّ غير متوقع من المزوّد" };
+}
+
+/**
+ * 🩺 تشخيص نهائي موحّد: يحوّل «هناك خطأ» الغامض إلى سبب واضح + خطوة تالية.
+ * كل مسارات AI (التحقق، الاكتشاف، والاستدعاء داخل كل وحدة) تستخدم هذه الدالة،
+ * فيرى المالك نفس السبب المفهوم أينما ظهر الفشل.
+ */
+export function humanizeProviderError(status: number, raw: string): string {
+  const verdict = probeVerdict(status, raw);
+  const detail = providerErrorDetail(raw);
+  const head = `(${status}) ${verdict.label}`;
+  return detail && detail !== head ? `${head} — تفصيل المزوّد: ${detail}` : head;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

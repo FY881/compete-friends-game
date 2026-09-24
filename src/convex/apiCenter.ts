@@ -16,7 +16,13 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { getTaskDef, modelCandidates, getPreset } from "./apiCenterCore";
+import {
+  getTaskDef,
+  humanizeProviderError,
+  modelCandidates,
+  getPreset,
+  probeVerdict,
+} from "./apiCenterCore";
 import {
   buildRequest,
   callLlmDetailed,
@@ -42,6 +48,7 @@ export const verifyProvider = action({
     model: string;
     latencyMs: number;
     status: number;
+    kind: string;
     reply?: string;
     error?: string;
   }> => {
@@ -96,7 +103,8 @@ export const verifyProvider = action({
         }
         ok = true;
       } else {
-        error = raw.slice(0, 240);
+        // تشخيص مفهوم: رصيد / مفتاح / مسار / حد استخدام — لا JSON خام في الواجهة
+        error = humanizeProviderError(res.status, raw);
       }
     } catch (e) {
       error = e instanceof Error ? e.message : "خطأ شبكة";
@@ -127,7 +135,16 @@ export const verifyProvider = action({
       // الدليل لا يُسقط النتيجة
     }
 
-    return { ok, url, model, latencyMs, status, reply, error };
+    return {
+      ok,
+      url,
+      model,
+      latencyMs,
+      status,
+      kind: ok ? "ok" : probeVerdict(status, error ?? "").kind,
+      reply,
+      error,
+    };
   },
 });
 
@@ -165,7 +182,7 @@ export const discoverModels = action({
       const res = await fetch(url, { headers, signal: controller.signal }).finally(() => clearTimeout(timer));
       const raw = await res.text().catch(() => "");
       if (!res.ok) {
-        error = `(${res.status}) ${raw.slice(0, 200)}`;
+        error = humanizeProviderError(res.status, raw);
       } else {
         const parsed = JSON.parse(raw) as {
           data?: Array<{ id?: string }>;

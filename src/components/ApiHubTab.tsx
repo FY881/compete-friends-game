@@ -191,6 +191,39 @@ export function ApiHubTab() {
   const usage = center.usage.today;
   const maxSeries = Math.max(1, ...center.usage.series.map((s: { calls: number }) => s.calls));
 
+  // 🩺 تشخيص حيّ — نحوّل آخر فشل مسجّل إلى سبب واضح وخطوة تالية قابلة للتنفيذ،
+  // حتى لا يبقى المالك أمام «هناك خطأ» غامضة أو حالة «متصل» مضلّلة.
+  const latest = center.events[0] as { ok: boolean; error?: string } | undefined;
+  const health = (() => {
+    const err = latest && !latest.ok ? (latest.error ?? "") : "";
+    const t = err.toLowerCase();
+    if (/رصيد|insufficient|usage limit|quota|billing|credit/.test(t)) {
+      return {
+        tone: "amber" as const,
+        title: "💰 رصيد المزوّد انتهى — أنظمة AI موقوفة حتى إضافة رصيد أو تبديل المزوّد",
+        body: "المفتاح صحيح، والمشكلة ليست في اللعبة: حساب المزوّد لا يملك رصيداً. أضف رصيداً في حساب المزوّد، أو أضبط مزوّداً آخر (النظام الثاني) فتعود كل التبويبات للعمل فوراً بلا تعديل كود.",
+        detail: err,
+      };
+    }
+    if (/مفتاح|401|403|unauthor|invalid/.test(t)) {
+      return {
+        tone: "rose" as const,
+        title: "🔑 المزوّد رفض المفتاح",
+        body: "حدّث المفتاح من القسم أعلاه ثم اضغط «تحقق حقيقي» للتأكد فوراً.",
+        detail: err,
+      };
+    }
+    if (center.circuit.open) {
+      return {
+        tone: "rose" as const,
+        title: "⚠️ قاطع الدائرة مفتوح — الطلبات موقوفة مؤقتاً",
+        body: "أوقف المحرك الضرب على المزوّد بعد فشل متتالٍ. أصلح السبب أعلاه ثم أعد الضبط من تبويب «القاطع والتبديل»، أو انتظر انتهاء التبريد تلقائياً.",
+        detail: err || undefined,
+      };
+    }
+    return null;
+  })();
+
   return (
     <div className="space-y-5" dir="rtl">
       {/* ═══ شريط الحالة العلوي — صورة فورية ═══ */}
@@ -248,6 +281,43 @@ export function ApiHubTab() {
           </div>
         </CardContent>
       </Card>
+
+      {health && (
+        <div
+          className={cn(
+            "flex items-start gap-3 rounded-2xl border p-4",
+            health.tone === "amber"
+              ? "border-amber-500/40 bg-amber-500/[0.07]"
+              : "border-rose-500/40 bg-rose-500/[0.06]",
+          )}
+        >
+          <AlertTriangle
+            className={cn(
+              "mt-0.5 size-4 shrink-0",
+              health.tone === "amber" ? "text-amber-600" : "text-rose-600",
+            )}
+          />
+          <div className="min-w-0 space-y-1">
+            <p
+              className={cn(
+                "text-sm font-black",
+                health.tone === "amber" ? "text-amber-800" : "text-rose-800",
+              )}
+            >
+              {health.title}
+            </p>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">{health.body}</p>
+            {health.detail && (
+              <p
+                className="max-h-24 overflow-auto rounded-lg bg-background/70 px-2 py-1 font-mono text-[10px] leading-relaxed text-muted-foreground"
+                dir="ltr"
+              >
+                {health.detail}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <Tabs value={panel} onValueChange={(v) => setPanel(v as PanelId)}>
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-muted/40 p-1.5">
@@ -368,8 +438,20 @@ export function ApiHubTab() {
                   onClick={() =>
                     run("verifyA", async () => {
                       const r = await verifyProvider({ which: "A" });
-                      if (r.ok) toast.success(`تحقق ناجح (${r.latencyMs}ms) على ${r.model}: ${r.reply || "استجابة فارغة"}`);
-                      else toast.error(`فشل (${r.status}): ${r.error?.slice(0, 160) ?? "سبب غير معروف"}`);
+                      if (r.ok) {
+                        toast.success(`تحقق ناجح (${r.latencyMs}ms) على ${r.model}: ${r.reply || "استجابة فارغة"}`);
+                        return;
+                      }
+                      // التشخيص يصل مفهومًا من المحرك: رصيد / مفتاح / مسار / حد استخدام
+                      const diagnosis = r.error ?? "سبب غير معروف";
+                      if (r.kind === "balance") {
+                        toast.error(`💰 رصيد المزوّد انتهى\n${diagnosis}`, {
+                          duration: 12000,
+                          description: "المفتاح صالح — أضف رصيدًا في حساب المزوّد أو أضبط مزوّدًا آخر (النظام الثاني) فتعود كل أنظمة AI للعمل فورًا.",
+                        });
+                        return;
+                      }
+                      toast.error(`فشل التحقق (${r.status})\n${diagnosis}`, { duration: 10000 });
                     })
                   }
                 >
@@ -468,6 +550,28 @@ export function ApiHubTab() {
                 >
                   {busy === "saveB" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                   حفظ المزوّد الاحتياطي
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-1.5 rounded-xl"
+                  disabled={busy !== null || !center.providers.B}
+                  onClick={() =>
+                    run("verifyB", async () => {
+                      const r = await verifyProvider({ which: "B" });
+                      if (r.ok) {
+                        toast.success(`تحقق ناجح (${r.latencyMs}ms) على ${r.model}: ${r.reply || "استجابة فارغة"}`);
+                        return;
+                      }
+                      const diagnosis = r.error ?? "سبب غير معروف";
+                      toast.error(
+                        r.kind === "balance" ? `💰 رصيد المزوّد انتهى\n${diagnosis}` : `فشل التحقق (${r.status})\n${diagnosis}`,
+                        { duration: 10000 },
+                      );
+                    })
+                  }
+                >
+                  {busy === "verifyB" ? <Loader2 className="size-4 animate-spin" /> : <FlaskConical className="size-4" />}
+                  تحقق حقيقي
                 </Button>
                 {center.providers.B && (
                   <Button

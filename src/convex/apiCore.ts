@@ -29,6 +29,12 @@ const ENV_SOURCES: Array<{ keys: string[]; presetId: string; baseUrl: string; ur
     urlKeys: ["MINIMAX_BASE_URL"],
   },
   {
+    keys: ["FIREWORKS_API_KEY"],
+    presetId: "fireworks",
+    baseUrl: "https://api.fireworks.ai/inference/v1",
+    urlKeys: ["FIREWORKS_BASE_URL"],
+  },
+  {
     keys: ["AI_API_KEY", "LLM_API_KEY", "AI_GATEWAY_KEY"],
     presetId: "generic",
     baseUrl: "",
