@@ -43,6 +43,20 @@ export function instrumentGate(
  * بوابة الحاكم السيادي الخاصة: هل يستطيع سحب طلبه أو تعديله؟
  * تُستخدم لتمكينه من رفض طلبه أو تعديله قبل قرار المحكمة فقط، مع تسجيل السبب.
  */
+export function deputySelfReviewGate(
+  proposal: { proposerRole?: string; status?: string },
+  action: "amend" | "withdraw",
+): { allowed: boolean; reason: string } {
+  if (proposal.proposerRole !== "deputy_owner") {
+    return { allowed: false, reason: "هذا الإجراء متاح فقط لطلبات نائب المالك" };
+  }
+  const allowedStatuses = action === "amend" ? ["court_review"] : ["court_review", "court_conditional"];
+  if (!allowedStatuses.includes(String(proposal.status))) {
+    return { allowed: false, reason: "لا يمكن تعديل الطلب أو سحبه بعد بدء جلسة المحكمة" };
+  }
+  return { allowed: true, reason: "الإجراء مسموح قبل قرار المحكمة" };
+}
+
 export function governorSelfReviewGate(
   proposal: { proposerRole?: string; status?: string },
   action: "amend" | "withdraw",

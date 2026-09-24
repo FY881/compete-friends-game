@@ -142,6 +142,91 @@ export const governorPropose = action({
   },
 });
 
+/**
+ * 🛠️ الأداة الحقيقية المدمجة في نائب المالك:
+ * يكتب تكليفاً حراً، فتحوّله API حقيقية إلى Proposal منضبط (عنوان/عملية/هدف/
+ * ملخص/سبب/خطر/وحدة)، ثم يدخل المسار الإلزامي: المحكمة ← نائب المالك ← إذن
+ * المالك ← الحاكم ← الغرفة ← التنفيذ. لا يعدّل أي شيء مباشرة بنفسه.
+ */
+export const deputyDraftProposal = action({
+  args: { brief: v.string() },
+  handler: async (ctx, { brief }): Promise<any> => {
+    const who = await requireAuthority(ctx);
+    const actorInfo = await ctx.runQuery(internal.governanceStore.getGovernanceActor, { userId: who.userId });
+    if (!actorInfo?.isOwner && !actorInfo?.isDeputy) throw new Error("أداة صياغة الطلبات متاحة لنائب المالك فقط");
+    if (brief.trim().length < 30) throw new Error("اكتب تكليفاً أوضح (٣٠ حرفاً على الأقل) ليحوّله النائب إلى طلب منضبط");
+    await ensureAiRuntime(ctx);
+    const result = await callLlmDetailed({
+      messages: [
+        { role: "system", content: "أنت نائب المالك في لعبة حرب العقول. حوّل التكليف إلى طلب تعديل إداري منضبط. أعد JSON فقط: title, operation (create|modify|delete|construct), targetKey (snake_case), summary, rationale, risk (low|medium|critical), requestedModule{name,description,kind,config}.config كائن JSON. لا تقترح تجاوز المحكمة أو تعديل الإنتاج مباشرة." },
+        { role: "user", content: brief },
+      ],
+      maxTokens: 900,
+      temperature: 0.25,
+      label: "Deputy Draft Proposal",
+      jsonMode: true,
+      task: "other",
+    });
+    const match = result.text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("الأداة لم تُخرج طلباً صالحاً — أعد صياغة التكليف");
+    const spec = JSON.parse(match[0]);
+    const operation = ["create", "modify", "delete", "construct"].includes(spec.operation) ? spec.operation : "construct";
+    const risk = ["low", "medium", "critical"].includes(spec.risk) ? spec.risk : "medium";
+    const moduleSpec = spec.requestedModule ?? {};
+    try { JSON.stringify(moduleSpec.config ?? {}); } catch { throw new Error("إعداد الوحدة غير قابل للتسلسل"); }
+    const id = await ctx.runMutation(internal.governanceStore.insertDeputyProposal, {
+      authorId: who.userId,
+      title: String(spec.title ?? "طلب تطوير من نائب المالك").slice(0, 160),
+      operation,
+      targetKey: String(spec.targetKey ?? "deputy_change").slice(0, 80),
+      summary: String(spec.summary ?? brief).slice(0, 1200),
+      rationale: String(spec.rationale ?? brief).slice(0, 1200),
+      risk,
+      requestedModule: {
+        name: String(moduleSpec.name ?? spec.targetKey ?? "deputy_change").slice(0, 120),
+        description: String(moduleSpec.description ?? spec.summary ?? brief).slice(0, 1200),
+        kind: String(moduleSpec.kind ?? "feature").slice(0, 40),
+        config: JSON.stringify(moduleSpec.config ?? {}),
+      },
+    });
+    return { proposalId: id, raw: result.text, provider: result.provider, model: result.model, tokensIn: result.tokensIn, tokensOut: result.tokensOut };
+  },
+});
+
+/**
+ * صلاحيات نائب المالك الحقيقية على طلبه: تعديل أو سحب قبل جلسة المحكمة فقط.
+ * لا يحذف سجلاً ولا يتجاوز بوابات الحكم.
+ */
+export const deputySelfReview = action({
+  args: {
+    proposalId: v.id("evolutionProposals"),
+    action: v.union(v.literal("amend"), v.literal("withdraw")),
+    reason: v.string(),
+    title: v.optional(v.string()),
+    summary: v.optional(v.string()),
+    rationale: v.optional(v.string()),
+    risk: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("critical"))),
+    requestedModule: v.optional(v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() })),
+  },
+  handler: async (ctx, args): Promise<any> => {
+    await requireAuthority(ctx);
+    if (args.reason.trim().length < 10) throw new Error("سبب قرار نائب المالك غير كافٍ — اكتب ما لا يقل عن ١٠ أحرف");
+    if (args.requestedModule?.config) {
+      try { JSON.parse(args.requestedModule.config || "{}"); } catch { throw new Error("إعداد الوحدة يجب أن يكون JSON صالحاً"); }
+    }
+    return await ctx.runMutation(internal.governanceStore.deputySelfDecide, {
+      proposalId: args.proposalId,
+      action: args.action,
+      reason: args.reason.slice(0, 3000),
+      title: args.title,
+      summary: args.summary,
+      rationale: args.rationale,
+      risk: args.risk,
+      requestedModule: args.requestedModule,
+    });
+  },
+});
+
 export const resolveConditions = action({
   args: { proposalId: v.id("evolutionProposals"), evidence: v.string() },
   handler: async (ctx, { proposalId, evidence }): Promise<any> => {

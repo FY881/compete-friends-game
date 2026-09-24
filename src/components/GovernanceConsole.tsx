@@ -18,11 +18,14 @@ export function GovernanceConsole() {
   const governor = useAction(api.governance.governorDecide);
   const owner = useAction(api.governance.ownerDecide);
   const governorSelf = useAction(api.governance.governorSelfReview);
+  const deputyDraft = useAction(api.governance.deputyDraftProposal);
+  const deputySelf = useAction(api.governance.deputySelfReview);
   const instrument = useAction(api.governance.runInstrument);
   const governorPropose = useAction(api.governance.governorPropose);
   const resolveConditions = useAction(api.governance.resolveConditions);
   const githubEvolution = useAction(api.githubEvolution.createEvolutionPullRequest);
   const [brief, setBrief] = useState("");
+  const [deputyBrief, setDeputyBrief] = useState("");
   const [impact, setImpact] = useState({ title: "", targetKey: "", summary: "", rationale: "", rollback: "" });
   const [form, setForm] = useState({ title: "", targetKey: "", name: "", description: "", summary: "", rationale: "", config: '{"enabled":true}' });
   const [busy, setBusy] = useState("");
@@ -102,6 +105,29 @@ export function GovernanceConsole() {
     finally { setBusy(""); }
   }
 
+  async function draftAsDeputy() {
+    setBusy("deputy-draft");
+    try {
+      const res = await deputyDraft({ brief: deputyBrief });
+      toast.success("أداة نائب المالك أنتجت طلباً منضبطاً وأرسلته إلى المحكمة");
+      setDeputyBrief("");
+      return res;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر توليد الطلب"); }
+    finally { setBusy(""); }
+  }
+
+  async function deputySelfReview(proposalId: Id<"evolutionProposals">, action: "amend" | "withdraw") {
+    const reason = window.prompt(action === "withdraw" ? "سبب سحب نائب المالك لطلبه:" : "سبب تعديل نائب المالك لطلبه:");
+    if (reason === null) return;
+    if (reason.trim().length < 10) { toast.error("اكتب سبباً واضحاً لا يقل عن ١٠ أحرف"); return; }
+    setBusy(`deputy:${action}:${proposalId}`);
+    try {
+      await deputySelf({ proposalId, action, reason: reason.trim() });
+      toast.success(action === "withdraw" ? "سُحب طلب نائب المالك وسُجل" : "عُدّل طلب نائب المالك وسُجل");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر تنفيذ قرار نائب المالك"); }
+    finally { setBusy(""); }
+  }
+
   async function governorSelfReview(proposalId: Id<"evolutionProposals">, action: "amend" | "withdraw") {
     const reason = window.prompt(action === "withdraw" ? "سبب سحب الحاكم لطلبه:" : "سبب تعديل الحاكم لطلبه:");
     if (reason === null) return;
@@ -147,6 +173,9 @@ export function GovernanceConsole() {
           <Textarea value={form.config} onChange={set("config")} className="font-mono text-xs" placeholder="إعداد JSON" />
           <Button onClick={submit} disabled={busy === "create"}>اقتراح نائب المالك</Button>
           <div className="my-2 border-t" />
+          <Textarea value={deputyBrief} onChange={(e) => setDeputyBrief(e.target.value)} placeholder="أداة نائب المالك: اكتب ما تريد تغييره بحرية، وسيحوّله الذكاء إلى طلب منضبط يمر بالمحكمة ثم إذن المالك" />
+          <Button variant="secondary" onClick={draftAsDeputy} disabled={busy === "deputy-draft"}>توليد طلب نائب المالك بالأداة الذكية</Button>
+          <div className="my-2 border-t" />
           <Textarea value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="تكليف الحاكم السيادي بصياغة تعديل جوهري مقترح موثق" />
           <Button variant="outline" onClick={proposeAsGovernor} disabled={busy === "governor-propose"}>طلب اقتراح من الحاكم السيادي</Button>
         </CardContent>
@@ -172,6 +201,7 @@ export function GovernanceConsole() {
             {p.status === "awaiting_deputy" && <Button size="sm" onClick={() => step("deputy", p._id)} disabled={busy === `deputy:${p._id}`}><Bot className="size-4" />قرار نائب المالك</Button>}
             {p.status === "awaiting_owner" && <><Button size="sm" onClick={() => ownerDecide(p._id, true)} disabled={busy === `owner:${p._id}`}><ShieldCheck className="size-4" />إذن المالك</Button><Button size="sm" variant="destructive" onClick={() => ownerDecide(p._id, false)} disabled={busy === `owner:${p._id}`}>رفض المالك</Button></>}
             {p.proposerRole === "sovereign_governor" && (p.status === "court_review" || p.status === "court_conditional") && <><Button size="sm" variant="outline" onClick={() => governorSelfReview(p._id, "amend")} disabled={busy === `amend:${p._id}`}>تعديل طلب الحاكم</Button><Button size="sm" variant="outline" onClick={() => governorSelfReview(p._id, "withdraw")} disabled={busy === `withdraw:${p._id}`}>سحب طلب الحاكم</Button></>}
+            {p.proposerRole === "deputy_owner" && (p.status === "court_review" || p.status === "court_conditional") && <><Button size="sm" variant="outline" onClick={() => deputySelfReview(p._id, "amend")} disabled={busy === `deputy:amend:${p._id}`}>تعديل طلب نائب المالك</Button><Button size="sm" variant="outline" onClick={() => deputySelfReview(p._id, "withdraw")} disabled={busy === `deputy:withdraw:${p._id}`}>سحب طلب نائب المالك</Button></>}
             {p.status === "awaiting_governor" && <Button size="sm" onClick={() => step("governor", p._id)} disabled={busy === `governor:${p._id}`}><ShieldCheck className="size-4" />قرار الحاكم</Button>}
             {p.status === "joint_approved" && <Button size="sm" onClick={() => step("run", p._id)} disabled={busy === `run:${p._id}`}><Play className="size-4" />تشغيل الأداة</Button>}
             {p.status === "joint_approved" && <Button size="sm" variant="outline" onClick={() => openEvolutionPullRequest(p._id)} disabled={busy === `github:${p._id}`}><GitBranch className="size-4" />فتح Pull Request آمن</Button>}

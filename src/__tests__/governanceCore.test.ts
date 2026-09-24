@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chamberGate, deriveCourtVerdict, governorSelfReviewGate, instrumentGate } from "../convex/governanceCore";
+import { chamberGate, deputySelfReviewGate, deriveCourtVerdict, governorSelfReviewGate, instrumentGate } from "../convex/governanceCore";
 
 const complete = {
   status: "executing",
@@ -51,6 +51,22 @@ describe("Governor self review gate", () => {
 
   it("refuses self review for deputy proposals", () => {
     expect(governorSelfReviewGate({ proposerRole: "deputy_owner", status: "court_review" }, "amend").allowed).toBe(false);
+  });
+});
+
+describe("Deputy owner self review gate", () => {
+  it("allows the deputy owner to amend only before the court session", () => {
+    expect(deputySelfReviewGate({ proposerRole: "deputy_owner", status: "court_review" }, "amend").allowed).toBe(true);
+    expect(deputySelfReviewGate({ proposerRole: "deputy_owner", status: "court_deliberating" }, "amend").allowed).toBe(false);
+  });
+
+  it("allows the deputy owner to withdraw only before the verdict is final", () => {
+    expect(deputySelfReviewGate({ proposerRole: "deputy_owner", status: "court_conditional" }, "withdraw").allowed).toBe(true);
+    expect(deputySelfReviewGate({ proposerRole: "deputy_owner", status: "awaiting_owner" }, "withdraw").allowed).toBe(false);
+  });
+
+  it("refuses self review for governor proposals", () => {
+    expect(deputySelfReviewGate({ proposerRole: "sovereign_governor", status: "court_review" }, "amend").allowed).toBe(false);
   });
 });
 

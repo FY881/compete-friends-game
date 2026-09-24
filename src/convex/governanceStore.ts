@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { isOwnerUser } from "./owner";
 import { AI_REGISTRY } from "./aiRegistry";
-import { chamberGate, governorSelfReviewGate, instrumentGate } from "./governanceCore";
+import { chamberGate, deputySelfReviewGate, governorSelfReviewGate, instrumentGate } from "./governanceCore";
 
 async function actor(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -87,6 +87,56 @@ export const insertGovernorProposal = internalMutation({
     const now = Date.now();
     const id = await ctx.db.insert("evolutionProposals", { ...a, proposerRole: "sovereign_governor", status: "court_review", createdAt: now, updatedAt: now });
     await ctx.db.insert("secretChamberAudit", { proposalId: id, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: "proposal_created", detail: `${a.operation}: ${a.targetKey}`, at: now });
+    return id;
+  },
+});
+
+/**
+ * قرار نائب المالك على طلبه هو: تعديل أو سحب قبل جلسة المحكمة فقط.
+ * أداة حقيقية مدمجة في صلاحياته، لكنها لا تتجاوز المحكمة ولا إذن المالك.
+ */
+export const deputySelfDecide = internalMutation({
+  args: {
+    proposalId: v.id("evolutionProposals"),
+    action: v.union(v.literal("amend"), v.literal("withdraw")),
+    reason: v.string(),
+    title: v.optional(v.string()),
+    summary: v.optional(v.string()),
+    rationale: v.optional(v.string()),
+    risk: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("critical"))),
+    requestedModule: v.optional(v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() })),
+  },
+  handler: async (ctx, a) => {
+    const p = await ctx.db.get(a.proposalId);
+    if (!p) throw new Error("الطلب غير موجود");
+    const gate = deputySelfReviewGate(p, a.action);
+    if (!gate.allowed) throw new Error(gate.reason);
+    const now = Date.now();
+    if (a.action === "withdraw") {
+      await ctx.db.patch(a.proposalId, { status: "cancelled", lastError: a.reason, updatedAt: now });
+      await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "نائب المالك", actorRole: "deputy_owner", action: "deputy_withdrew", detail: a.reason, at: now });
+      return { ok: true, status: "cancelled" };
+    }
+    await ctx.db.patch(a.proposalId, {
+      title: a.title ?? p.title,
+      summary: a.summary ?? p.summary,
+      rationale: a.rationale ?? p.rationale,
+      risk: a.risk ?? p.risk,
+      requestedModule: a.requestedModule ?? p.requestedModule,
+      updatedAt: now,
+    });
+    await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "نائب المالك", actorRole: "deputy_owner", action: "deputy_amended", detail: a.reason, at: now });
+    return { ok: true, status: p.status };
+  },
+});
+
+/** إدراج طلب صاغه نائب المالك بأداة المسودة الذكية — لا يتجاوز المحكمة. */
+export const insertDeputyProposal = internalMutation({
+  args: { authorId: v.id("users"), title: v.string(), operation: v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct")), targetKey: v.string(), summary: v.string(), rationale: v.string(), risk: v.union(v.literal("low"), v.literal("medium"), v.literal("critical")), requestedModule: v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() }) },
+  handler: async (ctx, a) => {
+    const now = Date.now();
+    const id = await ctx.db.insert("evolutionProposals", { ...a, proposerRole: "deputy_owner", status: "court_review", createdAt: now, updatedAt: now });
+    await ctx.db.insert("secretChamberAudit", { proposalId: id, actor: "نائب المالك", actorRole: "deputy_owner", action: "proposal_drafted", detail: `مسودة ذكية: ${a.operation}: ${a.targetKey}`, at: now });
     return id;
   },
 });
