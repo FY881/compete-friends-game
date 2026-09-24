@@ -131,6 +131,10 @@ export function ApiHubTab() {
   const testTask = useAction(api.apiCenter.testTask);
   const healthReport = useAction(api.apiCenter.healthReport);
   const selfHeal = useAction(api.apiCenter.selfHeal);
+  const syncCenterAction = useAction(api.apiCenter.syncCenter);
+  const [syncReport, setSyncReport] = useState<
+    Awaited<ReturnType<typeof syncCenterAction>> | null
+  >(null);
 
   const [panel, setPanel] = useState<PanelId>("providers");
   const [busy, setBusy] = useState<string | null>(null);
@@ -150,6 +154,23 @@ export function ApiHubTab() {
       if (r.circuitReset) toast.info("أُعيد فتح قاطع الدائرة تلقائياً بعد فحص ناجح");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "فشل فحص الصحة");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runSync = async () => {
+    setBusy("sync");
+    try {
+      const r = await syncCenterAction({});
+      setSyncReport(r);
+      toast.success(
+        r.slotA?.ok || r.slotB?.ok
+          ? "تم التزامن — كل الوحدات مرتبطة بالمزوّد الشغّال"
+          : "تم حقن إعدادات المركز في كل الوحدات — لا مزوّد يستجيب بعد",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل التزامن");
     } finally {
       setBusy(null);
     }
@@ -1239,7 +1260,28 @@ export function ApiHubTab() {
                   {busy === "heal" ? <Loader2 className="size-3.5 animate-spin" /> : <Wrench className="size-3.5" />}
                   إصلاح ذاتي شامل
                 </Button>
+                <Button size="sm" variant="outline" onClick={runSync} disabled={busy === "sync"} className="gap-1.5 rounded-lg">
+                  {busy === "sync" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+                  مزامنة المركز مع كل التبويبات
+                </Button>
               </div>
+              {syncReport && (
+                <div className="space-y-1.5 rounded-xl border border-sky-500/30 bg-sky-500/[0.05] p-3 text-[11px]">
+                  <p className="font-bold text-sky-700">
+                    تزامن المركز — {syncReport.engines.length} وحدة مرتبطة · البيئة الاحتياطية: {syncReport.envActive ? "فعّالة" : "غير مضبوطة"}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {syncReport.engines.map((e) => (
+                      <Badge key={e.key} variant="outline" className="rounded-full text-[10px]">
+                        {e.label} ← المركز
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-muted-foreground">
+                    المزوّد A: {syncReport.slotA?.ok ? `سليم (${syncReport.slotA.model ?? "—"})` : "غير مضبوط/فاشل"} · المزوّد B: {syncReport.slotB?.ok ? `سليم (${syncReport.slotB.model ?? "—"})` : "غير مضبوط/فاشل"}
+                  </p>
+                </div>
+              )}
               {liveHealth && (
                 <div className="space-y-2 rounded-xl border border-border/60 bg-background/60 p-3">
                   {liveHealth.slots.length === 0 && (

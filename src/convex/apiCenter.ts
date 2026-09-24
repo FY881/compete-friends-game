@@ -46,6 +46,71 @@ function findProvider(id: string): EngineProvider | null {
 }
 
 /** 🧪 تحقق حقيقي: طلب فعلي للمزوّد المختار بدليل مسجَّل */
+// ════════════════════════════════════════════════════════════════════
+// 🔄 التزامن الكامل — يربط كل تبويبات ووحدات غرفة المالك بمركز API
+// ════════════════════════════════════════════════════════════════════
+// يعيد حقن إعدادات المركز في كل الأنظمة عبر ensureAiRuntime، ويفحص مزوّد A
+// و B والبيئة معاً، ويُصدر تقريراً موحّداً لكل وحدة مرتبطة بالمركز.
+
+export const syncCenter = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    ok: boolean;
+    injected: boolean;
+    envActive: boolean;
+    slotA: SlotHealth | null;
+    slotB: SlotHealth | null;
+    engines: { key: string; label: string; provider: string }[];
+    syncedAt: number;
+  }> => {
+    // 1) حقن إعدادات المركز في كل الوحدات (env + A + B)
+    await ensureAiRuntime(ctx);
+
+    // 2) فحص حيّ للمزوّدين معاً (تزامن حقيقي وليس شكلياً)
+    const report = (await ctx.runAction(api.apiCenter.healthReport, {})) as any;
+    const slotA = (report?.slots as SlotHealth[] | undefined)?.find((s) => s.slot === "A") ?? null;
+    const slotB = (report?.slots as SlotHealth[] | undefined)?.find((s) => s.slot === "B") ?? null;
+
+    // 3) خريطة الوحدات المرتبطة بالمركز
+    const engines = (
+      [
+        ["vice_owner", "نائب المالك", "center"],
+        ["ai_systems", "أنظمة AI", "center"],
+        ["ai_control", "مركز تحكم AI", "center"],
+        ["moderation", "الإشراف الذكي", "center"],
+        ["crown_deck", "مجلس العقول", "center"],
+        ["ai_questions", "مولّد الأسئلة", "center"],
+        ["ai_coach", "المدرب الذكي", "center"],
+        ["ai_free", "AI حر", "center"],
+        ["reports_smart", "البلاغات الذكية", "center"],
+        ["question_packs", "حزم الأسئلة", "center"],
+      ] as const
+    ).map(([key, label, provider]) => ({ key, label, provider }));
+
+    try {
+      await ctx.runMutation(internal.apiHubStore.logApiEvent, {
+        provider: "center",
+        event: "sync_center",
+        detail: `تزامن المركز: env=${report?.envActive ? "فعّال" : "غير مضبوط"} · A=${slotA?.ok ? "سليم" : "فاشل"} · B=${slotB?.ok ? "سليم" : "فاشل"} · ${engines.length} وحدة مرتبطة`,
+        severity: "info",
+        at: Date.now(),
+      });
+    } catch {
+      /* لا يُسقط النتيجة */
+    }
+
+    return {
+      ok: true,
+      injected: true,
+      envActive: Boolean(report?.envActive),
+      slotA,
+      slotB,
+      engines,
+      syncedAt: Date.now(),
+    };
+  },
+});
+
 export const verifyProvider = action({
   args: { which: v.union(v.literal("A"), v.literal("B")) },
   handler: async (ctx, { which }): Promise<{
