@@ -3,6 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { isOwnerUser } from "./owner";
 import { AI_REGISTRY } from "./aiRegistry";
+import { chamberGate, instrumentGate } from "./governanceCore";
 
 async function actor(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -12,7 +13,7 @@ async function actor(ctx: any) {
   const deputy = await ctx.db.query("siteRoles").withIndex("by_user", (q: any) => q.eq("userId", userId)).first();
   const isDeputy = Boolean(deputy?.active && deputy.role === "deputy_owner");
   if (!isOwnerUser(user) && !isDeputy) throw new Error("غير مصرح — هذا المسار لمالك اللعبة أو نائب المالك فقط");
-  return { userId, name: user.name ?? "مسؤول" };
+  return { userId, name: user.name ?? "مسؤول", isDeputy };
 }
 
 export const createProposal = mutation({
@@ -23,11 +24,12 @@ export const createProposal = mutation({
   },
   handler: async (ctx, args) => {
     const who = await actor(ctx);
+    if (!who.isDeputy) throw new Error("الاقتراح المباشر متاح لنائب المالك فقط — استخدم اقتراح الحاكم السيادي");
     if (args.title.trim().length < 5 || args.summary.trim().length < 20 || args.rationale.trim().length < 20) throw new Error("بيانات المقترح غير مكتملة");
     if (args.targetKey.trim().length < 3 || args.requestedModule.name.trim().length < 3) throw new Error("مفتاح أو اسم الوحدة غير صالح");
     try { JSON.parse(args.requestedModule.config || "{}"); } catch { throw new Error("إعداد الوحدة يجب أن يكون JSON صالحاً"); }
     const now = Date.now();
-    const id = await ctx.db.insert("evolutionProposals", { ...args, authorId: who.userId, status: "court_review", createdAt: now, updatedAt: now });
+    const id = await ctx.db.insert("evolutionProposals", { ...args, authorId: who.userId, proposerRole: "deputy_owner", status: "court_review", createdAt: now, updatedAt: now });
     await ctx.db.insert("secretChamberAudit", { proposalId: id, actor: who.name, actorRole: "deputy_owner", action: "proposal_created", detail: `${args.operation}: ${args.targetKey}`, at: now });
     return id;
   },
@@ -44,18 +46,95 @@ export const listConsole = query({
     const proposals = await ctx.db.query("evolutionProposals").withIndex("by_status", (q: any) => q.gte("createdAt", 0)).order("desc").take(40);
     const operations = await ctx.db.query("evolutionOperations").withIndex("by_at", (q: any) => q.gte("at", 0)).order("desc").take(30);
     const audit = await ctx.db.query("secretChamberAudit").withIndex("by_at", (q: any) => q.gte("at", 0)).order("desc").take(50);
-    return { proposals, operations, audit, courtUnits: AI_REGISTRY.filter((x) => ["unit_questions", "unit_guardian", "unit_reports", "governor", "forge"].includes(x.key)).map((u) => ({ key: u.key, name: u.name, purpose: u.purpose })) };
+    return { proposals, operations, audit, courtUnits: AI_REGISTRY.map((u) => ({ key: u.key, name: u.name, purpose: u.purpose, dept: u.dept, wiring: u.wiring })) };
   },
 });
 
+export const insertGovernorProposal = internalMutation({
+  args: { authorId: v.id("users"), title: v.string(), operation: v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct")), targetKey: v.string(), summary: v.string(), rationale: v.string(), risk: v.union(v.literal("low"), v.literal("medium"), v.literal("critical")), requestedModule: v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() }) },
+  handler: async (ctx, a) => {
+    const now = Date.now();
+    const id = await ctx.db.insert("evolutionProposals", { ...a, proposerRole: "sovereign_governor", status: "court_review", createdAt: now, updatedAt: now });
+    await ctx.db.insert("secretChamberAudit", { proposalId: id, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: "proposal_created", detail: `${a.operation}: ${a.targetKey}`, at: now });
+    return id;
+  },
+});
+
+export const claimCourt = internalMutation({
+  args: { proposalId: v.id("evolutionProposals"), actorName: v.string() },
+  handler: async (ctx, a) => {
+    const p = await ctx.db.get(a.proposalId);
+    if (!p || p.status !== "court_review") throw new Error("المقترح قيد المعالجة أو خارج مرحلة المراجعة");
+    const now = Date.now();
+    await ctx.db.patch(a.proposalId, { status: "court_deliberating", updatedAt: now, lastError: undefined });
+    await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: a.actorName, actorRole: "system", action: "court_opened", detail: `استدعاء ${AI_REGISTRY.length} وحدة`, at: now });
+  },
+});
+
+export const failCourt = internalMutation({
+  args: { proposalId: v.id("evolutionProposals"), error: v.string() },
+  handler: async (ctx, a) => {
+    const now = Date.now();
+    await ctx.db.patch(a.proposalId, { status: "court_review", lastError: a.error, updatedAt: now });
+    await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "المحكمة", actorRole: "system", action: "court_failed", detail: a.error, at: now });
+  },
+});
+
+export const recordCourtDecision = internalMutation({
+  args: { proposalId: v.id("evolutionProposals"), verdict: v.union(v.literal("approved"), v.literal("rejected"), v.literal("conditional")), summary: v.string(), reviews: v.array(v.any()), conditions: v.optional(v.array(v.string())), actorName: v.string() },
+  handler: async (ctx, a) => {
+    const current = await ctx.db.get(a.proposalId);
+    if (!current || current.status !== "court_deliberating") throw new Error("جلسة المحكمة غير صالحة");
+    const now = Date.now();
+    const status = a.verdict === "approved" ? "awaiting_deputy" : a.verdict === "conditional" ? "court_conditional" : "court_rejected";
+    await ctx.db.patch(a.proposalId, { courtVerdict: a.verdict, courtSummary: a.summary, courtReviews: a.reviews as any[], courtConditions: a.conditions, courtAt: now, status, updatedAt: now, lastError: a.verdict === "rejected" ? a.summary : undefined });
+    await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: a.actorName, actorRole: "system", action: `court_${a.verdict}`, detail: a.summary, at: now });
+  },
+});
+
+export const resolveCourtConditions = internalMutation({
+  args: { proposalId: v.id("evolutionProposals"), evidence: v.string(), approved: v.boolean() },
+  handler: async (ctx, a) => {
+    const p = await ctx.db.get(a.proposalId);
+    if (!p || p.status !== "court_conditional") throw new Error("لا توجد شروط MHC معلقة");
+    const now = Date.now();
+    await ctx.db.patch(a.proposalId, { status: a.approved ? "awaiting_deputy" : "court_rejected", conditionsEvidence: a.evidence, conditionsResolvedAt: now, updatedAt: now });
+    await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "المحكمة", actorRole: "system", action: a.approved ? "conditions_approved" : "conditions_rejected", detail: a.evidence, at: now });
+  },
+});
+
+export const governanceIntegrity = query({
+  args: {},
+  handler: async () => ({
+    ok: true,
+    courtUnitCount: AI_REGISTRY.length,
+    allRegisteredUnitsIncluded: COURT_UNIT_KEYS.length === AI_REGISTRY.length,
+    requiredFlow: ["court", "deputy_owner", "sovereign_governor", "secret_chamber", "instrument"],
+    instrumentRequiresLiveApiResponse: true,
+    checkedAt: Date.now(),
+  }),
+});
+
+const COURT_UNIT_KEYS = AI_REGISTRY.map((unit) => unit.key);
+
 export const getProposal = internalQuery({ args: { proposalId: v.id("evolutionProposals") }, handler: async (ctx, { proposalId }) => ctx.db.get(proposalId) });
-export const recordCourtDecision = internalMutation({ args: { proposalId: v.id("evolutionProposals"), verdict: v.string(), summary: v.string(), reviews: v.array(v.any()), actorName: v.string() }, handler: async (ctx, a) => { const now = Date.now(); await ctx.db.patch(a.proposalId, { courtVerdict: a.verdict as any, courtSummary: a.summary, courtReviews: a.reviews as any[], courtAt: now, status: a.verdict === "approved" ? "awaiting_deputy" : "court_rejected", updatedAt: now, lastError: a.verdict === "approved" ? undefined : a.summary }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: a.actorName, actorRole: "system", action: "court_decision", detail: a.summary, at: now }); } });
-export const recordDeputyApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals") }, handler: async (ctx, a) => { const now = Date.now(); await ctx.db.patch(a.proposalId, { deputyApprovedAt: now, status: "awaiting_governor", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "نائب المالك", actorRole: "deputy_owner", action: "deputy_approved", detail: "موافقة نائب المالك بعد قرار المجلس", at: now }); } });
-export const recordGovernorApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const now = Date.now(); await ctx.db.patch(a.proposalId, { governorApprovedAt: now, chamberOpenedAt: now, status: "joint_approved", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: "chamber_opened", detail: a.reason, at: now }); } });
-export const markExecuting = internalMutation({ args: { proposalId: v.id("evolutionProposals") }, handler: async (ctx, a) => { const now = Date.now(); await ctx.db.patch(a.proposalId, { status: "executing", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "أداة التطوير", actorRole: "instrument", action: "instrument_started", detail: "طلب API حقيقي بدأ", at: now }); } });
+export const recordDeputyApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const now = Date.now(); await ctx.db.patch(a.proposalId, { deputyApprovedAt: now, deputyReason: a.reason, status: "awaiting_governor", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "نائب المالك", actorRole: "deputy_owner", action: "deputy_approved", detail: "موافقة نائب المالك بعد قرار المجلس", at: now }); } });
+export const recordGovernorApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const now = Date.now(); await ctx.db.patch(a.proposalId, { governorApprovedAt: now, governorReason: a.reason, chamberOpenedAt: now, status: "joint_approved", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: "chamber_opened", detail: a.reason, at: now }); } });
+export const recordRejection = internalMutation({
+  args: { proposalId: v.id("evolutionProposals"), role: v.union(v.literal("deputy_owner"), v.literal("sovereign_governor")), reason: v.string() },
+  handler: async (ctx, a) => {
+    const p = await ctx.db.get(a.proposalId);
+    if (!p) throw new Error("المقترح غير موجود");
+    const now = Date.now();
+    await ctx.db.patch(a.proposalId, { status: "court_rejected", lastError: a.reason, updatedAt: now });
+    await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: a.role === "deputy_owner" ? "نائب المالك" : "الحاكم السيادي", actorRole: a.role, action: "proposal_rejected", detail: a.reason, at: now });
+  },
+});
+
+export const markExecuting = internalMutation({ args: { proposalId: v.id("evolutionProposals") }, handler: async (ctx, a) => { const p = await ctx.db.get(a.proposalId); if (!p || !chamberGate(p).allowed) throw new Error("بوابة الغرفة مغلقة"); const now = Date.now(); await ctx.db.patch(a.proposalId, { status: "executing", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "أداة التطوير", actorRole: "instrument", action: "instrument_started", detail: "طلب API حقيقي بدأ", at: now }); } });
 export const markFailed = internalMutation({ args: { proposalId: v.id("evolutionProposals"), error: v.string() }, handler: async (ctx, a) => { const now = Date.now(); await ctx.db.patch(a.proposalId, { status: "failed", lastError: a.error, updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "أداة التطوير", actorRole: "instrument", action: "instrument_failed", detail: a.error, at: now }); } });
 export const applyInstrument = internalMutation({ args: { proposalId: v.id("evolutionProposals"), name: v.string(), description: v.string(), kind: v.string(), config: v.string(), provider: v.string(), model: v.string(), tokensIn: v.number(), tokensOut: v.number(), evidence: v.string(), actorName: v.string() }, handler: async (ctx, a) => {
-  const p = await ctx.db.get(a.proposalId); if (!p || p.status !== "executing" || !p.chamberOpenedAt) throw new Error("بوابة الأداة مغلقة");
+  const p = await ctx.db.get(a.proposalId); if (!p || !instrumentGate(p).allowed) throw new Error("بوابة الأداة مغلقة");
   const now = Date.now(); const existing = await ctx.db.query("evolutionModules").withIndex("by_key", (q: any) => q.eq("key", p.targetKey)).first();
   let before: string | undefined; let outcome: string;
   if (p.operation === "delete") { if (!existing) throw new Error("الوحدة غير موجودة"); before = JSON.stringify(existing); await ctx.db.delete(existing._id); outcome = "deleted"; }

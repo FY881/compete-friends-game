@@ -6,6 +6,7 @@ if (typeof window !== "undefined" && typeof process === "undefined") {
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { GovernanceConsole } from "@/components/GovernanceConsole";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useConvexAuth } from "convex/react";
@@ -487,6 +488,16 @@ function AppShell() {
                     }
                   />
                 </>
+              )}
+              {OWNER_ROOM_ENABLED && (
+                <Route
+                  path="/governance-console"
+                  element={
+                    <RequireAuth>
+                      <GovernanceConsole />
+                    </RequireAuth>
+                  }
+                />
               )}
               <Route
                 path="/atlas-login"

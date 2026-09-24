@@ -17,6 +17,9 @@ export function GovernanceConsole() {
   const deputy = useAction(api.governance.deputyDecide);
   const governor = useAction(api.governance.governorDecide);
   const instrument = useAction(api.governance.runInstrument);
+  const governorPropose = useAction(api.governance.governorPropose);
+  const resolveConditions = useAction(api.governance.resolveConditions);
+  const [brief, setBrief] = useState("");
   const [form, setForm] = useState({ title: "", targetKey: "", name: "", description: "", summary: "", rationale: "", config: '{"enabled":true}' });
   const [busy, setBusy] = useState("");
   const set = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((s) => ({ ...s, [key]: event.target.value }));
@@ -27,6 +30,22 @@ export function GovernanceConsole() {
       await create({ ...form, operation: "create", risk: "medium", requestedModule: { name: form.name, description: form.description, kind: "feature", config: form.config } });
       toast.success("سُجّل المقترح وأُرسل إلى المجلس");
     } catch (e) { toast.error(e instanceof Error ? e.message : "فشل الإنشاء"); }
+    finally { setBusy(""); }
+  }
+
+  async function proposeAsGovernor() {
+    setBusy("governor-propose");
+    try { await governorPropose({ brief }); toast.success("أعد الحاكم مقترحه وأرسله إلى المحكمة"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "فشل اقتراح الحاكم"); }
+    finally { setBusy(""); }
+  }
+
+  async function satisfy(proposalId: Id<"evolutionProposals">) {
+    const evidence = window.prompt("اكتب دليل استيفاء كل شروط المحكمة:");
+    if (!evidence) return;
+    setBusy(`conditions:${proposalId}`);
+    try { await resolveConditions({ proposalId, evidence }); toast.success("تمت مراجعة الشروط"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "فشل استيفاء الشروط"); }
     finally { setBusy(""); }
   }
 
@@ -61,14 +80,18 @@ export function GovernanceConsole() {
           <Textarea value={form.description} onChange={set("description")} placeholder="وصف الوحدة وأثرها الحقيقي" />
           <div className="grid gap-3 md:grid-cols-2"><Textarea value={form.summary} onChange={set("summary")} placeholder="ملخص التعديل" /><Textarea value={form.rationale} onChange={set("rationale")} placeholder="سبب الحاجة إلى التعديل" /></div>
           <Textarea value={form.config} onChange={set("config")} className="font-mono text-xs" placeholder="إعداد JSON" />
-          <Button onClick={submit} disabled={busy === "create"}>إرسال إلى المجلس</Button>
+          <Button onClick={submit} disabled={busy === "create"}>اقتراح نائب المالك</Button>
+          <div className="my-2 border-t" />
+          <Textarea value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="تكليف الحاكم السيادي بصياغة تعديل جوهري مقترح موثق" />
+          <Button variant="outline" onClick={proposeAsGovernor} disabled={busy === "governor-propose"}>طلب اقتراح من الحاكم السيادي</Button>
         </CardContent>
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card><CardHeader><CardTitle>دورة القرارات</CardTitle></CardHeader><CardContent className="space-y-3">
-          {data?.proposals.map((p: any) => <div key={p._id} className="rounded-xl border p-4"><div className="flex justify-between gap-2"><b>{p.title}</b><Badge variant="outline">{p.status}</Badge></div><p className="mt-2 text-xs text-muted-foreground">{p.summary}</p>{p.courtSummary && <p className="mt-2 text-xs text-emerald-700">المجلس: {p.courtSummary}</p>}<div className="mt-3 flex flex-wrap gap-2">
+          {data?.proposals.map((p: any) => <div key={p._id} className="rounded-xl border p-4"><div className="flex justify-between gap-2"><b>{p.title}</b><Badge variant="outline">{p.status}</Badge></div><p className="mt-2 text-xs text-muted-foreground">مقترح {p.proposerRole}: {p.summary}</p>{p.courtSummary && <p className="mt-2 text-xs text-emerald-700">المجلس: {p.courtSummary}</p>}{p.courtConditions?.length > 0 && <ul className="mt-2 list-inside list-disc text-xs text-amber-700">{p.courtConditions.map((c: string) => <li key={c}>{c}</li>)}</ul>}{p.courtReviews && <details className="mt-2 text-xs"><summary>مراجعة {p.courtReviews.length} وحدة ذكاء</summary><div className="mt-2 max-h-52 space-y-1 overflow-auto">{p.courtReviews.map((r: any) => <p key={r.unit} className="rounded border p-2"><b>{r.name}</b> — {r.vote} — {r.provider}/{r.model}<br />{r.opinion}</p>)}</div></details>}<div className="mt-3 flex flex-wrap gap-2">
             {p.status === "court_review" && <Button size="sm" onClick={() => step("court", p._id)} disabled={busy === `court:${p._id}`}><Radio className="size-4" />انعقاد المجلس</Button>}
+            {p.status === "court_conditional" && <Button size="sm" variant="outline" onClick={() => satisfy(p._id)} disabled={busy === `conditions:${p._id}`}>استيفاء شروط المحكمة</Button>}
             {p.status === "awaiting_deputy" && <Button size="sm" onClick={() => step("deputy", p._id)} disabled={busy === `deputy:${p._id}`}><Bot className="size-4" />قرار نائب المالك</Button>}
             {p.status === "awaiting_governor" && <Button size="sm" onClick={() => step("governor", p._id)} disabled={busy === `governor:${p._id}`}><ShieldCheck className="size-4" />قرار الحاكم</Button>}
             {p.status === "joint_approved" && <Button size="sm" onClick={() => step("run", p._id)} disabled={busy === `run:${p._id}`}><Play className="size-4" />تشغيل الأداة</Button>}
