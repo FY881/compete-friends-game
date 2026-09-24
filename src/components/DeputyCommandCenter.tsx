@@ -18,6 +18,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { GovernanceConsole } from "@/components/GovernanceConsole";
 
 /**
  * 👑 مركز قيادة نائب المالك (الإصدار 3.0)
@@ -245,6 +246,19 @@ export function DeputyCommandCenter() {
           <DeputyManager />
         </div>
       )}
+
+      {/* حاكمة التطور — المحكمة ← نائب المالك ← إذن المالك ← الحاكم السيادي + الأداة الحقيقية */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 text-slate-100">
+        <p className="flex items-center gap-2 text-sm font-black">
+          <Gavel className="size-4 text-amber-400" />
+          حاكمة التطور — تعديل حقيقي للعبة
+        </p>
+        <p className="mt-1 mb-4 text-[10px] text-slate-400">
+          أداة نائب المالك تحوّل تكليفك الحر إلى طلب منضبط يمر بالمحكمة، ثم يُطلب إذن المالك الصريح، ثم ينفّذ الحاكم
+          التعديل على وحدة runtime حقيقية. لا تنفيذ على الإنتاج أو main.
+        </p>
+        <GovernanceConsole />
+      </div>
     </div>
   );
 }

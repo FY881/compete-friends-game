@@ -25,7 +25,9 @@ import {
   ShieldCheck,
   Timer,
   Sparkles,
+  Gavel,
 } from "lucide-react";
+import { GovernanceConsole } from "@/components/GovernanceConsole";
 
 const KIND_LABELS: Record<string, string> = {
   xp_multiplier: "⭐ مضاعف الخبرة",
@@ -340,6 +342,25 @@ export function SovereignPanel() {
               </div>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      {/* حاكمة التطور — المحكمة ← نائب المالك ← إذن المالك ← الحاكم السيادي + الأداة الحقيقية */}
+      <Card className="border-amber-500/30 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base text-amber-700">
+            <Gavel className="size-4" /> حاكمة التطور — تعديل حقيقي للعبة
+            <Badge variant="outline" className="rounded-full text-[10px]">
+              بموافقتك الصريحة فقط
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-2">
+          <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+            المحكمة (٤٠ وحدة ذكاء) تُراجع الطلب، نائب المالك يُصادق، أنت تمنح الإذن، ثم ينفّذ الحاكم
+            على وحدة runtime حقيقية. لا يُنفَّذ أي تعديل على الإنتاج أو main تلقائياً.
+          </p>
+          <GovernanceConsole />
         </CardContent>
       </Card>
     </div>
