@@ -27,7 +27,15 @@ import {
 } from "./aiConfig";
 
 /** متغيّرات البيئة المدعومة للتشغيل الاحتياطي، بالأولوية */
-const ENV_SOURCES: Array<{ keys: string[]; presetId: string; baseUrl: string; urlKeys: string[] }> = [
+const ENV_SOURCES: Array<{ keys: string[]; presetId: string; baseUrl: string; urlKeys: string[]; models?: string[] }> = [
+  {
+    keys: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"],
+    // واجهة Gemini المتوافقة مع OpenAI — تعمل مباشرة مع محرك المركز.
+    presetId: "generic",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    urlKeys: [],
+    models: ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
+  },
   {
     keys: ["MINIMAX_API_KEY", "MINIMAX_TOKEN", "MINIMAX_KEY"],
     presetId: "minimax",
@@ -54,6 +62,10 @@ const ENV_SOURCES: Array<{ keys: string[]; presetId: string; baseUrl: string; ur
   },
 ];
 
+function envModelsFor(presetId: string): string[] {
+  return ENV_SOURCES.find((s) => s.presetId === presetId)?.models ?? [];
+}
+
 function envValue(names: string[]): string {
   for (const name of names) {
     const v = process.env?.[name];
@@ -75,7 +87,7 @@ function providerFromEnv(): EngineProvider | null {
       apiKey,
       baseUrl,
       presetId: source.presetId,
-      model: null,
+      model: source.models?.[0] ?? null,
       enabled: true,
     };
   }
@@ -108,12 +120,14 @@ export async function ensureAiRuntime(ctx: unknown): Promise<void> {
 
     let providers = cfg.providers ?? [];
     let envUsed = false;
+    let envModels: string[] = [];
 
     if (providers.length === 0 && cfg.guard?.allowEnvBootstrap !== false) {
       const envProvider = providerFromEnv();
       if (envProvider) {
         providers = [envProvider];
         envUsed = true;
+        envModels = envModelsFor(envProvider.presetId);
       }
     }
 
@@ -123,7 +137,7 @@ export async function ensureAiRuntime(ctx: unknown): Promise<void> {
       routes: cfg.routes,
       discovered: {
         ...(cfg.discovered ?? {}),
-        ...(envUsed ? { env: [] } : {}),
+        ...(envUsed ? { env: envModels } : {}),
       },
     });
 
