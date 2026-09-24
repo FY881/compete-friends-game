@@ -1,6 +1,7 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { sovereignTables } from "./schemaAppend";
+import { governanceTables } from "./schemaGovernance";
 import { roomForumTables } from "./schemaRooms";
 import { miniGameTables } from "./schemaMiniGames";
 import { gameLiveTables } from "./schemaGameLive";
@@ -309,6 +310,9 @@ export const premiumTables = {
 
   // 👑 الحاكم السيادي — عقوبات ومراسيم بمفعول فعلي
   ...sovereignTables,
+
+  // ⚖️小路 ومجلس الحاكم — pathway تشريعي تنفيذي غير قابل للالتفاف
+  ...governanceTables,
 
   // 🏛️ v10.0 — الغرف الخاصة المتقدمة + ملتقى العقول
   ...roomForumTables,

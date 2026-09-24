@@ -147,6 +147,7 @@ import { SoundControlPanel } from "@/components/owner/SoundControlPanel";
 import MasterAIDashboard from "@/components/owner/MasterAIDashboard";
 import { LawEnforcementTab } from "@/components/owner/LawEnforcementTab";
 import { AiUpgradeCenterTab } from "@/components/AiUpgradeCenterTab";
+import { GovernanceConsole } from "@/components/GovernanceConsole";
 
 // ---------------------------------------------------------------------------
 // Small helpers
