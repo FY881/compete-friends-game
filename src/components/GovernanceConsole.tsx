@@ -16,6 +16,7 @@ export function GovernanceConsole() {
   const court = useAction(api.governance.conveneCourt);
   const deputy = useAction(api.governance.deputyDecide);
   const governor = useAction(api.governance.governorDecide);
+  const owner = useAction(api.governance.ownerDecide);
   const instrument = useAction(api.governance.runInstrument);
   const governorPropose = useAction(api.governance.governorPropose);
   const resolveConditions = useAction(api.governance.resolveConditions);
@@ -89,6 +90,7 @@ export function GovernanceConsole() {
     try {
       if (kind === "court") await court({ proposalId });
       if (kind === "deputy") await deputy({ proposalId });
+      if (kind === "owner") await owner({ proposalId });
       if (kind === "governor") await governor({ proposalId });
       if (kind === "run") await instrument({ proposalId });
       toast.success("تمت الخطوة وسُجل الدليل");
@@ -140,6 +142,7 @@ export function GovernanceConsole() {
             {p.status === "court_review" && <Button size="sm" onClick={() => step("court", p._id)} disabled={busy === `court:${p._id}`}><Radio className="size-4" />انعقاد المجلس</Button>}
             {p.status === "court_conditional" && <Button size="sm" variant="outline" onClick={() => satisfy(p._id)} disabled={busy === `conditions:${p._id}`}>استيفاء شروط المحكمة</Button>}
             {p.status === "awaiting_deputy" && <Button size="sm" onClick={() => step("deputy", p._id)} disabled={busy === `deputy:${p._id}`}><Bot className="size-4" />قرار نائب المالك</Button>}
+            {p.status === "awaiting_owner" && <Button size="sm" onClick={() => step("owner", p._id)} disabled={busy === `owner:${p._id}`}><ShieldCheck className="size-4" />موافقة المالك</Button>}
             {p.status === "awaiting_governor" && <Button size="sm" onClick={() => step("governor", p._id)} disabled={busy === `governor:${p._id}`}><ShieldCheck className="size-4" />قرار الحاكم</Button>}
             {p.status === "joint_approved" && <Button size="sm" onClick={() => step("run", p._id)} disabled={busy === `run:${p._id}`}><Play className="size-4" />تشغيل الأداة</Button>}
             {p.status === "joint_approved" && <Button size="sm" variant="outline" onClick={() => openEvolutionPullRequest(p._id)} disabled={busy === `github:${p._id}`}><GitBranch className="size-4" />فتح Pull Request آمن</Button>}
