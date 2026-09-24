@@ -27,8 +27,8 @@ import {
   buildRequest,
   callLlmDetailed,
   getEngineConfig,
-  providerChatUrl,
-  providerModelsUrl,
+  providerChatUrls,
+  providerModelsUrls,
   readCompletion,
   type EngineProvider,
 } from "./aiConfig";
@@ -36,7 +36,12 @@ import { ensureAiRuntime } from "./apiCore";
 
 function findProvider(id: string): EngineProvider | null {
   const providers = getEngineConfig().providers;
-  return providers.find((p) => p.id === id) ?? null;
+  return (
+    providers.find((p) => p.id === id) ??
+    // Environment bootstrap is intentionally exposed through slot A so the
+    // owner can run a real verification even when no DB row exists yet.
+    (id === "A" ? providers.find((p) => p.id === "env") : null) ?? null
+  );
 }
 
 /** 🧪 تحقق حقيقي: طلب فعلي للمزوّد المختار بدليل مسجَّل */
@@ -61,18 +66,9 @@ export const verifyProvider = action({
       getEngineConfig().discovered[provider.id] ?? [],
       provider.model ?? null,
     );
-    const model = chain[0] ?? "gpt-4o-mini";
-    const url = providerChatUrl(provider);
-    const built = buildRequest({
-      provider,
-      model,
-      messages: [{ role: "user", content: "قل: جاهز" }],
-      maxTokens: 24,
-      temperature: 0,
-      jsonMode: false,
-      label: `Zaka Verify ${which}`,
-    });
-
+    const urls = providerChatUrls(provider);
+    let model = chain[0] ?? "gpt-4o-mini";
+    let url = urls[0] ?? "";
     const started = Date.now();
     let ok = false;
     let status = 0;
@@ -81,40 +77,70 @@ export const verifyProvider = action({
     let tokensIn = 0;
     let tokensOut = 0;
 
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 25_000);
-      const res = await fetch(url, {
-        method: "POST",
-        headers: built.headers,
-        body: JSON.stringify(built.body),
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timer));
-      status = res.status;
-      const raw = await res.text().catch(() => "");
-      if (res.ok) {
+    outer: for (const candidateModel of chain.length > 0 ? chain : [model]) {
+      for (const candidateUrl of urls.length > 0 ? urls : [url]) {
+        model = candidateModel;
+        url = candidateUrl;
+        const built = buildRequest({
+          provider,
+          model,
+          messages: [{ role: "user", content: "قل: جاهز" }],
+          maxTokens: 24,
+          temperature: 0,
+          jsonMode: false,
+          label: `Zaka Verify ${which}`,
+          url,
+        });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 25_000);
         try {
-          const parsed = readCompletion(JSON.parse(raw));
-          reply = parsed.text.slice(0, 200);
-          tokensIn = parsed.tokensIn;
-          tokensOut = parsed.tokensOut;
-        } catch {
-          reply = raw.slice(0, 200);
+          const res = await fetch(url, {
+            method: "POST",
+            headers: built.headers,
+            body: JSON.stringify(built.body),
+            signal: controller.signal,
+          });
+          status = res.status;
+          const raw = await res.text().catch(() => "");
+          if (res.ok) {
+            let parsedText = "";
+            try {
+              const parsed = readCompletion(JSON.parse(raw));
+              parsedText = parsed.text;
+              tokensIn = parsed.tokensIn;
+              tokensOut = parsed.tokensOut;
+            } catch {
+              if (!/^\s*(<!doctype|<html|<\?xml)/i.test(raw)) parsedText = raw;
+            }
+            if (parsedText.trim()) {
+              reply = parsedText.slice(0, 200);
+              ok = true;
+              error = undefined;
+              break outer;
+            }
+            error = "المزوّد أعاد رداً فارغاً";
+          } else {
+            error = humanizeProviderError(res.status, raw);
+            // 404/405/501 indicate that this endpoint is not the one exposed by
+            // the provider; try the next normalized/legacy path.
+            if ([404, 405, 501].includes(res.status)) continue;
+            // Authentication and balance failures apply to the provider itself.
+            if (res.status === 401 || res.status === 403 || res.status === 402) break outer;
+          }
+        } catch (e) {
+          error = e instanceof Error ? e.message : "خطأ شبكة";
+        } finally {
+          clearTimeout(timer);
         }
-        ok = true;
-      } else {
-        // تشخيص مفهوم: رصيد / مفتاح / مسار / حد استخدام — لا JSON خام في الواجهة
-        error = humanizeProviderError(res.status, raw);
       }
-    } catch (e) {
-      error = e instanceof Error ? e.message : "خطأ شبكة";
     }
+    if (!ok && !error) error = "تعذر الحصول على رد من المزوّد";
 
     const latencyMs = Date.now() - started;
     try {
       await ctx.runMutation(internal.apiCenterStore.recordCall, {
         ok,
-        provider: which,
+        provider: provider.id,
         providerKind: provider.kind,
         task: "verify",
         label: `Zaka Verify ${which}`,
@@ -162,40 +188,51 @@ export const discoverModels = action({
     const provider = findProvider(which);
     if (!provider) throw new Error("المزوّد غير مضبوط — احفظه أولاً.");
 
-    const url = providerModelsUrl(provider);
+    const urls = providerModelsUrls(provider);
     const presetId = provider.presetId;
     const preset = getPreset(presetId);
-
     const headers: Record<string, string> =
-      provider.kind === "key_only"
-        ? { Authorization: `Bearer ${provider.apiKey}` }
-        : preset.authStyle === "header" && preset.authHeaderName
-          ? { [preset.authHeaderName]: provider.apiKey }
-          : { Authorization: `Bearer ${provider.apiKey}` };
+      preset.authStyle === "header" && preset.authHeaderName
+        ? { [preset.authHeaderName]: provider.apiKey }
+        : { Authorization: `Bearer ${provider.apiKey}` };
 
     let models: string[] = [];
     let error: string | undefined;
+    let url = urls[0] ?? "";
 
-    try {
+    for (const candidateUrl of urls) {
+      url = candidateUrl;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 20_000);
-      const res = await fetch(url, { headers, signal: controller.signal }).finally(() => clearTimeout(timer));
-      const raw = await res.text().catch(() => "");
-      if (!res.ok) {
-        error = humanizeProviderError(res.status, raw);
-      } else {
+      try {
+        const res = await fetch(url, { headers, signal: controller.signal });
+        const raw = await res.text().catch(() => "");
+        if (!res.ok) {
+          error = humanizeProviderError(res.status, raw);
+          if ([404, 405, 501].includes(res.status)) continue;
+          if (res.status === 401 || res.status === 403 || res.status === 402) break;
+          continue;
+        }
         const parsed = JSON.parse(raw) as {
           data?: Array<{ id?: string }>;
           models?: Array<{ id?: string } | string>;
+          data_list?: Array<{ model_id?: string; id?: string }>;
         };
         const list =
           parsed.data?.map((m) => m?.id ?? "").filter(Boolean) ??
+          parsed.data_list?.map((m) => m?.model_id ?? m?.id ?? "").filter(Boolean) ??
           (parsed.models ?? []).map((m) => (typeof m === "string" ? m : (m?.id ?? ""))).filter(Boolean);
         models = [...new Set(list.map((m) => m.trim()).filter(Boolean))];
-        if (models.length === 0) error = "المزوّد ردّ بقائمة فارغة";
+        if (models.length > 0) {
+          error = undefined;
+          break;
+        }
+        error = "المزوّد ردّ بقائمة فارغة";
+      } catch (e) {
+        error = e instanceof Error ? e.message : "خطأ شبكة";
+      } finally {
+        clearTimeout(timer);
       }
-    } catch (e) {
-      error = e instanceof Error ? e.message : "خطأ شبكة";
     }
 
     // إن فشل الاكتشاف نُبقي نماذج قالب المزوّد — يعمل بلا اكتشاف

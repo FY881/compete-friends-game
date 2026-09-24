@@ -42,6 +42,8 @@ export type StoredProvider = {
   apiKey: string;
   baseUrl?: string;
   presetId?: string;
+  /**Explicitly distinguish key-only providers from key+URL providers.*/
+  kind?: "key_url" | "key_only";
   model?: string | null;
   enabled?: boolean;
   updatedAt: number;
@@ -84,7 +86,9 @@ function toProvider(which: "A" | "B", stored: StoredProvider | null) {
   const presetId = stored.presetId ?? detectPresetId(baseUrl);
   return {
     id: which,
-    kind: "key_url" as const,
+    // Rows created before the kind field existed are inferred safely. An empty URL
+    // means this is the key-only slot, not a broken key+URL provider.
+    kind: stored.kind ?? (baseUrl ? ("key_url" as const) : ("key_only" as const)),
     apiKey: stored.apiKey,
     baseUrl,
     presetId,
@@ -438,6 +442,7 @@ export const getCenter = query({
       const presetId = stored.presetId ?? detectPresetId(baseUrl);
       return {
         id: which,
+        kind: stored.kind ?? (baseUrl ? "key_url" : "key_only"),
         maskedKey: mask(stored.apiKey),
         baseUrl,
         presetId,
@@ -534,6 +539,7 @@ export const saveProvider = mutation({
       apiKey,
       baseUrl,
       presetId,
+      kind: baseUrl ? "key_url" : "key_only",
       model: args.model === undefined ? (prev?.model ?? null) : args.model,
       enabled: args.enabled === undefined ? (prev?.enabled !== false) : args.enabled,
       updatedAt: Date.now(),

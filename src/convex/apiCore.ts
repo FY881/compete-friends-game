@@ -18,15 +18,21 @@
 "use node";
 
 import { internal } from "./_generated/api";
-import { setEngineConfig, setEngineReporter, type EngineProvider, type EngineRoute } from "./aiConfig";
+import {
+  callLlm,
+  setEngineConfig,
+  setEngineReporter,
+  type EngineProvider,
+  type EngineRoute,
+} from "./aiConfig";
 
 /** متغيّرات البيئة المدعومة للتشغيل الاحتياطي، بالأولوية */
 const ENV_SOURCES: Array<{ keys: string[]; presetId: string; baseUrl: string; urlKeys: string[] }> = [
   {
-    keys: ["MINIMAX_API_KEY"],
+    keys: ["MINIMAX_API_KEY", "MINIMAX_TOKEN", "MINIMAX_KEY"],
     presetId: "minimax",
     baseUrl: "https://api.minimax.io/v1",
-    urlKeys: ["MINIMAX_BASE_URL"],
+    urlKeys: ["MINIMAX_BASE_URL", "MINIMAX_API_BASE", "MINIMAX_URL"],
   },
   {
     keys: ["FIREWORKS_API_KEY"],
@@ -35,10 +41,10 @@ const ENV_SOURCES: Array<{ keys: string[]; presetId: string; baseUrl: string; ur
     urlKeys: ["FIREWORKS_BASE_URL"],
   },
   {
-    keys: ["AI_API_KEY", "LLM_API_KEY", "AI_GATEWAY_KEY"],
+    keys: ["AI_API_KEY", "LLM_API_KEY", "AI_GATEWAY_KEY", "VLY_AI_API_KEY"],
     presetId: "generic",
     baseUrl: "",
-    urlKeys: ["AI_BASE_URL", "LLM_BASE_URL"],
+    urlKeys: ["AI_BASE_URL", "LLM_BASE_URL", "AI_API_BASE"],
   },
   {
     keys: ["OPENROUTER_API_KEY"],
@@ -131,8 +137,28 @@ export async function ensureAiRuntime(ctx: unknown): Promise<void> {
         // ملاحظة التشغيل الاحتياطي لا تُسقط الاستدعاء
       }
     }
-  } catch {
-    // بلا إعدادات ⇒ المحرك سيرمي خطأً واضحاً عند أول استدعاء
+  } catch (e) {
+    // Do not hide a database/Convex failure behind a generic "no provider" error.
+    // Clear the provider list for safety, then expose the real cause to the caller.
     setEngineConfig({ providers: [] });
+    const detail = e instanceof Error ? e.message : "تعذر قراءة إعدادات مركز API";
+    throw new Error(`تعذر تحميل إعدادات مركز API: ${detail}`);
   }
+}
+
+/**
+ * The single safe entry point for legacy AI modules. It always reloads the
+ * center configuration on the server and never accepts a client-side secret.
+ */
+export async function callCenterLlm(
+  ctx: unknown,
+  messages: Array<{ role: string; content: string }>,
+  maxTokens = 900,
+  temperature = 0.7,
+  label = "Zaka AI",
+  task = "other",
+  jsonMode = false,
+): Promise<string> {
+  await ensureAiRuntime(ctx);
+  return callLlm(messages, maxTokens, temperature, label, null, jsonMode, task);
 }

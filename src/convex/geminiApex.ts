@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { callCenterLlm } from "./apiCore";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
@@ -18,25 +19,16 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 
 const MODEL = "gemini-3.6-flash";
 
-async function callGemini(prompt: string): Promise<string | null> {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!key) return null;
+async function callGemini(ctx: unknown, prompt: string): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 400 },
-        }),
-      },
+    return await callCenterLlm(
+      ctx,
+      [{ role: "user", content: prompt }],
+      400,
+      0.2,
+      "Zaka Error Hunter Apex",
+      "error-hunter",
     );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return typeof text === "string" && text.trim() ? text.trim() : null;
   } catch {
     return null;
   }
@@ -230,6 +222,7 @@ export const aiStackTraceInterpreter = internalAction({
     const err = await ctx.runQuery(internal.geminiApex.getErrorInternal, { id: errorId });
     if (!err || !err.stack) return { interpreted: false };
     const story = await callGemini(
+      ctx,
       `أنت محلل أعطال خبير. اقرأ أثر المكدس هذا وحوّله إلى قصة فشل واضحة بالعربية، بهذا التنسيق:
 سلسلة الانكسار: <أ ← ب ← ج>
 الطبقة المسؤولة: <واجهة React / Convex خادم / شبكة / متصفح>
@@ -253,9 +246,6 @@ export const clusterUntriaged = internalAction({
   handler: async (
     ctx,
   ): Promise<{ clustered: number; regressions: number } | { skipped: true; reason: string }> => {
-    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!key) return { skipped: true, reason: "لا يوجد مفتاح GEMINI_API_KEY" };
-
     const errors = await ctx.runQuery(internal.geminiApex.getUnclusteredInternal, { limit: 8 });
     if (errors.length === 0) return { clustered: 0, regressions: 0 };
 
@@ -276,7 +266,7 @@ export const clusterUntriaged = internalAction({
 الخطأ (فئة ${err.category}): ${err.message.slice(0, 300)}
 ${err.stack ? `المكدس: ${err.stack.slice(0, 600)}` : ""}`;
 
-      const raw = await callGemini(prompt);
+      const raw = await callGemini(ctx, prompt);
       if (!raw) continue;
       const get = (label: string) => {
         const m = raw.match(new RegExp(`${label}:\\s*([^\\n]+)`));

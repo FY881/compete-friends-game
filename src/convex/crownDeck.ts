@@ -4,6 +4,7 @@ import { action, internalMutation, internalQuery, mutation, query } from "./_gen
 import { internal, api } from "./_generated/api";
 import { getCurrentUser } from "./users";
 import { isOwnerUser } from "./owner";
+import { callCenterLlm } from "./apiCore";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -19,25 +20,16 @@ import { isOwnerUser } from "./owner";
 
 const MODEL = "gemini-3.6-flash";
 
-async function callGemini(prompt: string, maxTokens = 700): Promise<string | null> {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!key) return null;
+async function callGemini(ctx: unknown, prompt: string, maxTokens = 700): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
-        }),
-      },
+    return await callCenterLlm(
+      ctx,
+      [{ role: "user", content: prompt }],
+      maxTokens,
+      0.3,
+      "Zaka Crown Deck",
+      "simulator",
     );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return typeof text === "string" && text.trim() ? text.trim() : null;
   } catch {
     return null;
   }
@@ -139,6 +131,7 @@ export const askAdvisor = action({
     );
 
     const raw = await callGemini(
+      ctx,
       `أنت المستشار الشخصي لمالك لعبة «حرب العقول» (كويز عربية). أجب بالعربية، موجزاً وعملياً، بناءً حصرياً على هذه البيانات الحية:\n\n${evidence}\n\nسؤال المالك: ${q}\n\nإذا كانت البيانات غير كافية للإجابة قل ذلك بصراحة ثم أعطِ أفضل ما يمكن استنتاجه. اجعل الإجابة من 3 إلى 8 أسطر مع توصية واضحة في النهاية.`,
       600,
     );
@@ -178,6 +171,7 @@ export const simulateDecision = action({
     });
 
     const raw = await callGemini(
+      ctx,
       `أنت محلل استراتيجي للعبة «حرب العقول». حلّل أثر هذا القرار قبل تطبيقه، بالعربية، بهذا التنسيق الدقيق:\n\nالتوقع: <ماذا سيحدث خلال أسبوع — من سطرين إلى ثلاثة>\nالفرصة: <أكبر مكسب متوقع>\nالخطر: <أكبر خسارة أو ضرر محتمل>\nدرجة الأمان: <آمن أو متوسط أو خطير>\nالتوصية: <نفّذ الآن أو جرّب على نطاق صغير أو لا تنفّذ>\n\nالسياق الحي:\n${context}`,
       700,
     );
@@ -702,6 +696,7 @@ export const askRoyalBanker = action({
       1,
     );
     const raw = await callGemini(
+      ctx,
       `أنت «مصرفي المملكة» — محلل اقتصادي للعبة «حرب العقول». أجب بالعربية بالاعتماد حصرياً على هذه البيانات الحية:
 
 ${evidence}
@@ -740,6 +735,7 @@ export const runCouncilSession = action({
       1,
     );
     const raw = await callGemini(
+      ctx,
       `أنت منسّق «مجلس العقول» للعبة «حرب العقول». الموضوع: ${topic.trim().slice(0, 200)}
 
 البيانات الحية:

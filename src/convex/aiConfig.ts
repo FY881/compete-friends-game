@@ -25,12 +25,17 @@ import {
   DEFAULT_GUARD,
   DEFAULT_TASK_KEY,
   MAX_MODEL_CANDIDATES,
+  chatUrlCandidates,
   decideCall,
   estimateTokens,
   getPreset,
   humanizeProviderError,
+  isAuthFailure,
+  isBalanceFailure,
+  isPathFailure,
   matchTaskFromLabel,
   modelCandidates,
+  modelsUrlCandidates,
   normalizeChatUrl,
   normalizeModelsUrl,
   promptFingerprint,
@@ -156,15 +161,30 @@ export function resolveRoute(task: string): EngineRoute {
   return engine.routes[task] ?? engine.routes[DEFAULT_TASK_KEY] ?? DEFAULT_ROUTE;
 }
 
-/** نقطة الاتصال الفعلية لمزوّد — يقبل كل ما يكتبه المالك */
+/** نقطة الاتصال الفعلية لمزوّد — يقبل كل ما يكتبه المالك. */
 export function providerChatUrl(p: EngineProvider): string {
-  if (p.kind === "key_only") return "https://openrouter.ai/api/v1/chat/completions";
-  return normalizeChatUrl(p.baseUrl ?? "", p.presetId);
+  return providerChatUrls(p)[0] ?? "";
+}
+
+/**
+ * All valid chat endpoints for a provider. The first one is the normalized
+ * OpenAI-compatible endpoint; alternatives are needed for providers such as
+ * MiniMax that still expose a legacy chatcompletion path.
+ */
+export function providerChatUrls(p: EngineProvider): string[] {
+  if (p.kind === "key_only") {
+    return ["https://openrouter.ai/api/v1/chat/completions"];
+  }
+  return chatUrlCandidates(p.baseUrl ?? "", p.presetId);
 }
 
 export function providerModelsUrl(p: EngineProvider): string {
-  if (p.kind === "key_only") return "https://openrouter.ai/api/v1/models";
-  return normalizeModelsUrl(p.baseUrl ?? "", p.presetId);
+  return providerModelsUrls(p)[0] ?? "";
+}
+
+export function providerModelsUrls(p: EngineProvider): string[] {
+  if (p.kind === "key_only") return ["https://openrouter.ai/api/v1/models"];
+  return modelsUrlCandidates(p.baseUrl ?? "", p.presetId);
 }
 
 /** هل المزوّد الأول (مفتاح + رابط) مفعّل؟ — للتوافق القديم */
@@ -245,6 +265,8 @@ export function buildRequest(input: {
   temperature: number;
   jsonMode: boolean;
   label: string;
+  /** Optional alternate endpoint selected by the resilient caller. */
+  url?: string;
 }): BuiltRequest {
   const preset = getPreset(input.provider.presetId);
   const body: Record<string, unknown> = {
@@ -252,6 +274,7 @@ export function buildRequest(input: {
     messages: input.messages,
     max_tokens: input.maxTokens,
     temperature: input.temperature,
+    stream: false,
   };
   if (input.jsonMode && preset.supportsJsonMode) body.response_format = { type: "json_object" };
   if (preset.reasoningSplit) body.reasoning_split = true;
@@ -261,45 +284,81 @@ export function buildRequest(input: {
   ) {
     body.thinking = { type: "disabled" };
   }
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "HTTP-Referer": "https://minds-war.app",
+    "X-Title": input.label,
+  };
+  if (preset.authStyle === "header" && preset.authHeaderName) {
+    headers[preset.authHeaderName] = input.provider.apiKey;
+  } else {
+    headers.Authorization = `Bearer ${input.provider.apiKey}`;
+  }
   return {
-    url: providerChatUrl(input.provider),
-    headers: {
-      Authorization: `Bearer ${input.provider.apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://minds-war.app",
-      "X-Title": input.label,
-    },
+    url: input.url ?? providerChatUrl(input.provider),
+    headers,
     body,
   };
 }
 
-/** يستخرج نصّ الرد من كل أشكال استجابات المزوّدين المعروفة */
+/** يستخرج نصّ الرد من OpenAI وMiniMax وواجهات JSON القديمة. */
 export function readCompletion(data: unknown): { text: string; tokensIn: number; tokensOut: number } {
   const d = data as {
     choices?: Array<{
+      text?: string | null;
       message?: {
-        content?: string | null;
+        content?: unknown;
         reasoning?: string | null;
         reasoning_content?: string | null;
         reasoning_details?: Array<{ text?: string }>;
       };
     }>;
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    reply?: unknown;
+    response?: unknown;
+    output_text?: unknown;
+    content?: unknown;
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   };
-  const msg = d?.choices?.[0]?.message;
-  const direct = typeof msg?.content === "string" ? stripThinking(msg.content) : "";
-  const details = Array.isArray(msg?.reasoning_details)
-    ? msg!.reasoning_details!.map((r) => r?.text ?? "").join(" ")
+
+  const contentToText = (value: unknown): string => {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) {
+      return value
+        .map((part) => {
+          if (typeof part === "string") return part;
+          const p = part as { text?: unknown; content?: unknown };
+          return typeof p.text === "string" ? p.text : contentToText(p.content);
+        })
+        .join(" ");
+    }
+    if (value && typeof value === "object") {
+      const p = value as { text?: unknown; content?: unknown };
+      return typeof p.text === "string" ? p.text : contentToText(p.content);
+    }
+    return "";
+  };
+
+  const choice = d?.choices?.[0];
+  const direct =
+    contentToText(choice?.message?.content) ||
+    contentToText(choice?.text) ||
+    contentToText(d?.output_text) ||
+    contentToText(d?.content) ||
+    contentToText(d?.reply) ||
+    contentToText(d?.response);
+  const details = Array.isArray(choice?.message?.reasoning_details)
+    ? choice!.message!.reasoning_details!.map((r) => r?.text ?? "").join(" ")
     : "";
   const reasoning =
-    (typeof msg?.reasoning_content === "string" && msg.reasoning_content) ||
-    (typeof msg?.reasoning === "string" && msg.reasoning) ||
+    (typeof choice?.message?.reasoning_content === "string" && choice.message.reasoning_content) ||
+    (typeof choice?.message?.reasoning === "string" && choice.message.reasoning) ||
     details;
-  const text = direct.trim().length > 0 ? direct : stripThinking(String(reasoning ?? ""));
+  const text = direct.trim().length > 0 ? stripThinking(direct) : stripThinking(String(reasoning ?? ""));
+  const usage = d?.usage ?? {};
   return {
     text,
-    tokensIn: Number(d?.usage?.prompt_tokens ?? 0) || 0,
-    tokensOut: Number(d?.usage?.completion_tokens ?? 0) || 0,
+    tokensIn: Number(usage.prompt_tokens ?? 0) || 0,
+    tokensOut: Number(usage.completion_tokens ?? 0) || 0,
   };
 }
 
@@ -482,7 +541,10 @@ export async function callLlmDetailed(opts: LlmOptions): Promise<LlmResult> {
     }
   }
 
-  // ② سلسلة المحاولات: مزوّد ← سلسلة نماذج ← محاولتان
+  // ② سلسلة المحاولات: مزوّد ← نماذج ← مسارات محادثة ← محاولتان.
+  // المسارات البديلة مهمة: MiniMax يعلن مسار OpenAI，但也 يعرّض مسارات
+  // chatcompletion legacy. Previously those alternatives were documented but
+  // never actually attempted, so one 404 made every AI tab fail together.
   let lastErr = "فشل استدعاء AI";
   let attempts = 0;
   let lastModel = route.model ?? head.model ?? "—";
@@ -493,120 +555,139 @@ export async function callLlmDetailed(opts: LlmOptions): Promise<LlmResult> {
       engine.discovered[provider.id] ?? [],
       route.model ?? provider.model ?? null,
     ).slice(0, MAX_MODEL_CANDIDATES);
-
-    // فشل على مستوى المزوّد كله (مفتاح مرفوض / رصيد منتهٍ) ⇒ لا نُهدر بقية نماذجه
+    const urls = providerChatUrls(provider);
     let providerFatal = false;
 
     for (const model of chain) {
       if (providerFatal) break;
       lastModel = model;
       let dropped = false;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        attempts += 1;
-        const built = buildRequest({ provider, model, messages: opts.messages, maxTokens, temperature, jsonMode, label });
-        if (dropped) {
-          delete built.body.response_format;
-          delete built.body.reasoning_split;
-          delete built.body.thinking;
-        }
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-        const at = Date.now();
-        try {
-          const response = await fetch(built.url, {
-            method: "POST",
-            headers: built.headers,
-            body: JSON.stringify(built.body),
-            signal: controller.signal,
-          });
-          const latencyMs = Date.now() - at;
-          const raw = await response.text().catch(() => "");
 
-          if (!response.ok) {
-            // تشخيص مفهوم بدل نص خام: رصيد / مفتاح / مسار / حد استخدام.
-            lastErr = humanizeProviderError(response.status, raw);
-            const unsupportedExtra =
-              response.status === 400 &&
-              /response_format|reasoning_split|thinking|max_tokens/i.test(raw) &&
-              !dropped;
-            if (unsupportedExtra) {
-              dropped = true;
-              continue; // نفس النموذج بلا إضافات اختيارية
+      for (const url of urls) {
+        if (providerFatal) break;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          attempts += 1;
+          const built = buildRequest({
+            provider,
+            model,
+            messages: opts.messages,
+            maxTokens,
+            temperature,
+            jsonMode,
+            label,
+            url,
+          });
+          if (dropped) {
+            delete built.body.response_format;
+            delete built.body.reasoning_split;
+            delete built.body.thinking;
+          }
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+          const at = Date.now();
+          try {
+            const response = await fetch(built.url, {
+              method: "POST",
+              headers: built.headers,
+              body: JSON.stringify(built.body),
+              signal: controller.signal,
+            });
+            const latencyMs = Date.now() - at;
+            const raw = await response.text().catch(() => "");
+
+            if (!response.ok) {
+              lastErr = humanizeProviderError(response.status, raw);
+              const unsupportedExtra =
+                response.status === 400 &&
+                /response_format|reasoning_split|thinking|max_tokens|stream/i.test(raw) &&
+                !dropped;
+              if (unsupportedExtra) {
+                dropped = true;
+                continue;
+              }
+              await report({
+                ok: false,
+                provider: provider.id,
+                providerKind: provider.kind,
+                task,
+                label,
+                model,
+                latencyMs,
+                tokensIn: 0,
+                tokensOut: 0,
+                cached: false,
+                attempt,
+                error: lastErr,
+                promptChars,
+                cacheTtlMs: 0,
+              });
+
+              // Path failures are retriable on the next candidate endpoint.
+              if (isPathFailure(response.status)) break;
+              // A rejected key or exhausted balance applies to the whole provider.
+              if (isAuthFailure(response.status) || response.status === 402 || isBalanceFailure(response.status, raw)) {
+                providerFatal = true;
+                break;
+              }
+              // 429 and other request errors can be model-specific; continue
+              // with the remaining model candidates.
+              continue;
             }
+
+            let parsed: unknown = null;
+            try {
+              parsed = JSON.parse(raw);
+            } catch {
+              parsed = null;
+            }
+            const plainTextIsUsable =
+              !parsed && raw.trim().length > 0 && !/^\s*(<!doctype|<html|<\?xml)/i.test(raw);
+            const { text, tokensIn, tokensOut } = parsed
+              ? readCompletion(parsed)
+              : plainTextIsUsable
+                ? { text: stripThinking(raw.slice(0, 4000)), tokensIn: 0, tokensOut: 0 }
+                : { text: "", tokensIn: 0, tokensOut: 0 };
+
+            if (!text.trim()) {
+              lastErr = "المزوّد أعاد رداً فارغاً أو استجابة غير مفهومة";
+              continue;
+            }
+
+            const msgText = opts.messages.map((m) => m.content).join(" ");
             await report({
-              ok: false,
+              ok: true,
               provider: provider.id,
               providerKind: provider.kind,
               task,
               label,
               model,
               latencyMs,
-              tokensIn: 0,
-              tokensOut: 0,
+              tokensIn: tokensIn || estimateTokens(msgText),
+              tokensOut: tokensOut || estimateTokens(text),
               cached: false,
               attempt,
-              error: lastErr,
               promptChars,
-              cacheTtlMs: 0,
+              cacheFp: fp || undefined,
+              cacheReply: fp ? text : undefined,
+              cacheTtlMs,
             });
-            if (response.status === 429) break; // لا نُهدر بقية المحاولات على نفس المزوّد
-            // مفتاح مرفوض أو رصيد منتهٍ = حالة المزوّد كله: انتقل للمزوّد التالي فوراً
-            if (response.status === 401 || response.status === 403 || response.status === 402) {
-              providerFatal = true;
-              break;
-            }
-            continue;
+
+            return {
+              text,
+              task,
+              provider: provider.id,
+              model,
+              latencyMs,
+              tokensIn,
+              tokensOut,
+              cached: false,
+              attempts,
+            };
+          } catch (e) {
+            lastErr = e instanceof Error ? e.message : "خطأ شبكة";
+          } finally {
+            clearTimeout(timer);
           }
-
-          let parsed: unknown = null;
-          try {
-            parsed = JSON.parse(raw);
-          } catch {
-            parsed = null;
-          }
-          const { text, tokensIn, tokensOut } = parsed
-            ? readCompletion(parsed)
-            : { text: stripThinking(raw.slice(0, 4000)), tokensIn: 0, tokensOut: 0 };
-
-          if (!text.trim()) {
-            lastErr = "المزوّد أعاد رداً فارغاً";
-            continue;
-          }
-
-          const msgText = opts.messages.map((m) => m.content).join(" ");
-          await report({
-            ok: true,
-            provider: provider.id,
-            providerKind: provider.kind,
-            task,
-            label,
-            model,
-            latencyMs,
-            tokensIn: tokensIn || estimateTokens(msgText),
-            tokensOut: tokensOut || estimateTokens(text),
-            cached: false,
-            attempt,
-            promptChars,
-            cacheFp: fp || undefined,
-            cacheReply: fp ? text : undefined,
-            cacheTtlMs,
-          });
-
-          return {
-            text,
-            task,
-            provider: provider.id,
-            model,
-            latencyMs,
-            tokensIn,
-            tokensOut,
-            cached: false,
-            attempts,
-          };
-        } catch (e) {
-          lastErr = e instanceof Error ? e.message : "خطأ شبكة";
-        } finally {
-          clearTimeout(timer);
         }
       }
     }

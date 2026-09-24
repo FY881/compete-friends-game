@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalAction, internalMutation, internalQuery, action, mutation, query } from "./_generated/server";
 import { internal, api } from "./_generated/api";
+import { callCenterLlm } from "./apiCore";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -35,25 +36,16 @@ ${playerAction ? `آخر أفعال اللاعب قبل الخطأ: ${playerActi
 }
 
 /** يشغّل Gemini ويُعيد النص الخام أو null عند الفشل/غياب المفتاح */
-async function callGemini(prompt: string): Promise<string | null> {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!key) return null;
+async function callGemini(ctx: unknown, prompt: string, maxTokens = 500): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
-        }),
-      },
+    return await callCenterLlm(
+      ctx,
+      [{ role: "user", content: prompt }],
+      maxTokens,
+      0.2,
+      "Zaka AI Doctor",
+      "error-hunter",
     );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return typeof text === "string" && text.trim() ? text.trim() : null;
   } catch {
     return null;
   }
@@ -114,15 +106,13 @@ export const applyDiagnosis = internalMutation({
 /** الدورة: تشخيص حتى 5 أخطاء غير مشخّصة لكل استدعاء (cron كل 5 دقائق) */
 export const diagnoseUnanalyzed = internalAction({
   handler: async (ctx): Promise<{ diagnosed: number } | { skipped: true; reason: string }> => {
-    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!key) return { skipped: true, reason: "لا يوجد مفتاح GEMINI_API_KEY" };
-
     const unanalyzed = await ctx.runQuery(internal.geminiDoctor.getUnanalyzedInternal, { limit: 5 });
     if (unanalyzed.length === 0) return { diagnosed: 0 };
 
     let diagnosed = 0;
     for (const err of unanalyzed) {
       const raw = await callGemini(
+        ctx,
         buildDiagnosisPrompt(err.message, err.stack, err.playerAction, err.category),
       );
       if (!raw) continue;
@@ -154,9 +144,6 @@ export const diagnoseUnanalyzed = internalAction({
 /** تقرير الصحة اليومي — يقرأ أخطاء 24 ساعة ويكتب تقريراً تنفيذياً بالعربية */
 export const dailyHealthReport = action({
   handler: async (ctx): Promise<string> => {
-    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!key) return "⚠️ لا يوجد مفتاح GEMINI_API_KEY — أضِفه من تبويب المفاتيح باسم GEMINI_API_KEY.";
-
     const since = Date.now() - 24 * 60 * 60 * 1000;
     const errors = await ctx.runQuery(internal.geminiDoctor.getRecentInternal, { since, limit: 40 });
     if (errors.length === 0) {
@@ -172,6 +159,7 @@ export const dailyHealthReport = action({
       .slice(0, 3000);
 
     const report = await callGemini(
+      ctx,
       `أنت طبيب صحة لعبة خبير. اكتب تقريراً تنفيذياً موجزاً بالعربية (5-8 أسطر) عن صحة لعبة كويز عربية خلال آخر 24 ساعة، بناءً على هذه الأخطاء الحقيقية. رتّب الأولويات، اذكر النمط المشترك إن وُجد، واختم بأهم إجراء واحد ينبغي فعله:\n\n${summary}`,
     );
 
@@ -184,8 +172,8 @@ export const dailyHealthReport = action({
 
 /** اختبار سريع: هل المفتاح يعمل؟ */
 export const testKey = action({
-  handler: async (): Promise<{ ok: boolean; reply: string }> => {
-    const reply = await callGemini("أجب بكلمة واحدة فقط: نعم");
+  handler: async (ctx): Promise<{ ok: boolean; reply: string }> => {
+    const reply = await callGemini(ctx, "أجب بكلمة واحدة فقط: نعم");
     return reply
       ? { ok: true, reply }
       : { ok: false, reply: "فشل الاتصال — تحقق من صحة المفتاح أو الحد اليومي." };
@@ -240,15 +228,13 @@ export const savePatch = internalMutation({
  */
 export const generatePatches = internalAction({
   handler: async (ctx): Promise<{ generated: number } | { skipped: true; reason: string }> => {
-    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!key) return { skipped: true, reason: "لا يوجد مفتاح GEMINI_API_KEY" };
-
     const candidates = await ctx.runQuery(internal.geminiDoctor.getPatchableInternal, { limit: 2 });
     if (candidates.length === 0) return { generated: 0 };
 
     let generated = 0;
     for (const err of candidates) {
       const raw = await callGemini(
+        ctx,
         `أنت مهندس برمجيات خبير في لعبة كويز عربية (React + TypeScript + Convex + Tailwind).
 هذا خطأ إنتاجي حقيقي يحتاج إصلاحاً:
 

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalAction, internalMutation, internalQuery, mutation, query, action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { callCenterLlm } from "./apiCore";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -19,25 +20,16 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 
 const MODEL = "gemini-3.6-flash";
 
-async function callGemini(prompt: string, maxTokens = 600): Promise<string | null> {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!key) return null;
+async function callGemini(ctx: unknown, prompt: string, maxTokens = 600): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
-        }),
-      },
+    return await callCenterLlm(
+      ctx,
+      [{ role: "user", content: prompt }],
+      maxTokens,
+      0.3,
+      "Zaka Error Hunter Apex",
+      "error-hunter",
     );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return typeof text === "string" && text.trim() ? text.trim() : null;
   } catch {
     return null;
   }
@@ -186,6 +178,7 @@ export const aiDailyWarReport = action({
     const snapshot = await ctx.runQuery(internal.errorHunterApex.warReportSnapshot, { since: dayAgo });
 
     const reply = await callGemini(
+      ctx,
       `أنت قائد عمليات صياد الأخطاء. اكتب تقرير حرب صباحي صارم بالعربية من هذه البيانات الحقيقية. التنسيق:
 🔴 ما انكسر: <أهم 3 عناقيد/أخطاء بالأثر>
 🟢 ما شُفي تلقائياً: <إحصاء + أبرز نجاح>
@@ -316,6 +309,7 @@ export const askAboutErrors = action({
     const evidence = await ctx.runQuery(internal.errorHunterApex.evidenceChain, { since: weekAgo });
 
     const reply = await callGemini(
+      ctx,
       `أنت محقق أخطاء خبير في لعبة عربية. أجب على سؤال المالك بالعربية من الأدلة الحقيقية فقط (لا تخترع). إن لم تكفِ الأدلة قل ذلك بوضوح.
 
 السؤال: ${q}

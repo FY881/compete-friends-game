@@ -17,10 +17,9 @@ import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { composeMessage, decideIntent, type AgentTraits, type PersonaKey } from "./aiBrain";
+import { callCenterLlm } from "./apiCore";
 
-/** ترتيب النماذج: الأخف أولاً (بلا شبكة تفكير) ثم البدائل. */
-const MODEL_CHAIN = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash"];
-const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+/** The center owns the provider, endpoint, model, key and fallbacks. */
 
 type VoiceContext = {
   name: string;
@@ -61,32 +60,22 @@ function tidy(raw: string): string {
     .slice(0, 240);
 }
 
-/** يجرّب سلسلة النماذج ويكتفي بأول إجابة نصية صحيحة. */
-async function askGemini(prompt: string, apiKey: string): Promise<string | null> {
-  for (const model of MODEL_CHAIN) {
-    try {
-      const res = await fetch(`${ENDPOINT}/${model}:generateContent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 600, temperature: 1.15 },
-        }),
-      });
-      if (!res.ok) continue;
-
-      const data: any = await res.json();
-      const parts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
-      const text = tidy(parts.map((p) => p?.text ?? "").join(" "));
-      if (text.length >= 6) return text;
-    } catch {
-      /* جرّب النموذج التالي */
-    }
+/** Uses the same resilient center path as every other game AI feature. */
+async function askGemini(ctx: unknown, prompt: string): Promise<string | null> {
+  try {
+    const text = await callCenterLlm(
+      ctx,
+      [{ role: "user", content: prompt }],
+      600,
+      1.0,
+      "Zaka Agent Voice",
+      "assistant",
+    );
+    const clean = tidy(text);
+    return clean.length >= 6 ? clean : null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 /**
@@ -110,11 +99,8 @@ export const speakNow = internalAction({
     let text: string | null = null;
     let engine = "builtin";
 
-    const apiKey = process.env.GOOGLE_API_KEY;
-    if (apiKey) {
-      text = await askGemini(buildPrompt(context), apiKey);
-      if (text) engine = "gemini";
-    }
+    text = await askGemini(ctx, buildPrompt(context));
+    if (text) engine = "center";
 
     if (!text) {
       text = composeMessage({

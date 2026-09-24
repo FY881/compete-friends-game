@@ -188,6 +188,11 @@ export function ApiHubTab() {
   };
 
   const providerHead = center.providers.A ?? center.providers.B;
+  // Environment bootstrap is a real server-side provider too. Keep the verify
+  // action usable when the owner configured the key through the Keys screen
+  // instead of duplicating it in the database.
+  const hasA = Boolean(center.providers.A || center.envBootstrap?.active);
+  const hasB = Boolean(center.providers.B);
   const usage = center.usage.today;
   const maxSeries = Math.max(1, ...center.usage.series.map((s: { calls: number }) => s.calls));
 
@@ -233,7 +238,7 @@ export function ApiHubTab() {
             <span className="flex items-center gap-2 text-sm font-black">
               <Cpu className="size-4 text-primary" /> مركز الذكاء الموحّد
             </span>
-            {center.providers.A || center.providers.B ? (
+            {hasA || hasB ? (
               <Badge className="rounded-full bg-emerald-600/10 text-[10px] text-emerald-700">
                 <CheckCircle2 className="me-1 size-3" /> المزوّد متصل
               </Badge>
@@ -335,7 +340,7 @@ export function ApiHubTab() {
             <CardHeader className="pb-2">
               <CardTitle className="flex flex-wrap items-center gap-2 text-base">
                 <Globe className="size-4 text-primary" /> النظام الأول — مفتاح + رابط المزوّد
-                {center.providers.A ? (
+                {hasA ? (
                   <Badge className="rounded-full bg-emerald-600/10 text-[10px] text-emerald-700">مضبوط</Badge>
                 ) : (
                   <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">غير مضبوط</Badge>
@@ -434,7 +439,7 @@ export function ApiHubTab() {
                 <Button
                   variant="outline"
                   className="gap-1.5 rounded-xl"
-                  disabled={busy !== null || !center.providers.A}
+                  disabled={busy !== null || !hasA}
                   onClick={() =>
                     run("verifyA", async () => {
                       const r = await verifyProvider({ which: "A" });
@@ -461,7 +466,7 @@ export function ApiHubTab() {
                 <Button
                   variant="outline"
                   className="gap-1.5 rounded-xl"
-                  disabled={busy !== null || !center.providers.A}
+                  disabled={busy !== null || !hasA}
                   onClick={() =>
                     run("discoverA", async () => {
                       const r = await discoverModels({ which: "A" });
@@ -554,7 +559,7 @@ export function ApiHubTab() {
                 <Button
                   variant="outline"
                   className="gap-1.5 rounded-xl"
-                  disabled={busy !== null || !center.providers.B}
+                  disabled={busy !== null || !hasB}
                   onClick={() =>
                     run("verifyB", async () => {
                       const r = await verifyProvider({ which: "B" });
