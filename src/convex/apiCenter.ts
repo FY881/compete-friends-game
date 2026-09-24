@@ -111,6 +111,95 @@ export const syncCenter = action({
   },
 });
 
+// ════════════════════════════════════════════════════════════════════
+// 🧮 الاختبار الضخم الشامل — ربط تلقائي ذكي + اختبار حيّ لكل تبويب وقسم
+// ════════════════════════════════════════════════════════════════════
+// يستدعي المركز لأنفسه: تزامن كامل + إشعار مركز AI حقيقي لكل وحدة
+// من وحدات اللعبة وغرفة المالك، ويُصدر تقريراً مفصلاً: ما يعمل وما لا يعمل.
+
+export const masterTest = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    sync: Awaited<ReturnType<typeof syncCenter extends never ? never : any>> | null;
+    units: { unit: string; label: string; ok: boolean; model?: string; latencyMs: number; error?: string }[];
+    passed: number;
+    failed: number;
+    centerModel?: string;
+    checkedAt: number;
+  }> => {
+    // 1) الربط التلقائي الذكي: تزامن كامل أولاً (env + A + B في كل الوحدات)
+    let sync: any = null;
+    try {
+      sync = (await ctx.runAction(api.apiCenter.syncCenter, {})) as any;
+    } catch {
+      sync = null;
+    }
+
+    // 2) اختبار حيّ لكل وحدة AI رئيسية عبر المسار الموحّد بالضبط كما تستخدمه اللعبة
+    const unitsToTest: { task: string; label: string }[] = [
+      { task: "questions", label: "مولّد الأسئلة" },
+      { task: "moderation", label: "الرقابة الآلية" },
+      { task: "reports", label: "تحليل البلاغات" },
+      { task: "coach", label: "المدرّب الشخصي" },
+      { task: "assistant", label: "المساعد الذكي" },
+      { task: "vice-owner", label: "نائب المالك" },
+      { task: "guardian", label: "الحارس السيادي" },
+      { task: "help-desk", label: "مكتب الدعم" },
+    ];
+
+    const units: { unit: string; label: string; ok: boolean; model?: string; latencyMs: number; error?: string }[] = [];
+    for (const u of unitsToTest) {
+      try {
+        const r = (await ctx.runAction(api.apiCenter.testTask, {
+          task: u.task,
+          prompt: "اختبار سريع: أجب بكلمة واحدة فقط — جاهز؟",
+        })) as any;
+        units.push({
+          unit: u.task,
+          label: u.label,
+          ok: Boolean(r?.ok),
+          model: r?.model,
+          latencyMs: r?.latencyMs ?? 0,
+          error: r?.error,
+        });
+      } catch (e) {
+        units.push({
+          unit: u.task,
+          label: u.label,
+          ok: false,
+          latencyMs: 0,
+          error: e instanceof Error ? e.message : "فشل غير معروف",
+        });
+      }
+    }
+
+    const passed = units.filter((u) => u.ok).length;
+    const failed = units.length - passed;
+
+    try {
+      await ctx.runMutation(internal.apiHubStore.logApiEvent, {
+        provider: "center",
+        event: "master_test",
+        detail: `الاختبار الضخم: ${passed}/${units.length} وحدة تعمل · ${failed} فاشلة`,
+        severity: failed === 0 ? "info" : "warning",
+        at: Date.now(),
+      });
+    } catch {
+      /* لا يُسقط النتيجة */
+    }
+
+    const firstOk = units.find((u) => u.ok);
+    return {
+      sync,
+      units,
+      passed,
+      failed,
+      centerModel: firstOk?.model,
+      checkedAt: Date.now(),
+    };
+  },
+});
+
 export const verifyProvider = action({
   args: { which: v.union(v.literal("A"), v.literal("B")) },
   handler: async (ctx, { which }): Promise<{

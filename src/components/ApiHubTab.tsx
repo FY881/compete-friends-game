@@ -132,8 +132,12 @@ export function ApiHubTab() {
   const healthReport = useAction(api.apiCenter.healthReport);
   const selfHeal = useAction(api.apiCenter.selfHeal);
   const syncCenterAction = useAction(api.apiCenter.syncCenter);
+  const masterTest = useAction(api.apiCenter.masterTest);
   const [syncReport, setSyncReport] = useState<
     Awaited<ReturnType<typeof syncCenterAction>> | null
+  >(null);
+  const [masterReport, setMasterReport] = useState<
+    Awaited<ReturnType<typeof masterTest>> | null
   >(null);
 
   const [panel, setPanel] = useState<PanelId>("providers");
@@ -171,6 +175,20 @@ export function ApiHubTab() {
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "فشل التزامن");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runMasterTest = async () => {
+    setBusy("master");
+    try {
+      const r = await masterTest({});
+      setMasterReport(r);
+      if (r.failed === 0) toast.success(`الاختبار الضخم: كل الوحدات ${r.units.length} تعمل بنجاح ✅`);
+      else toast.warning(`الاختبار الضخم: ${r.passed}/${r.units.length} وحدة تعمل — ${r.failed} فاشلة`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل الاختبار الضخم");
     } finally {
       setBusy(null);
     }
@@ -1264,6 +1282,10 @@ export function ApiHubTab() {
                   {busy === "sync" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                   مزامنة المركز مع كل التبويبات
                 </Button>
+                <Button size="sm" variant="outline" onClick={runMasterTest} disabled={busy === "master"} className="gap-1.5 rounded-lg">
+                  {busy === "master" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                  الاختبار الضخم الشامل
+                </Button>
               </div>
               {syncReport && (
                 <div className="space-y-1.5 rounded-xl border border-sky-500/30 bg-sky-500/[0.05] p-3 text-[11px]">
@@ -1302,6 +1324,25 @@ export function ApiHubTab() {
                       {liveHealth.circuitReset ? "🩹 أُعيد فتح القاطع تلقائياً — الشفاء نجح" : "القاطع مفتوح والفحص لم ينجح — أصلح السبب أولاً"}
                     </p>
                   )}
+                </div>
+              )}
+              {masterReport && (
+                <div className="space-y-2 rounded-xl border border-violet-500/30 bg-violet-500/[0.05] p-3 text-[11px]">
+                  <p className="font-bold text-violet-700">
+                    الاختبار الضخم — {masterReport.passed}/{masterReport.units.length} وحدة تعمل · النموذج: {masterReport.centerModel ?? "—"}
+                  </p>
+                  <div className="space-y-1">
+                    {masterReport.units.map((u) => (
+                      <div key={u.unit} className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={cn("rounded-full", u.ok ? "border-emerald-500/40 text-emerald-600" : "border-rose-500/40 text-rose-600")}>
+                          {u.ok ? "✓" : "✗"} {u.label}
+                        </Badge>
+                        {u.model && <span className="font-mono text-[10px]" dir="ltr">{u.model}</span>}
+                        {u.ok && <span className="text-muted-foreground">{u.latencyMs}ms</span>}
+                        {u.error && <span className="text-rose-600">{u.error}</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               {healLog.length > 0 && (
