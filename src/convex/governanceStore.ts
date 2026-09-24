@@ -43,7 +43,7 @@ export const listConsole = query({
     const user = await ctx.db.get(userId);
     const deputy = await ctx.db.query("siteRoles").withIndex("by_user", (q: any) => q.eq("userId", userId)).first();
     if (!isOwnerUser(user) && !(deputy?.active && deputy.role === "deputy_owner")) return null;
-    const proposals = await ctx.db.query("evolutionProposals").withIndex("by_status", (q: any) => q.gte("createdAt", 0)).order("desc").take(40);
+    const proposals = await ctx.db.query("evolutionProposals").order("desc").take(40);
     const operations = await ctx.db.query("evolutionOperations").withIndex("by_at", (q: any) => q.gte("at", 0)).order("desc").take(30);
     const audit = await ctx.db.query("secretChamberAudit").withIndex("by_at", (q: any) => q.gte("at", 0)).order("desc").take(50);
     return { proposals, operations, audit, courtUnits: AI_REGISTRY.map((u) => ({ key: u.key, name: u.name, purpose: u.purpose, dept: u.dept, wiring: u.wiring })) };
