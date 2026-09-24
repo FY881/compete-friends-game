@@ -50,6 +50,16 @@ export const listConsole = query({
   },
 });
 
+export const getGovernanceActor = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+    const deputy = await ctx.db.query("siteRoles").withIndex("by_user", (q: any) => q.eq("userId", userId)).first();
+    return { name: user.name ?? "مسؤول", isOwner: isOwnerUser(user), isDeputy: Boolean(deputy?.active && deputy.role === "deputy_owner") };
+  },
+});
+
 export const insertGovernorProposal = internalMutation({
   args: { authorId: v.id("users"), title: v.string(), operation: v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct")), targetKey: v.string(), summary: v.string(), rationale: v.string(), risk: v.union(v.literal("low"), v.literal("medium"), v.literal("critical")), requestedModule: v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() }) },
   handler: async (ctx, a) => {

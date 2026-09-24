@@ -4,7 +4,6 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { isOwnerUser } from "./owner";
 import { AI_REGISTRY } from "./aiRegistry";
 import { callLlmDetailed } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
@@ -24,11 +23,10 @@ const proposalText = (p: any) => JSON.stringify({
 async function requireAuthority(ctx: any) {
   const userId = await getAuthUserId(ctx);
   if (!userId) throw new Error("تسجيل الدخول مطلوب");
-  const user = await ctx.db.get(userId);
-  if (!user) throw new Error("المستخدم غير موجود");
-  const deputy = await ctx.db.query("siteRoles").withIndex("by_user", (q: any) => q.eq("userId", userId)).first();
-  if (!isOwnerUser(user) && !(deputy?.active && deputy.role === "deputy_owner")) throw new Error("غير مصرح");
-  return { userId, name: user.name ?? "مسؤول" };
+  const actorInfo = await ctx.runQuery(internal.governanceStore.getGovernanceActor, { userId });
+  if (!actorInfo) throw new Error("المستخدم غير موجود");
+  if (!actorInfo.isOwner && !actorInfo.isDeputy) throw new Error("غير مصرح");
+  return { userId, name: actorInfo.name };
 }
 
 export const conveneCourt = action({
