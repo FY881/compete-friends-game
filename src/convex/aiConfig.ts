@@ -284,10 +284,17 @@ export function buildRequest(input: {
   ) {
     body.thinking = { type: "disabled" };
   }
+  // رؤوس HTTP تقبل ASCII فقط — أي محرف عربي/شرطة طويلة (—) يُفشل الطلب كله
+  // بخطأ ByteString، لذا نُنظّف الاسم دائماً.
+  const safeLabel = (input.label ?? "ai-call")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80) || "ai-call";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "HTTP-Referer": "https://minds-war.app",
-    "X-Title": input.label,
+    "X-Title": safeLabel,
   };
   if (preset.authStyle === "header" && preset.authHeaderName) {
     headers[preset.authHeaderName] = input.provider.apiKey;
