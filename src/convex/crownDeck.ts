@@ -954,6 +954,7 @@ export const brainstormEvents = action({
       أحداث_سابقة: lab.ended.slice(0, 5),
     }, null, 1);
     const raw = await callGemini(
+      ctx,
       `أنت مختبر أحداث لعبة «حرب العقول». اقترح 3 أفكار أحداث مبنية على البيانات الحية، بالعربية، بهذا التنسيق:
 
 فكرة 1: <الاسم>
@@ -964,7 +965,8 @@ export const brainstormEvents = action({
 فكرة 3: ...
 
 البيانات:
-${evidence}`, 700);
+${evidence}`,
+    );
     return { ideas: raw, reason: raw ? null : "لا يوجد مفتاح GEMINI_API_KEY" };
   },
 });
@@ -1007,6 +1009,7 @@ export const summarizeComplaints = action({
     const digest = await ctx.runQuery(api.crownDeck.getComplaintDigest, {});
     if (!digest) return { summary: null, reason: "غير مصرح" };
     const raw = await callGemini(
+      ctx,
       `أنت مترجم شكاوى لعبة «حرب العقول». لخّص هذه البلاغات والاعتراضات بالعربية في تقرير تنفيذي قصير:
 
 البلاغات المفتوحة:
@@ -1020,7 +1023,8 @@ ${JSON.stringify(digest.appeals.slice(0, 10), null, 1)}
 الأولوية 1: <أهم بلاغ/اعتراض + لماذا>
 الأولوية 2: <التالي>
 الأولوية 3: <التالي>
-نمط متكرر: <شكوى تتكرر إن وُجدت، أو «لا يوجد نمط واضح»>`, 600);
+نمط متكرر: <شكوى تتكرر إن وُجدت، أو «لا يوجد نمط واضح»>`,
+    );
     return { summary: raw, reason: raw ? null : "لا يوجد مفتاح GEMINI_API_KEY أو لا شكاوى" };
   },
 });
