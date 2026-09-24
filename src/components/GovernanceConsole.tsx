@@ -12,6 +12,7 @@ import { Gavel, LockKeyhole, Play, ShieldCheck, Sparkles, Bot, CheckCircle2, Rad
 
 export function GovernanceConsole() {
   const data = useQuery(api.governanceStore.listConsole);
+  const modules = useQuery(api.governanceStore.listEvolutionModules);
   const create = useMutation(api.governanceStore.createProposal);
   const court = useAction(api.governance.conveneCourt);
   const deputy = useAction(api.governance.deputyDecide);
@@ -22,9 +23,12 @@ export function GovernanceConsole() {
   const deputySelf = useAction(api.governance.deputySelfReview);
   const instrument = useAction(api.governance.runInstrument);
   const governorPropose = useAction(api.governance.governorPropose);
+  const ownerGovernor = useAction(api.governance.ownerGovernorDecide);
   const resolveConditions = useAction(api.governance.resolveConditions);
   const githubEvolution = useAction(api.githubEvolution.createEvolutionPullRequest);
   const [brief, setBrief] = useState("");
+  const [govOp, setGovOp] = useState<"create" | "modify" | "delete" | "construct">("modify");
+  const [govTarget, setGovTarget] = useState("");
   const [deputyBrief, setDeputyBrief] = useState("");
   const [impact, setImpact] = useState({ title: "", targetKey: "", summary: "", rationale: "", rollback: "" });
   const [form, setForm] = useState({ title: "", targetKey: "", name: "", description: "", summary: "", rationale: "", config: '{"enabled":true}' });
@@ -63,8 +67,27 @@ export function GovernanceConsole() {
 
   async function proposeAsGovernor() {
     setBusy("governor-propose");
-    try { await governorPropose({ brief }); toast.success("أعد الحاكم مقترحه وأرسله إلى المحكمة"); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "فشل اقتراح الحاكم"); }
+    try {
+      await governorPropose({ brief, operation: govOp, targetKey: govTarget.trim() || undefined });
+      toast.success("أعد الحاكم طلبه بالأداة الحقيقية وأرسله إلى المحكمة");
+      setBrief("");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "فشل اقتراح الحاكم"); }
+    finally { setBusy(""); }
+  }
+
+  async function ownerGovernorDecide(proposalId: Id<"evolutionProposals">, approved: boolean) {
+    let reason = "";
+    if (!approved) {
+      const input = window.prompt("سبب رفض المالك لطلب الحاكم (يُسجل في الغرفة السرية):");
+      if (input === null) return;
+      reason = input.trim();
+      if (reason.length < 10) { toast.error("اكتب سبباً واضحاً لا يقل عن ١٠ أحرف"); return; }
+    }
+    setBusy(`owner-gov:${proposalId}`);
+    try {
+      await ownerGovernor({ proposalId, approved, reason: reason || undefined });
+      toast.success(approved ? "مُنح إذن المالك لطلب الحاكم — بانتظار قرار الحاكم السيادي" : "رُفض طلب الحاكم وأُوقف قبل أي تنفيذ");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر تسجيل إذن المالك لطلب الحاكم"); }
     finally { setBusy(""); }
   }
 
@@ -176,8 +199,19 @@ export function GovernanceConsole() {
           <Textarea value={deputyBrief} onChange={(e) => setDeputyBrief(e.target.value)} placeholder="أداة نائب المالك: اكتب ما تريد تغييره بحرية، وسيحوّله الذكاء إلى طلب منضبط يمر بالمحكمة ثم إذن المالك" />
           <Button variant="secondary" onClick={draftAsDeputy} disabled={busy === "deputy-draft"}>توليد طلب نائب المالك بالأداة الذكية</Button>
           <div className="my-2 border-t" />
-          <Textarea value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="تكليف الحاكم السيادي بصياغة تعديل جوهري مقترح موثق" />
-          <Button variant="outline" onClick={proposeAsGovernor} disabled={busy === "governor-propose"}>طلب اقتراح من الحاكم السيادي</Button>
+          <p className="text-xs font-semibold text-muted-foreground">أداة الحاكم السيادي — يعدّل اللعبة كما يريد، وبعد إذنك الصريح فقط</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <select value={govOp} onChange={(e) => setGovOp(e.target.value as "create" | "modify" | "delete" | "construct")} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <option value="modify">تعديل وحدة runtime قائمة</option>
+              <option value="construct">إعادة بناء وحدة قائمة</option>
+              <option value="delete">حذف وحدة من اللعبة</option>
+              <option value="create">إنشاء وحدة جديدة</option>
+            </select>
+            <Input list="evolution-modules" value={govTarget} onChange={(e) => setGovTarget(e.target.value)} placeholder="مفتاح الوحدة الحقيقية snake_case" />
+            <datalist id="evolution-modules">{(modules ?? []).map((m: any) => <option key={m.key} value={m.key}>{m.name}</option>)}</datalist>
+          </div>
+          <Textarea value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="تكليف الحاكم: اكتب بحرية ما تريد تغييره، وستحوّله الأداة إلى طلب منضبط على وحدة حقيقية" />
+          <Button variant="outline" onClick={proposeAsGovernor} disabled={busy === "governor-propose"}>توليد طلب الحاكم بالأداة الحقيقية</Button>
         </CardContent>
       </Card>
 
@@ -193,13 +227,23 @@ export function GovernanceConsole() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader><CardTitle>وحدات اللعبة الحقيقية في runtime</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {modules === null && <p className="text-xs text-muted-foreground">هذا المسار محجوز لمالك اللعبة ونائب المالك.</p>}
+          {modules?.length === 0 && <p className="text-xs text-muted-foreground">لا توجد وحدات runtime بعد — أنشئ أول وحدة بأداة الحاكم بعد اكتمال التسلسل.</p>}
+          {(modules ?? []).map((m: any) => <div key={m.key} className="flex items-center justify-between gap-2 rounded-lg border p-3 text-sm"><span><b>{m.name}</b> <span className="font-mono text-xs text-muted-foreground">{m.key}</span></span><span className="text-xs text-muted-foreground">{m.kind} · v{m.version}</span></div>)}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 xl:grid-cols-2">
         <Card><CardHeader><CardTitle>دورة القرارات</CardTitle></CardHeader><CardContent className="space-y-3">
           {data?.proposals.map((p: any) => <div key={p._id} className="rounded-xl border p-4"><div className="flex justify-between gap-2"><b>{p.title}</b><Badge variant="outline">{p.status}</Badge></div><p className="mt-2 text-xs text-muted-foreground">مقترح {p.proposerRole}: {p.summary}</p>{p.courtSummary && <p className="mt-2 text-xs text-emerald-700">المجلس: {p.courtSummary}</p>}{p.courtConditions?.length > 0 && <ul className="mt-2 list-inside list-disc text-xs text-amber-700">{p.courtConditions.map((c: string) => <li key={c}>{c}</li>)}</ul>}{p.courtReviews && <details className="mt-2 text-xs"><summary>مراجعة {p.courtReviews.length} وحدة ذكاء</summary><div className="mt-2 max-h-52 space-y-1 overflow-auto">{p.courtReviews.map((r: any) => <p key={r.unit} className="rounded border p-2"><b>{r.name}</b> — {r.vote} — {r.provider}/{r.model}<br />{r.opinion}</p>)}</div></details>}<div className="mt-3 flex flex-wrap gap-2">
             {p.status === "court_review" && <Button size="sm" onClick={() => step("court", p._id)} disabled={busy === `court:${p._id}`}><Radio className="size-4" />انعقاد المجلس</Button>}
             {p.status === "court_conditional" && <Button size="sm" variant="outline" onClick={() => satisfy(p._id)} disabled={busy === `conditions:${p._id}`}>استيفاء شروط المحكمة</Button>}
             {p.status === "awaiting_deputy" && <Button size="sm" onClick={() => step("deputy", p._id)} disabled={busy === `deputy:${p._id}`}><Bot className="size-4" />قرار نائب المالك</Button>}
-            {p.status === "awaiting_owner" && <><Button size="sm" onClick={() => ownerDecide(p._id, true)} disabled={busy === `owner:${p._id}`}><ShieldCheck className="size-4" />إذن المالك</Button><Button size="sm" variant="destructive" onClick={() => ownerDecide(p._id, false)} disabled={busy === `owner:${p._id}`}>رفض المالك</Button></>}
+            {p.status === "awaiting_owner" && p.proposerRole === "sovereign_governor" && <><Button size="sm" onClick={() => ownerGovernorDecide(p._id, true)} disabled={busy === `owner-gov:${p._id}`}><ShieldCheck className="size-4" />إذن المالك لطلب الحاكم</Button><Button size="sm" variant="destructive" onClick={() => ownerGovernorDecide(p._id, false)} disabled={busy === `owner-gov:${p._id}`}>رفض المالك لطلب الحاكم</Button></>}
+            {p.status === "awaiting_owner" && p.proposerRole !== "sovereign_governor" && <><Button size="sm" onClick={() => ownerDecide(p._id, true)} disabled={busy === `owner:${p._id}`}><ShieldCheck className="size-4" />إذن المالك</Button><Button size="sm" variant="destructive" onClick={() => ownerDecide(p._id, false)} disabled={busy === `owner:${p._id}`}>رفض المالك</Button></>}
             {p.proposerRole === "sovereign_governor" && (p.status === "court_review" || p.status === "court_conditional") && <><Button size="sm" variant="outline" onClick={() => governorSelfReview(p._id, "amend")} disabled={busy === `amend:${p._id}`}>تعديل طلب الحاكم</Button><Button size="sm" variant="outline" onClick={() => governorSelfReview(p._id, "withdraw")} disabled={busy === `withdraw:${p._id}`}>سحب طلب الحاكم</Button></>}
             {p.proposerRole === "deputy_owner" && (p.status === "court_review" || p.status === "court_conditional") && <><Button size="sm" variant="outline" onClick={() => deputySelfReview(p._id, "amend")} disabled={busy === `deputy:amend:${p._id}`}>تعديل طلب نائب المالك</Button><Button size="sm" variant="outline" onClick={() => deputySelfReview(p._id, "withdraw")} disabled={busy === `deputy:withdraw:${p._id}`}>سحب طلب نائب المالك</Button></>}
             {p.status === "awaiting_governor" && <Button size="sm" onClick={() => step("governor", p._id)} disabled={busy === `governor:${p._id}`}><ShieldCheck className="size-4" />قرار الحاكم</Button>}

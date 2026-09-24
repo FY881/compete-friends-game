@@ -7,7 +7,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { AI_REGISTRY } from "./aiRegistry";
 import { callLlmDetailed } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
-import { deriveCourtVerdict } from "./governanceCore";
+import { deriveCourtVerdict, governorOwnerGrantGate, governorToolTargetGate } from "./governanceCore";
 
 const COURT_UNITS = [...AI_REGISTRY];
 const proposalText = (p: any) => JSON.stringify({
@@ -102,43 +102,89 @@ export const conveneCourt = action({
   },
 });
 
+/**
+ * 🛠️ أداة الحاكم السيادي الحقيقية المدمجة فيه:
+ * يكتب تكليفه الحر ويختار عملية فعلية على وحدة runtime قائمة فعلاً (تعديل/حذف/
+ * بناء) أو إنشاء وحدة جديدة. الأداة تتحقق من الوحدة الحقيقية عبر الخادم، ثم
+ * تحوّل التكليف إلى Proposal منضبط يمر بالمحكمة ← نائب المالك ← إذن المالك ←
+ * الحاكم ← الغرفة ← التنفيذ. لا تعدّل شيئاً مباشرة ولا تتجاوز بوابتك.
+ */
 export const governorPropose = action({
-  args: { brief: v.string() },
-  handler: async (ctx, { brief }): Promise<any> => {
+  args: {
+    brief: v.string(),
+    operation: v.optional(v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct"))),
+    targetKey: v.optional(v.string()),
+  },
+  handler: async (ctx, { brief, operation: requestedOperation, targetKey: requestedTarget }): Promise<any> => {
     const who = await requireAuthority(ctx);
     if (brief.trim().length < 30) throw new Error("التكليف لا يصف التعديل الجوهري بوضوح");
     await ensureAiRuntime(ctx);
     const result = await callLlmDetailed({
       messages: [
-        { role: "system", content: "أنت الحاكم السيادي. اقترح تعديلاً جوهرياً آمناً. أعد JSON فقط يحتوي title وoperation وtargetKey وsummary وrationale وrisk وrequestedModule." },
-        { role: "user", content: brief },
+        { role: "system", content: "أنت الحاكم السيادي. اقترح تعديلاً جوهرياً آمناً. أعد JSON فقط يحتوي title وoperation (create|modify|delete|construct) وtargetKey (snake_case) وsummary وrationale وrisk (low|medium|critical) وrequestedModule{name,description,kind,config}.config كائن JSON." },
+        { role: "user", content: requestedOperation ? `العملية المطلوبة: ${requestedOperation}\nالوحدة المستهدفة: ${requestedTarget ?? "(اخترها بنفسك)"}\nالتكليف: ${brief}` : brief },
       ],
       maxTokens: 900,
       temperature: 0.25,
-      label: "Sovereign Governor Proposal",
+      label: "Sovereign Governor Tool",
       jsonMode: true,
       task: "other",
     });
     const match = result.text.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("الحاكم لم يخرج مقترحاً صالحاً");
     const spec = JSON.parse(match[0]);
-    const operation = ["create", "modify", "delete", "construct"].includes(spec.operation) ? spec.operation : "construct";
+    const opList = ["create", "modify", "delete", "construct"] as const;
+    const operation: "create" | "modify" | "delete" | "construct" = requestedOperation ?? (opList.includes(spec.operation) ? spec.operation : "construct");
     const risk = ["low", "medium", "critical"].includes(spec.risk) ? spec.risk : "medium";
-    return await ctx.runMutation(internal.governanceStore.insertGovernorProposal, {
+    const targetKey = String(requestedTarget ?? spec.targetKey ?? "governor_change").slice(0, 80);
+    // تحقق واقعي: العملية يجب أن تنطبق على وحدة runtime حقيقية.
+    const existing = await ctx.runQuery(internal.governanceStore.getEvolutionModule, { key: targetKey });
+    const targetGate = governorToolTargetGate(operation, Boolean(existing));
+    if (!targetGate.allowed) throw new Error(targetGate.reason);
+    const moduleSpec = spec.requestedModule ?? {};
+    const id = await ctx.runMutation(internal.governanceStore.insertGovernorProposal, {
       authorId: who.userId,
-      title: String(spec.title),
+      title: String(spec.title ?? "مرسوم تطوير من الحاكم السيادي").slice(0, 160),
       operation,
-      targetKey: String(spec.targetKey),
-      summary: String(spec.summary),
-      rationale: String(spec.rationale),
+      targetKey,
+      summary: String(spec.summary ?? brief).slice(0, 1200),
+      rationale: String(spec.rationale ?? brief).slice(0, 1200),
       risk,
       requestedModule: {
-        name: String(spec.requestedModule.name),
-        description: String(spec.requestedModule.description),
-        kind: String(spec.requestedModule.kind),
-        config: JSON.stringify(spec.requestedModule.config),
+        name: String(moduleSpec.name ?? existing?.name ?? targetKey).slice(0, 120),
+        description: String(moduleSpec.description ?? spec.summary ?? brief).slice(0, 1200),
+        kind: String(moduleSpec.kind ?? existing?.kind ?? "feature").slice(0, 40),
+        config: JSON.stringify(moduleSpec.config ?? (existing ? JSON.parse(existing.config) : {})),
       },
     });
+    return { proposalId: id, operation, targetKey, targetExisted: Boolean(existing), provider: result.provider, model: result.model };
+  },
+});
+
+/**
+ * 👑 إذن/رفض المالك على طلب الحاكم السيادي (ميزة مستقلة).
+ * لا تُشغَّل أداة الحاكم إلا بعد هذا الإذن الصريح، والرفض يُوقف الطلب فوراً.
+ */
+export const ownerGovernorDecide = action({
+  args: {
+    proposalId: v.id("evolutionProposals"),
+    approved: v.boolean(),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, { proposalId, approved, reason }): Promise<any> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("تسجيل الدخول مطلوب");
+    const actorInfo = await ctx.runQuery(internal.governanceStore.getGovernanceActor, { userId });
+    if (!actorInfo?.isOwner) throw new Error("إذن المالك متاح لصاحب اللعبة فقط");
+    const proposal = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
+    if (!proposal) throw new Error("طلب الحاكم غير موجود");
+    const gate = governorOwnerGrantGate(proposal);
+    if (!gate.allowed) throw new Error(gate.reason);
+    const note = (reason ?? "").trim() || (approved
+      ? "إذن صريح من المالك لطلب الحاكم السيادي بعد قرار المحكمة وموافقة نائب المالك"
+      : "رفض صريح من المالك لطلب الحاكم السيادي: أُوقف الطلب ولم يُفتح أي تنفيذ");
+    const verdict = await ctx.runMutation(internal.governanceStore.recordOwnerGovernorDecision, { proposalId, approved, reason: note });
+    return verdict.approved ? { approved: true, next: "awaiting_governor" } : { approved: false, status: "cancelled" };
   },
 });
 

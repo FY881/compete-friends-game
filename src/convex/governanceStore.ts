@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { isOwnerUser } from "./owner";
 import { AI_REGISTRY } from "./aiRegistry";
-import { chamberGate, deputySelfReviewGate, governorSelfReviewGate, instrumentGate } from "./governanceCore";
+import { chamberGate, deputySelfReviewGate, governorOwnerGrantGate, governorSelfReviewGate, instrumentGate } from "./governanceCore";
 
 async function actor(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -47,6 +47,46 @@ export const listConsole = query({
     const operations = await ctx.db.query("evolutionOperations").withIndex("by_at", (q: any) => q.gte("at", 0)).order("desc").take(30);
     const audit = await ctx.db.query("secretChamberAudit").withIndex("by_at", (q: any) => q.gte("at", 0)).order("desc").take(50);
     return { proposals, operations, audit, courtUnits: AI_REGISTRY.map((u) => ({ key: u.key, name: u.name, purpose: u.purpose, dept: u.dept, wiring: u.wiring })) };
+  },
+});
+
+/**
+ * 🛠️ أداة الحاكم السيادي الواقعية: تُعيد الوحدات الحقيقية في runtime حتى يعدّلها
+ * الحاكم كما يريد (تعديل/حذف/بناء) بدل العمل على الهواء. مقصورة على المالك ونائبه.
+ */
+export const listEvolutionModules = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    const deputy = await ctx.db.query("siteRoles").withIndex("by_user", (q: any) => q.eq("userId", userId)).first();
+    if (!isOwnerUser(user) && !(deputy?.active && deputy.role === "deputy_owner")) return null;
+    const modules = await ctx.db.query("evolutionModules").withIndex("by_key", (q: any) => q.gte("key", "")).collect();
+    return modules.map((m) => ({ key: m.key, name: m.name, description: m.description, kind: m.kind, status: m.status, version: m.version, updatedAt: m.updatedAt }));
+  },
+});
+
+/**
+ * إذن المالك على طلب الحاكم السيادي — ميزة مستقلة ومخصصة لطلبات الحاكم.
+ * تُسجَّل بنطاق ownerGrantScope="governor_request" ويُدقّق القرار في الغرفة.
+ */
+export const recordOwnerGovernorDecision = internalMutation({
+  args: { proposalId: v.id("evolutionProposals"), approved: v.boolean(), reason: v.string() },
+  handler: async (ctx, a) => {
+    const p = await ctx.db.get(a.proposalId);
+    if (!p) throw new Error("طلب الحاكم غير موجود");
+    const gate = governorOwnerGrantGate(p);
+    if (!gate.allowed) throw new Error(gate.reason);
+    const now = Date.now();
+    if (!a.approved) {
+      await ctx.db.patch(a.proposalId, { status: "cancelled", lastError: a.reason, ownerReason: a.reason, ownerGrantScope: "governor_request", ownerVerdictAt: now, updatedAt: now });
+      await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "المالك", actorRole: "owner", action: "owner_rejected_governor_request", detail: a.reason, at: now });
+      return { approved: false };
+    }
+    await ctx.db.patch(a.proposalId, { ownerApprovedAt: now, ownerReason: a.reason, ownerGrantScope: "governor_request", ownerVerdictAt: now, status: "awaiting_governor", updatedAt: now });
+    await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "المالك", actorRole: "owner", action: "owner_granted_governor_request", detail: a.reason, at: now });
+    return { approved: true };
   },
 });
 
@@ -259,6 +299,13 @@ export const governanceIntegrity = query({
 const COURT_UNIT_KEYS = AI_REGISTRY.map((unit) => unit.key);
 
 export const getProposal = internalQuery({ args: { proposalId: v.id("evolutionProposals") }, handler: async (ctx, { proposalId }) => ctx.db.get(proposalId) });
+export const getEvolutionModule = internalQuery({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const module = await ctx.db.query("evolutionModules").withIndex("by_key", (q: any) => q.eq("key", key)).first();
+    return module ? { key: module.key, name: module.name, description: module.description, kind: module.kind, config: module.config, version: module.version } : null;
+  },
+});
 export const recordDeputyApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const p = await ctx.db.get(a.proposalId); if (!p || p.status !== "awaiting_deputy" || p.courtVerdict !== "approved") throw new Error("موافقة نائب المالك غير متاحة خارج مرحلة ما بعد قرار المحكمة"); const now = Date.now(); await ctx.db.patch(a.proposalId, { deputyApprovedAt: now, deputyReason: a.reason, status: "awaiting_owner", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "نائب المالك", actorRole: "deputy_owner", action: "deputy_approved", detail: a.reason.slice(0, 3000), at: now }); } });
 export const recordOwnerApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const p = await ctx.db.get(a.proposalId); if (!p || p.status !== "awaiting_owner" || !p.deputyApprovedAt) throw new Error("موافقة المالك غير متاحة في هذه المرحلة"); const now = Date.now(); await ctx.db.patch(a.proposalId, { ownerApprovedAt: now, ownerReason: a.reason, status: "awaiting_governor", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "المالك", actorRole: "owner", action: "owner_approved", detail: "موافقة المالك الصريحة بعد موافقةCourt ونائب المالك", at: now }); } });
 export const recordGovernorApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const p = await ctx.db.get(a.proposalId); if (!p || p.status !== "awaiting_governor" || !p.ownerApprovedAt || !p.deputyApprovedAt || p.courtVerdict !== "approved") throw new Error("بوابة الحاكم مغلقة: يلزم قرار المحكمة ثم نائب المالك ثم إذن المالك"); const now = Date.now(); await ctx.db.patch(a.proposalId, { governorApprovedAt: now, governorReason: a.reason, chamberOpenedAt: now, status: "joint_approved", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: "chamber_opened", detail: a.reason.slice(0, 3000), at: now }); } });

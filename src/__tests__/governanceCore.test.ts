@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chamberGate, deputySelfReviewGate, deriveCourtVerdict, governorSelfReviewGate, instrumentGate } from "../convex/governanceCore";
+import { chamberGate, deputySelfReviewGate, deriveCourtVerdict, governorOwnerGrantGate, governorSelfReviewGate, governorToolTargetGate, instrumentGate } from "../convex/governanceCore";
 
 const complete = {
   status: "executing",
@@ -67,6 +67,35 @@ describe("Deputy owner self review gate", () => {
 
   it("refuses self review for governor proposals", () => {
     expect(deputySelfReviewGate({ proposerRole: "sovereign_governor", status: "court_review" }, "amend").allowed).toBe(false);
+  });
+});
+
+describe("Owner grant gate for governor requests", () => {
+  const base = { proposerRole: "sovereign_governor", status: "awaiting_owner", courtVerdict: "approved", deputyApprovedAt: 1 };
+
+  it("allows the owner verdict only for governor requests past the full chain", () => {
+    expect(governorOwnerGrantGate(base).allowed).toBe(true);
+  });
+
+  it("refuses deputy requests and incomplete chains", () => {
+    expect(governorOwnerGrantGate({ ...base, proposerRole: "deputy_owner" }).allowed).toBe(false);
+    expect(governorOwnerGrantGate({ ...base, status: "awaiting_deputy" }).allowed).toBe(false);
+    expect(governorOwnerGrantGate({ ...base, courtVerdict: "conditional" }).allowed).toBe(false);
+    expect(governorOwnerGrantGate({ ...base, deputyApprovedAt: undefined }).allowed).toBe(false);
+  });
+});
+
+describe("Governor real tool target gate", () => {
+  it("requires a real existing module for modify, construct and delete", () => {
+    expect(governorToolTargetGate("modify", true).allowed).toBe(true);
+    expect(governorToolTargetGate("modify", false).allowed).toBe(false);
+    expect(governorToolTargetGate("delete", false).allowed).toBe(false);
+    expect(governorToolTargetGate("construct", false).allowed).toBe(false);
+  });
+
+  it("requires a free key for create", () => {
+    expect(governorToolTargetGate("create", false).allowed).toBe(true);
+    expect(governorToolTargetGate("create", true).allowed).toBe(false);
   });
 });
 

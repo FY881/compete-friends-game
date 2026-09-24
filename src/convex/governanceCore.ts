@@ -70,3 +70,38 @@ export function governorSelfReviewGate(
   }
   return { allowed: true, reason: "الإجراء مسموح قبل قرار المحكمة" };
 }
+
+/**
+ * بوابة إذن المالك الخاصة بطلب الحاكم السيادي (الميزة الجديدة).
+ * إذن صريح منفصل: لا تُشغَّل أداة الحاكم إلا بعد موافقة المالك على طلبه هو،
+ * بعد قرار المحكمة وموافقة نائب المالك. الرفض يُوقف الطلب فوراً.
+ */
+export function governorOwnerGrantGate(proposal: {
+  proposerRole?: string;
+  status?: string;
+  courtVerdict?: string;
+  deputyApprovedAt?: number;
+}): { allowed: boolean; reason: string } {
+  if (proposal.proposerRole !== "sovereign_governor") {
+    return { allowed: false, reason: "هذا القرار مخصص لطلبات الحاكم السيادي فقط" };
+  }
+  if (proposal.status !== "awaiting_owner") return { allowed: false, reason: "طلب الحاكم ليس في مرحلة إذن المالك" };
+  if (proposal.courtVerdict !== "approved") return { allowed: false, reason: "قرار المحكمة غير مكتمل" };
+  if (!proposal.deputyApprovedAt) return { allowed: false, reason: "موافقة نائب المالك مطلوبة قبل إذن المالك" };
+  return { allowed: true, reason: "إذن المالك متاح لطلب الحاكم السيادي" };
+}
+
+/**
+ * بوابة أداة الحاكم الواقعية: تُتحقق أن العملية تنطبق على وحدة runtime حقيقية.
+ *  - modify/construct: الوحدة يجب أن تكون قائمة فعلاً.
+ *  - create: الوحدة يجب ألا تكون موجودة.
+ *  - delete: الوحدة يجب أن تكون قائمة.
+ */
+export function governorToolTargetGate(
+  operation: "create" | "modify" | "delete" | "construct",
+  moduleExists: boolean,
+): { allowed: boolean; reason: string } {
+  if (operation === "create" && moduleExists) return { allowed: false, reason: "مفتاح الوحدة مستخدم بالفعل — استخدم تعديل أو بناء" };
+  if (operation !== "create" && !moduleExists) return { allowed: false, reason: "الوحدة المستهدفة غير موجودة في runtime" };
+  return { allowed: true, reason: "العملية تنطبق على وحدة runtime حقيقية" };
+}

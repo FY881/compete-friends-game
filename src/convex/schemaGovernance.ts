@@ -56,6 +56,8 @@ export const governanceTables = {
     deputyReason: v.optional(v.string()),
     ownerApprovedAt: v.optional(v.number()),
     ownerReason: v.optional(v.string()),
+    ownerGrantScope: v.optional(v.union(v.literal("deputy_request"), v.literal("governor_request"))),
+    ownerVerdictAt: v.optional(v.number()),
     governorApprovedAt: v.optional(v.number()),
     governorReason: v.optional(v.string()),
     chamberOpenedAt: v.optional(v.number()),
@@ -64,7 +66,7 @@ export const governanceTables = {
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_status", ["status", "createdAt"]).index("by_author", ["authorId"]),
+  }).index("by_status", ["status", "createdAt"]).index("by_author", ["authorId"]).index("by_proposer_status", ["proposerRole", "status"]),
 
   evolutionOperations: defineTable({
     proposalId: v.id("evolutionProposals"), operation: v.string(), targetKey: v.string(),
