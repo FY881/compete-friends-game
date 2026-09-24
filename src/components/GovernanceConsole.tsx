@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Gavel, LockKeyhole, Play, ShieldCheck, Sparkles, Bot, CheckCircle2, Radio } from "lucide-react";
+import { Gavel, LockKeyhole, Play, ShieldCheck, Sparkles, Bot, CheckCircle2, Radio, GitBranch } from "lucide-react";
 
 export function GovernanceConsole() {
   const data = useQuery(api.governanceStore.listConsole);
@@ -19,6 +19,7 @@ export function GovernanceConsole() {
   const instrument = useAction(api.governance.runInstrument);
   const governorPropose = useAction(api.governance.governorPropose);
   const resolveConditions = useAction(api.governance.resolveConditions);
+  const githubEvolution = useAction(api.githubEvolution.createEvolutionPullRequest);
   const [brief, setBrief] = useState("");
   const [form, setForm] = useState({ title: "", targetKey: "", name: "", description: "", summary: "", rationale: "", config: '{"enabled":true}' });
   const [busy, setBusy] = useState("");
@@ -47,6 +48,18 @@ export function GovernanceConsole() {
     try { await resolveConditions({ proposalId, evidence }); toast.success("تمت مراجعة الشروط"); }
     catch (e) { toast.error(e instanceof Error ? e.message : "فشل استيفاء الشروط"); }
     finally { setBusy(""); }
+  }
+
+  async function openEvolutionPullRequest(proposalId: Id<"evolutionProposals">) {
+    setBusy(`github:${proposalId}`);
+    try {
+      const result = await githubEvolution({ proposalId });
+      toast.success(`تم فتح Pull Request: ${result.pullRequestUrl ?? "تم تسجيل العملية"}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذر فتح Pull Request");
+    } finally {
+      setBusy("");
+    }
   }
 
   async function step(kind: string, proposalId: Id<"evolutionProposals">) {
@@ -95,6 +108,7 @@ export function GovernanceConsole() {
             {p.status === "awaiting_deputy" && <Button size="sm" onClick={() => step("deputy", p._id)} disabled={busy === `deputy:${p._id}`}><Bot className="size-4" />قرار نائب المالك</Button>}
             {p.status === "awaiting_governor" && <Button size="sm" onClick={() => step("governor", p._id)} disabled={busy === `governor:${p._id}`}><ShieldCheck className="size-4" />قرار الحاكم</Button>}
             {p.status === "joint_approved" && <Button size="sm" onClick={() => step("run", p._id)} disabled={busy === `run:${p._id}`}><Play className="size-4" />تشغيل الأداة</Button>}
+            {p.status === "joint_approved" && <Button size="sm" variant="outline" onClick={() => openEvolutionPullRequest(p._id)} disabled={busy === `github:${p._id}`}><GitBranch className="size-4" />فتح Pull Request آمن</Button>}
           </div></div>)}
         </CardContent></Card>
         <Card><CardHeader><CardTitle className="flex items-center gap-2"><LockKeyhole className="size-5" />سجل الغرفة السرية</CardTitle></CardHeader><CardContent className="max-h-[560px] space-y-2 overflow-auto">
