@@ -1,0 +1,50 @@
+name: Evolution Governance Check
+
+on:
+  pull_request:
+    paths:
+      - ".evolution/proposals/**"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  evolution-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout proposal evidence
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .evolution/proposals
+          sparse-checkout-cone-mode: false
+
+      - name: Validate evolution evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(.evolution/proposals/*.json)
+          if [ -e "${files[0]}" ] && [ ! -f "${files[0]}" ]; then
+            echo "No Evolution proposal evidence found" >&2
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            [ -f "$file" ] || continue
+            node - "$file" <<'NODE'
+            const fs = require('fs');
+            const file = process.argv[2];
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            const required = ['proposalId', 'title', 'operation', 'targetKey', 'courtVerdict', 'deputyApprovedAt', 'governorApprovedAt', 'chamberOpenedAt'];
+            for (const key of required) {
+              if (data[key] === undefined || data[key] === null || data[key] === '') {
+                throw new Error(`Missing ${key} in ${file}`);
+              }
+            }
+            if (data.courtVerdict !== 'approved') throw new Error(`Court did not approve ${file}`);
+            if (!data.deputyApprovedAt) throw new Error(`Deputy approval missing in ${file}`);
+            if (!data.governorApprovedAt) throw new Error(`Governor approval missing in ${file}`);
+            if (!data.chamberOpenedAt) throw new Error(`Secret chamber approval missing in ${file}`);
+            console.log(`Governance evidence valid: ${file}`);
+            NODE
+          done
