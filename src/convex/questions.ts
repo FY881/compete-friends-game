@@ -5,8 +5,9 @@ export type Question = { id: string; category: string; difficulty: Difficulty; q
 import { MEGA_PACK_1, MEGA_PACK_2 } from "./megaQuestions";
 import { MEGA_PACK_3 } from "./megaQuestions3";
 import { MEGA_PACK_4 } from "./megaQuestions4";
+import { MEGA_PACK_5, MEGA_PACK_5B } from "./megaQuestions5";
 
-export const EXTRA_QUESTIONS: Question[] = [...MEGA_PACK_4,
+export const EXTRA_QUESTIONS: Question[] = [...MEGA_PACK_5, ...MEGA_PACK_5B, ...MEGA_PACK_4,
   // ── أسئلة إضافية جديدة (q321 – q542) ─────────────────────────────────
 
   // ── عام ──
