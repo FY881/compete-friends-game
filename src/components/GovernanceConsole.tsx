@@ -27,7 +27,7 @@ export function GovernanceConsole() {
   async function submit() {
     setBusy("create");
     try {
-      await create({ ...form, operation: "create", risk: "medium", requestedModule: { name: form.name, description: form.description, kind: "feature", config: form.config } });
+      await create({ title: form.title, targetKey: form.targetKey, summary: form.summary, rationale: form.rationale, operation: "create", risk: "medium", requestedModule: { name: form.name, description: form.description, kind: "feature", config: form.config } });
       toast.success("سُجّل المقترح وأُرسل إلى المجلس");
     } catch (e) { toast.error(e instanceof Error ? e.message : "فشل الإنشاء"); }
     finally { setBusy(""); }
