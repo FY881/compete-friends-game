@@ -21,6 +21,7 @@ export function GovernanceConsole() {
   const resolveConditions = useAction(api.governance.resolveConditions);
   const githubEvolution = useAction(api.githubEvolution.createEvolutionPullRequest);
   const [brief, setBrief] = useState("");
+  const [impact, setImpact] = useState({ title: "", targetKey: "", summary: "", rationale: "", rollback: "" });
   const [form, setForm] = useState({ title: "", targetKey: "", name: "", description: "", summary: "", rationale: "", config: '{"enabled":true}' });
   const [busy, setBusy] = useState("");
   const set = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((s) => ({ ...s, [key]: event.target.value }));
@@ -31,6 +32,27 @@ export function GovernanceConsole() {
       await create({ title: form.title, targetKey: form.targetKey, summary: form.summary, rationale: form.rationale, operation: "create", risk: "medium", requestedModule: { name: form.name, description: form.description, kind: "feature", config: form.config } });
       toast.success("سُجّل المقترح وأُرسل إلى المجلس");
     } catch (e) { toast.error(e instanceof Error ? e.message : "فشل الإنشاء"); }
+    finally { setBusy(""); }
+  }
+
+  async function submitHighImpactPlan() {
+    if (impact.title.trim().length < 5 || impact.summary.trim().length < 20 || impact.rationale.trim().length < 20 || impact.rollback.trim().length < 20) {
+      toast.error("أكمل سبب التغيير وخطة الرجوع قبل إرسال طلب الأثر العالي");
+      return;
+    }
+    setBusy("impact");
+    try {
+      await create({
+        title: impact.title,
+        targetKey: impact.targetKey || "high_impact_change",
+        operation: "construct",
+        summary: impact.summary,
+        rationale: `${impact.rationale}\nخطة الرجوع: ${impact.rollback}`,
+        risk: "critical",
+        requestedModule: { name: impact.targetKey || "high_impact_change", description: "طلب تخطيط تعديل عالي الأثر؛ لا تنفيذ مباشر", kind: "high_impact_plan", config: JSON.stringify({ directProductionMutation: false, humanExecutionRequired: true, rollback: impact.rollback }) },
+      });
+      toast.success("تم إرسال مخطط الأثر العالي إلى المحكمة؛ لم يُنفذ أي تغيير");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر إرسال المخطط"); }
     finally { setBusy(""); }
   }
 
@@ -97,6 +119,18 @@ export function GovernanceConsole() {
           <div className="my-2 border-t" />
           <Textarea value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="تكليف الحاكم السيادي بصياغة تعديل جوهري مقترح موثق" />
           <Button variant="outline" onClick={proposeAsGovernor} disabled={busy === "governor-propose"}>طلب اقتراح من الحاكم السيادي</Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardHeader><CardTitle className="flex items-center gap-2 text-amber-700">مخطط التعديلات عالية الأثر</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">للإنتاج أو الصلاحيات أو قاعدة البيانات أو API أو main: إعداد ومراجعة فقط، ولا يوجد تنفيذ مباشر.</p>
+          <div className="grid gap-3 md:grid-cols-2"><Input value={impact.title} onChange={(e) => setImpact({ ...impact, title: e.target.value })} placeholder="عنوان طلب الأثر العالي" /><Input value={impact.targetKey} onChange={(e) => setImpact({ ...impact, targetKey: e.target.value })} placeholder="المفتاح أو النظام المتأثر" /></div>
+          <Textarea value={impact.summary} onChange={(e) => setImpact({ ...impact, summary: e.target.value })} placeholder="ملخص التغيير المطلوب" />
+          <Textarea value={impact.rationale} onChange={(e) => setImpact({ ...impact, rationale: e.target.value })} placeholder="سبب necessity والإحداثيات" />
+          <Textarea value={impact.rollback} onChange={(e) => setImpact({ ...impact, rollback: e.target.value })} placeholder="خطة rollback التفصيلية" />
+          <Button onClick={submitHighImpactPlan} disabled={busy === "impact"} variant="outline">إرسال مخطط الأثر العالي إلى المحكمة</Button>
         </CardContent>
       </Card>
 
