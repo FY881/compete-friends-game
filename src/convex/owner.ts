@@ -1094,7 +1094,7 @@ export const getQuestionBank = query({
     return QUESTION_BANK.map((q) => ({
       id: q.id,
       category: q.category,
-      difficulty: q.difficulty as QuestionRow["difficulty"],
+      difficulty: q.difficulty as "easy" | "medium" | "hard" | "extreme" as QuestionRow["difficulty"],
       question: q.question,
       disabled: disabled.has(q.id),
     }));

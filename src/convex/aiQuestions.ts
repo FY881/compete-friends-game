@@ -368,7 +368,7 @@ export const insertBatch = internalMutation({
       await ctx.db.insert("aiQuestions", {
         qid: q.qid,
         category: q.category,
-        difficulty: q.difficulty,
+        difficulty: q.difficulty as "easy" | "medium" | "hard",
         question: q.question,
         options: q.options,
         correctIndex: q.correctIndex,
