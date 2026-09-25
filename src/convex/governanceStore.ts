@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { isOwnerUser } from "./owner";
 import { AI_REGISTRY } from "./aiRegistry";
 import { chamberGate, deputySelfReviewGate, governorFreezeGate, governorOwnerGrantGate, governorSelfReviewGate, mandateGate, protectedTargetGate, sovereignExecutionGate } from "./governanceCore";
@@ -341,7 +342,21 @@ export const getEvolutionModule = internalQuery({
     return module ? { key: module.key, name: module.name, description: module.description, kind: module.kind, config: module.config, version: module.version } : null;
   },
 });
-export const recordDeputyApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const p = await ctx.db.get(a.proposalId); if (!p || p.status !== "awaiting_deputy" || p.courtVerdict !== "approved") throw new Error("موافقة نائب المالك غير متاحة خارج مرحلة ما بعد قرار المحكمة"); const now = Date.now(); await ctx.db.patch(a.proposalId, { deputyApprovedAt: now, deputyReason: a.reason, status: "awaiting_owner", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "نائب المالك", actorRole: "deputy_owner", action: "deputy_approved", detail: a.reason.slice(0, 3000), at: now }); } });
+export const recordDeputyApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => {
+  const p = await ctx.db.get(a.proposalId);
+  if (!p || p.status !== "awaiting_deputy" || p.courtVerdict !== "approved") throw new Error("موافقة نائب المالك غير متاحة خارج مرحلة ما بعد قرار المحكمة");
+  const now = Date.now();
+  await ctx.db.patch(a.proposalId, { deputyApprovedAt: now, deputyReason: a.reason, status: "awaiting_owner", updatedAt: now });
+  await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "نائب المالك", actorRole: "deputy_owner", action: "deputy_approved", detail: a.reason.slice(0, 3000), at: now });
+  // إذن المالك لم يعد ينتظر فتح اللوحة: الطلب يطرق جرس المالك فور وصوله بوابته.
+  await ctx.runMutation(internal.notify.ownerPermissionRequested, {
+    proposalId: a.proposalId,
+    title: p.title,
+    summary: (p.summary ?? "").slice(0, 200),
+    risk: p.risk,
+    proposerRole: p.proposerRole,
+  });
+} });
 export const recordOwnerApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const p = await ctx.db.get(a.proposalId); if (!p || p.status !== "awaiting_owner" || !p.deputyApprovedAt) throw new Error("موافقة المالك غير متاحة في هذه المرحلة"); const now = Date.now(); await ctx.db.patch(a.proposalId, { ownerApprovedAt: now, ownerReason: a.reason, status: "awaiting_governor", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "المالك", actorRole: "owner", action: "owner_approved", detail: "موافقة المالك الصريحة بعد موافقةCourt ونائب المالك", at: now }); } });
 export const recordGovernorApproval = internalMutation({ args: { proposalId: v.id("evolutionProposals"), reason: v.string() }, handler: async (ctx, a) => { const p = await ctx.db.get(a.proposalId); if (!p || p.status !== "awaiting_governor" || !p.ownerApprovedAt || !p.deputyApprovedAt || p.courtVerdict !== "approved") throw new Error("بوابة الحاكم مغلقة: يلزم قرار المحكمة ثم نائب المالك ثم إذن المالك"); const now = Date.now(); await ctx.db.patch(a.proposalId, { governorApprovedAt: now, governorReason: a.reason, chamberOpenedAt: now, status: "joint_approved", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: "chamber_opened", detail: a.reason.slice(0, 3000), at: now }); } });
 export const recordRejection = internalMutation({

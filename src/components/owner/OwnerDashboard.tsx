@@ -23,8 +23,10 @@ import {
   RefreshCw,
   Sparkles,
   Bot,
+  Gavel,
   ChevronLeft,
 } from "lucide-react";
+import { useNavigate } from "react-router";
 import { HealthPanel } from "./HealthPanel";
 import { AnnouncementCenter } from "./AnnouncementCenter";
 import { SiteLockPanel } from "./SiteLockPanel";
@@ -325,6 +327,7 @@ export function OwnerDashboard({
   onNavigate: (tab: string) => void;
 }) {
   const dashboard = useQuery(api.owner.getDashboard);
+  const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0);
 
   // سلاسل حقيقية من الخادم — بلا أي توليد عشوائي
@@ -551,6 +554,12 @@ export function OwnerDashboard({
             label="الرقابة الذكية"
             onClick={() => onNavigate("aiadmin")}
             color="amber"
+          />
+          <QuickAction
+            icon={Gavel}
+            label="محكمة التطور — صلاحيات جذرية"
+            onClick={() => navigate("/governance-console")}
+            color="rose"
           />
         </div>
       </div>

@@ -13,6 +13,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { OWNER_EMAIL } from "./owner";
 
 /**
  * أدخل إشعاراً للاعب (أو الكل بـ "__all__") — الاستخدام الداخلي فقط.
@@ -116,6 +117,32 @@ export const duelResult = internalMutation({
       category: "duels",
       priority: "important",
       actionUrl: "/play",
+    });
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// إشعار إذن المالك — يصل للمالك لحظة وصول طلب الحاكم السيادي إلى بوابة إذنه
+// ─────────────────────────────────────────────────────────────────────────
+
+export const ownerPermissionRequested = internalMutation({
+  args: { proposalId: v.string(), title: v.string(), summary: v.string(), risk: v.string(), proposerRole: v.string() },
+  handler: async (ctx, { proposalId, title, summary, risk, proposerRole }) => {
+    const ownerId = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", OWNER_EMAIL))
+      .first();
+    if (!ownerId) return;
+    const who = proposerRole === "sovereign_governor" ? "الحاكم السيادي" : proposerRole === "deputy_owner" ? "نائب المالك" : "طلب تطوير";
+    const riskLabel = risk === "critical" ? "خطر حرج" : risk === "medium" ? "خطر متوسط" : "خطر منخفض";
+    await ctx.runMutation(internal.notify.push, {
+      userId: ownerId._id,
+      title: "⚖️ طلب تطوير بانتظار إذنك",
+      body: `${who} — ${title} (${riskLabel}): ${summary}`,
+      type: "warning",
+      category: "system",
+      priority: "critical",
+      actionUrl: `/governance-console?proposal=${proposalId}`,
     });
   },
 });

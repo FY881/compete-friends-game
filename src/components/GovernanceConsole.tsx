@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Gavel, LockKeyhole, Play, ShieldCheck, Sparkles, Bot, CheckCircle2, Radio, GitBranch, Power, Undo2 } from "lucide-react";
 
+import { useSearchParams } from "react-router";
 import { isRuleModuleKey, previewRuleConfig, ruleSurfaceFor, RULE_MODULE_KEYS } from "@/convex/evolutionRules";
 
 const MANDATE_OPS = ["create", "modify", "construct", "delete"] as const;
@@ -22,6 +23,9 @@ function readLiveValue(source: unknown, path: string): number {
 
 export function GovernanceConsole() {
   const data = useQuery(api.governanceStore.listConsole);
+  // رابط الإشعار يقود مباشرة إلى الطلب المعني (?proposal=...)
+  const [searchParams] = useSearchParams();
+  const focusId = searchParams.get("proposal");
   const modules = useQuery(api.governanceStore.listEvolutionModules);
   const create = useMutation(api.governanceStore.createProposal);
   const court = useAction(api.governance.conveneCourt);
@@ -262,6 +266,14 @@ export function GovernanceConsole() {
 
   return (
     <div dir="rtl" className="space-y-5">
+      {focusId && (
+        <div className="flex items-start gap-2 rounded-xl border border-primary/40 bg-primary/5 p-3 text-sm">
+          <Radio className="mt-0.5 size-4 shrink-0 text-primary" />
+          <span>
+            وصلت من إشعار الإذن: الطلب <b className="font-mono text-xs">{focusId}</b> مُبرَز بإطار في قائمة الطلبات. إن لم يظهر فهذا الحساب ليس صاحب الصلاحية.
+          </span>
+        </div>
+      )}
       <Card className="overflow-hidden border-slate-800 bg-slate-950 text-slate-100">
         <CardHeader><CardTitle className="flex items-center gap-2"><Gavel className="size-5 text-amber-400" />المجلس ← نائب المالك ← الحاكم السيادي ← الغرفة السرية</CardTitle></CardHeader>
         <CardContent className="grid gap-2 text-xs text-slate-300 sm:grid-cols-4">
@@ -321,7 +333,7 @@ export function GovernanceConsole() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card><CardHeader><CardTitle>دورة القرارات</CardTitle></CardHeader><CardContent className="space-y-3">
-          {data?.proposals.map((p: any) => <div key={p._id} className="rounded-xl border p-4"><div className="flex justify-between gap-2"><b>{p.title}</b><Badge variant="outline">{p.status}</Badge></div><p className="mt-2 text-xs text-muted-foreground">مقترح {p.proposerRole}: {p.summary}</p>{p.courtSummary && <p className="mt-2 text-xs text-emerald-700">المجلس: {p.courtSummary}</p>}{p.courtConditions?.length > 0 && <ul className="mt-2 list-inside list-disc text-xs text-amber-700">{p.courtConditions.map((c: string) => <li key={c}>{c}</li>)}</ul>}{p.courtReviews && <details className="mt-2 text-xs"><summary>مراجعة {p.courtReviews.length} وحدة ذكاء</summary><div className="mt-2 max-h-52 space-y-1 overflow-auto">{p.courtReviews.map((r: any) => <p key={r.unit} className="rounded border p-2"><b>{r.name}</b> — {r.vote} — {r.provider}/{r.model}<br />{r.opinion}</p>)}</div></details>}          {isRuleModuleKey(p.targetKey) && liveRulesData && (() => {
+          {data?.proposals.map((p: any) => <div key={p._id} className={focusId === p._id ? "rounded-xl border-2 border-primary bg-primary/5 p-4" : "rounded-xl border p-4"}><div className="flex justify-between gap-2"><b>{p.title}</b><Badge variant="outline">{p.status}</Badge></div><p className="mt-2 text-xs text-muted-foreground">مقترح {p.proposerRole}: {p.summary}</p>{p.courtSummary && <p className="mt-2 text-xs text-emerald-700">المجلس: {p.courtSummary}</p>}{p.courtConditions?.length > 0 && <ul className="mt-2 list-inside list-disc text-xs text-amber-700">{p.courtConditions.map((c: string) => <li key={c}>{c}</li>)}</ul>}{p.courtReviews && <details className="mt-2 text-xs"><summary>مراجعة {p.courtReviews.length} وحدة ذكاء</summary><div className="mt-2 max-h-52 space-y-1 overflow-auto">{p.courtReviews.map((r: any) => <p key={r.unit} className="rounded border p-2"><b>{r.name}</b> — {r.vote} — {r.provider}/{r.model}<br />{r.opinion}</p>)}</div></details>}          {isRuleModuleKey(p.targetKey) && liveRulesData && (() => {
             const rows = previewRuleConfig(p.targetKey, p.requestedModule.config, liveRulesData.rules);
             return (
               <div className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
