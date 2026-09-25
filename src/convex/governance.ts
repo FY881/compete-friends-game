@@ -7,7 +7,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { AI_REGISTRY } from "./aiRegistry";
 import { callLlmDetailed } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
-import { deriveCourtVerdict, governorOwnerGrantGate, governorToolTargetGate } from "./governanceCore";
+import { deriveCourtVerdict, governorOwnerGrantGate, governorToolTargetGate, mandateGate, protectedTargetGate } from "./governanceCore";
 
 const COURT_UNITS = [...AI_REGISTRY];
 const proposalText = (p: any) => JSON.stringify({
@@ -141,6 +141,12 @@ export const governorPropose = action({
     const existing = await ctx.runQuery(internal.governanceStore.getEvolutionModule, { key: targetKey });
     const targetGate = governorToolTargetGate(operation, Boolean(existing));
     if (!targetGate.allowed) throw new Error(targetGate.reason);
+    // حدود مطلقة: الإنتاج/الكود/المفاتيح خارج سلطة الحاكم ولو وُجد تفويض.
+    const boundary = protectedTargetGate(targetKey);
+    if (!boundary.allowed) throw new Error(boundary.reason);
+    // إن كان هناك تفويض سارٍ يغطي الطلب: يُربط الطلب به ويُسرَّع بعد قرار المحكمة.
+    const mandate = await ctx.runQuery(internal.governanceStore.getActiveMandate, {});
+    const coverage = mandateGate(mandate, { operation, targetKey, risk }, Date.now());
     const moduleSpec = spec.requestedModule ?? {};
     const id = await ctx.runMutation(internal.governanceStore.insertGovernorProposal, {
       authorId: who.userId,
@@ -156,8 +162,18 @@ export const governorPropose = action({
         kind: String(moduleSpec.kind ?? existing?.kind ?? "feature").slice(0, 40),
         config: JSON.stringify(moduleSpec.config ?? (existing ? JSON.parse(existing.config) : {})),
       },
+      mandateId: coverage.allowed && mandate ? mandate._id : undefined,
     });
-    return { proposalId: id, operation, targetKey, targetExisted: Boolean(existing), provider: result.provider, model: result.model };
+    return {
+      proposalId: id,
+      operation,
+      targetKey,
+      targetExisted: Boolean(existing),
+      provider: result.provider,
+      model: result.model,
+      fastTrack: coverage.allowed,
+      mandateTitle: coverage.allowed && mandate ? mandate.title : undefined,
+    };
   },
 });
 
@@ -412,13 +428,12 @@ export const governorDecide = action({
   },
 });
 
-export const runInstrument = action({
-  args: { proposalId: v.id("evolutionProposals") },
-  handler: async (ctx, { proposalId }): Promise<any> => {
-    const who = await requireAuthority(ctx);
-    const proposal: any = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
-    if (!proposal || proposal.status !== "joint_approved" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt || !proposal.ownerApprovedAt || !proposal.governorApprovedAt || !proposal.chamberOpenedAt) throw new Error("الغرفة السرية مغلقة: المسار غير مكتمل");
-    await ctx.runMutation(internal.governanceStore.markExecuting, { proposalId });
+/**
+ * 🛠️ جسم الأداة الحقيقية المشترك: ينتج الإصدار النهائي ويطبّقه على وحدة
+ * runtime فعلية. يُستخدم من مسار الغرفة السرية ومن مسار التفويض معاً،
+ * بينما تبقى بوابات كل مسار محفوظة على الخادم.
+ */
+async function runSecretInstrument(ctx: any, proposal: any, who: { name: string }) {
     try {
       await ensureAiRuntime(ctx);
       const result = await callLlmDetailed({
@@ -437,7 +452,7 @@ export const runInstrument = action({
       const spec = JSON.parse(match[0]);
       const kind = ["feature", "content", "rule", "integration"].includes(spec.kind) ? spec.kind : "feature";
       const applied = await ctx.runMutation(internal.governanceStore.applyInstrument, {
-        proposalId,
+        proposalId: proposal._id,
         name: String(spec.name || proposal.requestedModule.name).slice(0, 120),
         description: String(spec.description || proposal.requestedModule.description).slice(0, 1200),
         kind,
@@ -449,11 +464,40 @@ export const runInstrument = action({
         evidence: result.text.slice(0, 3000),
         actorName: who.name,
       });
-      return { ok: true, operationId: applied.operationId, provider: result.provider, model: result.model, tokensIn: result.tokensIn, tokensOut: result.tokensOut };
+      return { ok: true, operationId: applied.operationId, path: applied.path, provider: result.provider, model: result.model, tokensIn: result.tokensIn, tokensOut: result.tokensOut };
     } catch (error) {
       const detail = error instanceof Error ? error.message : "فشل غير معروف";
-      await ctx.runMutation(internal.governanceStore.markFailed, { proposalId, error: detail });
-      throw new Error(`توقفت الأداة: ${detail}`);
+      await ctx.runMutation(internal.governanceStore.markFailed, { proposalId: proposal._id, error: detail });
+      throw new Error(`توقفت أداة الحاكم: ${detail}`);
     }
+}
+
+/** مسار الغرفة السرية: التسلسل الكامل (المحكمة ← نائب المالك ← المالك ← الحاكم). */
+export const runInstrument = action({
+  args: { proposalId: v.id("evolutionProposals") },
+  handler: async (ctx, { proposalId }): Promise<any> => {
+    const who = await requireAuthority(ctx);
+    const proposal: any = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
+    if (!proposal || proposal.status !== "joint_approved" || proposal.courtVerdict !== "approved" || !proposal.deputyApprovedAt || !proposal.ownerApprovedAt || !proposal.governorApprovedAt || !proposal.chamberOpenedAt) throw new Error("الغرفة السرية مغلقة: المسار غير مكتمل");
+    await ctx.runMutation(internal.governanceStore.markExecuting, { proposalId });
+    return await runSecretInstrument(ctx, proposal, who);
+  },
+});
+
+/**
+ * 🕊️ التنفيذ المفوّض (الميزة الجديدة): ينفّذ طلب الحاكم بعد قرار المحكمة
+ * بموجب تفويض سارٍ من المالك، مع إعادة تحقق حيّة من التجميد والهدف المحمي
+ * وسقف الخطر والقائمة البيضاء والرصيد عند لحظة التنفيذ نفسها.
+ */
+export const governorMandateExecute = action({
+  args: { proposalId: v.id("evolutionProposals") },
+  handler: async (ctx, { proposalId }): Promise<any> => {
+    const who = await requireAuthority(ctx);
+    const proposal: any = await ctx.runQuery(internal.governanceStore.getProposal, { proposalId });
+    if (!proposal) throw new Error("الطلب غير موجود");
+    if (!proposal.mandateId) throw new Error("هذا الطلب غير مرتبط بتفويض المالك");
+    if (proposal.status !== "mandate_approved") throw new Error("الطلب ليس جاهزاً للتنفيذ المفوّض");
+    await ctx.runMutation(internal.governanceStore.markExecutingViaMandate, { proposalId });
+    return await runSecretInstrument(ctx, proposal, who);
   },
 });

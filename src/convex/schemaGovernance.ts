@@ -16,6 +16,45 @@ export const governanceTables = {
     updatedAt: v.number(),
   }).index("by_key", ["key"]),
 
+  /**
+   * 🕊️ تفويض الحاكم السيادي: سلطة جذرية ممنوحة من المالك، محدودة النطاق والرصيد والزمن،
+   * وقابلة للسحب فوراً. لا تشمل الإنتاج/الكود/المفاتيح أبداً — تلك تبقى في مسار الموافقة الفردية.
+   */
+  evolutionMandates: defineTable({
+    title: v.string(),
+    grantedById: v.id("users"),
+    grantedByName: v.string(),
+    operations: v.array(v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct"))),
+    /** قائمة بيضاء لمفاتيح الوحدات — فارغة تعني كل وحدات runtime المسموحة عدا المحمية */
+    moduleAllowlist: v.array(v.string()),
+    maxRisk: v.union(v.literal("low"), v.literal("medium"), v.literal("critical")),
+    /** رصيد التنفيذ الكلي تحت هذا التفويض — لا يُتجدد تلقائياً */
+    quota: v.number(),
+    usedCount: v.number(),
+    status: v.union(v.literal("active"), v.literal("revoked"), v.literal("expired")),
+    expiresAt: v.number(),
+    reason: v.string(),
+    revokedAt: v.optional(v.number()),
+    revokeReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_status", ["status", "createdAt"]),
+
+  /** حالة سلطة الحاكم: مفتاح تجميد فوري + عدّادات حقيقية من قاعدة البيانات */
+  evolutionGovernorState: defineTable({
+    scope: v.string(),
+    frozen: v.boolean(),
+    frozenReason: v.optional(v.string()),
+    frozenAt: v.optional(v.number()),
+    frozenBy: v.optional(v.string()),
+    executions: v.number(),
+    mandateExecutions: v.number(),
+    chamberExecutions: v.number(),
+    rollbacks: v.number(),
+    lastExecutionAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index("by_scope", ["scope"]),
+
   evolutionIntegrations: defineTable({
     key: v.string(),
     name: v.string(),
@@ -42,7 +81,7 @@ export const governanceTables = {
     requestedModule: v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() }),
     status: v.union(
       v.literal("court_review"), v.literal("court_deliberating"), v.literal("court_conditional"), v.literal("court_rejected"), v.literal("awaiting_deputy"),
-      v.literal("awaiting_owner"), v.literal("awaiting_governor"), v.literal("joint_approved"), v.literal("executing"),
+      v.literal("awaiting_owner"), v.literal("awaiting_governor"), v.literal("joint_approved"), v.literal("mandate_approved"), v.literal("executing"),
       v.literal("executed"), v.literal("failed"), v.literal("cancelled"),
     ),
     courtVerdict: v.optional(v.union(v.literal("approved"), v.literal("rejected"), v.literal("conditional"))),
@@ -56,8 +95,13 @@ export const governanceTables = {
     deputyReason: v.optional(v.string()),
     ownerApprovedAt: v.optional(v.number()),
     ownerReason: v.optional(v.string()),
-    ownerGrantScope: v.optional(v.union(v.literal("deputy_request"), v.literal("governor_request"), v.literal("mind_hub_request"))),
+    ownerGrantScope: v.optional(v.union(v.literal("deputy_request"), v.literal("governor_request"), v.literal("mandate"), v.literal("mind_hub_request"))),
     ownerVerdictAt: v.optional(v.number()),
+    /** التفويض السارٍ الذي أجاز هذا الطلب (مسار الحاكم السريع) */
+    mandateId: v.optional(v.id("evolutionMandates")),
+    /** نُقض التنفيذ واستُعيد الإصدار السابق — نقض حقيقي قابل للتدقيق */
+    revertedAt: v.optional(v.number()),
+    revertOperationId: v.optional(v.id("evolutionOperations")),
     governorApprovedAt: v.optional(v.number()),
     governorReason: v.optional(v.string()),
     chamberOpenedAt: v.optional(v.number()),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chamberGate, deputySelfReviewGate, deriveCourtVerdict, governorOwnerGrantGate, governorSelfReviewGate, governorToolTargetGate, instrumentGate } from "../convex/governanceCore";
+import { chamberGate, deputySelfReviewGate, deriveCourtVerdict, governorFreezeGate, governorOwnerGrantGate, governorSelfReviewGate, governorToolTargetGate, instrumentGate, mandateGate, protectedTargetGate, sovereignExecutionGate } from "../convex/governanceCore";
 
 const complete = {
   status: "executing",
@@ -35,6 +35,68 @@ describe("Secret chamber gate", () => {
 
   it("opens only after Court, Deputy, Owner and Governor approval", () => {
     expect(chamberGate({ ...complete, status: "joint_approved" }).allowed).toBe(true);
+  });
+});
+
+describe("Sovereign mandate gate", () => {
+  const mandate = { status: "active", operations: ["modify", "construct"], moduleAllowlist: [], maxRisk: "medium", quota: 3, usedCount: 0, expiresAt: 1_000 };
+  const ask = { operation: "modify", targetKey: "arena_rules", risk: "low" };
+
+  it("allows a request inside the mandate boundary", () => {
+    expect(mandateGate(mandate, ask, 500).allowed).toBe(true);
+  });
+
+  it("blocks a missing, expired or revoked mandate", () => {
+    expect(mandateGate(null, ask, 500).allowed).toBe(false);
+    expect(mandateGate(mandate, ask, 2_000).allowed).toBe(false);
+    expect(mandateGate({ ...mandate, status: "revoked" }, ask, 500).allowed).toBe(false);
+  });
+
+  it("blocks operations, targets and risk levels beyond the grant", () => {
+    expect(mandateGate(mandate, { ...ask, operation: "delete" }, 500).allowed).toBe(false);
+    expect(mandateGate({ ...mandate, moduleAllowlist: ["other_key"] }, ask, 500).allowed).toBe(false);
+    expect(mandateGate(mandate, { ...ask, risk: "critical" }, 500).allowed).toBe(false);
+  });
+
+  it("blocks once the execution quota is exhausted", () => {
+    expect(mandateGate({ ...mandate, usedCount: 3 }, ask, 500).allowed).toBe(false);
+  });
+});
+
+describe("Absolute governor boundaries", () => {
+  it("keeps production, code, keys and database targets out of reach", () => {
+    for (const key of ["production_flags", "main_branch_rules", "api_keys_pool", "database_schema", "deploy_pipeline", "env_secrets"]) {
+      expect(protectedTargetGate(key).allowed).toBe(false);
+    }
+    expect(protectedTargetGate("arena_rules").allowed).toBe(true);
+  });
+
+  it("stops every path while the governor is frozen", () => {
+    expect(governorFreezeGate({ frozen: true, frozenReason: "مراجعة" }).allowed).toBe(false);
+    expect(governorFreezeGate({ frozen: false }).allowed).toBe(true);
+    expect(governorFreezeGate(null).allowed).toBe(true);
+  });
+});
+
+describe("Sovereign execution gate", () => {
+  const proposal = { status: "executing", courtVerdict: "approved", targetKey: "arena_rules", operation: "modify", risk: "low", mandateId: "m1" };
+  const mandate = { status: "active", operations: ["modify"], moduleAllowlist: [], maxRisk: "medium", quota: 2, usedCount: 0, expiresAt: 5_000 };
+
+  it("uses the mandate path only with court approval and a live mandate", () => {
+    expect(sovereignExecutionGate({ proposal, mandate, state: null, now: 1_000 }).path).toBe("mandate");
+    expect(sovereignExecutionGate({ proposal: { ...proposal, courtVerdict: "conditional" }, mandate, state: null, now: 1_000 }).allowed).toBe(false);
+    expect(sovereignExecutionGate({ proposal, mandate: null, state: null, now: 1_000 }).allowed).toBe(false);
+  });
+
+  it("denies everything while frozen or aimed at a protected target", () => {
+    expect(sovereignExecutionGate({ proposal, mandate, state: { frozen: true, frozenReason: "طوارئ" }, now: 1_000 }).allowed).toBe(false);
+    expect(sovereignExecutionGate({ proposal: { ...proposal, targetKey: "production_flags" }, mandate, state: null, now: 1_000 }).allowed).toBe(false);
+  });
+
+  it("still requires the full chamber chain when there is no mandate", () => {
+    const chamberProposal = { status: "executing", courtVerdict: "approved", targetKey: "arena_rules", deputyApprovedAt: 1, ownerApprovedAt: 2, governorApprovedAt: 3, chamberOpenedAt: 4 };
+    expect(sovereignExecutionGate({ proposal: chamberProposal, mandate: null, state: null, now: 1_000 }).path).toBe("chamber");
+    expect(sovereignExecutionGate({ proposal: { ...chamberProposal, ownerApprovedAt: undefined }, mandate: null, state: null, now: 1_000 }).allowed).toBe(false);
   });
 });
 

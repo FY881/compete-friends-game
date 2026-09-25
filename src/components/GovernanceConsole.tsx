@@ -8,7 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Gavel, LockKeyhole, Play, ShieldCheck, Sparkles, Bot, CheckCircle2, Radio, GitBranch } from "lucide-react";
+import { Gavel, LockKeyhole, Play, ShieldCheck, Sparkles, Bot, CheckCircle2, Radio, GitBranch, Power, Undo2 } from "lucide-react";
+
+const MANDATE_OPS = ["create", "modify", "construct", "delete"] as const;
+type MandateRisk = "low" | "medium" | "critical";
 
 export function GovernanceConsole() {
   const data = useQuery(api.governanceStore.listConsole);
@@ -25,6 +28,14 @@ export function GovernanceConsole() {
   const governorPropose = useAction(api.governance.governorPropose);
   const ownerGovernor = useAction(api.governance.ownerGovernorDecide);
   const resolveConditions = useAction(api.governance.resolveConditions);
+  const mandateExecute = useAction(api.governance.governorMandateExecute);
+  const mandateState = useQuery(api.governanceStore.mandateState);
+  const grantMandateMut = useMutation(api.governanceStore.grantMandate);
+  const revokeMandateMut = useMutation(api.governanceStore.revokeMandate);
+  const freezeMut = useMutation(api.governanceStore.setGovernorFreeze);
+  const rollbackMut = useMutation(api.governanceStore.rollbackExecution);
+  const [freezeReason, setFreezeReason] = useState("");
+  const [mf, setMf] = useState({ title: "", allowlist: "", quota: "3", hours: "24", ops: ["modify", "construct"] as string[], maxRisk: "medium" as MandateRisk, reason: "" });
   const githubEvolution = useAction(api.githubEvolution.createEvolutionPullRequest);
   const [brief, setBrief] = useState("");
   const [govOp, setGovOp] = useState<"create" | "modify" | "delete" | "construct">("modify");
@@ -68,8 +79,10 @@ export function GovernanceConsole() {
   async function proposeAsGovernor() {
     setBusy("governor-propose");
     try {
-      await governorPropose({ brief, operation: govOp, targetKey: govTarget.trim() || undefined });
-      toast.success("أعد الحاكم طلبه بالأداة الحقيقية وأرسله إلى المحكمة");
+      const res = await governorPropose({ brief, operation: govOp, targetKey: govTarget.trim() || undefined });
+      toast.success(res?.fastTrack
+        ? `الطلب داخل تفويضك «${res.mandateTitle ?? ""}» — سينفّذ بعد قرار المحكمة دون إعادة إذن فردي`
+        : "أعد الحاكم طلبه بالأداة الحقيقية وأرسله إلى المحكمة (تسلسل كامل)");
       setBrief("");
     } catch (e) { toast.error(e instanceof Error ? e.message : "فشل اقتراح الحاكم"); }
     finally { setBusy(""); }
@@ -175,7 +188,69 @@ export function GovernanceConsole() {
     finally { setBusy(""); }
   }
 
+  async function grantMandate() {
+    if (mf.ops.length === 0) { toast.error("حدد عملية واحدة على الأقل للتفويض"); return; }
+    setBusy("mandate-grant");
+    try {
+      await grantMandateMut({
+        title: mf.title,
+        operations: mf.ops as ("create" | "modify" | "delete" | "construct")[],
+        moduleAllowlist: mf.allowlist.split(",").map((s) => s.trim()).filter(Boolean),
+        maxRisk: mf.maxRisk,
+        quota: Number(mf.quota) || 0,
+        expiresInHours: Number(mf.hours) || 0,
+        reason: mf.reason,
+      });
+      toast.success("مُنح الحاكم تفويضاً حقيقياً بحدوده المسجلة — يُطبَّق فوراً على الخادم");
+      setMf({ title: "", allowlist: "", quota: "3", hours: "24", ops: ["modify", "construct"], maxRisk: "medium", reason: "" });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر منح التفويض"); }
+    finally { setBusy(""); }
+  }
+
+  async function revokeMandateNow(mandateId: Id<"evolutionMandates">) {
+    const reason = window.prompt("سبب سحب التفويض من الحاكم:");
+    if (reason === null) return;
+    if (reason.trim().length < 10) { toast.error("اكتب سبباً واضحاً لا يقل عن ١٠ أحرف"); return; }
+    setBusy("mandate-revoke");
+    try { await revokeMandateMut({ mandateId, reason: reason.trim() }); toast.success("سُحب التفويض — توقفت كل عمليات الحاكم المفوّضة فوراً"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "تعذر سحب التفويض"); }
+    finally { setBusy(""); }
+  }
+
+  async function toggleFreeze(frozen: boolean) {
+    if (frozen && freezeReason.trim().length < 10) { toast.error("اكتب سبب التجميد (١٠ أحرف على الأقل)"); return; }
+    setBusy("freeze");
+    try { await freezeMut({ frozen, reason: freezeReason.trim() }); toast.success(frozen ? "جُمّدت سلطة الحاكم فوراً (المساران معاً)" : "رُفع التجميد عن سلطة الحاكم"); setFreezeReason(""); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "تعذر تغيير حالة التجميد"); }
+    finally { setBusy(""); }
+  }
+
+  async function runMandate(proposalId: Id<"evolutionProposals">) {
+    setBusy(`mandate-run:${proposalId}`);
+    try { await mandateExecute({ proposalId }); toast.success("نُفّذ التعديل فعلياً على وحدة runtime بموجب تفويضك"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "تعذر التنفيذ المفوّض"); }
+    finally { setBusy(""); }
+  }
+
+  async function rollback(proposalId: Id<"evolutionProposals">) {
+    const reason = window.prompt("سبب نقض التنفيذ واستعادة الإصدار السابق فعلياً:");
+    if (reason === null) return;
+    if (reason.trim().length < 10) { toast.error("اكتب سبباً واضحاً لا يقل عن ١٠ أحرف"); return; }
+    setBusy(`rollback:${proposalId}`);
+    try {
+      const res = await rollbackMut({ proposalId, reason: reason.trim() });
+      toast.success(res.outcome === "rollback_deleted" ? "نُقض الإنشاء وحُذفت الوحدة من runtime" : "استُعيد الإصدار السابق من اللقطة المخزنة");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر النقض"); }
+    finally { setBusy(""); }
+  }
+
   if (data === null) return <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">هذا المسار محجوز لمالك اللعبة ونائب المالك.</CardContent></Card>;
+
+  const mandate = mandateState?.active ?? null;
+  const govState = mandateState?.governor;
+  const mandates = mandateState?.mandates ?? [];
+  const isOwner = mandateState?.isOwner ?? false;
+  const mandateHoursLeft = mandate ? Math.max(0, Math.round((mandate.expiresAt - Date.now()) / 3600_000)) : 0;
 
   return (
     <div dir="rtl" className="space-y-5">
@@ -249,6 +324,10 @@ export function GovernanceConsole() {
             {p.status === "awaiting_governor" && <Button size="sm" onClick={() => step("governor", p._id)} disabled={busy === `governor:${p._id}`}><ShieldCheck className="size-4" />قرار الحاكم</Button>}
             {p.status === "joint_approved" && <Button size="sm" onClick={() => step("run", p._id)} disabled={busy === `run:${p._id}`}><Play className="size-4" />تشغيل الأداة</Button>}
             {p.status === "joint_approved" && <Button size="sm" variant="outline" onClick={() => openEvolutionPullRequest(p._id)} disabled={busy === `github:${p._id}`}><GitBranch className="size-4" />فتح Pull Request آمن</Button>}
+            {p.status === "mandate_approved" && <Button size="sm" onClick={() => runMandate(p._id)} disabled={busy === `mandate-run:${p._id}`}><Power className="size-4" />تنفيذ الحاكم بموجب تفويضك</Button>}
+            {p.status === "executed" && !p.revertedAt && <Button size="sm" variant="outline" onClick={() => rollback(p._id)} disabled={busy === `rollback:${p._id}`}><Undo2 className="size-4" />نقض واسترجاع الإصدار السابق</Button>}
+            {p.revertedAt && <Badge variant="outline" className="border-rose-500/50 text-rose-600">منقوض — استُعيد الإصدار السابق</Badge>}
+            {p.mandateId && <Badge variant="outline" className="border-amber-500/50 text-amber-700">مفوّض</Badge>}
           </div></div>)}
         </CardContent></Card>
         <Card><CardHeader><CardTitle className="flex items-center gap-2"><LockKeyhole className="size-5" />سجل الغرفة السرية</CardTitle></CardHeader><CardContent className="max-h-[560px] space-y-2 overflow-auto">
@@ -257,6 +336,94 @@ export function GovernanceConsole() {
       </div>
 
       <Card><CardHeader><CardTitle>عمليات موثّقة</CardTitle></CardHeader><CardContent className="space-y-2">{data?.operations.map((o: any) => <div key={o._id} className="flex items-center gap-2 rounded-lg border p-3 text-sm"><CheckCircle2 className="size-4 text-emerald-600" /><b>{o.operation}</b><span>{o.targetKey}</span><span className="ms-auto text-xs text-muted-foreground">{o.provider}/{o.model} · {o.tokensIn}+{o.tokensOut} tokens</span></div>)}</CardContent></Card>
+
+      {/* 🕊️ سلطة الحاكم السيادية: تفويض حقيقي + تجميد فوري + عدّادات من قاعدة البيانات */}
+      <Card className="border-amber-500/40">
+        <CardHeader><CardTitle className="flex items-center gap-2"><Power className="size-5 text-amber-600" />سلطة الحاكم السيادية — تفويض، تجميد، ونقض</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 text-xs sm:grid-cols-4">
+            {[["تنفيذات كلية", govState?.executions ?? 0], ["بموجب التفويض", govState?.mandateExecutions ?? 0], ["عبر الغرفة السرية", govState?.chamberExecutions ?? 0], ["عمليات نقض", govState?.rollbacks ?? 0]].map(([label, value]) => (
+              <div key={String(label)} className="rounded-xl border bg-muted/20 p-3">
+                <p className="text-muted-foreground">{label}</p>
+                <p className="text-lg font-black">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 text-xs ${govState?.frozen ? "border-rose-500/50 bg-rose-500/10" : "border-emerald-500/40 bg-emerald-500/5"}`}>
+            <ShieldCheck className="size-4" />
+            <span className="font-bold">{govState?.frozen ? `سلطة الحاكم مجمّدة — ${govState.frozenReason}` : "سلطة الحاكم فعّالة"}</span>
+            {isOwner && (
+              <div className="ms-auto flex flex-wrap items-center gap-2">
+                <Input value={freezeReason} onChange={(e) => setFreezeReason(e.target.value)} placeholder="سبب التجميد (١٠ أحرف)" className="h-8 w-56 text-xs" />
+                {govState?.frozen
+                  ? <Button size="sm" variant="outline" onClick={() => toggleFreeze(false)} disabled={busy === "freeze"}>رفع التجميد</Button>
+                  : <Button size="sm" variant="destructive" onClick={() => toggleFreeze(true)} disabled={busy === "freeze"}><Power className="size-4" />تجميد فوري</Button>}
+              </div>
+            )}
+          </div>
+
+          {mandate ? (
+            <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <b className="text-sm">{mandate.title}</b>
+                <Badge variant="outline">{mandate.expired ? "منتهٍ" : `ينتهي بعد ${mandateHoursLeft} ساعة`}</Badge>
+                <Badge variant="outline">رصيد متبقٍ {mandate.remaining}/{mandate.quota}</Badge>
+                <Badge variant="outline">سقف الخطر: {mandate.maxRisk}</Badge>
+                <Badge variant="outline">عمليات: {mandate.operations.join(" / ")}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">القائمة البيضاء: {mandate.moduleAllowlist.length > 0 ? mandate.moduleAllowlist.join(", ") : "كل وحدات runtime المسموحة (عدا الأهداف المحمية)"}</p>
+              <p className="text-xs text-muted-foreground">سبب المنح: {mandate.reason}</p>
+              {isOwner && <Button size="sm" variant="destructive" onClick={() => revokeMandateNow(mandate._id)} disabled={busy === "mandate-revoke"}>سحب التفويض فوراً</Button>}
+            </div>
+          ) : (
+            <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
+              لا يوجد تفويض سارٍ — كل طلب من الحاكم يمر بالتسلسل الكامل مع إذنك الفردي لكل تعديل.
+            </p>
+          )}
+
+          {isOwner && (
+            <div className="space-y-3 rounded-xl border p-4">
+              <p className="text-xs font-semibold text-muted-foreground">منح تفويض جديد للحاكم — لا يشمل الإنتاج ولا الكود ولا المفاتيح ولا قاعدة البيانات أبداً</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Input value={mf.title} onChange={(e) => setMf({ ...mf, title: e.target.value })} placeholder="عنوان التفويض (مثال: مرسوم ضبط الوحدات الأسبوعي)" />
+                <Input value={mf.allowlist} onChange={(e) => setMf({ ...mf, allowlist: e.target.value })} placeholder="مفاتيح وحدات مسموحة، بفاصلة (فارغة = الكل عدا المحمية)" />
+                <Input type="number" value={mf.quota} onChange={(e) => setMf({ ...mf, quota: e.target.value })} placeholder="رصيد التنفيذ (1–50)" />
+                <Input type="number" value={mf.hours} onChange={(e) => setMf({ ...mf, hours: e.target.value })} placeholder="المدة بالساعات (1–720)" />
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                {MANDATE_OPS.map((op) => (
+                  <label key={op} className="flex items-center gap-1.5">
+                    <input type="checkbox" checked={mf.ops.includes(op)} onChange={() => setMf({ ...mf, ops: mf.ops.includes(op) ? mf.ops.filter((x) => x !== op) : [...mf.ops, op] })} />
+                    {op}
+                  </label>
+                ))}
+                <select value={mf.maxRisk} onChange={(e) => setMf({ ...mf, maxRisk: e.target.value as MandateRisk })} className="ms-auto h-8 rounded-md border border-input bg-background px-2 text-xs">
+                  <option value="low">أقصى خطر: منخفض</option>
+                  <option value="medium">أقصى خطر: متوسط</option>
+                  <option value="critical">أقصى خطر: حرج</option>
+                </select>
+              </div>
+              <Textarea value={mf.reason} onChange={(e) => setMf({ ...mf, reason: e.target.value })} placeholder="سبب منح التفويض (٢٠ حرفاً على الأقل) — يُسجَّل في الغرفة السرية" />
+              <Button onClick={grantMandate} disabled={busy === "mandate-grant"}><Power className="size-4" />منح التفويض</Button>
+            </div>
+          )}
+
+          {mandates.length > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground">سجل التفويضات ({mandates.length})</summary>
+              <div className="mt-2 space-y-1">
+                {mandates.map((m: any) => (
+                  <p key={m._id} className="rounded border p-2">
+                    <b>{m.title}</b> — {m.status} — نُفّذ {m.usedCount}/{m.quota} — ينتهي {new Date(m.expiresAt).toLocaleString("ar-EG")}
+                    {m.revokeReason ? ` — السبب: ${m.revokeReason}` : ""}
+                  </p>
+                ))}
+              </div>
+            </details>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

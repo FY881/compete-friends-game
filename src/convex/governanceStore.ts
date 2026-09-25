@@ -3,7 +3,38 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { isOwnerUser } from "./owner";
 import { AI_REGISTRY } from "./aiRegistry";
-import { chamberGate, deputySelfReviewGate, governorOwnerGrantGate, governorSelfReviewGate, instrumentGate } from "./governanceCore";
+import { chamberGate, deputySelfReviewGate, governorFreezeGate, governorOwnerGrantGate, governorSelfReviewGate, mandateGate, protectedTargetGate, sovereignExecutionGate } from "./governanceCore";
+
+const GOVERNOR_SCOPE = "sovereign_governor";
+
+/** يقرأ صف حالة سلطة الحاكم بلا إنشاء (آمن داخل الاستعلامات). */
+async function readGovernorState(ctx: any) {
+  return await ctx.db.query("evolutionGovernorState").withIndex("by_scope", (q: any) => q.eq("scope", GOVERNOR_SCOPE)).first();
+}
+
+/** يقرأ أو ينشئ صف حالة الحاكم — داخل الطفرات فقط. */
+async function ensureGovernorState(ctx: any) {
+  const existing = await readGovernorState(ctx);
+  if (existing) return existing;
+  const now = Date.now();
+  const id = await ctx.db.insert("evolutionGovernorState", { scope: GOVERNOR_SCOPE, frozen: false, executions: 0, mandateExecutions: 0, chamberExecutions: 0, rollbacks: 0, updatedAt: now });
+  return await ctx.db.get(id);
+}
+
+/** عدّادات حقيقية مشتقة من قاعدة البيانات — لا أرقام وهمية. */
+async function bumpGovernorState(ctx: any, delta: { executions?: number; mandateExecutions?: number; chamberExecutions?: number; rollbacks?: number; lastExecutionAt?: number }) {
+  const state = await ensureGovernorState(ctx);
+  if (!state) return;
+  const now = Date.now();
+  await ctx.db.patch(state._id, {
+    executions: state.executions + (delta.executions ?? 0),
+    mandateExecutions: state.mandateExecutions + (delta.mandateExecutions ?? 0),
+    chamberExecutions: state.chamberExecutions + (delta.chamberExecutions ?? 0),
+    rollbacks: state.rollbacks + (delta.rollbacks ?? 0),
+    lastExecutionAt: delta.lastExecutionAt ?? state.lastExecutionAt,
+    updatedAt: now,
+  });
+}
 
 async function actor(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -122,11 +153,11 @@ export const getGovernanceActor = internalQuery({
 });
 
 export const insertGovernorProposal = internalMutation({
-  args: { authorId: v.id("users"), title: v.string(), operation: v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct")), targetKey: v.string(), summary: v.string(), rationale: v.string(), risk: v.union(v.literal("low"), v.literal("medium"), v.literal("critical")), requestedModule: v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() }) },
+  args: { authorId: v.id("users"), title: v.string(), operation: v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct")), targetKey: v.string(), summary: v.string(), rationale: v.string(), risk: v.union(v.literal("low"), v.literal("medium"), v.literal("critical")), requestedModule: v.object({ name: v.string(), description: v.string(), kind: v.string(), config: v.string() }), mandateId: v.optional(v.id("evolutionMandates")) },
   handler: async (ctx, a) => {
     const now = Date.now();
     const id = await ctx.db.insert("evolutionProposals", { ...a, proposerRole: "sovereign_governor", status: "court_review", createdAt: now, updatedAt: now });
-    await ctx.db.insert("secretChamberAudit", { proposalId: id, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: "proposal_created", detail: `${a.operation}: ${a.targetKey}`, at: now });
+    await ctx.db.insert("secretChamberAudit", { proposalId: id, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: a.mandateId ? "proposal_created_under_mandate" : "proposal_created", detail: `${a.operation}: ${a.targetKey}${a.mandateId ? " — داخل تفويض المالك" : ""}`, at: now });
     return id;
   },
 });
@@ -267,7 +298,10 @@ export const recordCourtDecision = internalMutation({
     const current = await ctx.db.get(a.proposalId);
     if (!current || current.status !== "court_deliberating") throw new Error("جلسة المحكمة غير صالحة");
     const now = Date.now();
-    const status = a.verdict === "approved" ? "awaiting_deputy" : a.verdict === "conditional" ? "court_conditional" : "court_rejected";
+    // مسار التفويض: قرار المحكمة كافٍ للانتقال إلى التنفيذ السريع (إذن المالك ممنوح مسبقاً بالتفويض)
+    const status = a.verdict === "approved"
+      ? (current.mandateId ? "mandate_approved" : "awaiting_deputy")
+      : a.verdict === "conditional" ? "court_conditional" : "court_rejected";
     await ctx.db.patch(a.proposalId, { courtVerdict: a.verdict, courtSummary: a.summary, courtReviews: a.reviews as any[], courtConditions: a.conditions, courtAt: now, status, updatedAt: now, lastError: a.verdict === "rejected" ? a.summary : undefined });
     await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: a.actorName, actorRole: "system", action: `court_${a.verdict}`, detail: a.summary, at: now });
   },
@@ -320,17 +354,253 @@ export const recordRejection = internalMutation({
   },
 });
 
-export const markExecuting = internalMutation({ args: { proposalId: v.id("evolutionProposals") }, handler: async (ctx, a) => { const p = await ctx.db.get(a.proposalId); if (!p || !chamberGate(p).allowed) throw new Error("بوابة الغرفة مغلقة"); const now = Date.now(); await ctx.db.patch(a.proposalId, { status: "executing", updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "أداة التطوير", actorRole: "instrument", action: "instrument_started", detail: "طلب API حقيقي بدأ", at: now }); } });
+export const markExecuting = internalMutation({ args: { proposalId: v.id("evolutionProposals") }, handler: async (ctx, a) => {
+  const p = await ctx.db.get(a.proposalId);
+  if (!p) throw new Error("الطلب غير موجود");
+  const freeze = governorFreezeGate(await readGovernorState(ctx));
+  if (!freeze.allowed) throw new Error(freeze.reason);
+  const target = protectedTargetGate(p.targetKey);
+  if (!target.allowed) throw new Error(target.reason);
+  if (!chamberGate(p).allowed) throw new Error("بوابة الغرفة مغلقة");
+  const now = Date.now();
+  await ctx.db.patch(a.proposalId, { status: "executing", updatedAt: now });
+  await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "أداة التطوير", actorRole: "instrument", action: "instrument_started", detail: "طلب API حقيقي بدأ عبر الغرفة السرية", at: now });
+} });
+
+/**
+ * 🕊️ حجز تنفيذ عبر تفويض المالك السارٍ (المسار السريع الجديد).
+ * لا يمنح شيئاً بنفسه: يعيد التحقق حيّاً من التجميد والهدف المحمي وصلاحية
+ * التفويض وقرار المحكمة، ثم يحجز الطلب للتنفيذ الفعلي.
+ */
+export const markExecutingViaMandate = internalMutation({ args: { proposalId: v.id("evolutionProposals") }, handler: async (ctx, a) => {
+  const p = await ctx.db.get(a.proposalId);
+  if (!p) throw new Error("الطلب غير موجود");
+  if (!p.mandateId) throw new Error("هذا الطلب غير مرتبط بتفويض المالك");
+  if (p.status !== "mandate_approved") throw new Error("الطلب ليس في مرحلة التنفيذ المفوّض");
+  const mandate = await ctx.db.get(p.mandateId);
+  const freeze = governorFreezeGate(await readGovernorState(ctx));
+  if (!freeze.allowed) throw new Error(freeze.reason);
+  const target = protectedTargetGate(p.targetKey);
+  if (!target.allowed) throw new Error(target.reason);
+  const coverage = mandateGate(mandate, { operation: p.operation, targetKey: p.targetKey, risk: p.risk }, Date.now());
+  if (!coverage.allowed) throw new Error(coverage.reason);
+  if (p.courtVerdict !== "approved") throw new Error("التفويض لا يُغني عن قرار المحكمة");
+  const now = Date.now();
+  await ctx.db.patch(a.proposalId, { status: "executing", updatedAt: now, lastError: undefined });
+  await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "الحاكم السيادي", actorRole: "sovereign_governor", action: "mandate_execution_claimed", detail: `تفويض ${p.mandateId} — ${p.operation}: ${p.targetKey}`, at: now });
+} });
 export const markFailed = internalMutation({ args: { proposalId: v.id("evolutionProposals"), error: v.string() }, handler: async (ctx, a) => { const now = Date.now(); await ctx.db.patch(a.proposalId, { status: "failed", lastError: a.error, updatedAt: now }); await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: "أداة التطوير", actorRole: "instrument", action: "instrument_failed", detail: a.error, at: now }); } });
 export const applyInstrument = internalMutation({ args: { proposalId: v.id("evolutionProposals"), name: v.string(), description: v.string(), kind: v.string(), config: v.string(), provider: v.string(), model: v.string(), tokensIn: v.number(), tokensOut: v.number(), evidence: v.string(), actorName: v.string() }, handler: async (ctx, a) => {
-  const p = await ctx.db.get(a.proposalId); if (!p || !instrumentGate(p).allowed) throw new Error("بوابة الأداة مغلقة");
+  const p = await ctx.db.get(a.proposalId); if (!p) throw new Error("الطلب غير موجود");
+  const mandateRow = p.mandateId ? await ctx.db.get(p.mandateId) : null;
+  const execGate = sovereignExecutionGate({ proposal: p, mandate: mandateRow, state: await readGovernorState(ctx), now: Date.now() });
+  if (!execGate.allowed) throw new Error(execGate.reason);
   const now = Date.now(); const existing = await ctx.db.query("evolutionModules").withIndex("by_key", (q: any) => q.eq("key", p.targetKey)).first();
   let before: string | undefined; let outcome: string;
   if (p.operation === "delete") { if (!existing) throw new Error("الوحدة غير موجودة"); before = JSON.stringify(existing); await ctx.db.delete(existing._id); outcome = "deleted"; }
   else if (p.operation === "modify" || p.operation === "construct") { if (!existing) throw new Error("الوحدة غير موجودة للتعديل"); before = JSON.stringify(existing); await ctx.db.patch(existing._id, { name: a.name, description: a.description, kind: a.kind as any, config: a.config, version: existing.version + 1, updatedAt: now }); outcome = "updated"; }
   else { if (existing) throw new Error("مفتاح الوحدة مستخدم"); await ctx.db.insert("evolutionModules", { key: p.targetKey, name: a.name, description: a.description, kind: a.kind as any, status: "active", config: a.config, version: 1, sourceProposal: a.proposalId, createdAt: now, updatedAt: now }); outcome = "created"; }
   const operationId = await ctx.db.insert("evolutionOperations", { proposalId: a.proposalId, operation: outcome, targetKey: p.targetKey, before, after: JSON.stringify({ name: a.name, description: a.description, kind: a.kind, config: a.config }), provider: a.provider, model: a.model, apiVerified: true, tokensIn: a.tokensIn, tokensOut: a.tokensOut, result: outcome, evidence: a.evidence, at: now });
-  await ctx.db.patch(a.proposalId, { status: "executed", executedAt: now, executionId: operationId, updatedAt: now, lastError: undefined });
-  await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: a.actorName, actorRole: "instrument", action: `instrument_${outcome}`, detail: `${a.provider}/${a.model} — ${a.tokensIn}+${a.tokensOut} tokens — ${operationId}`, at: now });
-  return { operationId };
+  await ctx.db.patch(a.proposalId, { status: "executed", executedAt: now, executionId: operationId, updatedAt: now, lastError: undefined, ownerGrantScope: p.mandateId ? "mandate" : p.ownerGrantScope });
+  // استهلاك رصيد التفويض عند التنفيذ الفعلي فقط — لا يُستهلك على محاولة فاشلة
+  if (p.mandateId && mandateRow) await ctx.db.patch(p.mandateId, { usedCount: mandateRow.usedCount + 1, updatedAt: now });
+  await bumpGovernorState(ctx, { executions: 1, mandateExecutions: p.mandateId ? 1 : 0, chamberExecutions: p.mandateId ? 0 : 1, lastExecutionAt: now });
+  await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: a.actorName, actorRole: "instrument", action: `instrument_${outcome}`, detail: `${execGate.path === "mandate" ? "بموجب التفويض — " : "بموجب الغرفة السرية — "}${a.provider}/${a.model} — ${a.tokensIn}+${a.tokensOut} tokens — ${operationId}`, at: now });
+  return { operationId, path: execGate.path };
 } });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🕊️ سلطة الحاكم السيادية الموسّعة: تفويض من المالك + تجميد فوري + نقض حقيقي
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function requireOwner(ctx: any) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("تسجيل الدخول مطلوب");
+  const user = await ctx.db.get(userId);
+  if (!user || !isOwnerUser(user)) throw new Error("هذه الصلاحية لمالك اللعبة وحده");
+  return { userId, name: user.name ?? "المالك" };
+}
+
+/** التفويض السارٍ الوحيد للحاكم — يُقرأ داخل المسارات الحسّاسة. */
+export const getActiveMandate = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("evolutionMandates").withIndex("by_status", (q: any) => q.eq("status", "active")).order("desc").first();
+  },
+});
+
+/** حالة التجميد فقط — تُفحص قبل كل حجز تنفيذ. */
+export const getGovernorState = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const state = await readGovernorState(ctx);
+    return { frozen: Boolean(state?.frozen), frozenReason: state?.frozenReason ?? "" };
+  },
+});
+
+/** لوحة سلطة الحاكم: التفويض + التجميد + عدّادات حقيقية من قاعدة البيانات. */
+export const mandateState = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    const deputy = await ctx.db.query("siteRoles").withIndex("by_user", (q: any) => q.eq("userId", userId)).first();
+    const isOwner = isOwnerUser(user);
+    if (!isOwner && !(deputy?.active && deputy.role === "deputy_owner")) return null;
+    const active = await ctx.db.query("evolutionMandates").withIndex("by_status", (q: any) => q.eq("status", "active")).order("desc").first();
+    const mandates = await ctx.db.query("evolutionMandates").order("desc").take(10);
+    const state = await readGovernorState(ctx);
+    const now = Date.now();
+    return {
+      isOwner,
+      active: active
+        ? { ...active, expired: active.expiresAt <= now, remaining: Math.max(0, active.quota - active.usedCount) }
+        : null,
+      mandates,
+      governor: {
+        frozen: Boolean(state?.frozen),
+        frozenReason: state?.frozenReason ?? "",
+        frozenAt: state?.frozenAt ?? null,
+        executions: state?.executions ?? 0,
+        mandateExecutions: state?.mandateExecutions ?? 0,
+        chamberExecutions: state?.chamberExecutions ?? 0,
+        rollbacks: state?.rollbacks ?? 0,
+        lastExecutionAt: state?.lastExecutionAt ?? null,
+      },
+      now,
+    };
+  },
+});
+
+/**
+ * 🕊️ منح الحاكم تفويضاً حقيقياً: نطاق عمليات + قائمة وحدات بيضاء + سقف خطر +
+ * رصيد تنفيذ + انتهاء زمني. لا يشمل أبداً أهدافاً محمية (إنتاج/كود/مفاتيح).
+ */
+export const grantMandate = mutation({
+  args: {
+    title: v.string(),
+    operations: v.array(v.union(v.literal("create"), v.literal("modify"), v.literal("delete"), v.literal("construct"))),
+    moduleAllowlist: v.array(v.string()),
+    maxRisk: v.union(v.literal("low"), v.literal("medium"), v.literal("critical")),
+    quota: v.number(),
+    expiresInHours: v.number(),
+    reason: v.string(),
+  },
+  handler: async (ctx, a) => {
+    const who = await requireOwner(ctx);
+    if (a.title.trim().length < 5) throw new Error("عنوان التفويض قصير");
+    if (a.reason.trim().length < 20) throw new Error("اكتب سبباً واضحاً للتفويض (٢٠ حرفاً على الأقل)");
+    if (a.operations.length === 0) throw new Error("حدد عملية واحدة على الأقل للتفويض");
+    if (a.quota < 1 || a.quota > 50) throw new Error("الرصيد يجب أن يكون بين ١ و٥٠ تنفيذاً");
+    if (a.expiresInHours < 1 || a.expiresInHours > 720) throw new Error("المدة يجب أن تكون بين ساعة و٧٢٠ ساعة");
+    const allowlist = a.moduleAllowlist.map((key) => key.trim().toLowerCase()).filter(Boolean);
+    for (const key of allowlist) {
+      const gate = protectedTargetGate(key);
+      if (!gate.allowed) throw new Error(`${key}: ${gate.reason}`);
+    }
+    const now = Date.now();
+    // تفويض سارٍ واحد فقط: منح تفويض جديد يسحب الأقدم تلقائياً لتفادي أي غموض.
+    const previous = await ctx.db.query("evolutionMandates").withIndex("by_status", (q: any) => q.eq("status", "active")).order("desc").first();
+    if (previous) {
+      await ctx.db.patch(previous._id, { status: "revoked", revokedAt: now, revokeReason: "أُسقط لصالح تفويض أحدث من المالك", updatedAt: now });
+      await ctx.db.insert("secretChamberAudit", { actor: who.name, actorRole: "owner", action: "mandate_superseded", detail: `تفويض #${previous._id} أُسقط لصالح تفويض أحدث`, at: now });
+    }
+    const expiresAt = now + Math.floor(a.expiresInHours) * 3600_000;
+    const id = await ctx.db.insert("evolutionMandates", {
+      title: a.title.trim().slice(0, 160),
+      grantedById: who.userId,
+      grantedByName: who.name,
+      operations: a.operations,
+      moduleAllowlist: allowlist,
+      maxRisk: a.maxRisk,
+      quota: Math.floor(a.quota),
+      usedCount: 0,
+      status: "active",
+      expiresAt,
+      reason: a.reason.trim().slice(0, 2000),
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert("secretChamberAudit", { actor: who.name, actorRole: "owner", action: "mandate_granted", detail: `${a.title.trim()} — عمليات: ${a.operations.join("/")} — سقف الخطر: ${a.maxRisk} — رصيد: ${a.quota} — ينتهي: ${new Date(expiresAt).toISOString()}`, at: now });
+    return { mandateId: id, expiresAt };
+  },
+});
+
+/** سحب التفويض فوراً — يوقف كل تنفيذ مفوّض من اللحظة نفسها. */
+export const revokeMandate = mutation({
+  args: { mandateId: v.id("evolutionMandates"), reason: v.string() },
+  handler: async (ctx, a) => {
+    const who = await requireOwner(ctx);
+    if (a.reason.trim().length < 10) throw new Error("اكتب سبب سحب التفويض (١٠ أحرف على الأقل)");
+    const mandate = await ctx.db.get(a.mandateId);
+    if (!mandate) throw new Error("التفويض غير موجود");
+    if (mandate.status !== "active") throw new Error("التفويض غير نشط أصلاً");
+    const now = Date.now();
+    await ctx.db.patch(a.mandateId, { status: "revoked", revokedAt: now, revokeReason: a.reason.trim().slice(0, 1000), updatedAt: now });
+    await ctx.db.insert("secretChamberAudit", { actor: who.name, actorRole: "owner", action: "mandate_revoked", detail: `${mandate.title} — ${a.reason.trim()}`, at: now });
+    return { ok: true };
+  },
+});
+
+/** مفتاح التجميد الفوري (Kill Switch): يوقف الحاكم بمساريه معاً. */
+export const setGovernorFreeze = mutation({
+  args: { frozen: v.boolean(), reason: v.string() },
+  handler: async (ctx, a) => {
+    const who = await requireOwner(ctx);
+    if (a.frozen && a.reason.trim().length < 10) throw new Error("اكتب سبب التجميد (١٠ أحرف على الأقل)");
+    const state = await ensureGovernorState(ctx);
+    const now = Date.now();
+    await ctx.db.patch(state._id, {
+      frozen: a.frozen,
+      frozenReason: a.frozen ? a.reason.trim().slice(0, 1000) : undefined,
+      frozenAt: a.frozen ? now : undefined,
+      frozenBy: a.frozen ? who.name : undefined,
+      updatedAt: now,
+    });
+    await ctx.db.insert("secretChamberAudit", { actor: who.name, actorRole: "owner", action: a.frozen ? "governor_frozen" : "governor_unfrozen", detail: a.frozen ? a.reason.trim() : "رفع المالك التجميد عن سلطة الحاكم", at: now });
+    return { frozen: a.frozen };
+  },
+});
+
+/**
+ * ↩️ نقض تنفيذ سابق واستعادة الإصدار الفعلي من لقطة `before` المخزنة.
+ * نقض حقيقي على البيانات: لا يعتمد على أي محاكاة، وكل خطوة تُسجّل في الغرفة.
+ */
+export const rollbackExecution = mutation({
+  args: { proposalId: v.id("evolutionProposals"), reason: v.string() },
+  handler: async (ctx, a) => {
+    const who = await requireOwner(ctx);
+    if (a.reason.trim().length < 10) throw new Error("اكتب سبب النقض (١٠ أحرف على الأقل)");
+    const p = await ctx.db.get(a.proposalId);
+    if (!p || p.status !== "executed" || !p.executionId) throw new Error("لا يوجد تنفيذ مكتمل قابل للنقض");
+    if (p.revertedAt) throw new Error("هذا التنفيذ منقوض مسبقاً");
+    const op = await ctx.db.get(p.executionId);
+    if (!op) throw new Error("سجل التنفيذ مفقود");
+    const now = Date.now();
+    const current = await ctx.db.query("evolutionModules").withIndex("by_key", (q: any) => q.eq("key", p.targetKey)).first();
+    let outcome: string;
+    let preRollback: string;
+    if (!op.before) {
+      // التنفيذ الأصلي كان إنشاءً: النقض = حذف الوحدة المُنشأة.
+      if (!current) throw new Error("الوحدة المُنشأة لم تعد موجودة — لا شيء لنقضه");
+      preRollback = JSON.stringify(current);
+      await ctx.db.delete(current._id);
+      outcome = "rollback_deleted";
+    } else {
+      const snap = JSON.parse(op.before);
+      preRollback = JSON.stringify(current ?? null);
+      if (current) {
+        await ctx.db.patch(current._id, { name: snap.name, description: snap.description, kind: snap.kind, config: snap.config, version: current.version + 1, updatedAt: now });
+      } else {
+        await ctx.db.insert("evolutionModules", { key: p.targetKey, name: snap.name, description: snap.description, kind: snap.kind, status: snap.status ?? "active", config: snap.config, version: (snap.version ?? 1) + 1, sourceProposal: p._id, createdAt: now, updatedAt: now });
+      }
+      outcome = "rollback_restored";
+    }
+    const operationId = await ctx.db.insert("evolutionOperations", { proposalId: a.proposalId, operation: outcome, targetKey: p.targetKey, before: preRollback, after: op.before ?? "{}", provider: "Owner Rollback", model: "rollback", apiVerified: true, tokensIn: 0, tokensOut: 0, result: outcome, evidence: a.reason.trim().slice(0, 3000), at: now });
+    await ctx.db.patch(a.proposalId, { revertedAt: now, revertOperationId: operationId, updatedAt: now });
+    await bumpGovernorState(ctx, { rollbacks: 1 });
+    await ctx.db.insert("secretChamberAudit", { proposalId: a.proposalId, actor: who.name, actorRole: "owner", action: "execution_rolled_back", detail: `${p.targetKey} — ${a.reason.trim()} — ${operationId}`, at: now });
+    return { ok: true, outcome, operationId };
+  },
+});
