@@ -4,6 +4,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import { isOwnerUser } from "./owner";
 import { AI_REGISTRY } from "./aiRegistry";
 import { chamberGate, deputySelfReviewGate, governorFreezeGate, governorOwnerGrantGate, governorSelfReviewGate, mandateGate, protectedTargetGate, sovereignExecutionGate } from "./governanceCore";
+import { isRuleModuleKey, mergeRuleConfig, validateRuleConfig } from "./evolutionRules";
 
 const GOVERNOR_SCOPE = "sovereign_governor";
 
@@ -396,11 +397,19 @@ export const applyInstrument = internalMutation({ args: { proposalId: v.id("evol
   const execGate = sovereignExecutionGate({ proposal: p, mandate: mandateRow, state: await readGovernorState(ctx), now: Date.now() });
   if (!execGate.allowed) throw new Error(execGate.reason);
   const now = Date.now(); const existing = await ctx.db.query("evolutionModules").withIndex("by_key", (q: any) => q.eq("key", p.targetKey)).first();
+  // ⚖️ إن كان الهدف قانوناً حيّاً: تحقق صارم من الحدود ثم دمج القيم فوق القائم.
+  // لا شيء خارج الحدود يُكتب على اللعبة، ولا تُفقد القوانين الأخرى في الوحدة نفسها.
+  let finalConfig = a.config;
+  if (isRuleModuleKey(p.targetKey)) {
+    const check = validateRuleConfig(p.targetKey, a.config);
+    if (check.errors.length > 0) throw new Error(`الحاكم خرج عن حدود القوانين: ${check.errors.slice(0, 3).join(" | ")}`);
+    finalConfig = mergeRuleConfig(existing?.config, check.values ?? {});
+  }
   let before: string | undefined; let outcome: string;
   if (p.operation === "delete") { if (!existing) throw new Error("الوحدة غير موجودة"); before = JSON.stringify(existing); await ctx.db.delete(existing._id); outcome = "deleted"; }
-  else if (p.operation === "modify" || p.operation === "construct") { if (!existing) throw new Error("الوحدة غير موجودة للتعديل"); before = JSON.stringify(existing); await ctx.db.patch(existing._id, { name: a.name, description: a.description, kind: a.kind as any, config: a.config, version: existing.version + 1, updatedAt: now }); outcome = "updated"; }
-  else { if (existing) throw new Error("مفتاح الوحدة مستخدم"); await ctx.db.insert("evolutionModules", { key: p.targetKey, name: a.name, description: a.description, kind: a.kind as any, status: "active", config: a.config, version: 1, sourceProposal: a.proposalId, createdAt: now, updatedAt: now }); outcome = "created"; }
-  const operationId = await ctx.db.insert("evolutionOperations", { proposalId: a.proposalId, operation: outcome, targetKey: p.targetKey, before, after: JSON.stringify({ name: a.name, description: a.description, kind: a.kind, config: a.config }), provider: a.provider, model: a.model, apiVerified: true, tokensIn: a.tokensIn, tokensOut: a.tokensOut, result: outcome, evidence: a.evidence, at: now });
+  else if (p.operation === "modify" || p.operation === "construct") { if (!existing) throw new Error("الوحدة غير موجودة للتعديل"); before = JSON.stringify(existing); await ctx.db.patch(existing._id, { name: a.name, description: a.description, kind: a.kind as any, config: finalConfig, version: existing.version + 1, updatedAt: now }); outcome = "updated"; }
+  else { if (existing) throw new Error("مفتاح الوحدة مستخدم"); await ctx.db.insert("evolutionModules", { key: p.targetKey, name: a.name, description: a.description, kind: a.kind as any, status: "active", config: finalConfig, version: 1, sourceProposal: a.proposalId, createdAt: now, updatedAt: now }); outcome = "created"; }
+  const operationId = await ctx.db.insert("evolutionOperations", { proposalId: a.proposalId, operation: outcome, targetKey: p.targetKey, before, after: JSON.stringify({ name: a.name, description: a.description, kind: a.kind, config: finalConfig }), provider: a.provider, model: a.model, apiVerified: true, tokensIn: a.tokensIn, tokensOut: a.tokensOut, result: outcome, evidence: a.evidence, at: now });
   await ctx.db.patch(a.proposalId, { status: "executed", executedAt: now, executionId: operationId, updatedAt: now, lastError: undefined, ownerGrantScope: p.mandateId ? "mandate" : p.ownerGrantScope });
   // استهلاك رصيد التفويض عند التنفيذ الفعلي فقط — لا يُستهلك على محاولة فاشلة
   if (p.mandateId && mandateRow) await ctx.db.patch(p.mandateId, { usedCount: mandateRow.usedCount + 1, updatedAt: now });

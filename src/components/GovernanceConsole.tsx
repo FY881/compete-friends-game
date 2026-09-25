@@ -10,8 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Gavel, LockKeyhole, Play, ShieldCheck, Sparkles, Bot, CheckCircle2, Radio, GitBranch, Power, Undo2 } from "lucide-react";
 
+import { isRuleModuleKey, previewRuleConfig, ruleSurfaceFor, RULE_MODULE_KEYS } from "@/convex/evolutionRules";
+
 const MANDATE_OPS = ["create", "modify", "construct", "delete"] as const;
 type MandateRisk = "low" | "medium" | "critical";
+
+/** يقرأ قيمة قانون حيّ من كائن القوانين بمسار نقطي. */
+function readLiveValue(source: unknown, path: string): number {
+  return path.split(".").reduce<unknown>((acc, part) => (acc && typeof acc === "object" ? (acc as Record<string, unknown>)[part] : undefined), source) as number;
+}
 
 export function GovernanceConsole() {
   const data = useQuery(api.governanceStore.listConsole);
@@ -30,6 +37,7 @@ export function GovernanceConsole() {
   const resolveConditions = useAction(api.governance.resolveConditions);
   const mandateExecute = useAction(api.governance.governorMandateExecute);
   const mandateState = useQuery(api.governanceStore.mandateState);
+  const liveRulesData = useQuery(api.evolutionRuntime.liveRules);
   const grantMandateMut = useMutation(api.governanceStore.grantMandate);
   const revokeMandateMut = useMutation(api.governanceStore.revokeMandate);
   const freezeMut = useMutation(api.governanceStore.setGovernorFreeze);
@@ -313,7 +321,25 @@ export function GovernanceConsole() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card><CardHeader><CardTitle>دورة القرارات</CardTitle></CardHeader><CardContent className="space-y-3">
-          {data?.proposals.map((p: any) => <div key={p._id} className="rounded-xl border p-4"><div className="flex justify-between gap-2"><b>{p.title}</b><Badge variant="outline">{p.status}</Badge></div><p className="mt-2 text-xs text-muted-foreground">مقترح {p.proposerRole}: {p.summary}</p>{p.courtSummary && <p className="mt-2 text-xs text-emerald-700">المجلس: {p.courtSummary}</p>}{p.courtConditions?.length > 0 && <ul className="mt-2 list-inside list-disc text-xs text-amber-700">{p.courtConditions.map((c: string) => <li key={c}>{c}</li>)}</ul>}{p.courtReviews && <details className="mt-2 text-xs"><summary>مراجعة {p.courtReviews.length} وحدة ذكاء</summary><div className="mt-2 max-h-52 space-y-1 overflow-auto">{p.courtReviews.map((r: any) => <p key={r.unit} className="rounded border p-2"><b>{r.name}</b> — {r.vote} — {r.provider}/{r.model}<br />{r.opinion}</p>)}</div></details>}<div className="mt-3 flex flex-wrap gap-2">
+          {data?.proposals.map((p: any) => <div key={p._id} className="rounded-xl border p-4"><div className="flex justify-between gap-2"><b>{p.title}</b><Badge variant="outline">{p.status}</Badge></div><p className="mt-2 text-xs text-muted-foreground">مقترح {p.proposerRole}: {p.summary}</p>{p.courtSummary && <p className="mt-2 text-xs text-emerald-700">المجلس: {p.courtSummary}</p>}{p.courtConditions?.length > 0 && <ul className="mt-2 list-inside list-disc text-xs text-amber-700">{p.courtConditions.map((c: string) => <li key={c}>{c}</li>)}</ul>}{p.courtReviews && <details className="mt-2 text-xs"><summary>مراجعة {p.courtReviews.length} وحدة ذكاء</summary><div className="mt-2 max-h-52 space-y-1 overflow-auto">{p.courtReviews.map((r: any) => <p key={r.unit} className="rounded border p-2"><b>{r.name}</b> — {r.vote} — {r.provider}/{r.model}<br />{r.opinion}</p>)}</div></details>}          {isRuleModuleKey(p.targetKey) && liveRulesData && (() => {
+            const rows = previewRuleConfig(p.targetKey, p.requestedModule.config, liveRulesData.rules);
+            return (
+              <div className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
+                <p className="text-[11px] font-semibold">تأثير حقيقي على اللعبة — {p.targetKey}</p>
+                <div className="mt-1 space-y-0.5">
+                  {rows.map((row) => (
+                    <p key={row.path} className="text-[11px]">
+                      {row.label}: {row.from} → <b>{Number.isFinite(row.to) ? row.to : "قيمة غير صالحة"}</b>
+                      {row.status === "out_of_bounds" && <span className="text-rose-600"> (خارج الحدود — لن تُنفذ)</span>}
+                      {row.status === "invalid" && <span className="text-rose-600"> (غير رقمية)</span>}
+                    </p>
+                  ))}
+                  {rows.length === 0 && <p className="text-[11px] text-muted-foreground">لا تغيير في القوانين الحيّة</p>}
+                </div>
+              </div>
+            );
+          })()}
+          <div className="mt-3 flex flex-wrap gap-2">
             {p.status === "court_review" && <Button size="sm" onClick={() => step("court", p._id)} disabled={busy === `court:${p._id}`}><Radio className="size-4" />انعقاد المجلس</Button>}
             {p.status === "court_conditional" && <Button size="sm" variant="outline" onClick={() => satisfy(p._id)} disabled={busy === `conditions:${p._id}`}>استيفاء شروط المحكمة</Button>}
             {p.status === "awaiting_deputy" && <Button size="sm" onClick={() => step("deputy", p._id)} disabled={busy === `deputy:${p._id}`}><Bot className="size-4" />قرار نائب المالك</Button>}
@@ -421,6 +447,68 @@ export function GovernanceConsole() {
                 ))}
               </div>
             </details>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ⚖️ القوانين الحيّة — ما يعدّله الحاكم يؤثر فعلياً على نتائج اللاعبين */}
+      <Card className="border-emerald-500/40">
+        <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="size-5 text-emerald-600" />القوانين الحيّة — تأثير الحاكم الحقيقي على اللعبة</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            يقرأ الخادم هذه القيم فعلياً عند تسجيل النقاط، ومنح الخبرة، ومنح المكافأة اليومية.
+            إن لم توجد الوحدة فالقيمة المعروضة هي قيمة اللعبة الافتراضية، وإن وُجدت فالحاكم قد عدّلها فعلاً.
+          </p>
+          {!liveRulesData ? (
+            <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">لوحة القوانين الحيّة متاحة للمالك ونائب المالك.</p>
+          ) : (
+            <>
+              <div className="grid gap-3 lg:grid-cols-3">
+                {RULE_MODULE_KEYS.map((key) => {
+                  const surface = liveRulesData.surfaces.find((s: any) => s.key === key);
+                  const defs = ruleSurfaceFor(key) ?? [];
+                  return (
+                    <div key={key} className="rounded-xl border p-3">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <b className="font-mono text-xs">{key}</b>
+                        <Badge variant="outline">{surface?.active ? `نشط v${surface.version}` : surface?.exists ? "معطّل" : "غير موجود"}</Badge>
+                      </div>
+                      <div className="space-y-1">
+                        {defs.map((def) => {
+                          const current = readLiveValue(liveRulesData.rules, def.path);
+                          const changed = current !== def.defaultValue;
+                          return (
+                            <div key={def.path} className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="truncate text-muted-foreground">{def.label}</span>
+                              <span className="flex shrink-0 items-center gap-1.5">
+                                <b>{current}</b>
+                                {changed && <Badge variant="outline" className="border-emerald-500/50 text-emerald-700">معدّل (الأصل {def.defaultValue})</Badge>}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="outline">وحدات مؤثرة الآن: {liveRulesData.applied.length > 0 ? liveRulesData.applied.join(", ") : "لا شيء — اللعبة على قيمها الافتراضية"}</Badge>
+                {liveRulesData.rejected.length > 0 && <Badge variant="outline" className="border-rose-500/50 text-rose-600">قيم مرفوضة: {liveRulesData.rejected.length} — لم تُطبَّق على اللعبة</Badge>}
+              </div>
+              {liveRulesData.rejected.length > 0 && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground">تفاصيل القيم المرفوضة</summary>
+                  <div className="mt-2 space-y-1">
+                    {liveRulesData.rejected.map((row: any, index: number) => (
+                      <p key={`${row.moduleKey}-${row.field}-${index}`} className="rounded border border-rose-500/30 p-2">
+                        <b className="font-mono">{row.moduleKey}</b> · {row.field} — {row.reason}
+                      </p>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

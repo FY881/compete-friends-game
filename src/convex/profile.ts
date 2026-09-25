@@ -2,6 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { normalizeDisplayName, nameRejection, NAME_MIN } from "./identityCore";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { dailyRewardXp, dayKey } from "./gameConfig";
 
 const DAILY_BADGE_STEPS = [
@@ -116,7 +117,9 @@ export const claimDailyReward = mutation({
 
     const streak =
       profile?.lastClaimDay === yesterday ? (profile.dailyStreak ?? 0) + 1 : 1;
-    const xpEarned = dailyRewardXp(streak);
+    // ⚖️ المكافأة اليومية الفعلية تُقرأ من القوانين الحيّة (قد يعدّلها الحاكم بموافقة المالك).
+    const dailyRules = (await ctx.runQuery(internal.evolutionRuntime.getLiveRules, {})).rules.daily;
+    const xpEarned = Math.min(dailyRules.base + Math.max(0, streak - 1) * dailyRules.step, dailyRules.cap);
 
     const had = new Set(profile?.badges ?? []);
     const next = new Set(had);

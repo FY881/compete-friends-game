@@ -909,34 +909,38 @@ export const submitAnswer = mutation({
       /* اختياري — لا يعطل الإجابة */
     }
 
+    // ⚖️ القوانين الحيّة: قواعد التسجيل تُقرأ فعلياً من قاعدة البيانات،
+    // فأي تعديل يوافق عليه المالك يغيّر نقاط اللاعبين الحقيقيين في هذه الجولة.
+    const scoring = (await ctx.runQuery(internal.evolutionRuntime.getLiveRules, {})).rules.scoring;
+
     let points = 0;
     let streak = 0;
     let bestStreak = player.bestStreak;
     let firstBlood = false;
     if (correct) {
-      points += DIFFICULTY_BASE_POINTS[question.difficulty];
-      points += Math.round(DIFFICULTY_SPEED_BONUS[question.difficulty] * remainingRatio);
+      points += scoring.base[question.difficulty] ?? 0;
+      points += Math.round((scoring.speed[question.difficulty] ?? 0) * remainingRatio);
       streak = player.streak + 1;
       bestStreak = Math.max(bestStreak, streak);
       points += Math.min(
-        MAX_STREAK_BONUS,
-        Math.max(0, (streak - 1) * STREAK_BONUS_PER_STEP),
+        scoring.maxStreakBonus,
+        Math.max(0, (streak - 1) * scoring.streakBonusPerStep),
       );
 
       // First-blood bonus: the first correct answer in the question wins it.
       const firstCorrect = game.firstCorrect ?? [];
       if (firstCorrect[questionIndex] == null) {
         firstCorrect[questionIndex] = userId;
-        points += FIRST_BLOOD_BONUS;
+        points += scoring.firstBloodBonus;
         firstBlood = true;
         await ctx.db.patch(game._id, { firstCorrect });
       }
     }
 
-    // Golden question: the final question of the round doubles all points,
+    // Golden question: the final question of the round multiplies all points,
     // keeping every comeback alive until the last second.
     if (correct && questionIndex === game.questionIds.length - 1) {
-      points *= GOLDEN_QUESTION_MULTIPLIER;
+      points *= scoring.goldenMultiplier;
     }
 
     // A retry earns half points — the price of the second chance.
@@ -1326,6 +1330,9 @@ export const finishGame = internalMutation({
         return Math.max(max, midpointScores.get(p.userId) ?? 0);
       }, 0);
 
+    // ⚖️ خبرة نهاية الجولة تُحسب من القوانين الحيّة نفسها.
+    const liveXp = (await ctx.runQuery(internal.evolutionRuntime.getLiveRules, {})).rules.xp;
+
     for (let i = 0; i < sorted.length; i++) {
       const p = sorted[i];
       const rank = i + 1;
@@ -1335,12 +1342,12 @@ export const finishGame = internalMutation({
       const correctCount = answered.filter((a) => a.correct).length;
       const won = rank === 1;
 
-      let xp = XP_PER_GAME + correctCount * XP_PER_CORRECT_ANSWER;
-      if (won) xp += XP_FOR_WIN;
-      if (p.bestStreak >= 3) xp += XP_FOR_STREAK_3;
-      if (p.bestStreak >= 5) xp += XP_FOR_STREAK_5;
+      let xp = liveXp.perGame + correctCount * liveXp.perCorrect;
+      if (won) xp += liveXp.forWin;
+      if (p.bestStreak >= 3) xp += liveXp.forStreak3;
+      if (p.bestStreak >= 5) xp += liveXp.forStreak5;
       if (correctCount === questionCount && questionCount >= 3) {
-        xp += XP_PERFECT_GAME;
+        xp += liveXp.perfect;
       }
 
       // 🚀 معزز الخبرة ×2 — يُستهلك جولة واحدة عند كل استخدام (مربع economy)
@@ -1360,7 +1367,7 @@ export const finishGame = internalMutation({
       // First game of the day: a small bonus that also marks the calendar day
       // (used by the daily-reward streak UI).
       const firstOfDay = (profile?.lastPlayedDay ?? "") !== today;
-      if (firstOfDay) xp += FIRST_GAME_OF_DAY_XP;
+      if (firstOfDay) xp += liveXp.firstOfDay;
       const had = new Set(profile?.badges ?? []);
       const next = new Set(had);
 

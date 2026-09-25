@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { dailyRewardXp, dayKey, levelFromXp, levelTitle, xpToReachLevel } from "./gameConfig";
 import { resolveQuestion } from "./games";
 
@@ -188,6 +189,11 @@ export const getMyProfile = query({
 
     const today = dayKey(Date.now());
 
+    // ⚖️ القوانين الحيّة للمكافأة اليومية — يُعرض للاعب نفس ما سيمنحه الخادم فعلاً.
+    const dailyRules = (await ctx.runQuery(internal.evolutionRuntime.getLiveRules, {})).rules.daily;
+    const liveDailyXp = (streak: number) =>
+      Math.min(dailyRules.base + Math.max(0, streak - 1) * dailyRules.step, dailyRules.cap);
+
     if (!profile) {
       return {
         xp: 0,
@@ -208,7 +214,7 @@ export const getMyProfile = query({
         badges: [],
         dailyStreak: 0,
         canClaimDaily: true,
-        nextDailyRewardXp: dailyRewardXp(1),
+        nextDailyRewardXp: liveDailyXp(1),
         firstGameOfDayDone: false,
       };
     }
@@ -254,7 +260,7 @@ export const getMyProfile = query({
       badges: profile.badges.map((id) => BADGE_MAP[id]).filter(Boolean),
       dailyStreak: profile.dailyStreak ?? 0,
       canClaimDaily: profile.lastClaimDay !== today,
-      nextDailyRewardXp: dailyRewardXp((profile.dailyStreak ?? 0) + 1),
+      nextDailyRewardXp: liveDailyXp((profile.dailyStreak ?? 0) + 1),
       firstGameOfDayDone: profile.lastPlayedDay === today,
     };
   },

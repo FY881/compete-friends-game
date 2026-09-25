@@ -8,6 +8,7 @@ import { AI_REGISTRY } from "./aiRegistry";
 import { callLlmDetailed } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
 import { deriveCourtVerdict, governorOwnerGrantGate, governorToolTargetGate, mandateGate, protectedTargetGate } from "./governanceCore";
+import { applyRuleValues, isRuleModuleKey, ruleSurfaceBrief, validateRuleConfig, RULE_MODULE_KEYS } from "./evolutionRules";
 
 const COURT_UNITS = [...AI_REGISTRY];
 const proposalText = (p: any) => JSON.stringify({
@@ -119,9 +120,12 @@ export const governorPropose = action({
     const who = await requireAuthority(ctx);
     if (brief.trim().length < 30) throw new Error("التكليف لا يصف التعديل الجوهري بوضوح");
     await ensureAiRuntime(ctx);
+    // ⚖️ القوانين الحيّة: الحاكم يرى القيم الفعلية وحدودها ثم يعدّل اللعبة فعلياً.
+    const live = await ctx.runQuery(internal.evolutionRuntime.getLiveRules, {});
+    const ruleBrief = RULE_MODULE_KEYS.map((key) => `${key} => ${ruleSurfaceBrief(key)}`).join("\n");
     const result = await callLlmDetailed({
       messages: [
-        { role: "system", content: "أنت الحاكم السيادي. اقترح تعديلاً جوهرياً آمناً. أعد JSON فقط يحتوي title وoperation (create|modify|delete|construct) وtargetKey (snake_case) وsummary وrationale وrisk (low|medium|critical) وrequestedModule{name,description,kind,config}.config كائن JSON." },
+        { role: "system", content: `أنت الحاكم السيادي. اقترح تعديلاً جوهرياً آمناً. أعد JSON فقط يحتوي title وoperation (create|modify|delete|construct) وtargetKey (snake_case) وsummary وrationale وrisk (low|medium|critical) وrequestedModule{name,description,kind,config}.config كائن JSON.\n\nسطح القوانين الحيّة التي تغيّر اللعبة فعلاً (عدّل داخلها فقط وضمن الحدود):\n${ruleBrief}\nالقيم الفعلية الآن: ${JSON.stringify(live.rules)}` },
         { role: "user", content: requestedOperation ? `العملية المطلوبة: ${requestedOperation}\nالوحدة المستهدفة: ${requestedTarget ?? "(اخترها بنفسك)"}\nالتكليف: ${brief}` : brief },
       ],
       maxTokens: 900,
@@ -137,6 +141,10 @@ export const governorPropose = action({
     const operation: "create" | "modify" | "delete" | "construct" = requestedOperation ?? (opList.includes(spec.operation) ? spec.operation : "construct");
     const risk = ["low", "medium", "critical"].includes(spec.risk) ? spec.risk : "medium";
     const targetKey = String(requestedTarget ?? spec.targetKey ?? "governor_change").slice(0, 80);
+    // تحقق مسبق من حدود القوانين الحيّة قبل أن يدخل الطلب المحكمة.
+    const ruleCheck = isRuleModuleKey(targetKey) ? validateRuleConfig(targetKey, (spec.requestedModule ?? {}).config ?? {}) : null;
+    if (ruleCheck && ruleCheck.errors.length > 0) throw new Error(`قوانين خارج الحدود: ${ruleCheck.errors.slice(0, 3).join(" | ")}`);
+    if (ruleCheck && Object.keys(ruleCheck.values ?? {}).length === 0) throw new Error(`لم يحدد الحاكم أي قانون قابل للتعديل داخل ${targetKey}`);
     // تحقق واقعي: العملية يجب أن تنطبق على وحدة runtime حقيقية.
     const existing = await ctx.runQuery(internal.governanceStore.getEvolutionModule, { key: targetKey });
     const targetGate = governorToolTargetGate(operation, Boolean(existing));
@@ -159,8 +167,10 @@ export const governorPropose = action({
       requestedModule: {
         name: String(moduleSpec.name ?? existing?.name ?? targetKey).slice(0, 120),
         description: String(moduleSpec.description ?? spec.summary ?? brief).slice(0, 1200),
-        kind: String(moduleSpec.kind ?? existing?.kind ?? "feature").slice(0, 40),
-        config: JSON.stringify(moduleSpec.config ?? (existing ? JSON.parse(existing.config) : {})),
+        kind: String(moduleSpec.kind ?? existing?.kind ?? (ruleCheck ? "rule" : "feature")).slice(0, 40),
+        config: ruleCheck
+          ? JSON.stringify(applyRuleValues(existing ? JSON.parse(existing.config) : {}, ruleCheck.values ?? {}))
+          : JSON.stringify(moduleSpec.config ?? (existing ? JSON.parse(existing.config) : {})),
       },
       mandateId: coverage.allowed && mandate ? mandate._id : undefined,
     });
