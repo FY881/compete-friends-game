@@ -1,14 +1,40 @@
-export type Difficulty = "easy" | "medium" | "hard";
+import {
+  DIFFICULTIES,
+  DIFFICULTY_LABELS,
+  isDifficulty,
+  normalizeDifficulty,
+  type Difficulty,
+} from "../lib/question-difficulty";
 
-export type Question = { id: string; category: string; difficulty: Difficulty; question: string; options: [string, string, string, string]; correctIndex: 0 | 1 | 2 | 3 }
+export { DIFFICULTIES, DIFFICULTY_LABELS, isDifficulty, normalizeDifficulty };
+export type { Difficulty };
+
+export type Question = {
+  id: string;
+  category: string;
+  difficulty: Difficulty;
+  question: string;
+  options: [string, string, string, string];
+  correctIndex: 0 | 1 | 2 | 3;
+};
 
 import { MEGA_PACK_1, MEGA_PACK_2 } from "./megaQuestions";
 import { MEGA_PACK_3 } from "./megaQuestions3";
 import { MEGA_PACK_4 } from "./megaQuestions4";
 import { MEGA_PACK_5, MEGA_PACK_5B } from "./megaQuestions5";
 import { MEGA_PACK_6 } from "./megaQuestions6";
+import { MEGA_PACK_7 } from "./megaQuestions7";
+import { MEGA_PACK_8 } from "./megaQuestions8";
+import { MEGA_PACK_9 } from "./megaQuestions9";
+import { MEGA_PACK_10 } from "./megaQuestions10";
+import { MEGA_PACK_11 } from "./megaQuestions11";
 
 export const EXTRA_QUESTIONS: Question[] = [...MEGA_PACK_6, ...MEGA_PACK_5, ...MEGA_PACK_5B, ...MEGA_PACK_4,
+  ...MEGA_PACK_7,
+  ...MEGA_PACK_8,
+  ...MEGA_PACK_9,
+  ...MEGA_PACK_10,
+  ...MEGA_PACK_11,
   // ── أسئلة إضافية جديدة (q321 – q542) ─────────────────────────────────
 
   // ── عام ──

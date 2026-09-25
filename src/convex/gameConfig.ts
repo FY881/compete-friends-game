@@ -60,11 +60,13 @@ export const DIFFICULTY_BASE_POINTS: Record<Difficulty, number> = {
   easy: 100,
   medium: 150,
   hard: 200,
+  extreme: 300,
 };
 export const DIFFICULTY_SPEED_BONUS: Record<Difficulty, number> = {
   easy: 100,
   medium: 140,
   hard: 180,
+  extreme: 240,
 };
 
 // ── Streaks ──────────────────────────────────────────────────────────────

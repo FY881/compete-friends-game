@@ -46,7 +46,7 @@ import {
   dayKey,
   levelFromXp,
 } from "./gameConfig";
-import { CATEGORIES, QUESTION_BANK, type Question } from "./questions";
+import { CATEGORIES, DIFFICULTIES, normalizeDifficulty, QUESTION_BANK, type Difficulty, type Question } from "./questions";
 import { BADGE_MAP, type Badge } from "./stats";
 import { isUserBanned } from "./owner";
 
@@ -65,7 +65,7 @@ export type AnswerInfo = {
 export type GameQuestion = {
   id: string;
   category: string;
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: Difficulty;
   question: string;
   options: string[];
   correctIndex: number | null; // hidden until the question is revealed
@@ -78,6 +78,8 @@ export type GameSettings = {
   categories: string[];
   /** 0 (or absent on legacy rooms) = classic; 5 | 10 | 15 = timed round in minutes. */
   durationMinutes?: number;
+  /** Exact difficulty requested by the host; absent keeps adaptive mixing. */
+  difficulty?: Difficulty;
 };
 
 export type MyResult = {
@@ -193,7 +195,7 @@ async function getAllQuestions(ctx: DbCtx): Promise<Question[]> {
   const aiQuestions: Question[] = approved.map((r) => ({
     id: r.qid,
     category: r.category,
-    difficulty: r.difficulty,
+    difficulty: normalizeDifficulty(r.difficulty),
     question: r.question,
     options: r.options as [string, string, string, string],
     correctIndex: r.correctIndex as 0 | 1 | 2 | 3,
@@ -207,30 +209,47 @@ async function pickQuestions(
   categories: string[],
   count: number,
   hardRatioHint?: number,
+  difficulty?: Difficulty,
 ): Promise<string[]> {
   const all = await getAllQuestions(ctx);
   const pool = all.filter(
-    (q) => categories.length === 0 || categories.includes(q.category),
+    (q) =>
+      (categories.length === 0 || categories.includes(q.category)) &&
+      (difficulty == null || q.difficulty === difficulty),
   );
   if (pool.length === 0) {
     throw new Error("لا توجد أسئلة في الفئات المختارة");
   }
 
+  if (difficulty != null) {
+    return shuffle(pool).slice(0, count).map((q) => q.id);
+  }
+
   const easy = shuffle(pool.filter((q) => q.difficulty === "easy"));
   const medium = shuffle(pool.filter((q) => q.difficulty === "medium"));
   const hard = shuffle(pool.filter((q) => q.difficulty === "hard"));
+  const extreme = shuffle(pool.filter((q) => q.difficulty === "extreme"));
 
   // ⚖️ تخصيص الصعوبة يُطبَّق في الطبقة الأعلى عبر معامل hardRatio — هنا الافتراضي 20%
   const hardRatio = hardRatioHint ?? 0.2;
-
-  const nHard = Math.min(hard.length, Math.max(1, Math.floor(count * hardRatio)));
-  const nMedium = Math.min(medium.length, count - nHard);
-  const nEasy = Math.min(easy.length, count - nHard - nMedium);
+  const nExtreme = Math.min(
+    extreme.length,
+    count >= 3 ? Math.max(1, Math.floor(count * hardRatio * 0.35)) : 0,
+    count,
+  );
+  const nHard = Math.min(
+    hard.length,
+    count >= 2 ? Math.max(1, Math.floor(count * hardRatio)) : 0,
+    Math.max(0, count - nExtreme),
+  );
+  const nMedium = Math.min(medium.length, Math.max(0, count - nExtreme - nHard));
+  const nEasy = Math.min(easy.length, Math.max(0, count - nExtreme - nHard - nMedium));
 
   const picked: Question[] = shuffle([
     ...easy.slice(0, nEasy),
     ...medium.slice(0, nMedium),
     ...hard.slice(0, nHard),
+    ...extreme.slice(0, nExtreme),
   ]);
 
   // Top-up from the remaining pool if a filter left us short.
@@ -260,7 +279,7 @@ async function resolveQuestion(
   return {
     id: row.qid,
     category: row.category,
-    difficulty: row.difficulty,
+    difficulty: normalizeDifficulty(row.difficulty),
     question: row.question,
     options: row.options as [string, string, string, string],
     correctIndex: row.correctIndex as 0 | 1 | 2 | 3,
@@ -356,10 +375,13 @@ export async function pickAdaptiveQuestions(
   userId: Id<"users">,
   categories: string[],
   count: number,
+  difficulty?: Difficulty,
 ): Promise<string[]> {
   const all = await getAllQuestions(ctx);
   const pool = all.filter(
-    (q) => categories.length === 0 || categories.includes(q.category),
+    (q) =>
+      (categories.length === 0 || categories.includes(q.category)) &&
+      (difficulty == null || q.difficulty === difficulty),
   );
   if (pool.length === 0) throw new Error("لا توجد أسئلة في الفئات المختارة");
 
@@ -435,6 +457,7 @@ export async function pickAdaptiveQuestions(
     if (spec !== undefined) w *= 1.15 - spec * 0.35;
     else if (specAcc.size > 0) w *= 1.1;
     if (q.difficulty === "hard") w *= skill > 0.6 ? 1.4 : 0.8;
+    if (q.difficulty === "extreme") w *= skill > 0.75 ? 1.5 : 0.45;
     if (q.difficulty === "easy") w *= skill < 0.4 ? 1.3 : 0.7;
     weighted.push({ q, w });
   }
@@ -461,7 +484,13 @@ export async function pickAdaptiveQuestions(
     items.splice(idx, 1);
   }
 
-  // العدّاد الإحصائي للأسئلة AI (يُغذي جودة المحتوى)
+  // فائض آمن: يملأ العدد المطلوب حتى مع نضوب مجموعة بعد استبعاد آخر جولتين.
+  if (picked.length < count) {
+    for (const q of pool) {
+      if (picked.length >= count) break;
+      if (!picked.includes(q.id)) picked.push(q.id);
+    }
+  }
   return picked;
 }
 
@@ -508,6 +537,7 @@ function validateSettings(settings: {
   timePerQuestionMs: number;
   categories: string[];
   durationMinutes?: number;
+  difficulty?: Difficulty;
 }) {
   if (
     !(QUESTION_COUNT_OPTIONS as readonly number[]).includes(
@@ -534,6 +564,9 @@ function validateSettings(settings: {
   ) {
     throw new Error("فئة أسئلة غير صالحة");
   }
+  if (settings.difficulty != null && !DIFFICULTIES.includes(settings.difficulty)) {
+    throw new Error("مستوى صعوبة غير صالح");
+  }
   return { ...settings, categories: unique, durationMinutes };
 }
 
@@ -551,6 +584,14 @@ export const createGame = mutation({
         timePerQuestionMs: v.number(),
         categories: v.array(v.string()),
         durationMinutes: v.optional(v.number()),
+        difficulty: v.optional(
+          v.union(
+            v.literal("easy"),
+            v.literal("medium"),
+            v.literal("hard"),
+            v.literal("extreme"),
+          ),
+        ),
       }),
     ),
   },
@@ -601,13 +642,20 @@ export const createGame = mutation({
     // 🎯 الأسئلة الديناميكية: مبنية على نقاط ضعف المضيف ومستواه (تُسقط للقالب الثابت عند الخطأ)
     let questionIds: string[];
     try {
-      questionIds = await pickAdaptiveQuestions(ctx, userId, safeSettings.categories, poolSizeFor(safeSettings));
+      questionIds = await pickAdaptiveQuestions(
+        ctx,
+        userId,
+        safeSettings.categories,
+        poolSizeFor(safeSettings),
+        safeSettings.difficulty,
+      );
     } catch {
       questionIds = await pickQuestions(
         ctx,
         safeSettings.categories,
         poolSizeFor(safeSettings),
         hardHint,
+        safeSettings.difficulty,
       );
     }
 

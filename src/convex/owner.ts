@@ -1076,7 +1076,7 @@ export const getFinishedGames = query({
 export type QuestionRow = {
   id: string;
   category: string;
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: "easy" | "medium" | "hard" | "extreme";
   question: string;
   disabled: boolean;
 };

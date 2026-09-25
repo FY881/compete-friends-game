@@ -2,7 +2,13 @@ import { v } from "convex/values";
 import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { CATEGORIES, QUESTION_BANK } from "./questions";
+import {
+  CATEGORIES,
+  isDifficulty,
+  normalizeDifficulty,
+  QUESTION_BANK,
+  type Difficulty,
+} from "./questions";
 import { isStaffUser } from "./owner";
 import { callLlm, getOpenRouterKey } from "./aiConfig";
 import { ensureAiRuntime } from "./apiCore";
@@ -27,7 +33,7 @@ function parseGeneratedQuestion(
 ): {
   qid: string;
   category: string;
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: Difficulty;
   question: string;
   options: string[];
   correctIndex: number;
@@ -37,9 +43,9 @@ function parseGeneratedQuestion(
     const options = Array.isArray(q.options)
       ? (q.options as unknown[]).map(String)
       : [];
-    const difficulty = ["easy", "medium", "hard"].includes(String(q.difficulty))
-      ? (String(q.difficulty) as "easy" | "medium" | "hard")
-      : "medium";
+    const difficulty = isDifficulty(q.difficulty)
+      ? q.difficulty
+      : normalizeDifficulty(q.difficulty);
     const correctIndex = typeof q.correctIndex === "number" ? q.correctIndex : 0;
     if (!question || options.length < 2) return null;
     return {
@@ -64,7 +70,7 @@ function parseGeneratedQuestions(
 ): {
   qid: string;
   category: string;
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: Difficulty;
   question: string;
   options: string[];
   correctIndex: number;
@@ -87,7 +93,7 @@ function parseGeneratedQuestions(
     question: string;
     options: string[];
     correctIndex: number;
-    difficulty: "easy" | "medium" | "hard";
+    difficulty: Difficulty;
   }> | null = null;
 
   for (const line of lines) {
@@ -150,8 +156,7 @@ export const generateQuestions = action({
       throw new Error("لا يوجد نظام API مُفعّل — فعّل النظام الأول (مفتاح + رابط) أو الثاني (مفتاح فقط) من مركز API");
     }
 
-    const systemPrompt = `أنت مولّد أسئلة ثقافية للعبة "حرب العقول". أنشئ ${boundedCount} أسئلة في الفئة "${category}" باللغة العربية الفصحى.
-لكل سؤال: نص واضح + 4 خيارات (خيار واحد صحيح) + مؤشر الإجابة الصحيحة (0-3) + مستوى صعوبة من (easy|medium|hard).
+    const systemPrompt = `أنت مولّد أسئلة ثقافية للعبة "حرب العقول". أنشئ ${boundedCount} أسئلة في الفئة "${category}" باللغة العربية الفصحى.  لكل سؤال: نص واضح + 4 خيارات (خيار واحد صحيح) + مؤشر الإجابة الصحيحة (0-3) + مستوى صعوبة من (easy|medium|hard|extreme).
 لا تكرر الأسئلة المعروفة جداً. أعطِ إجابة بصيغة JSON مصفوفة حصرية دون أي نص آخر:
 [{"question":"...","options":["...","...","...","..."],"correctIndex":0,"difficulty":"medium"}]
 الحقل correctIndex يجب أن يشير إلى موضع الخيار الصحيح داخل المصفوفة options (0 أولاً).`;
@@ -249,7 +254,7 @@ export const getAiQuestionQueue = query({
       .map((r) => ({
         id: r._id,
         category: r.category,
-        difficulty: r.difficulty,
+        difficulty: normalizeDifficulty(r.difficulty),
         question: r.question,
         options: r.options,
         correctIndex: r.correctIndex,
@@ -344,7 +349,12 @@ export const insertBatch = internalMutation({
       v.object({
         qid: v.string(),
         category: v.string(),
-        difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+        difficulty: v.union(
+          v.literal("easy"),
+          v.literal("medium"),
+          v.literal("hard"),
+          v.literal("extreme"),
+        ),
         question: v.string(),
         options: v.array(v.string()),
         correctIndex: v.number(),

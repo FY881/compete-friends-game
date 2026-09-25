@@ -23,6 +23,14 @@ export const gameSettingsValidator = v.object({
   timePerQuestionMs: v.number(), // 10s | 15s | 20s | 30s
   categories: v.array(v.string()), // empty array = all categories
   durationMinutes: v.optional(v.number()), // 0/absent = classic by question count; 5 | 10 | 15 = timed round
+  difficulty: v.optional(
+    v.union(
+      v.literal("easy"),
+      v.literal("medium"),
+      v.literal("hard"),
+      v.literal("extreme"),
+    ),
+  ), // absent = mixed adaptive difficulty
 });
 
 /** One recorded answer inside a player's answers array. */

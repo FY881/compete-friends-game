@@ -39,8 +39,8 @@ export type RuleDef = {
 /** كائن القوانين الفعّال الذي تقرأه مسارات اللعب الحقيقية. */
 export type LiveRules = {
   scoring: {
-    base: { easy: number; medium: number; hard: number };
-    speed: { easy: number; medium: number; hard: number };
+    base: { easy: number; medium: number; hard: number; extreme: number };
+    speed: { easy: number; medium: number; hard: number; extreme: number };
     streakBonusPerStep: number;
     maxStreakBonus: number;
     firstBloodBonus: number;
@@ -60,8 +60,8 @@ export type LiveRules = {
 
 export const DEFAULT_LIVE_RULES: LiveRules = {
   scoring: {
-    base: { easy: DIFFICULTY_BASE_POINTS.easy, medium: DIFFICULTY_BASE_POINTS.medium, hard: DIFFICULTY_BASE_POINTS.hard },
-    speed: { easy: DIFFICULTY_SPEED_BONUS.easy, medium: DIFFICULTY_SPEED_BONUS.medium, hard: DIFFICULTY_SPEED_BONUS.hard },
+    base: { easy: DIFFICULTY_BASE_POINTS.easy, medium: DIFFICULTY_BASE_POINTS.medium, hard: DIFFICULTY_BASE_POINTS.hard, extreme: DIFFICULTY_BASE_POINTS.extreme },
+    speed: { easy: DIFFICULTY_SPEED_BONUS.easy, medium: DIFFICULTY_SPEED_BONUS.medium, hard: DIFFICULTY_SPEED_BONUS.hard, extreme: DIFFICULTY_SPEED_BONUS.extreme },
     streakBonusPerStep: STREAK_BONUS_PER_STEP,
     maxStreakBonus: MAX_STREAK_BONUS,
     firstBloodBonus: FIRST_BLOOD_BONUS,
@@ -84,9 +84,11 @@ export const RULE_DEFS: RuleDef[] = [
   { path: "scoring.base.easy", label: "نقاط الإجابة الصحيحة — سهل", min: 0, max: 1000, defaultValue: DEFAULT_LIVE_RULES.scoring.base.easy },
   { path: "scoring.base.medium", label: "نقاط الإجابة الصحيحة — متوسط", min: 0, max: 1000, defaultValue: DEFAULT_LIVE_RULES.scoring.base.medium },
   { path: "scoring.base.hard", label: "نقاط الإجابة الصحيحة — صعب", min: 0, max: 1000, defaultValue: DEFAULT_LIVE_RULES.scoring.base.hard },
+  { path: "scoring.base.extreme", label: "نقاط الإجابة الصحيحة — شبه مستحيل", min: 0, max: 1000, defaultValue: DEFAULT_LIVE_RULES.scoring.base.extreme },
   { path: "scoring.speed.easy", label: "مكافأة السرعة — سهل", min: 0, max: 2000, defaultValue: DEFAULT_LIVE_RULES.scoring.speed.easy },
   { path: "scoring.speed.medium", label: "مكافأة السرعة — متوسط", min: 0, max: 2000, defaultValue: DEFAULT_LIVE_RULES.scoring.speed.medium },
   { path: "scoring.speed.hard", label: "مكافأة السرعة — صعب", min: 0, max: 2000, defaultValue: DEFAULT_LIVE_RULES.scoring.speed.hard },
+  { path: "scoring.speed.extreme", label: "مكافأة السرعة — شبه مستحيل", min: 0, max: 2000, defaultValue: DEFAULT_LIVE_RULES.scoring.speed.extreme },
   { path: "scoring.streakBonusPerStep", label: "مكافأة السلسلة لكل خطوة", min: 0, max: 200, defaultValue: DEFAULT_LIVE_RULES.scoring.streakBonusPerStep },
   { path: "scoring.maxStreakBonus", label: "سقف مكافأة السلسلة", min: 0, max: 1000, defaultValue: DEFAULT_LIVE_RULES.scoring.maxStreakBonus },
   { path: "scoring.firstBloodBonus", label: "مكافأة الأسبق للإجابة", min: 0, max: 500, defaultValue: DEFAULT_LIVE_RULES.scoring.firstBloodBonus },
