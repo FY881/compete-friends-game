@@ -27,7 +27,7 @@ export const gameSettingsValidator = v.object({
     v.union(
       v.literal("easy"),
       v.literal("medium"),
-      v.literal("hard"),
+      v.literal("hard"), v.literal("extreme"),
       v.literal("extreme"),
     ),
   ), // absent = mixed adaptive difficulty

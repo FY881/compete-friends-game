@@ -57,6 +57,11 @@ const DIFFICULTY_STYLES = {
     badge: "border-rose-500/30 bg-rose-500/10 text-rose-700",
     dot: "bg-rose-500",
   },
+  extreme: {
+    label: "شبه مستحيل",
+    badge: "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700",
+    dot: "bg-fuchsia-500",
+  },
 } as const;
 
 function CountdownRing({
