@@ -502,6 +502,34 @@ export const premiumTables = {
     judgeAt: v.number(),
   }).index("by_status", ["status"]),
 
+  // ⚖️ مجلس العقول الدائم — ملفات المناظرة بين وحدات الذكاء المتنازعة
+  aiDebates: defineTable({
+    conflictKey: v.string(), // بصمة الخلاف الأصلي في aiConflicts
+    target: v.string(),
+    unitA: v.string(),
+    unitB: v.string(),
+    stanceA: v.string(),
+    stanceB: v.string(),
+    severity: v.string(),
+    speeches: v.array(
+      v.object({
+        role: v.string(), // advocate | nemesis | senator
+        speaker: v.string(),
+        text: v.string(),
+        side: v.string(), // A | B | neutral
+      }),
+    ),
+    verdict: v.optional(v.string()),
+    winner: v.optional(v.string()), // A | B | split
+    confidence: v.optional(v.number()),
+    autoExecuted: v.optional(v.boolean()),
+    status: v.union(v.literal("open"), v.literal("resolved")),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_created", ["createdAt"]),
+
   // 🧠 العقل المُنسّق — القرارات التنفيذية الموزونة عبر كل أدوات العقول
   conductorDecisions: defineTable({
     cycle: v.number(), // رقم الدورة (تتصاعد)

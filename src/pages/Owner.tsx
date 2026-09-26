@@ -75,6 +75,7 @@ import {
   Radio,
   RotateCcw,
   Scale,
+  Landmark,
   Search,
   Shield,
   Bug,
@@ -128,6 +129,7 @@ import { OwnerBrief } from "@/components/OwnerBrief";
 import { ContentQuality } from "@/components/ContentQuality";
 import { ConductorPanel } from "@/components/ConductorPanel";
 import { ConciergeChat } from "@/components/ConciergeChat";
+import { DebateHall } from "@/components/DebateHall";
 import { ScientistLab } from "@/components/ScientistLab";
 import { CommunityMonitor } from "@/components/CommunityMonitor";
 import { AiControlRoom } from "@/components/owner/AiControlRoom";
@@ -2271,6 +2273,7 @@ const NAV_GROUPS = [
       { id: "conductor", icon: BrainCircuit, label: "العقل المُنسّق 🧠" },
       { id: "scientist", icon: FlaskConical, label: "مخبر العالِم 🧪" },
       { id: "concierge", icon: Sparkles, label: "كونسيرج العقول 🎩" },
+      { id: "debatehall", icon: Landmark, label: "قاعة المناظرات ⚖️" },
       { id: "communitymonitor", icon: MessagesSquare, label: "مراقب المجتمع 💬" },
       { id: "appeals", icon: Scale, label: "الاعتراضات 🛡️" },
       { id: "economywar", icon: Store, label: "غرفة الاقتصاد 🛒" },
@@ -2426,6 +2429,8 @@ export default function Owner() {
         return <ScientistLab />;
       case "concierge":
         return <ConciergeChat />;
+      case "debatehall":
+        return <DebateHall />;
       case "communitymonitor":
         return <CommunityMonitor />;
       case "appeals":

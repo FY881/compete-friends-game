@@ -250,6 +250,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiFate.fateJob, {}),
   },
+  {
+    key: "debate_round",
+    name: "مجلس العقول — جولة مناظرة",
+    description: "يفتح ملفات مناظرة لخلافات وحدات الذكاء المعلّقة، ويحاورها ثلاثة وزراء (محامٍ، نقيض، سيناتور)، ويصدر حكماً موزوناً يُنفَّذ آلياً عند ثقة عالية.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiDebate.debateJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
