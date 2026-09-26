@@ -232,6 +232,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiScientist.scientistJob, {}),
   },
+  {
+    key: "mentor_soulmates",
+    name: "بازار العقول — شبكة التوأمات",
+    description: "يبني بصمة عقل لكل لاعب من إجاباته الحقيقية، ويستخرج توأم الروح ونقيض كل عقل، ويحدّث الشبكة.",
+    group: "AI",
+    intervalMinutes: 1440,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiMentor.refreshSoulmates, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

@@ -427,6 +427,48 @@ export const premiumTables = {
   })
     .index("by_run", ["runId"]),
 
+  // 🧬 بازار العقول — شبكة التوأمات والأعداء المعلنين المشتقة من البصمات
+  mindSoulmates: defineTable({
+    userId: v.id("users"),
+    userName: v.string(),
+    twinId: v.id("users"),
+    twinName: v.string(),
+    twinAffinity: v.number(), // 0-100 قرب العقلين
+    nemesisId: v.id("users"),
+    nemesisName: v.string(),
+    nemesisContrast: v.number(), // 0-100 بعد العقلين
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // 🗺️ مسار العقل — خطة أسبوعية شخصية مشتقة من أضعف الفئات
+  mindPaths: defineTable({
+    userId: v.id("users"),
+    focusCategory: v.string(),
+    secondCategory: v.string(),
+    strengthCategory: v.string(),
+    weakAcc: v.number(),
+    strongAcc: v.number(),
+    coachNote: v.string(),
+    weeklyTarget: v.number(),
+    speedTargetMs: v.number(),
+    challengeQuestionId: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // 🤝 عهود التوأم — تحديات متبادلة بين اللاعبين المتشابهين (بصمات حقيقية)
+  mindPacts: defineTable({
+    fromId: v.id("users"),
+    fromName: v.string(),
+    toId: v.id("users"),
+    toName: v.string(),
+    kind: v.string(), // twin_challenge | nemesis_duel
+    message: v.string(),
+    status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
+    createdAt: v.number(),
+  })
+    .index("by_to", ["toId"])
+    .index("by_from", ["fromId"]),
+
   // 🧠 العقل المُنسّق — القرارات التنفيذية الموزونة عبر كل أدوات العقول
   conductorDecisions: defineTable({
     cycle: v.number(), // رقم الدورة (تتصاعد)
