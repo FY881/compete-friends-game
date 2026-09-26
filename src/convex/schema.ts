@@ -452,6 +452,35 @@ const schema = defineSchema(
     }).index("by_season", ["seasonKey"]),
 
     // ═══ الحكم الآلي — سجل اللعب النظيف ═══
+    // 🕵️ محقق العقول — ملفات التحقيقات الجنائية الرقمية في الغش
+    detectiveCases: defineTable({
+      suspectId: v.id("users"),
+      suspectName: v.string(),
+      eventIds: v.array(v.id("fairPlayLog")), // الأحداث المحوَّلة إلى تحقيق
+      status: v.union(
+        v.literal("open"), // تحقيق جارٍ
+        v.literal("closed"), // أُصدر الحكم
+      ),
+      verdict: v.optional(
+        v.union(
+          v.literal("innocent"), // سلوك بشري طبيعي
+          v.literal("suspicious"), // شبهات تحتاج مراقبة أطول
+          v.literal("guilty"), // أدلة قاطعة على الغش
+          v.literal("inconclusive"), // الأدلة غير كافية
+        ),
+      ),
+      confidence: v.optional(v.number()), // 0-100
+      summary: v.optional(v.string()), // التقرير السردي الكامل
+      evidenceBullets: v.optional(v.array(v.string())), // الأدلة المفرغة
+      recommendedActions: v.optional(v.array(v.string())), // التوصيات
+      model: v.optional(v.string()),
+      createdAt: v.number(),
+      closedAt: v.optional(v.number()),
+    })
+      .index("by_suspect", ["suspectId"])
+      .index("by_status", ["status"])
+      .index("by_created", ["createdAt"]),
+
     fairPlayLog: defineTable({
       userId: v.id("users"),
       userName: v.string(),
