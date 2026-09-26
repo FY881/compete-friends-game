@@ -321,6 +321,40 @@ export const premiumTables = {
   // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
   ...gameLiveTables,
 
+  // 🧠 العقل المُنسّق — القرارات التنفيذية الموزونة عبر كل أدوات العقول
+  conductorDecisions: defineTable({
+    cycle: v.number(), // رقم الدورة (تتصاعد)
+    pulse: v.string(), // نبض الأدوات وقت القرار (JSON مفاتيح الأدوات وقيمها)
+    decision: v.union(
+      v.literal("sharpen_colossus"), // اشدد فخاخ الطاغوت
+      v.literal("ease_questions"), // خفف صعوبة الترسانة
+      v.literal("generate_questions"), // املأ فئة نازفة
+      v.literal("boost_training"), // أطلق تدريباً جماعياً مُعلناً
+      v.literal("investigate"), // افتح تحقيقاً للمشتبه الأعلى
+      v.literal("narrate_hype"), // أطلق معلقاً على أقوى لحظة
+      v.literal("prophecy"), // أجبر العرّاف على نبوءة جديدة
+      v.literal("hold"), // لا شيء — كل شيء متوازن
+    ),
+    reason: v.string(), // المبرر المعلن
+    confidence: v.number(),
+    status: v.union(
+      v.literal("executed"),
+      v.literal("skipped"),
+    ),
+    outcome: v.optional(
+      v.union(
+        v.literal("good"), // المؤشرات تحسنت بعده
+        v.literal("bad"), // المؤشرات تدهورت
+        v.literal("neutral"), // بلا أثر واضح
+        v.literal("pending"), // لم يُقيَّم بعد
+      ),
+    ),
+    engine: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_cycle", ["cycle"])
+    .index("by_created", ["createdAt"]),
+
   // 🔮 عرّاف العقول — نبوءات علنية شجاعة تُحاسب آلياً على دقتها
   oracleProphecies: defineTable({
     kind: v.union(

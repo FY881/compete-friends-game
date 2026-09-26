@@ -214,6 +214,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiOracle.resolveDueInternal, {}),
   },
+  {
+    key: "conductor_cycle",
+    name: "دورة العقل المُنسّق",
+    description: "يقرأ نبض كل أدوات العقول دفعة واحدة، يختار فعل واحد موزون مبرراً وينفذه، ثم يقيّم قراره السابق بالنتائج.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiConductor.conductJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
