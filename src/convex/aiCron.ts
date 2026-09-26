@@ -223,6 +223,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiConductor.conductJob, {}),
   },
+  {
+    key: "scientist_lab",
+    name: "مخبر عالِم العقول",
+    description: "يصمم تجارب سببية مقسّمة على غرف اللعب، يقيس أثرها بالثقة الإحصائية، ويستنتج ما يعمل فعلاً وما لا يعمل.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiScientist.scientistJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

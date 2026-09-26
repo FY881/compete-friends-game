@@ -47,6 +47,7 @@ import {
   BarChart3,
   Bot,
   BrainCircuit,
+  FlaskConical,
   Check,
   Inbox,
   Crown,
@@ -126,6 +127,7 @@ import { SmartInbox } from "@/components/SmartInbox";
 import { OwnerBrief } from "@/components/OwnerBrief";
 import { ContentQuality } from "@/components/ContentQuality";
 import { ConductorPanel } from "@/components/ConductorPanel";
+import { ScientistLab } from "@/components/ScientistLab";
 import { CommunityMonitor } from "@/components/CommunityMonitor";
 import { AiControlRoom } from "@/components/owner/AiControlRoom";
 import { AppealsPanel } from "@/components/Appeals";
@@ -2266,6 +2268,7 @@ const NAV_GROUPS = [
       { id: "commandbrief", icon: BarChart3, label: "بريف المالك 📊" },
       { id: "contentquality", icon: Library, label: "جودة المحتوى 📚" },
       { id: "conductor", icon: BrainCircuit, label: "العقل المُنسّق 🧠" },
+      { id: "scientist", icon: FlaskConical, label: "مخبر العالِم 🧪" },
       { id: "communitymonitor", icon: MessagesSquare, label: "مراقب المجتمع 💬" },
       { id: "appeals", icon: Scale, label: "الاعتراضات 🛡️" },
       { id: "economywar", icon: Store, label: "غرفة الاقتصاد 🛒" },
@@ -2416,6 +2419,8 @@ export default function Owner() {
       case "contentquality":
         return <ContentQuality />;
       case "conductor":
+        return <ScientistLab />;
+      case "scientist":
         return <ConductorPanel />;
       case "communitymonitor":
         return <CommunityMonitor />;

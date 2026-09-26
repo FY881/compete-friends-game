@@ -321,6 +321,31 @@ export const premiumTables = {
   // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
   ...gameLiveTables,
 
+  // 🧪 عالِم العقول — تجارب سببية حقيقية على الجامعة الحية
+  experiments: defineTable({
+    hypothesis: v.string(), // الفرضية بالعربية
+    lever: v.string(), // الرافعة المُجربة (مثل: reveal_duration, golden_multiplier)
+    treatment: v.string(), // القيمة التجريبية (JSON)
+    control: v.string(), // قيمة الضبط (كما كانت)
+    // مقسّم الغرف: كل غرفة جديدة تنضم لمجموعة بالحظ (بصمة code)
+    treatmentRooms: v.array(v.string()),
+    controlRooms: v.array(v.string()),
+    metricsBefore: v.optional(v.string()), // لقطة المؤشرات قبل التجربة (JSON)
+    metricsAfter: v.optional(v.string()),
+    status: v.union(
+      v.literal("running"), // جارية — تجمع بيانات
+      v.literal("concluded"), // استُنتجت
+      v.literal("aborted"), // أُلغيت (خطر واضح)
+    ),
+    conclusion: v.optional(v.string()), // الاستنتاج السببي
+    causalConfidence: v.optional(v.number()), // 0-100: قوة الدليل الإحصائي
+    appliedGlobally: v.optional(v.boolean()), // هل وافق العقل على تعميم النتيجة؟
+    startedAt: v.number(),
+    concludedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_started", ["startedAt"]),
+
   // 👤 صدى الذات — نسخة رقمية من عقل اللاعب الماضي يواجهه بها اليوم
   echoMatches: defineTable({
     userId: v.id("users"),
