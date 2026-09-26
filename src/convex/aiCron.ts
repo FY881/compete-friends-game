@@ -178,6 +178,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: false,
     run: (ctx) => ctx.runMutation(internal.clans.weeklyCrown, {}),
   },
+  {
+    key: "chronicle_weekly",
+    name: "سجل العقول الأسبوعي",
+    description: "يصدر جريدة الموقع الأسبوعية من أرشيف اللعب الحقيقي: بطل الأسبوع، معركة القمة، ورقم الأسبوع.",
+    group: "AI",
+    intervalMinutes: 10080,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiChronicle.weeklyEdition, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

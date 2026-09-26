@@ -321,6 +321,32 @@ export const premiumTables = {
   // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
   ...gameLiveTables,
 
+  // 📰 سجل العقول — جريدة الموقع الذكية التي تُروى بالبيانات الحقيقية
+  chronicleIssues: defineTable({
+    edition: v.string(), // مفتاح الإصدار YYYY-Www
+    weekStart: v.number(),
+    weekEnd: v.number(),
+    status: v.union(
+      v.literal("draft"), // تحت التوليد
+      v.literal("published"), // منشورة للجميع
+    ),
+    headline: v.string(), // العنوان الرئيسي
+    intro: v.string(), // افتتاحية المحرر
+    sections: v.array(
+      v.object({
+        key: v.string(), // بطل الأسبوع | معركة الأسبوع | صعود العقول | رقم الأسبوع | كشف الأقنعة
+        title: v.string(),
+        body: v.string(),
+        emoji: v.string(),
+      }),
+    ),
+    engine: v.optional(v.string()), // llm | local
+    publishedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_edition", ["edition"])
+    .index("by_published", ["publishedAt"]),
+
   // 🎙️ المعلق الأسطوري — لحظات المباراة المروية بالذكاء الاصطناعي
   casterNarrative: defineTable({
     gameId: v.id("games"),
