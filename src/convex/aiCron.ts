@@ -259,6 +259,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiDebate.debateJob, {}),
   },
+  {
+    key: "summit_decompose",
+    name: "عقل القمة — تحليل الغائبين",
+    description: "يحلّل بصمات اللاعبين الغائبين إلى جينات معرفية تورّث للمتعثرين مع وصية عقلية مولّدة.",
+    group: "AI",
+    intervalMinutes: 1440,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiSummit.summitJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

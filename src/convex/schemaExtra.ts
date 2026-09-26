@@ -502,6 +502,22 @@ export const premiumTables = {
     judgeAt: v.number(),
   }).index("by_status", ["status"]),
 
+  // 🌳 شجرة النسب العقلية — جينات اللاعبين الغائبين تُورّث للمتعثرين
+  mindGenealogy: defineTable({
+    ancestorId: v.id("users"), // اللاعب صاحب البصمة المتحللة
+    ancestorName: v.string(),
+    geneStrong: v.string(), // أقوى فئة
+    geneSecond: v.string(),
+    geneWeak: v.string(), // أضعف فئة (تحذير للوارث)
+    strengthAcc: v.number(), // دقة القوة %
+    overallAcc: v.number(),
+    lastSeen: v.number(),
+    inheritedBy: v.optional(v.id("users")),
+    inheritedAt: v.optional(v.number()),
+    charter: v.optional(v.string()), // الوصية العقلية
+    createdAt: v.number(),
+  }).index("by_ancestor", ["ancestorId"]),
+
   // ⚖️ مجلس العقول الدائم — ملفات المناظرة بين وحدات الذكاء المتنازعة
   aiDebates: defineTable({
     conflictKey: v.string(), // بصمة الخلاف الأصلي في aiConflicts
