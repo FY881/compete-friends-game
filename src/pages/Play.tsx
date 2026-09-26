@@ -29,6 +29,7 @@ import { MindsCouncil } from "@/components/MindsCouncil";
 import { AppealForm } from "@/components/Appeals";
 import { AdaptiveRewardCard } from "@/components/AdaptiveRewardCard";
 import { SmartMatchCard } from "@/components/SmartMatchCard";
+import { MindsAcademy } from "@/components/MindsAcademy";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -329,6 +330,7 @@ export default function Play() {
     { id: "agents", label: "العقول الحيّة", emoji: "🧠", group: "الذكاء والعقول", node: <LivingAgentsTab /> },
     { id: "council", label: "مجلس العقول", emoji: "🗳️", group: "الذكاء والعقول", node: <MindsCouncil /> },
     { id: "match", label: "المطابقة الذكية", emoji: "🧩", group: "الذكاء والعقول", node: <SmartMatchCard /> },
+    { id: "academy", label: "مدرسة العقول", emoji: "🎓", group: "الذكاء والعقول", node: <MindsAcademy /> },
     { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
 
     // ── لك شخصياً ──

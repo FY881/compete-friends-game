@@ -282,6 +282,34 @@ const schema = defineSchema(
     // 🧬 تخصصات العقل المتطور — إتقان حقيقي لكل حقل معرفي (بريميوم)
     // يُحدَّث آلياً من كل جولة، ويُستخدم لاختيار أسئلة حسب تخصص اللاعب
     // وحساب ألقاب التخصص في ملفه الشخصي.
+    // 🎓 مدرسة العقول — جلسات تدريب AI مولّدة من نقاط ضعف اللاعب الحقيقية
+    trainingSessions: defineTable({
+      userId: v.id("users"),
+      category: v.string(), // الفئة المستهدفة للتدريب
+      difficulty: v.union(
+        v.literal("easy"),
+        v.literal("medium"),
+        v.literal("hard"),
+        v.literal("extreme"),
+      ),
+      questionIds: v.array(v.string()), // أسئلة الجلسة (من البنك أو المولّدة)
+      status: v.union(
+        v.literal("active"), // جارٍ التدريب
+        v.literal("completed"), // أُكملت مع نتيجة
+        v.literal("expired"), // فاتت مهلتها
+      ),
+      correct: v.optional(v.number()), // النتيجة عند الإكمال
+      total: v.optional(v.number()),
+      masteryBefore: v.optional(v.number()), // إتقان الفئة قبل الجلسة
+      masteryAfter: v.optional(v.number()),
+      source: v.optional(v.string()), // bank | generated — هل وُلّدت أسئلة الجلسة؟
+      createdAt: v.number(),
+      completedAt: v.optional(v.number()),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_status", ["userId", "status"])
+      .index("by_created", ["createdAt"]),
+
     mindSpecializations: defineTable({
       userId: v.id("users"),
       category: v.string(),
