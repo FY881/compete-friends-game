@@ -321,6 +321,38 @@ export const premiumTables = {
   // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
   ...gameLiveTables,
 
+  // 👤 صدى الذات — نسخة رقمية من عقل اللاعب الماضي يواجهه بها اليوم
+  echoMatches: defineTable({
+    userId: v.id("users"),
+    echoVersion: v.number(), // لقطة الزمن التي بُني منها الصدى
+    questionIds: v.array(v.string()),
+    status: v.union(
+      v.literal("active"),
+      v.literal("done"),
+    ),
+    // أداء الصدى المُحاكى لكل سؤال (مُعدّ مسبقاً من بصمة الماضي)
+    echoAnswers: v.array(
+      v.object({
+        questionId: v.string(),
+        correct: v.boolean(),
+        elapsedMs: v.number(),
+      }),
+    ),
+    myCorrect: v.optional(v.number()),
+    echoCorrect: v.optional(v.number()),
+    verdict: v.optional(
+      v.union(
+        v.literal("surpassed"), // تجاوزت عقلك القديم
+        v.literal("matched"), // تعادل معه
+        v.literal("lost"), // ما زلت تحت ظل ذاتك القديمة
+      ),
+    ),
+    createdAt: v.number(),
+    finishedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"]),
+
   // 📖 ملحمة العقول — مغامرة سردية تفاعلية أبوابها محاكمها أسئلة حقيقية
   sagaRuns: defineTable({
     userId: v.id("users"),
