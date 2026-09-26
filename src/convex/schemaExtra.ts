@@ -321,6 +321,55 @@ export const premiumTables = {
   // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
   ...gameLiveTables,
 
+  // 📖 ملحمة العقول — مغامرة سردية تفاعلية أبوابها محاكمها أسئلة حقيقية
+  sagaRuns: defineTable({
+    userId: v.id("users"),
+    heroName: v.string(), // اسم البطل
+    theme: v.string(), // عالم الملحمة (مستوحى من أقوى فئات اللاعب)
+    status: v.union(
+      v.literal("active"), // مغامرة جارية
+      v.literal("completed"), // وصل للنهاية (مجد أو سقوط)
+      v.literal("abandoned"), // تُركت
+    ),
+    chapterIndex: v.number(), // الفصل الحالي
+    totalChapters: v.number(),
+    glory: v.number(), // مجد مكتسب (0..100)
+    pathTaken: v.array(v.string()), // خيارات البطل في كل فصل
+    endingTitle: v.optional(v.string()), // لقب النهاية عند الإكمال
+    createdAt: v.number(),
+    endedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_user_status", ["userId", "status"]),
+
+  sagaChapters: defineTable({
+    runId: v.id("sagaRuns"),
+    index: v.number(),
+    scene: v.string(), // نص المشهد السردي
+    choices: v.array(
+      v.object({
+        key: v.string(), // a | b | c
+        text: v.string(),
+        gateDifficulty: v.union(
+          v.literal("easy"),
+          v.literal("medium"),
+          v.literal("hard"),
+          v.literal("extreme"),
+        ),
+        gateCategory: v.string(), // فئة سؤال البوابة
+        gloryReward: v.number(),
+        riskNote: v.string(), // ما تخسره إن أخفقت
+      }),
+    ),
+    chosenKey: v.optional(v.string()),
+    gateQuestionId: v.optional(v.string()),
+    gatePassed: v.optional(v.boolean()),
+    narration: v.optional(v.string()), // وصف نتيجة اختياره
+    createdAt: v.number(),
+  })
+    .index("by_run", ["runId"]),
+
   // 🧠 العقل المُنسّق — القرارات التنفيذية الموزونة عبر كل أدوات العقول
   conductorDecisions: defineTable({
     cycle: v.number(), // رقم الدورة (تتصاعد)

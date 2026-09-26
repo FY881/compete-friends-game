@@ -33,6 +33,7 @@ import { MindsAcademy } from "@/components/MindsAcademy";
 import { ChronicleCard } from "@/components/ChronicleCard";
 import { ColossusCard } from "@/components/ColossusCard";
 import { OracleCard } from "@/components/OracleCard";
+import { SagaReader } from "@/components/SagaReader";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -337,6 +338,7 @@ export default function Play() {
     { id: "chronicle", label: "سجل العقول", emoji: "📰", group: "الذكاء والعقول", node: <ChronicleCard /> },
     { id: "colossus", label: "الطاغوت", emoji: "👹", group: "الذكاء والعقول", node: <ColossusCard /> },
     { id: "oracle", label: "العرّاف", emoji: "🔮", group: "الذكاء والعقول", node: <OracleCard /> },
+    { id: "saga", label: "ملحمة العقول", emoji: "📖", group: "الذكاء والعقول", node: <SagaReader /> },
     { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
 
     // ── لك شخصياً ──
