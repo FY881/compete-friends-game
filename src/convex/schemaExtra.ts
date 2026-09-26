@@ -502,6 +502,23 @@ export const premiumTables = {
     judgeAt: v.number(),
   }).index("by_status", ["status"]),
 
+  // ✨ لحظات القدر — جدار الأسطورة الزمني للّحظات الاستثنائية
+  mindMoments: defineTable({
+    dedupeKey: v.string(), // منع التكرار (game:user:kind)
+    userId: v.id("users"),
+    userName: v.string(),
+    kind: v.string(), // نوع النمط الأسطوري
+    title: v.string(),
+    narrative: v.optional(v.string()), // القصة المولدة
+    detail: v.string(),
+    rarity: v.number(), // 0-100
+    hidden: v.boolean(),
+    playedAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_played", ["playedAt"])
+    .index("by_user", ["userId"]),
+
   // 🌳 شجرة النسب العقلية — جينات اللاعبين الغائبين تُورّث للمتعثرين
   mindGenealogy: defineTable({
     ancestorId: v.id("users"), // اللاعب صاحب البصمة المتحللة

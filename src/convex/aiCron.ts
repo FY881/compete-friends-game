@@ -268,6 +268,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiSummit.summitJob, {}),
   },
+  {
+    key: "moment_scan",
+    name: "لحظات القدر — كاشف الأسطورة",
+    description: "يمسح الجولات الحديثة بحثاً عن 8 أنماط نادرة، ويولّد قصص لحظات الجلاء وينشرها على جدار الأسطورة.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiMoment.momentJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
