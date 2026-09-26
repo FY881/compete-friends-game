@@ -1094,10 +1094,32 @@ export const getQuestionBank = query({
     return QUESTION_BANK.map((q) => ({
       id: q.id,
       category: q.category,
-      difficulty: q.difficulty as "easy" | "medium" | "hard" | "extreme" as QuestionRow["difficulty"],
+      difficulty: q.difficulty as "easy" | "medium" | "hard" | "extreme",
       question: q.question,
       disabled: disabled.has(q.id),
     }));
+  },
+});
+
+/** Bank-wide stats per difficulty tier (owner dashboard). */
+export const getBankStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    const me = await ctx.db.get(userId);
+    if (!isStaffUser(me)) return null;
+    const dist: Record<string, number> = {};
+    const perCategory: Record<string, number> = {};
+    for (const q of QUESTION_BANK) {
+      dist[q.difficulty] = (dist[q.difficulty] ?? 0) + 1;
+      perCategory[q.category] = (perCategory[q.category] ?? 0) + 1;
+    }
+    return {
+      total: QUESTION_BANK.length,
+      dist,
+      perCategory,
+    };
   },
 });
 
@@ -1521,7 +1543,7 @@ export const toggleQuestion = mutation({
 export type QuestionQualityRow = {
   id: string;
   category: string;
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: "easy" | "medium" | "hard" | "extreme";
   question: string;
   disabled: boolean;
   timesAsked: number;

@@ -38,19 +38,19 @@ export const MEGA_PACK_3: Question[] = [
   { id: "q709", category: "جغرافيا", difficulty: "easy", question: "ما هي أعلى قمة في العالم؟", options: ["K2", "إفرست", "كليمنجارو", "مونت بلانك"], correctIndex: 1 },
 
   // ── لغة وأدب ──
-  { id: "q710", category: "لغة وأدب", difficulty: "medium", question: "من صاحب مقامات الحريري؟", options: ["الحريري", "الهمذاني", "الجاحظ", "ابن المقفع"], correctIndex: 0 },
-  { id: "q711", category: "لغة وأدب", difficulty: "hard", question: "ما هو البحر الشعري الذي يكثر في مراثي الخنساء؟", options: ["الطويل", "الكامل", "البسيط", "الوافر"], correctIndex: 0 },
-  { id: "q712", category: "لغة وأدب", difficulty: "medium", question: "من كتب «مقدمة» في علم الاجتماع قبل ابن خلدون؟", options: ["لا أحد قبله", "الجاحظ", "المسعودي", "ابن بطوطة"], correctIndex: 0 },
-  { id: "q713", category: "لغة وأدب", difficulty: "easy", question: "ما جمع كلمة «قلم»؟", options: ["قلمات", "أقلام", "قولمة", "قلمون"], correctIndex: 1 },
-  { id: "q714", category: "لغة وأدب", difficulty: "hard", question: "ما اسم الشاعر الملقب بـ«شاعر النيل»؟", options: ["حافظ إبراهيم", "أحمد شوقي", "معروف الرصافي", "بدر شاكر السياب"], correctIndex: 0 },
-  { id: "q715", category: "لغة وأدب", difficulty: "medium", question: "كم حرفاً في الأبجدية العربية؟", options: ["26", "28", "30", "32"], correctIndex: 1 },
+  { id: "q710", category: "لغة", difficulty: "medium", question: "من صاحب مقامات الحريري؟", options: ["الحريري", "الهمذاني", "الجاحظ", "ابن المقفع"], correctIndex: 0 },
+  { id: "q711", category: "لغة", difficulty: "hard", question: "ما هو البحر الشعري الذي يكثر في مراثي الخنساء؟", options: ["الطويل", "الكامل", "البسيط", "الوافر"], correctIndex: 0 },
+  { id: "q712", category: "لغة", difficulty: "medium", question: "من كتب «مقدمة» في علم الاجتماع قبل ابن خلدون؟", options: ["لا أحد قبله", "الجاحظ", "المسعودي", "ابن بطوطة"], correctIndex: 0 },
+  { id: "q713", category: "لغة", difficulty: "easy", question: "ما جمع كلمة «قلم»؟", options: ["قلمات", "أقلام", "قولمة", "قلمون"], correctIndex: 1 },
+  { id: "q714", category: "لغة", difficulty: "hard", question: "ما اسم الشاعر الملقب بـ«شاعر النيل»؟", options: ["حافظ إبراهيم", "أحمد شوقي", "معروف الرصافي", "بدر شاكر السياب"], correctIndex: 0 },
+  { id: "q715", category: "لغة", difficulty: "medium", question: "كم حرفاً في الأبجدية العربية؟", options: ["26", "28", "30", "32"], correctIndex: 1 },
 
   // ── رياضيات ومنطق ──
-  { id: "q716", category: "رياضيات ومنطق", difficulty: "medium", question: "ما هو مجموع زوايا الرباعي بالدرجات؟", options: ["180", "270", "360", "450"], correctIndex: 2 },
-  { id: "q717", category: "رياضيات ومنطق", difficulty: "hard", question: "ما هي قيمة العدد النيبري مقربة لخانتين؟", options: ["2.71", "3.14", "1.61", "2.31"], correctIndex: 0 },
-  { id: "q718", category: "رياضيات ومنطق", difficulty: "medium", question: "إذا كان س = 5، فما قيمة 3س + 4؟", options: ["15", "19", "23", "27"], correctIndex: 1 },
-  { id: "q719", category: "رياضيات ومنطق", difficulty: "easy", question: "ما هو مربع العدد 12؟", options: ["124", "144", "169", "196"], correctIndex: 1 },
-  { id: "q720", category: "رياضيات ومنطق", difficulty: "hard", question: "كم عدد أضلاع المتوازي الست常规؟ (سداسي منتظم)", options: ["5", "6", "7", "8"], correctIndex: 1 },
+  { id: "q716", category: "رياضيات", difficulty: "medium", question: "ما هو مجموع زوايا الرباعي بالدرجات؟", options: ["180", "270", "360", "450"], correctIndex: 2 },
+  { id: "q717", category: "رياضيات", difficulty: "hard", question: "ما هي قيمة العدد النيبري مقربة لخانتين؟", options: ["2.71", "3.14", "1.61", "2.31"], correctIndex: 0 },
+  { id: "q718", category: "رياضيات", difficulty: "medium", question: "إذا كان س = 5، فما قيمة 3س + 4؟", options: ["15", "19", "23", "27"], correctIndex: 1 },
+  { id: "q719", category: "رياضيات", difficulty: "easy", question: "ما هو مربع العدد 12؟", options: ["124", "144", "169", "196"], correctIndex: 1 },
+  { id: "q720", category: "رياضيات", difficulty: "hard", question: "كم عدد أضلاع المتوازي الست常规؟ (سداسي منتظم)", options: ["5", "6", "7", "8"], correctIndex: 1 },
 
   // ── رياضة ──
   { id: "q721", category: "رياضة", difficulty: "easy", question: "بأي جزء من الجسم يُلعب كرة القدم رسمياً؟", options: ["اليد", "القدم", "الرأس فقط", "الجسم كله"], correctIndex: 1 },
@@ -60,17 +60,17 @@ export const MEGA_PACK_3: Question[] = [
   { id: "q725", category: "رياضة", difficulty: "easy", question: "ما هي الرياضة التي يُلقب لاعبها بـ«ملكة الألعاب»؟", options: ["السباحة", "ألعاب القوى", "الجمباز", "الملاكمة"], correctIndex: 1 },
 
   // ── تقنية ──
-  { id: "q726", category: "تقنية", difficulty: "medium", question: "ما معنى اختصار HTML؟", options: ["لغة ترميز النص الفائق", "لغة برمجة عالية المستوى", "بروتوكول نقل نص", "قاعدة بيانات نصية"], correctIndex: 0 },
-  { id: "q727", category: "تقنية", difficulty: "hard", question: "من اخترع المحرك البخاري المحسّن الذي أشعل الثورة الصناعية؟", options: ["جيمس وات", "توماس إديسون", "نيكولا تسلا", "مايكل فاراداي"], correctIndex: 0 },
-  { id: "q728", category: "تقنية", difficulty: "easy", question: "ما هو الجهاز المسؤول عن المعالجة في الحاسوب؟", options: ["الشاشة", "المعالج المركزي", "لوحة المفاتيح", "الطابعة"], correctIndex: 1 },
-  { id: "q729", category: "تقنية", difficulty: "medium", question: "ما معنى اختصار RAM؟", options: ["ذاكرة الوصول العشوائي", "ذاكرة القراءة فقط", "وحدة المعالجة", "منفذ الشبكة"], correctIndex: 0 },
-  { id: "q730", category: "تقنية", difficulty: "hard", question: "ما هي الخوارزمية الأكثر استخداماً لتشفير HTTPS؟", options: ["RSA/TLS", "MD5", "SHA-1", "Base64"], correctIndex: 0 },
+  { id: "q726", category: "تكنولوجيا", difficulty: "medium", question: "ما معنى اختصار HTML؟", options: ["لغة ترميز النص الفائق", "لغة برمجة عالية المستوى", "بروتوكول نقل نص", "قاعدة بيانات نصية"], correctIndex: 0 },
+  { id: "q727", category: "تكنولوجيا", difficulty: "hard", question: "من اخترع المحرك البخاري المحسّن الذي أشعل الثورة الصناعية؟", options: ["جيمس وات", "توماس إديسون", "نيكولا تسلا", "مايكل فاراداي"], correctIndex: 0 },
+  { id: "q728", category: "تكنولوجيا", difficulty: "easy", question: "ما هو الجهاز المسؤول عن المعالجة في الحاسوب؟", options: ["الشاشة", "المعالج المركزي", "لوحة المفاتيح", "الطابعة"], correctIndex: 1 },
+  { id: "q729", category: "تكنولوجيا", difficulty: "medium", question: "ما معنى اختصار RAM؟", options: ["ذاكرة الوصول العشوائي", "ذاكرة القراءة فقط", "وحدة المعالجة", "منفذ الشبكة"], correctIndex: 0 },
+  { id: "q730", category: "تكنولوجيا", difficulty: "hard", question: "ما هي الخوارزمية الأكثر استخداماً لتشفير HTTPS؟", options: ["RSA/TLS", "MD5", "SHA-1", "Base64"], correctIndex: 0 },
 
   // ── فنون وثقافة ──
-  { id: "q731", category: "فنون وثقافة", difficulty: "medium", question: "من رسم لوحة «الليل المرصّع بالنجوم»؟", options: ["فان جوخ", "بيكاسو", "مونيه", "دافنشي"], correctIndex: 0 },
-  { id: "q732", category: "فنون وثقافة", difficulty: "hard", question: "ما هي أقدم آلة موسيقية معروفة في التاريخ؟", options: ["الناي", "العود", "الدف", "القيثارة"], correctIndex: 0 },
-  { id: "q733", category: "فنون وثقافة", difficulty: "easy", question: "ما اللون الذي يُحصل عليه بمزج الأزرق والأصفر؟", options: ["البني", "الأخضر", "البرتقالي", "البنفسجي"], correctIndex: 1 },
-  { id: "q734", category: "فنون وثقافة", difficulty: "medium", question: "كم مفردة في الأوبيرا الكلاسيكية عادة؟", options: ["3 فصول", "4 فصول", "5 فصول", "فصل واحد"], correctIndex: 0 },
+  { id: "q731", category: "فنون", difficulty: "medium", question: "من رسم لوحة «الليل المرصّع بالنجوم»؟", options: ["فان جوخ", "بيكاسو", "مونيه", "دافنشي"], correctIndex: 0 },
+  { id: "q732", category: "فنون", difficulty: "hard", question: "ما هي أقدم آلة موسيقية معروفة في التاريخ؟", options: ["الناي", "العود", "الدف", "القيثارة"], correctIndex: 0 },
+  { id: "q733", category: "فنون", difficulty: "easy", question: "ما اللون الذي يُحصل عليه بمزج الأزرق والأصفر؟", options: ["البني", "الأخضر", "البرتقالي", "البنفسجي"], correctIndex: 1 },
+  { id: "q734", category: "فنون", difficulty: "medium", question: "كم مفردة في الأوبيرا الكلاسيكية عادة؟", options: ["3 فصول", "4 فصول", "5 فصول", "فصل واحد"], correctIndex: 0 },
 
   // ── دين وثقافة ──
   { id: "q735", category: "دين وثقافة", difficulty: "medium", question: "كم عدد أركان الإيمان؟", options: ["5", "6", "7", "8"], correctIndex: 1 },

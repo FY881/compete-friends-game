@@ -27,7 +27,7 @@ export const gameSettingsValidator = v.object({
     v.union(
       v.literal("easy"),
       v.literal("medium"),
-      v.literal("hard"), v.literal("extreme"),
+      v.literal("hard"),
       v.literal("extreme"),
     ),
   ), // absent = mixed adaptive difficulty
@@ -1335,7 +1335,7 @@ const schema = defineSchema(
     aiQuestions: defineTable({
       qid: v.string(), // custom id مثل "ai-1a2b3c" — يُخزَّن في games.questionIds
       category: v.string(), // must be one of CATEGORIES
-      difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+      difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard"), v.literal("extreme")),
       question: v.string(),
       options: v.array(v.string()), // exactly 4
       correctIndex: v.number(), // 0-3

@@ -803,10 +803,17 @@ export const updateSettings = mutation({
     const shapeChanged =
       current.questionCount !== safe.questionCount ||
       (current.durationMinutes ?? DURATION_MODE_OFF) !== safe.durationMinutes ||
-      JSON.stringify(current.categories) !== JSON.stringify(safe.categories);
+      JSON.stringify(current.categories) !== JSON.stringify(safe.categories) ||
+      current.difficulty !== safe.difficulty;
 
     if (shapeChanged) {
-      const questionIds = await pickQuestions(ctx, safe.categories, poolSizeFor(safe));
+      const questionIds = await pickQuestions(
+        ctx,
+        safe.categories,
+        poolSizeFor(safe),
+        undefined,
+        safe.difficulty,
+      );
       await ctx.db.patch(game._id, {
         settings: safe,
         questionIds,
@@ -1222,6 +1229,8 @@ export const rematch = mutation({
       ctx,
       settingsOf(game).categories,
       poolSizeFor(settingsOf(game)),
+      undefined,
+      settingsOf(game).difficulty,
     );
 
     const gameId = await ctx.db.insert("games", {

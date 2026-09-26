@@ -47,6 +47,7 @@ import { FeaturesShowcase } from "@/components/FeaturesShowcase";
 import { GameModes } from "@/components/game/GameModes";
 import { SmartGateway } from "@/components/SmartGateway";
 import { Volume2, VolumeX } from "lucide-react";
+import type { Difficulty } from "@/lib/question-difficulty";
 import { OwnerLoginDialog } from "@/components/OwnerLoginDialog";
 import StorePage from "@/components/StorePage";
 import { toast } from "sonner";
@@ -81,6 +82,7 @@ import {
   DURATION_OPTIONS,
   formatDurationLabel,
 } from "@/lib/game-config";
+import { DIFFICULTIES, DIFFICULTY_LABELS } from "@/lib/question-difficulty";
 
 const NICKNAME_KEY = "mindclash.nickname";
 
@@ -140,6 +142,7 @@ export default function Play() {
   // «مدة الجولة» at room creation: classic (by question count) or a timed
   // match (5/10/15 دقائق — the round runs on the clock until time runs out).
   const [roundDuration, setRoundDuration] = useState<number>(DURATION_MODE_OFF);
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
 
   const persistNickname = (value: string) => {
     setNickname(value);
@@ -224,8 +227,15 @@ export default function Play() {
               timePerQuestionMs: ANSWER_MS,
               categories: [],
               durationMinutes: roundDuration,
+              difficulty,
             }
-          : undefined;
+          : {
+              questionCount: 5,
+              timePerQuestionMs: ANSWER_MS,
+              categories: [],
+              durationMinutes: DURATION_MODE_OFF,
+              difficulty,
+            };
       const { code: roomCode } = await createGame({
         name: nickname.trim(),
         settings,
@@ -647,6 +657,38 @@ export default function Play() {
               </p>
             </motion.div>
 
+            {/* مستوى الصعوبة — حدده قبل إنشاء الغرفة */}
+            <motion.div
+              variants={fadeUp}
+              className="mt-4 rounded-2xl border border-fuchsia-500/15 bg-card/70 p-4 shadow-sm backdrop-blur-sm"
+            >
+              <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                <Star className="size-3.5 text-fuchsia-500" />
+                مستوى الصعوبة
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                {DIFFICULTIES.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    disabled={creating || banned}
+                    onClick={() => setDifficulty(d)}
+                    className={cn(
+                      "rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all",
+                      difficulty === d
+                        ? "border-fuchsia-500 bg-fuchsia-500 text-white shadow-sm"
+                        : "border-border/80 bg-card text-muted-foreground hover:border-fuchsia-500/40 hover:text-foreground",
+                    )}
+                  >
+                    {DIFFICULTY_LABELS[d]}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                «متوسط» = خليط تكيفي يتوزع تلقائياً حسب مستواك. اختيار مستوى محدد يجعل كل الأسئلة منه (شبه مستحيل = 300 نقطة أساس).
+              </p>
+            </motion.div>
+
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-2">
                 <Users className="size-4 text-primary" />
@@ -654,7 +696,7 @@ export default function Play() {
               </span>
               <span className="flex items-center gap-2">
                 <Zap className="size-4 text-primary" />
-                حتى 380 نقطة للسؤال
+                حتى 540 نقطة للسؤال
               </span>
               <span className="flex items-center gap-2">
                 <Flame className="size-4 text-primary" />

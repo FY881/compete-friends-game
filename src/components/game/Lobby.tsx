@@ -40,6 +40,7 @@ import {
   Check,
   Crown,
   Copy,
+  Filter,
   Flag,
   Gauge,
   Link2,
@@ -145,6 +146,12 @@ function ReactionsPanel({ code }: { code: string }) {
   );
 }
 import { GameAvatar, copyText } from "./ui";
+import {
+  DIFFICULTIES,
+  DIFFICULTY_LABELS,
+  normalizeDifficulty,
+  type Difficulty,
+} from "@/lib/question-difficulty";
 
 const REPORT_REASONS = [
   "اسم مسيء أو غير لائق",
@@ -185,6 +192,10 @@ function SettingsSummary({ settings }: { settings: GameSettings }) {
           كل الفئات
         </Badge>
       )}
+      <Badge variant="outline" className="gap-1.5 rounded-full border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-700">
+        <Filter className="size-3.5" />
+        {DIFFICULTY_LABELS[normalizeDifficulty(settings.difficulty)]}
+      </Badge>
     </div>
   );
 }
@@ -323,6 +334,36 @@ function HostSettings({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Difficulty filter */}
+      <div className="mt-4">
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+          <Filter className="size-3.5 text-primary" />
+          مستوى الصعوبة
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {DIFFICULTIES.map((d) => (
+            <button
+              key={d}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange({ ...settings, difficulty: d })}
+              className={cn(
+                "rounded-xl border px-4 py-2 text-sm font-bold transition-all",
+                normalizeDifficulty(settings.difficulty) === d
+                  ? "border-fuchsia-500 bg-fuchsia-500 text-white shadow-sm"
+                  : "border-border/80 bg-card text-muted-foreground hover:border-fuchsia-500/50 hover:text-foreground",
+              )}
+            >
+              {DIFFICULTY_LABELS[d]}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          «متوسط» = خليط تكيفي يتوزع تلقائياً حسب مستواك (سهل/متوسط/صعب/شبه مستحيل).
+          اختيار مستوى محدد يجعل كل الأسئلة من ذلك المستوى.
+        </p>
       </div>
 
       {/* Categories */}
