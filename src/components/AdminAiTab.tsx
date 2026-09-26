@@ -3,6 +3,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { SettingsData } from "@/convex/owner";
+import { DIFFICULTY_LABELS } from "@/lib/question-difficulty";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  ScanSearch,
   Timer,
   Smartphone,
   UserCog,
@@ -162,6 +164,7 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
   const clientErrors = useQuery(api.owner.listClientErrors);
   const runSweepNow = useAction(api.autoAdmin.runSweepNow);
   const generateQuestions = useAction(api.aiQuestions.generateQuestions);
+  const runVerifier = useAction(api.aiVerifier.verifyPendingQuestions);
   const approveQuestion = useMutation(api.aiQuestions.approveQuestion);
   const rejectQuestion = useMutation(api.aiQuestions.rejectQuestion);
   const [busy, setBusy] = useState(false);
@@ -173,6 +176,14 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
   const [genCount, setGenCount] = useState(6);
   const [genBusy, setGenBusy] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [verifierBusy, setVerifierBusy] = useState(false);
+  const [verifierAutoApply, setVerifierAutoApply] = useState(false);
+  const [verifierResult, setVerifierResult] = useState<{
+    checked: number;
+    passed: number;
+    fixedCount: number;
+    rejected: number;
+  } | null>(null);
 
   const latest = reports?.[0];
 
@@ -298,6 +309,37 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
       toast.error(error instanceof Error ? error.message : "تعذّر التوليد.");
     } finally {
       setGenBusy(false);
+    }
+  };
+
+  /** 🧠 مدقق العقول — يفحص الطابور المعلّق ويصحح/يرفض آلياً حسب اختيار المالك. */
+  const handleRunVerifier = async () => {
+    setVerifierBusy(true);
+    setVerifierResult(null);
+    try {
+      const result = await runVerifier({
+        limit: 10,
+        autoApply: verifierAutoApply,
+      });
+      setVerifierResult(result);
+      if (result.checked === 0) {
+        toast.info("لا أسئلة جديدة بانتظار التدقيق.");
+      } else if (verifierAutoApply) {
+        toast.success(
+          `اكتمل التدقيق: ${result.passed} سليم اعتُمد، ${result.fixedCount} صُحح واعتُمد، ${result.rejected} رُفض.`,
+        );
+      } else {
+        toast.success(
+          `اكتمل التدقيق: ${result.passed} سليم، ${result.fixedCount} يحتاج تصحيحاً، ${result.rejected} مرفوض — راجع الأحكام في الطابور.`,
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "تعذّر تشغيل المدقق.",
+      );
+    } finally {
+      setVerifierBusy(false);
     }
   };
 
@@ -781,6 +823,56 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
             )}
           </div>
 
+          {/* 🧠 مدقق العقول — التدقيق الآلي قبل الاعتماد */}
+          <div className="rounded-2xl border border-violet-500/25 bg-violet-500/[0.04] p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="flex items-center gap-1.5 text-xs font-bold">
+                <ScanSearch className="size-3.5 text-violet-600" />
+                مدقّق العقول — فحص ذكي قبل الاعتماد
+              </p>
+              <label className="ms-auto flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={verifierAutoApply}
+                  onChange={(e) => setVerifierAutoApply(e.target.checked)}
+                  className="size-3.5 accent-violet-600"
+                />
+                اعتماد/تصحيح/رفض آلي
+              </label>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+              يفحص كل سؤال معلّق: صحة الإجابة واقعياً، وضوح اللغة، معايرة الصعوبة،
+              والتكرار مع البنك. بدون «آلي» يعطي أحكاماً فقط وقرار الاعتماد بيدك.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                onClick={handleRunVerifier}
+                disabled={verifierBusy || !settings.aiKeyConfigured}
+                className="gap-1.5 rounded-xl bg-violet-600 text-white hover:bg-violet-700"
+              >
+                {verifierBusy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ScanSearch className="size-4" />
+                )}
+                {verifierBusy ? "جارٍ التدقيق…" : "دقّق الأسئلة المعلّقة"}
+              </Button>
+              {verifierResult && verifierResult.checked > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                  <Badge variant="outline" className="rounded-full border-emerald-500/40 bg-emerald-500/10 text-emerald-700">
+                    ✓ {verifierResult.passed} سليم
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-amber-500/40 bg-amber-500/10 text-amber-700">
+                    ✎ {verifierResult.fixedCount} قابل للإصلاح
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-rose-500/40 bg-rose-500/10 text-rose-700">
+                    ✕ {verifierResult.rejected} مرفوض
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Review queue */}
           <div>
             <p className="flex items-center gap-1.5 text-xs font-bold">
@@ -818,17 +910,42 @@ export function AdminAiTab({ settings }: { settings: SettingsData }) {
                         {q.category}
                       </Badge>
                       <Badge variant="outline" className="rounded-full text-[10px]">
-                        {q.difficulty === "easy"
-                          ? "سهل"
-                          : q.difficulty === "medium"
-                            ? "متوسط"
-                            : "صعب"}
+                        {DIFFICULTY_LABELS[q.difficulty as keyof typeof DIFFICULTY_LABELS] ?? q.difficulty}
                       </Badge>
                       <span className="ms-auto text-[10px] text-muted-foreground">
                         {fmtDate(q.createdAt)}
                       </span>
                     </div>
                     <p className="mt-2 text-sm font-bold leading-relaxed">{q.question}</p>
+                    {q.verification && (
+                      <div
+                        className={cn(
+                          "mt-2 rounded-xl border px-3 py-2",
+                          q.verification.verdict === "pass"
+                            ? "border-emerald-500/30 bg-emerald-500/5"
+                            : q.verification.verdict === "fixable"
+                              ? "border-amber-500/30 bg-amber-500/5"
+                              : "border-rose-500/30 bg-rose-500/5",
+                        )}
+                      >
+                        <p className="flex items-center gap-1.5 text-[11px] font-bold">
+                          {q.verification.verdict === "pass" ? (
+                            <span className="text-emerald-700">✓ حكم المدقق: سليم ({q.verification.score}%)</span>
+                          ) : q.verification.verdict === "fixable" ? (
+                            <span className="text-amber-700">✎ حكم المدقق: قابل للإصلاح ({q.verification.score}%)</span>
+                          ) : (
+                            <span className="text-rose-700">✕ حكم المدقق: مرفوض ({q.verification.score}%)</span>
+                          )}
+                        </p>
+                        {q.verification.issues.length > 0 && (
+                          <ul className="mt-1 space-y-0.5 text-[10px] leading-relaxed text-muted-foreground">
+                            {q.verification.issues.map((issue, i) => (
+                              <li key={i}>• {issue}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                     <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                       {q.options.map((opt, i) => (
                         <div

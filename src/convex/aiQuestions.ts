@@ -22,6 +22,11 @@ type GeneratedQuestion = {
   correctIndex: number;
   status: "pending" | "approved" | "rejected";
   createdAt: number;
+  verification: {
+    verdict: "pass" | "fixable" | "reject";
+    score: number;
+    issues: string[];
+  } | null;
 };
 
 /**
@@ -260,6 +265,13 @@ export const getAiQuestionQueue = query({
         correctIndex: r.correctIndex,
         status: r.status as "pending" | "approved" | "rejected",
         createdAt: r.createdAt,
+        verification: r.verification
+          ? {
+              verdict: r.verification.verdict,
+              score: r.verification.score,
+              issues: r.verification.issues,
+            }
+          : null,
       }));
 
     // Convex لا يسمح بأسماء حقول غير ASCII — نستخدم slug لكل فئة.

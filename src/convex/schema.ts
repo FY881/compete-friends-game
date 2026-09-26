@@ -1351,6 +1351,31 @@ const schema = defineSchema(
       scheduledFor: v.optional(v.number()), // يُعتمد آلياً في هذا التوقيت (النشر المجدول)
       editedAt: v.optional(v.number()), // آخر تحرير يدوي
       editedBy: v.optional(v.string()),
+      // 🧠 مدقّق العقول — حكم الذكاء الاصطناعي على السؤال قبل اعتماده
+      verification: v.optional(
+        v.object({
+          verdict: v.union(
+            v.literal("pass"),
+            v.literal("fixable"),
+            v.literal("reject"),
+          ),
+          score: v.number(),
+          issues: v.array(v.string()),
+          fixedQuestion: v.optional(v.string()),
+          fixedOptions: v.optional(v.array(v.string())),
+          fixedCorrectIndex: v.optional(v.number()),
+          fixedDifficulty: v.optional(
+            v.union(
+              v.literal("easy"),
+              v.literal("medium"),
+              v.literal("hard"),
+              v.literal("extreme"),
+            ),
+          ),
+          verifiedAt: v.number(),
+          model: v.string(),
+        }),
+      ),
     })
       .index("by_qid", ["qid"])
       .index("by_status", ["status"])
