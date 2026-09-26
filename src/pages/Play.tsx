@@ -36,6 +36,7 @@ import { OracleCard } from "@/components/OracleCard";
 import { SagaReader } from "@/components/SagaReader";
 import { EchoCard } from "@/components/EchoCard";
 import { MentorHub } from "@/components/MentorHub";
+import { FateWell } from "@/components/FateWell";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -343,6 +344,7 @@ export default function Play() {
     { id: "saga", label: "ملحمة العقول", emoji: "📖", group: "الذكاء والعقول", node: <SagaReader /> },
     { id: "echo", label: "صدى الذات", emoji: "👤", group: "الذكاء والعقول", node: <EchoCard /> },
     { id: "bazaar", label: "بازار العقول", emoji: "🧬", group: "الذكاء والعقول", node: <MentorHub /> },
+    { id: "fate", label: "بئر القدر", emoji: "🎲", group: "الذكاء والعقول", node: <FateWell /> },
     { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
 
     // ── لك شخصياً ──

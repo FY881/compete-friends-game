@@ -241,6 +241,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiMentor.refreshSoulmates, {}),
   },
+  {
+    key: "fate_judge",
+    name: "بئر القدر — الحكم الآلي",
+    description: "يحكم الرهانات المستحقة آلياً من الأداء الفعلي: يدفع المضاعف للوفاء ويبتلع الخاسر، ويطلق الإحالات الظرفية.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiFate.fateJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

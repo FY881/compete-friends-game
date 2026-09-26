@@ -469,6 +469,39 @@ export const premiumTables = {
     .index("by_to", ["toId"])
     .index("by_from", ["fromId"]),
 
+  // 🎲 بئر القدر — رهانات ولاء على الأداء المستقبلي يحكمها الوقت آلياً
+  fateBets: defineTable({
+    userId: v.id("users"),
+    userName: v.string(),
+    kind: v.string(), // correct_answers | win_match | streak_reach | category_sweep | flip
+    stake: v.number(), // نقاط ولاء مخصومة فوراً (0 للإحالات)
+    multiplier: v.number(), // مضاعف الرد عند الوفاء
+    target: v.number(), // الهدف العددي
+    category: v.optional(v.union(v.string(), v.null())), // فئة أو نوع إحالة
+    flipId: v.optional(v.id("fateFlips")), // لخانات القبول المرتبطة بإحالة
+    status: v.union(v.literal("open"), v.literal("fulfilled"), v.literal("forfeited")),
+    verdictDetail: v.optional(v.string()),
+    createdAt: v.number(),
+    judgeAt: v.number(),
+    judgedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status_judge", ["status", "judgeAt"]),
+
+  // 🌪️ إحالات القدر الظرفية — مهام مولّدة من حالة السوق الحقيقية
+  fateFlips: defineTable({
+    kind: v.string(), // ghost_category | streak_guard | seasonal_close
+    title: v.string(),
+    desc: v.string(),
+    target: v.number(),
+    reward: v.number(), // ولاء يُدفع عند الوفاء
+    status: v.union(v.literal("open"), v.literal("closed")),
+    acceptedCount: v.number(),
+    fulfilledCount: v.number(),
+    createdAt: v.number(),
+    judgeAt: v.number(),
+  }).index("by_status", ["status"]),
+
   // 🧠 العقل المُنسّق — القرارات التنفيذية الموزونة عبر كل أدوات العقول
   conductorDecisions: defineTable({
     cycle: v.number(), // رقم الدورة (تتصاعد)
