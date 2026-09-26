@@ -321,6 +321,37 @@ export const premiumTables = {
   // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
   ...gameLiveTables,
 
+  // 🔮 عرّاف العقول — نبوءات علنية شجاعة تُحاسب آلياً على دقتها
+  oracleProphecies: defineTable({
+    kind: v.union(
+      v.literal("weekly_champion"), // من سيصدر لوحة الصدارة نهاية الأسبوع
+      v.literal("upset"), // لاعب صاعد سيفاجئ متصدراً
+      v.literal("accuracy_drop"), // دقة الفئة ستنهار هذا الأسبوع
+      v.literal("colossus_fate"), // مصير الطاغوت: هزيمة أو نجاة
+      v.literal("dark_horse"), // الحصان الأسود في الترتيب
+    ),
+    subjectId: v.optional(v.id("users")), // اللاعب موضوع النبوءة
+    subjectName: v.string(),
+    claim: v.string(), // نص النبوءة الصريح
+    confidence: v.number(), // 0-100 جسارة العرّاف
+    stake: v.number(), // نقاط ولاء يخاطر بها
+    dataBasis: v.string(), // الأرقام التي بنى عليها (شفافية كاملة)
+    status: v.union(
+      v.literal("open"), // بانتظار الحكم الزمن
+      v.literal("fulfilled"), // تحققت ✅
+      v.literal("falsified"), // كُذّبت ❌
+      v.literal("void"), // ظروف حالت دون الحكم
+    ),
+    verdictDetail: v.optional(v.string()),
+    windowStart: v.number(),
+    windowEnd: v.number(), // موعد الحكم
+    resolvedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_window", ["windowEnd"])
+    .index("by_subject", ["subjectId"]),
+
   // 👹 الطاغوت — عدو جماعي حي يتعلم من دقة المجتمع ويتكيف أسبوعياً
   colossusSeasons: defineTable({
     season: v.number(), // رقم الموسم (أسبوع زمني)

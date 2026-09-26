@@ -196,6 +196,24 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiColossus.evolveSeason, {}),
   },
+  {
+    key: "oracle_prophecy",
+    name: "نبوءات العرّاف",
+    description: "يصدر العرّاف نبوءات علنية قابلة للتكذيب عن الأسبوع القادم ويُحاسب آلياً على دقتها عند انتهاء نافذتها.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiOracle.prophecyJob, {}),
+  },
+  {
+    key: "oracle_verdict",
+    name: "محكمة العرّاف",
+    description: "يفتح النبوءات المستحقة للحكم آلياً ويقارن الادعاء بالواقع الفعلي — لا تفسيرات مرنة.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiOracle.resolveDueInternal, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
