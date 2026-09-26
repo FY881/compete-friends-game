@@ -320,4 +320,25 @@ export const premiumTables = {
   ...miniGameTables,
   // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
   ...gameLiveTables,
+
+  // 🎙️ المعلق الأسطوري — لحظات المباراة المروية بالذكاء الاصطناعي
+  casterNarrative: defineTable({
+    gameId: v.id("games"),
+    code: v.string(),
+    momentKind: v.union(
+      v.literal("match_intro"), // افتتاحية المباراة
+      v.literal("question_start"), // لحظة إطلاق سؤال
+      v.literal("reveal"), // كشف الإجابة: البطل/المفاجأة/الخلاصة
+      v.literal("streak_alert"), // سلسلة نارية
+      v.literal("comeback_alert"), // عودة من الغفير
+      v.literal("finale"), // قصة النهاية الختامية
+    ),
+    atQuestionIndex: v.number(),
+    text: v.string(), // السرد الدرامي المولّد
+    stats: v.optional(v.string()), // سياق الأرقام المُغذي للسرد
+    engine: v.optional(v.string()), // llm | local — مصدر السرد
+    createdAt: v.number(),
+  })
+    .index("by_game", ["gameId", "createdAt"])
+    .index("by_code", ["code", "createdAt"]),
 };

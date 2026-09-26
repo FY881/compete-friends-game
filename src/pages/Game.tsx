@@ -56,6 +56,7 @@ function RoomShell({ children }: { children: React.ReactNode }) {
  *                              + نصف نقاط عند الإعادة. لم يُعد بناؤه، بل صُحّح التعليق ليشير إليه.
  */
 import { LiveMindRadar } from "@/components/game/LiveMindRadar";
+import { CasterBar } from "@/components/game/CasterBar";
 
 export default function Game() {
   const { code = "" } = useParams();
@@ -312,6 +313,7 @@ export default function Game() {
 
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         {data.game.status !== "finished" && <LiveMindRadar code={data.game.code} />}
+        {data.game.status === "playing" && <CasterBar code={data.game.code} />}
         {data.game.status === "waiting" && <Lobby game={data} me={me} onLeave={handleLeave} />}
         {data.game.status === "playing" && me && <QuestionStage game={data} me={me} />}
         {data.game.status === "finished" && <ResultsStage game={data} />}

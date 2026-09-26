@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Eye, Loader2, Send, Swords, Users } from "lucide-react";
+import { CasterBar } from "./CasterBar";
 
 const HEARTBEAT_MS = 30_000;
 
@@ -84,6 +85,9 @@ export function SpectatorStage({ code }: { code: string }) {
 
   return (
     <div className="space-y-5">
+      {/* 🎙️ بث المعلق الأسطوري — اللحظات تُروى أولاً بأول */}
+      <CasterBar code={code} />
+
       {/* شريط المشاهدة */}
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-sky-500/25 bg-gradient-to-l from-sky-500/10 to-transparent px-4 py-3">
         <span className="flex size-9 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600">

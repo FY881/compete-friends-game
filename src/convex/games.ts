@@ -871,6 +871,12 @@ export const startGame = mutation({
       internal.games.revealQuestion,
       { gameId: game._id, index: 0 },
     );
+    // 🎙️ المعلق الأسطوري: افتتاحية المباراة (بلا انتظار — لا يعيق اللعب)
+    await ctx.scheduler.runAfter(0, internal.aiCaster.narrateMomentInternal, {
+      gameId: game._id,
+      kind: "match_intro",
+      questionIndex: 0,
+    });
   },
 });
 
@@ -1290,6 +1296,12 @@ export const revealQuestion = internalMutation({
       gameId,
       index,
     });
+    // 🎙️ المعلق الأسطوري: سرد لحظة الكشف (نتائج حقيقية الآن مكتملة)
+    await ctx.scheduler.runAfter(0, internal.aiCaster.narrateMomentInternal, {
+      gameId,
+      kind: "reveal",
+      questionIndex: index,
+    });
   },
 });
 
@@ -1323,6 +1335,12 @@ export const advanceQuestion = internalMutation({
     if (index >= game.questionIds.length - 1 || timeBudgetGone || nextWouldNotFit) {
       await ctx.db.patch(gameId, { status: "finished" });
       await ctx.scheduler.runAfter(0, internal.games.finishGame, { gameId });
+      // 🎙️ المعلق الأسطوري: قصة النهاية الختامية
+      await ctx.scheduler.runAfter(0, internal.aiCaster.narrateMomentInternal, {
+        gameId,
+        kind: "finale",
+        questionIndex: index,
+      });
       return;
     }
 
