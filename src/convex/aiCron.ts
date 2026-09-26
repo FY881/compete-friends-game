@@ -277,6 +277,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiMoment.momentJob, {}),
   },
+  {
+    key: "exchange_tick",
+    name: "صرف القدرات — نبض المؤشر",
+    description: "يحسب مؤشر MIDX من النشاط الفعلي ويسوّي الصفقات المستحقة وينشر توقعات المحلّل.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiExchange.exchangeJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

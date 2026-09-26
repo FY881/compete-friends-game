@@ -502,6 +502,40 @@ export const premiumTables = {
     judgeAt: v.number(),
   }).index("by_status", ["status"]),
 
+  // 📈 صرف القدرات — مؤشر سوق حي للولاء + صفقات وتوقعات محلل
+  exchangeTicks: defineTable({
+    midx: v.number(), // قيمة المؤشر
+    activeToday: v.number(),
+    todayRounds: v.number(),
+    circulating: v.number(), // الولاء المتداول
+    createdAt: v.number(),
+  }).index("by_created", ["createdAt"]),
+
+  exchangeTrades: defineTable({
+    userId: v.id("users"),
+    userName: v.string(),
+    direction: v.union(v.literal("up"), v.literal("down")),
+    stake: v.number(),
+    entryMidx: v.number(),
+    windowHours: v.number(), // 24 | 48 | 168
+    status: v.union(v.literal("open"), v.literal("won"), v.literal("lost")),
+    exitMidx: v.optional(v.number()),
+    payout: v.optional(v.number()),
+    createdAt: v.number(),
+    settleAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status_settle", ["status", "settleAt"]),
+
+  exchangeForecasts: defineTable({
+    trend: v.string(), // up | down | flat
+    changePct: v.number(),
+    comment: v.string(),
+    status: v.string(), // open | judged
+    wasRight: v.optional(v.boolean()),
+    createdAt: v.number(),
+  }).index("by_created", ["createdAt"]),
+
   // ✨ لحظات القدر — جدار الأسطورة الزمني للّحظات الاستثنائية
   mindMoments: defineTable({
     dedupeKey: v.string(), // منع التكرار (game:user:kind)
