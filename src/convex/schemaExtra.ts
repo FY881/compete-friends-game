@@ -502,6 +502,24 @@ export const premiumTables = {
     judgeAt: v.number(),
   }).index("by_status", ["status"]),
 
+  // 🔍 مرصد العادات — تشخيص أنماط سلوكية وتحديات كسر العادة
+  habitChallenges: defineTable({
+    userId: v.id("users"),
+    userName: v.string(),
+    habit: v.string(), // haste | collapse | stubbornness | avoidance | lateIgnition
+    title: v.string(),
+    goal: v.string(),
+    beforeIndex: v.number(), // مؤشر العادة عند البدء
+    afterIndex: v.optional(v.number()),
+    reward: v.optional(v.number()),
+    status: v.union(v.literal("active"), v.literal("broken"), v.literal("relapsed")),
+    startedAt: v.number(),
+    judgeAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status_judge", ["status", "judgeAt"])
+    .index("by_user_status", ["userId", "status"]),
+
   // 📈 صرف القدرات — مؤشر سوق حي للولاء + صفقات وتوقعات محلل
   exchangeTicks: defineTable({
     midx: v.number(), // قيمة المؤشر

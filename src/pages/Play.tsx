@@ -40,6 +40,7 @@ import { FateWell } from "@/components/FateWell";
 import { SummitHall } from "@/components/SummitHall";
 import { MomentWall } from "@/components/MomentWall";
 import { ExchangeBoard } from "@/components/ExchangeBoard";
+import { HabitObservatory } from "@/components/HabitObservatory";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -351,6 +352,7 @@ export default function Play() {
     { id: "summit", label: "عقل القمة", emoji: "🌳", group: "الذكاء والعقول", node: <SummitHall /> },
     { id: "moments", label: "لحظات القدر", emoji: "✨", group: "الذكاء والعقول", node: <MomentWall /> },
     { id: "exchange", label: "صرف القدرات", emoji: "📈", group: "الذكاء والعقول", node: <ExchangeBoard /> },
+    { id: "habits", label: "مرصد العادات", emoji: "🔍", group: "الذكاء والعقول", node: <HabitObservatory /> },
     { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
 
     // ── لك شخصياً ──
