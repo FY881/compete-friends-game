@@ -187,6 +187,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiChronicle.weeklyEdition, {}),
   },
+  {
+    key: "colossus_evolution",
+    name: "تطور الطاغوت",
+    description: "يقرأ الطاغوت دقة المجتمع من مواسمه السابقة ويبني ترسانة موسم جديدة أشرس مع فخاخ في فئات القوة.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiColossus.evolveSeason, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

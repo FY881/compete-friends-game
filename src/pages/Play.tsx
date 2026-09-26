@@ -31,6 +31,7 @@ import { AdaptiveRewardCard } from "@/components/AdaptiveRewardCard";
 import { SmartMatchCard } from "@/components/SmartMatchCard";
 import { MindsAcademy } from "@/components/MindsAcademy";
 import { ChronicleCard } from "@/components/ChronicleCard";
+import { ColossusCard } from "@/components/ColossusCard";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -333,6 +334,7 @@ export default function Play() {
     { id: "match", label: "المطابقة الذكية", emoji: "🧩", group: "الذكاء والعقول", node: <SmartMatchCard /> },
     { id: "academy", label: "مدرسة العقول", emoji: "🎓", group: "الذكاء والعقول", node: <MindsAcademy /> },
     { id: "chronicle", label: "سجل العقول", emoji: "📰", group: "الذكاء والعقول", node: <ChronicleCard /> },
+    { id: "colossus", label: "الطاغوت", emoji: "👹", group: "الذكاء والعقول", node: <ColossusCard /> },
     { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
 
     // ── لك شخصياً ──

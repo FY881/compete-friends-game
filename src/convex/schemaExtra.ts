@@ -321,6 +321,41 @@ export const premiumTables = {
   // 🎯 v15.0 — الغرفة الحيّة: سجل تعديلات الصعوبة التكيّفية
   ...gameLiveTables,
 
+  // 👹 الطاغوت — عدو جماعي حي يتعلم من دقة المجتمع ويتكيف أسبوعياً
+  colossusSeasons: defineTable({
+    season: v.number(), // رقم الموسم (أسبوع زمني)
+    name: v.string(), // اسم الطاغوت المولّد
+    persona: v.string(), // شخصية الطاغوت (تُقرأ في الواجهة)
+    taunt: v.string(), // استفزازه الافتتاحي
+    hp: v.number(), // نقاط حياته = دقة المجتمع المتوقعة × عدد الأسئلة
+    questionIds: v.array(v.string()), // ترسانة الأسئلة المختارة تكيفياً
+    weaknesses: v.array(v.string()), // فئات ضعفه (مكافأة مضاعفة عليها)
+    status: v.union(
+      v.literal("active"),
+      v.literal("defeated"), // هُزم هذا الأسبوع
+      v.literal("escaped"), // نجا من هزيمة المجتمع
+    ),
+    defeatedBy: v.optional(v.number()), // عدد الهزائم
+    solversCount: v.optional(v.number()),
+    createdAt: v.number(),
+    endsAt: v.number(),
+  })
+    .index("by_season", ["season"])
+    .index("by_status", ["status"]),
+
+  colossusStrikes: defineTable({
+    season: v.number(),
+    userId: v.id("users"),
+    userName: v.string(),
+    questionIndex: v.number(),
+    correct: v.boolean(),
+    elapsedMs: v.number(),
+    damage: v.number(), // الضرر المسلّط
+    createdAt: v.number(),
+  })
+    .index("by_season", ["season"])
+    .index("by_user_season", ["userId", "season"]),
+
   // 📰 سجل العقول — جريدة الموقع الذكية التي تُروى بالبيانات الحقيقية
   chronicleIssues: defineTable({
     edition: v.string(), // مفتاح الإصدار YYYY-Www
