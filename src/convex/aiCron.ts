@@ -295,6 +295,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiHabit.habitJob, {}),
   },
+  {
+    key: "rivalry_duels",
+    name: "صراع النقيض — إشعال وحكم النزالات",
+    description: "يفتح نزالات سحابية بين كل لاعب ونقيضه المعلن (تباعد البصمة الأقصى)، ويحكم زمنياً على الأداء المُعلن: نصر يُنّهب 120 ولاء والغياب يُوثّق.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiRivalry.rivalryJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

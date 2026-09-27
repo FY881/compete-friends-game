@@ -615,6 +615,50 @@ export const premiumTables = {
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),
 
+  // 🗡️ صراع النقيض — نزالات سحابية بين المتناقضين عقلياً، تُشعل آلياً وتُحكم زمنياً
+  rivalryDuels: defineTable({
+    challengerId: v.id("users"),
+    challengerName: v.string(),
+    foeId: v.id("users"),
+    foeName: v.string(),
+    contrast: v.number(), // 0-100 تباعد البصمتين (من mindSoulmates.nemesisContrast)
+    tier: v.number(), // 1 ظل | 2 عقول | 3 دم
+    status: v.union(v.literal("open"), v.literal("settled")),
+    salt: v.string(), // نكتة الإشعال
+    challengerDeclared: v.optional(
+      v.object({
+        score: v.number(),
+        correct: v.number(),
+        questions: v.number(),
+        players: v.number(),
+        fastest: v.number(),
+        won: v.boolean(),
+        at: v.number(),
+      }),
+    ),
+    foeDeclared: v.optional(
+      v.object({
+        score: v.number(),
+        correct: v.number(),
+        questions: v.number(),
+        players: v.number(),
+        fastest: v.number(),
+        won: v.boolean(),
+        at: v.number(),
+      }),
+    ),
+    winner: v.optional(v.union(v.literal("challenger"), v.literal("foe"), v.literal("draw"))),
+    narrative: v.optional(v.string()), // السرد الدرامي (ذكاء أو محلي)
+    verdictDetail: v.optional(v.string()),
+    reward: v.number(),
+    createdAt: v.number(),
+    judgeAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_challenger_status", ["challengerId", "status"])
+    .index("by_foe_status", ["foeId", "status"]),
+
   // 🧠 العقل المُنسّق — القرارات التنفيذية الموزونة عبر كل أدوات العقول
   conductorDecisions: defineTable({
     cycle: v.number(), // رقم الدورة (تتصاعد)

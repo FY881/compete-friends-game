@@ -41,6 +41,7 @@ import { SummitHall } from "@/components/SummitHall";
 import { MomentWall } from "@/components/MomentWall";
 import { ExchangeBoard } from "@/components/ExchangeBoard";
 import { HabitObservatory } from "@/components/HabitObservatory";
+import { RivalryArena } from "@/components/RivalryArena";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -353,6 +354,7 @@ export default function Play() {
     { id: "moments", label: "لحظات القدر", emoji: "✨", group: "الذكاء والعقول", node: <MomentWall /> },
     { id: "exchange", label: "صرف القدرات", emoji: "📈", group: "الذكاء والعقول", node: <ExchangeBoard /> },
     { id: "habits", label: "مرصد العادات", emoji: "🔍", group: "الذكاء والعقول", node: <HabitObservatory /> },
+    { id: "duels", label: "صراع النقيض", emoji: "🗡️", group: "الذكاء والعقول", node: <RivalryArena /> },
     { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
 
     // ── لك شخصياً ──
