@@ -615,6 +615,43 @@ export const premiumTables = {
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),
 
+  // ⚔️ الحرب الكبرى — جيوش كونية متصارعة بذخيرة حية من إجابات المجتمع
+  mindWars: defineTable({
+    armyAName: v.string(), // عقول البرق
+    armyAEmoji: v.string(),
+    armyBName: v.string(), // عقول العزائم
+    armyBEmoji: v.string(),
+    soldierCount: v.number(),
+    front: v.number(), // -100..100 (موجب = تقدم البرق)
+    totalRoundsA: v.number(), // ذخيرة البرق (إجابات صحيحة + قذائف الانتصار)
+    totalRoundsB: v.number(),
+    reports: v.array(
+      v.object({
+        at: v.number(),
+        text: v.string(),
+        engine: v.string(), // llm | local
+      }),
+    ),
+    winner: v.optional(v.union(v.literal("A"), v.literal("B"), v.literal("draw"))),
+    status: v.union(v.literal("active"), v.literal("settled")),
+    startedAt: v.number(),
+    endsAt: v.number(),
+    settledAt: v.optional(v.number()),
+  }).index("by_status", ["status"]),
+
+  warSoldiers: defineTable({
+    warId: v.id("mindWars"),
+    userId: v.id("users"),
+    name: v.string(),
+    army: v.string(), // A (برق) | B (عزائم)
+    medianMs: v.number(), // وسيط سرعة العقل عند التجنيد
+    rounds: v.number(), // إجابات صحيحة مكتشفة
+    bonusRounds: v.number(), // قذائف الانتصار (×2 لكل جولة مكسورة)
+    mvp: v.optional(v.boolean()),
+  })
+    .index("by_war", ["warId"])
+    .index("by_user", ["userId"]),
+
   // 🏆 كأس التحالفات — موسم ثنائي الأسبوع: نقاط شرف من إنجازات حقيقية في 4 أقسام
   cupStandings: defineTable({
     season: v.number(), // رقم الموسم = floor(now / 14 يوم)

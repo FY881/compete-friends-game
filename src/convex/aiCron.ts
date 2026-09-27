@@ -331,6 +331,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiCup.cupJob, {}),
   },
+  {
+    key: "mind_war",
+    name: "الحرب الكبرى — مسح الذخيرة والتسوية",
+    description: "يمسح إجابات المجتمع الحية أثناء الحرب الكبرى فيتحرك بها الجبهة، ويبث تقارير المراسل، ويحوّم المنتصر بالغنائم عند انتهاء المدة.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiWar.warJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
