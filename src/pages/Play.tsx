@@ -48,6 +48,7 @@ import { AllianceCup } from "@/components/AllianceCup";
 import { MindWar } from "@/components/MindWar";
 import { HonorCourt } from "@/components/HonorCourt";
 import { GhostDuel } from "@/components/GhostDuel";
+import { MindsCompass } from "@/components/MindsCompass";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -331,6 +332,15 @@ export default function Play() {
    * فقط: كل المميزات كما هي، واستهلاك قاعدة البيانات ينزل بنسبة ضخمة.
    */
   const [deckPanel, setDeckPanel] = useState<string | null>(null);
+  // 🧭 مستقبل البوصلة: "توجّه الآن" يفتح تبويب النظام الهدف مباشرة
+  useEffect(() => {
+    const go = (e: Event) => {
+      const target = (e as CustomEvent<string>).detail;
+      if (typeof target === "string" && target) setDeckPanel(target);
+    };
+    window.addEventListener("minds-compass-go", go);
+    return () => window.removeEventListener("minds-compass-go", go);
+  }, []);
   const SYSTEMS_DECK: { id: string; label: string; emoji: string; group: string; node: ReactNode }[] = [
     // ── المسابقات ──
     { id: "tournament", label: "البطولات", emoji: "🏆", group: "المسابقات", node: <TournamentPanel /> },
@@ -345,6 +355,7 @@ export default function Play() {
     { id: "modes", label: "أنماط اللعب", emoji: "🎮", group: "المسابقات", node: <GameModesPanel /> },
 
     // ── الذكاء والعقول ──
+    { id: "compass", label: "بوصلة العقول", emoji: "🧭", group: "الذكاء والعقول", node: <MindsCompass /> },
     { id: "agents", label: "العقول الحيّة", emoji: "🧠", group: "الذكاء والعقول", node: <LivingAgentsTab /> },
     { id: "council", label: "مجلس العقول", emoji: "🗳️", group: "الذكاء والعقول", node: <MindsCouncil /> },
     { id: "match", label: "المطابقة الذكية", emoji: "🧩", group: "الذكاء والعقول", node: <SmartMatchCard /> },

@@ -615,6 +615,13 @@ export const premiumTables = {
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),
 
+  // 🧭 بوصلة العقول — لقطات «أهم 3 حركات الآن» لكل لاعب (كاش 10 دقائق)
+  compassHints: defineTable({
+    userId: v.id("users"),
+    moves: v.string(), // JSON: مصفوفة الحركات المُرتّبة
+    scannedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
   // 👻 مبارزة الشبح — نقيضك كشبح فوري يجيب أسئلة معك من بصمته الحقيقية
   ghostDuels: defineTable({
     userId: v.id("users"),
