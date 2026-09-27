@@ -615,6 +615,31 @@ export const premiumTables = {
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),
 
+  // ⚜️ مجلس التوأم الحربي — تحالف تكتيكي مع توأم روحك: قطاعات دفاع متبادلة وتغطية أسبوعية
+  twinAlliances: defineTable({
+    aId: v.id("users"),
+    aName: v.string(),
+    bId: v.id("users"),
+    bName: v.string(),
+    twinAffinity: v.number(), // قرب العقلين (من mindSoulmates.twinAffinity)
+    defenseSector: v.string(), // فئة الضعف المشترك — يتناوب الطرفان حراستها
+    defenseBase: v.number(), // دقة الفريق المشتركة في القطاع عند التأسيس (%)
+    offenseSector: v.string(), // فئة القوة المشتركة — يقودها الطرفان
+    offenseBase: v.number(),
+    doctrine: v.string(), // العقيدة التحالفية
+    crest: v.optional(v.string()), // العقيدة المحسّنة بالذكاء
+    coverScoreA: v.number(), // تغطية الطرف A (0..1) عند الحكم
+    coverScoreB: v.number(),
+    verdict: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("settled")),
+    formedAt: v.number(),
+    judgeAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_a", ["aId"])
+    .index("by_b", ["bId"]),
+
   // 🪞 المرآة الحربية — محاكاة نزال النقيض رياضياً وخطة أسبوعية تُحكم بتحسّن حقيقي
   warPlans: defineTable({
     userId: v.id("users"),

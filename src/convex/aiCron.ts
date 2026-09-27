@@ -313,6 +313,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiMirror.mirrorJob, {}),
   },
+  {
+    key: "twin_council",
+    name: "مجلس التوأم الحربي — قياس التغطية المتبادلة",
+    description: "يحكم على تحالفات التوأم بقياس تغطية كل طرف للقطاع الدفاعي المشترك من الإجابات الفعلية: تغطية متبادلة تمنح 65 ولاء لكل طرف، والتخلف يُوثّق.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiAlliance.councilJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
