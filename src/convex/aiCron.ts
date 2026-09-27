@@ -349,6 +349,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiCourt.courtJob, {}),
   },
+  {
+    key: "ghost_sweeper",
+    name: "مبارزة الشبح — قصّي المباريات التلاشية",
+    description: "يقصّي مبارزات الشبح التي انقضى وقتها دون إكمال (ربع ساعة) ويوثّق تلاشي الشبح — يبقي الساحة نظيفة للمبارزة القادمة.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiGhost.ghostJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

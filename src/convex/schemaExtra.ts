@@ -615,6 +615,37 @@ export const premiumTables = {
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),
 
+  // 👻 مبارزة الشبح — نقيضك كشبح فوري يجيب أسئلة معك من بصمته الحقيقية
+  ghostDuels: defineTable({
+    userId: v.id("users"),
+    userName: v.string(),
+    ghostId: v.id("users"), // نقيضك (صاحب البصمة)
+    ghostName: v.string(),
+    ghostContrast: v.number(),
+    ghostSample: v.number(), // حجم بصمة الشبح عند البناء
+    ghostAccSnapshot: v.string(), // بصمة دقته (JSON) لحظة البناء
+    questions: v.array(
+      v.object({
+        questionId: v.string(),
+        ghostCorrect: v.boolean(), // محاكى مسبقاً باحتمال دقته الفعلي
+        ghostElapsedMs: v.number(), // زمن إجابة الشبح الوهمي
+      }),
+    ),
+    myCorrect: v.number(),
+    ghostCorrect: v.number(),
+    myAnswered: v.number(),
+    result: v.optional(v.union(v.literal("win"), v.literal("loss"), v.literal("draw"))),
+    reward: v.number(),
+    verdict: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("settled"), v.literal("expired")),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    settledAt: v.optional(v.number()),
+    taunt: v.string(), // استفزاز الشبح الافتتاحي
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"]),
+
   // 🧑‍⚖️ محكمة الشرف العقلية — طعن في الأحكام الآلية بدرجة أدلة من الحقيقة
   courtCases: defineTable({
     caseKey: v.string(), // بصمة منع التكرار: domain:recordId
