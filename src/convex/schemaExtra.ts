@@ -615,6 +615,33 @@ export const premiumTables = {
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),
 
+  // 🧑‍⚖️ محكمة الشرف العقلية — طعن في الأحكام الآلية بدرجة أدلة من الحقيقة
+  courtCases: defineTable({
+    caseKey: v.string(), // بصمة منع التكرار: domain:recordId
+    domain: v.string(), // rivalry | mirror | council
+    recordId: v.string(), // معرف السجل المُطعَن فيه
+    plaintiffId: v.id("users"),
+    plaintiffName: v.string(),
+    respondentName: v.string(), // النظام المُدعى عليه (اسم الأداة)
+    reasons: v.string(), // مبرر الطعن
+    overturned: v.optional(v.boolean()), // هل نُقض الحكم؟
+    compensation: v.optional(v.number()),
+    verdict: v.optional(v.string()),
+    rulings: v.array(
+      v.object({
+        at: v.number(),
+        text: v.string(),
+        engine: v.string(), // llm | local
+      }),
+    ),
+    status: v.union(v.literal("filed"), v.literal("judged")),
+    createdAt: v.number(),
+    judgedAt: v.optional(v.number()),
+  })
+    .index("by_plaintiff", ["plaintiffId"])
+    .index("by_status", ["status"])
+    .index("by_case_key", ["caseKey"]),
+
   // ⚔️ الحرب الكبرى — جيوش كونية متصارعة بذخيرة حية من إجابات المجتمع
   mindWars: defineTable({
     armyAName: v.string(), // عقول البرق

@@ -46,6 +46,7 @@ import { WarMirror } from "@/components/WarMirror";
 import { TwinCouncil } from "@/components/TwinCouncil";
 import { AllianceCup } from "@/components/AllianceCup";
 import { MindWar } from "@/components/MindWar";
+import { HonorCourt } from "@/components/HonorCourt";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -363,6 +364,7 @@ export default function Play() {
     { id: "twincouncil", label: "مجلس التوأم الحربي", emoji: "⚜️", group: "الذكاء والعقول", node: <TwinCouncil /> },
     { id: "alliancecup", label: "كأس التحالفات", emoji: "🏆", group: "الذكاء والعقول", node: <AllianceCup /> },
     { id: "mindwar", label: "الحرب الكبرى", emoji: "⚔️", group: "الذكاء والعقول", node: <MindWar /> },
+    { id: "court", label: "محكمة الشرف", emoji: "🧑‍⚖️", group: "الذكاء والعقول", node: <HonorCourt /> },
     { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
 
     // ── لك شخصياً ──

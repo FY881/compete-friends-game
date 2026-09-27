@@ -340,6 +340,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiWar.warJob, {}),
   },
+  {
+    key: "court_sweeper",
+    name: "محكمة الشرف العقلية — الحكم التلقائي",
+    description: "يحكم بمعايير الأدلة الصارمة على الدعاوى المتهدلة بعد 24 ساعة من رفعها: نُقض الظلم بتعويض، أو رُفض الطعن بمبرر موثق.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiCourt.courtJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
