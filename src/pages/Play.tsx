@@ -44,6 +44,7 @@ import { HabitObservatory } from "@/components/HabitObservatory";
 import { RivalryArena } from "@/components/RivalryArena";
 import { WarMirror } from "@/components/WarMirror";
 import { TwinCouncil } from "@/components/TwinCouncil";
+import { AllianceCup } from "@/components/AllianceCup";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -359,6 +360,7 @@ export default function Play() {
     { id: "duels", label: "صراع النقيض", emoji: "🗡️", group: "الذكاء والعقول", node: <RivalryArena /> },
     { id: "warmirror", label: "المرآة الحربية", emoji: "🪞", group: "الذكاء والعقول", node: <WarMirror /> },
     { id: "twincouncil", label: "مجلس التوأم الحربي", emoji: "⚜️", group: "الذكاء والعقول", node: <TwinCouncil /> },
+    { id: "alliancecup", label: "كأس التحالفات", emoji: "🏆", group: "الذكاء والعقول", node: <AllianceCup /> },
     { id: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", group: "الذكاء والعقول", node: <PersonalChallenges /> },
 
     // ── لك شخصياً ──

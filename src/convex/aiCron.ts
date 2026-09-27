@@ -322,6 +322,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiAlliance.councilJob, {}),
   },
+  {
+    key: "alliance_cup",
+    name: "كأس التحالفات — إغلاق الموسم والتتويج",
+    description: "يغلق المواسم المنتهية، يوّج التحالف الأعلى نقاط شرف، يوزع المكافآت، وينشر إعلان التتويج — المجد يُبنى من نزالات وخطط وتغطيات حقيقية.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiCup.cupJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

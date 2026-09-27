@@ -615,6 +615,39 @@ export const premiumTables = {
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),
 
+  // 🏆 كأس التحالفات — موسم ثنائي الأسبوع: نقاط شرف من إنجازات حقيقية في 4 أقسام
+  cupStandings: defineTable({
+    season: v.number(), // رقم الموسم = floor(now / 14 يوم)
+    name: v.string(), // اسم التحالف: «لاعب × توأم»
+    members: v.array(v.string()), // معرفات الأعضاء (strings)
+    crest: v.string(), // شعار التحالف (إيموجي)
+    division: v.string(), // ظل | فولاذ | ذهب | أسطورة
+    honorPoints: v.number(),
+    duelsWon: v.number(),
+    plansWon: v.number(),
+    coversFull: v.number(),
+    coversHalf: v.number(),
+    status: v.union(v.literal("open"), v.literal("crowned"), v.literal("closed")),
+    crownedAt: v.optional(v.number()),
+    lastFeatsAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_season", ["season"])
+    .index("by_status", ["status"]),
+
+  cupSeasons: defineTable({
+    season: v.number(),
+    championName: v.string(),
+    championCrest: v.string(),
+    championPoints: v.number(),
+    championMembers: v.array(v.string()),
+    runnerName: v.optional(v.string()),
+    runnerPoints: v.number(),
+    teamsCount: v.number(),
+    crownedAt: v.number(),
+    chronicle: v.optional(v.string()), // نبأ التتويج بلسان المُعلن الذكي
+  }).index("by_season", ["season"]),
+
   // ⚜️ مجلس التوأم الحربي — تحالف تكتيكي مع توأم روحك: قطاعات دفاع متبادلة وتغطية أسبوعية
   twinAlliances: defineTable({
     aId: v.id("users"),
