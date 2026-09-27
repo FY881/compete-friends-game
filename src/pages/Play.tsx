@@ -50,6 +50,7 @@ import { HonorCourt } from "@/components/HonorCourt";
 import { GhostDuel } from "@/components/GhostDuel";
 import { MindsCompass } from "@/components/MindsCompass";
 import { MetaMind } from "@/components/MetaMind";
+import { StripeStore } from "@/components/StripeStore";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -358,6 +359,7 @@ export default function Play() {
     // ── الذكاء والعقول ──
     { id: "compass", label: "بوصلة العقول", emoji: "🧭", group: "الذكاء والعقول", node: <MindsCompass /> },
     { id: "metamind", label: "العقل الأعظم", emoji: "🜂", group: "الذكاء والعقول", node: <MetaMind isAdmin={user?.role === "admin"} /> },
+    { id: "store", label: "متجر العقول", emoji: "💳", group: "الذكاء والعقول", node: <StripeStore /> },
     { id: "agents", label: "العقول الحيّة", emoji: "🧠", group: "الذكاء والعقول", node: <LivingAgentsTab /> },
     { id: "council", label: "مجلس العقول", emoji: "🗳️", group: "الذكاء والعقول", node: <MindsCouncil /> },
     { id: "match", label: "المطابقة الذكية", emoji: "🧩", group: "الذكاء والعقول", node: <SmartMatchCard /> },
