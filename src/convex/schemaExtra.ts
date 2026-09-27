@@ -1023,4 +1023,35 @@ export const premiumTables = {
   })
     .index("by_game", ["gameId", "createdAt"])
     .index("by_code", ["code", "createdAt"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🕊️ الوكلاء الأحرار — الأداة 29: عقول مستقلة تزرع نفسها في كل ركن
+  // ═══════════════════════════════════════════════════════════════════════
+  freeAgents: defineTable({
+    name: v.string(),
+    emoji: v.string(),
+    role: v.string(), // لقب الوكيل الوظيفي
+    post: v.string(), // مكان الزرع العشوائي: home | duel | war | store | court | compass | meta | grand | agents
+    persona: v.string(), // شخصية المراقبة (تُبنى منها ملاحظاته)
+    watch: v.string(), // ما يراقبه في عقول اللاعبين
+    active: v.boolean(),
+    observations: v.number(), // كم ملاحظة سجّل
+    createdAt: v.number(),
+    lastPulseAt: v.number(),
+  })
+    .index("by_post", ["post"])
+    .index("by_active", ["active"]),
+
+  // ملاحظات الوكلاء على العقول: فهم صامت يتراكم دون تدخل من أحد
+  agentMindNotes: defineTable({
+    agentId: v.optional(v.id("freeAgents")),
+    agentName: v.string(),
+    post: v.string(),
+    actorName: v.string(), // العقل المُلاحَظ (اسم أو نظام)
+    note: v.string(),
+    confidence: v.number(), // 0-1 مدى تأكد الوكيل من قراءته
+    createdAt: v.number(),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_created", ["createdAt"]),
 };

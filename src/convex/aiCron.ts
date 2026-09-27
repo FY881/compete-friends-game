@@ -385,6 +385,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiGrandStrategy.grandJob, {}),
   },
+  {
+    key: "free_agents",
+    name: "الوكلاء الأحرار — زرع وملاحظة",
+    description: "كل 6 ساعات يزرع وكلاء حرّين عشوائياً في ركنات اللعبة، وكل وكيل يكتب ملاحظة صامتة عن العقول التي رآها — بلا أي تدخل من المالك أو النظام.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiFreeAgents.agentsJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
