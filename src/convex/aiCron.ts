@@ -367,6 +367,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiCompass.compassJob, {}),
   },
+  {
+    key: "meta_pulse",
+    name: "العقل الأعظم — نبضة تشخيص المنظومة",
+    description: "كل 6 ساعات يقرأ ناقل القرارات الحقيقي ويصدر نبضة: صحة كل أداة، الصمت المقلق، الظلم المتكرر، ودرجة حياة المنظومة — وتشريح يومي معلن.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiMeta.metaJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

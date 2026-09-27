@@ -622,6 +622,19 @@ export const premiumTables = {
     scannedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // 🜂 العقل الأعظم — نبضات تشخيص المنظومة كل 6 ساعات
+  metaMindPulses: defineTable({
+    lifeScore: v.number(),
+    activeTools: v.number(),
+    totalTools: v.number(),
+    totalEvents: v.number(),
+    unjustTotal: v.number(),
+    narration: v.string(),
+    engine: v.string(), // llm | local
+    healthJson: v.string(), // JSON صحة الأدوات
+    createdAt: v.number(),
+  }).index("by_created", ["createdAt"]),
+
   // 👻 مبارزة الشبح — نقيضك كشبح فوري يجيب أسئلة معك من بصمته الحقيقية
   ghostDuels: defineTable({
     userId: v.id("users"),
