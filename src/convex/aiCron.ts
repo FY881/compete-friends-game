@@ -376,6 +376,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiMeta.metaJob, {}),
   },
+  {
+    key: "grand_strategy",
+    name: "الخطة الكبرى — دماغ السبورة الاستراتيجي",
+    description: "كل يوم يقرأ نضارة السبورة (أكبر اللاعبين نشاطاً + جبهة الحرب) ويصدر خطة كبرى من 3 قرارات استراتيجية بكنز ولاء — وتُحكم بعد 3 أيام على تأييد اللاعبين.",
+    group: "AI",
+    intervalMinutes: 1440,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiGrandStrategy.grandJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

@@ -635,6 +635,23 @@ export const premiumTables = {
     createdAt: v.number(),
   }).index("by_created", ["createdAt"]),
 
+  // ♟️ الخطة الكبرى — خطط استراتيجية للسبورة كلها تُحكم زمنياً
+  grandStrategies: defineTable({
+    summary: v.string(),
+    movesJson: v.string(), // JSON: قرارات الخطة
+    engine: v.string(), // llm | local
+    leadersJson: v.string(), // لقطة صنّاد السبورة عند النشر
+    frontJson: v.string(), // لقطة الجبهة
+    status: v.union(v.literal("active"), v.literal("judged")),
+    rewardPool: v.number(),
+    participants: v.array(v.string()),
+    verdict: v.optional(v.string()),
+    createdAt: v.number(),
+    judgeAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_created", ["createdAt"]),
+
   // 👻 مبارزة الشبح — نقيضك كشبح فوري يجيب أسئلة معك من بصمته الحقيقية
   ghostDuels: defineTable({
     userId: v.id("users"),

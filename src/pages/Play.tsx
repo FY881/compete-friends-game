@@ -51,6 +51,7 @@ import { GhostDuel } from "@/components/GhostDuel";
 import { MindsCompass } from "@/components/MindsCompass";
 import { MetaMind } from "@/components/MetaMind";
 import { StripeStore } from "@/components/StripeStore";
+import { GrandStrategy } from "@/components/GrandStrategy";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -360,6 +361,7 @@ export default function Play() {
     { id: "compass", label: "بوصلة العقول", emoji: "🧭", group: "الذكاء والعقول", node: <MindsCompass /> },
     { id: "metamind", label: "العقل الأعظم", emoji: "🜂", group: "الذكاء والعقول", node: <MetaMind isAdmin={user?.role === "admin"} /> },
     { id: "store", label: "متجر العقول", emoji: "💳", group: "الذكاء والعقول", node: <StripeStore /> },
+    { id: "grandplan", label: "الخطة الكبرى", emoji: "♟️", group: "الذكاء والعقول", node: <GrandStrategy /> },
     { id: "agents", label: "العقول الحيّة", emoji: "🧠", group: "الذكاء والعقول", node: <LivingAgentsTab /> },
     { id: "council", label: "مجلس العقول", emoji: "🗳️", group: "الذكاء والعقول", node: <MindsCouncil /> },
     { id: "match", label: "المطابقة الذكية", emoji: "🧩", group: "الذكاء والعقول", node: <SmartMatchCard /> },
