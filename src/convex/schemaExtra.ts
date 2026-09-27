@@ -615,6 +615,34 @@ export const premiumTables = {
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),
 
+  // 🪞 المرآة الحربية — محاكاة نزال النقيض رياضياً وخطة أسبوعية تُحكم بتحسّن حقيقي
+  warPlans: defineTable({
+    userId: v.id("users"),
+    userName: v.string(),
+    periodKey: v.string(), // أسبوع ISO: 2026-W39
+    nemesisId: v.id("users"),
+    nemesisName: v.string(),
+    twinId: v.id("users"),
+    twinAffinity: v.number(),
+    winProbability: v.number(), // 0-100 من محاكاة Monte Carlo
+    projectedScore: v.number(),
+    foeProjectedScore: v.number(),
+    gapCategories: v.array(v.string()), // فئات الفجوة (قوات العدو)
+    breakTargets: v.array(v.string()), // فئات الاختراق (سلاحك)
+    accByCatBefore: v.string(), // بصمة بدء الخطة (JSON) — مرجع الحكم الصادق
+    orders: v.string(), // أوامر الحرب (JSON)
+    improvedCats: v.optional(v.array(v.string())),
+    reward: v.optional(v.number()),
+    verdict: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("won"), v.literal("lost")),
+    createdAt: v.number(),
+    judgeAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_period", ["userId", "periodKey"])
+    .index("by_status", ["status"]),
+
   // 🗡️ صراع النقيض — نزالات سحابية بين المتناقضين عقلياً، تُشعل آلياً وتُحكم زمنياً
   rivalryDuels: defineTable({
     challengerId: v.id("users"),

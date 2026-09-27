@@ -304,6 +304,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiRivalry.rivalryJob, {}),
   },
+  {
+    key: "war_mirror",
+    name: "المرآة الحربية — الحكم الأسبوعي للخطط",
+    description: "يحكم على خطط الحرب الأسبوعية بمقارنة بصمة البدء بالبصمة الحالية: تحسّن حقيقي في فئات الفجوة يُكافأ بـ45 ولاء، والتهاون يُوثّق.",
+    group: "AI",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiMirror.mirrorJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));
