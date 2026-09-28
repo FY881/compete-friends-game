@@ -115,10 +115,30 @@ export const agentMindTables = {
     total: v.number(), // إجمالي الانتقالات من نفس المبدأ
     confidence: v.number(), // hits ÷ total
     avgLagMs: v.number(), // متوسط الزمن بين الفعلين
+    prevConfidence: v.optional(v.number()), // قيمتها قبل آخر مراجعة
+    revisions: v.optional(v.number()), // كم مرة راجع الوكلاء تقديرهم
+    trend: v.optional(v.string()), // rising | falling | steady
     updatedAt: v.number(),
     createdAt: v.number(),
   })
     .index("by_subject", ["subjectName"])
     .index("by_confidence", ["confidence"])
     .index("by_pair", ["subjectName", "fromSystem", "toSystem"]),
+
+  // 🧭 خريطة جاذبية الأنظمة — أي منطقة في اللعبة تجذب العقول إليها،
+  //    مقيسة من مسارات اللاعبين الحقيقية لا من رأي أحد.
+  mindFlow: defineTable({
+    fromSystem: v.string(),
+    fromLabel: v.string(),
+    toSystem: v.string(),
+    toLabel: v.string(),
+    moves: v.number(), // كم انتقالاً وقع على هذا الطريق
+    minds: v.number(), // كم عقلًا سلكه
+    weight: v.number(), // نسبة هذا الطريق من كل خروج من fromSystem
+    updatedAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_pair", ["fromSystem", "toSystem"])
+    .index("by_weight", ["weight"])
+    .index("by_created", ["createdAt"]),
 };

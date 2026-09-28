@@ -109,6 +109,17 @@ type Trigger = {
   total: number;
   confidence: number;
   avgLagMs: number;
+  trend?: string;
+  revisions?: number;
+};
+
+type Flow = {
+  _id: string;
+  fromLabel: string;
+  toLabel: string;
+  moves: number;
+  minds: number;
+  weight: number;
 };
 
 type Intent = { subject: string; best: Trigger; rules: number };
@@ -116,7 +127,23 @@ type Intent = { subject: string; best: Trigger; rules: number };
 type Deeper = {
   triggers: Trigger[];
   intents: Intent[];
-  stats: { rules: number; subjects: number; strongest: number; avgConfidence: number };
+  flows: Flow[];
+  stats: {
+    rules: number;
+    subjects: number;
+    flows: number;
+    strongest: number;
+    avgConfidence: number;
+    revisions: number;
+    falling: number;
+    rising: number;
+  };
+};
+
+const TREND: Record<string, { label: string; cls: string }> = {
+  rising: { label: "▲ يثبت", cls: "border-emerald-500/40 text-emerald-300" },
+  falling: { label: "▼ يتراجع", cls: "border-rose-500/40 text-rose-300" },
+  steady: { label: "＝ ثابت", cls: "border-slate-500/40 text-slate-400" },
 };
 
 type Stats = {
@@ -251,6 +278,7 @@ export function FreeAgents() {
   const method = watch?.method ?? [];
   const triggers = deeper?.triggers ?? [];
   const intents = deeper?.intents ?? [];
+  const flows = deeper?.flows ?? [];
   const stats: Stats | undefined = watch?.stats ?? data?.stats;
 
   const labelOf = (post: string) => {
@@ -645,6 +673,17 @@ export function FreeAgents() {
                 </p>
                 <span className="shrink-0 text-[10px] text-slate-500">{it.rules} قاعدة</span>
               </div>
+              {it.best.trend && (
+                <span
+                  className={
+                    "mt-1 inline-block rounded-full border px-2 py-0.5 text-[9px] " +
+                    (TREND[it.best.trend]?.cls ?? TREND.steady.cls)
+                  }
+                >
+                  {TREND[it.best.trend]?.label ?? it.best.trend}
+                  {(it.best.revisions ?? 0) > 0 ? ` · ${it.best.revisions} مراجعة` : ""}
+                </span>
+              )}
               <p className="mt-1 text-[11px] leading-relaxed text-slate-300">
                 بعد «{it.best.fromLabel}» يقصد «{it.best.toLabel}» في {it.best.hits} من{" "}
                 {it.best.total} مرة
@@ -662,6 +701,42 @@ export function FreeAgents() {
                 <span className="text-[9px] text-slate-500">
                   ثبات {Math.round(it.best.confidence * 100)}%
                 </span>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* خريطة جاذبية الأنظمة */}
+      {flows.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold text-slate-300">
+            خريطة جاذبية الأنظمة — إلى أين تُسحب العقول
+          </h3>
+          <p className="text-[10px] leading-relaxed text-slate-500">
+            مجموع مسارات كل العقول الحقيقية: أي منطقة في اللعبة تجذب إليها بعد كل خروج من أخرى
+            — أثر أقدام لا رأي أحد.
+          </p>
+          {flows.map((f) => (
+            <div key={f._id} className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-[11px] text-slate-300">
+                  <span className="text-slate-400">{f.fromLabel}</span>{" "}
+                  <span className="text-amber-300">→</span>{" "}
+                  <span className="font-bold text-slate-100">{f.toLabel}</span>
+                </p>
+                <span className="shrink-0 text-[10px] text-slate-500">
+                  {f.moves} انتقال · {f.minds} عقل
+                </span>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-700/50">
+                  <div
+                    className="h-full rounded-full bg-amber-400/70"
+                    style={{ width: `${Math.round(f.weight * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-slate-500">جذب {Math.round(f.weight * 100)}%</span>
               </div>
             </div>
           ))}

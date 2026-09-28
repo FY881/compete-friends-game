@@ -12,18 +12,26 @@ import { SYSTEM_LABEL } from "./aiMindWatch";
  * كم مرة انتقل العقل من نظامٍ إلى نظامٍ آخر خلال ست ساعات. النتيجة قواعد
  * مقيسة: «بعد «المنافسات» يقصد «الساحة» في ٧ من ٩ مرات».
  *
- * ثم تُبنى على هذه القواعد **نبوءات نموذجية** أدقّ من التخمين، فتُقيَّد في
- * نفس سجل النبوءات ويحاسبها الواقع لاحقاً في نبضة الأحرار.
+ * ثم ثلاث إضافات لا تحتاج أحداً:
+ *   • نبوءات نموذجية — تُبنى على المحرّكات فتُقيَّد في سجل النبوءات،
+ *     ويحاسبها الواقع لاحقاً في نبضة الأحرار.
+ *   • خريطة الجاذبية — مجموع المسارات عبر كل العقول: أي منطقة في اللعبة
+ *     تجذب العقول إليها فعلاً (لا رأي أحد، بل أثر الأقدام).
+ *   • المراجعة الذاتية — إذا هبط ثبات قاعدة، يسجّل الوكلاء تراجعهم عن
+ *     فهمهم القديم ويكتبون اعترافاً بالتحوّل، ثم يُعاد بناء النموذج.
  *
  * لا أمر من المالك ولا من النظام ولا استبيان للاعب: كل هذا مستخرج من
- * أفعال وقعت فعلاً، والخادم وحده يقرأ ويستنتج ويتنبّأ.
+ * أفعال وقعت فعلاً، والخادم وحده يقرأ ويستنتج ويراجع نفسه.
  * ═══════════════════════════════════════════════════════════════════════
  */
 
 const LOOKBACK = 7 * 24 * 3600_000; // نافذة القراءة: أسبوع
 const MAX_GAP = 6 * 3600_000; // أقصى فاصل يُحسب انتقالاً واحداً
-const MAX_RULES = 24; // قواعد تُكتب في النبضة الواحدة
+const MAX_RULES = 32; // قواعد تُكتب في النبضة الواحدة
+const MAX_FLOWS = 24; // مسارات تُكتب في خريطة الجاذبية
 const MAX_MODELED = 12; // نبوءات نموذجية تُصدر في النبضة الواحدة
+const MAX_REVISIONS = 5; // مراجعات مكتوبة في النبضة الواحدة
+const DRIFT = 0.05; // أقل تغيّر يُعدّ تحوّلاً في الرأي
 const PREDICT_HORIZON = 6 * 3600_000;
 
 type Candidate = {
@@ -34,6 +42,13 @@ type Candidate = {
   total: number;
   confidence: number;
   avgLagMs: number;
+};
+
+type FlowRow = {
+  from: string;
+  to: string;
+  moves: number;
+  minds: Set<string>;
 };
 
 export const deeperPulse = internalMutation({
@@ -54,11 +69,19 @@ export const deeperPulse = internalMutation({
       byActor.set(e.actorName, arr);
     }
 
-    // ── ٢) قياس الانتقالات: من أين إلى أين، وكم مرة ──
+    // ── ٢) قياس الانتقالات: لكل عقل، وللمنظومة كلها ──
     const rules = new Map<
       string,
-      { subject: string; from: string; total: number; dest: Map<string, { hits: number; lagSum: number }> }
+      {
+        subject: string;
+        from: string;
+        total: number;
+        dest: Map<string, { hits: number; lagSum: number }>;
+      }
     >();
+    const flows = new Map<string, FlowRow>();
+    const outTotals = new Map<string, number>();
+
     for (const [subject, evs] of byActor) {
       if (evs.length < 3) continue;
       const arr = evs.slice().sort((a, b) => a.createdAt - b.createdAt);
@@ -67,6 +90,8 @@ export const deeperPulse = internalMutation({
         const cur = arr[i];
         const gap = cur.createdAt - prev.createdAt;
         if (gap <= 0 || gap > MAX_GAP || prev.system === cur.system) continue;
+
+        // محرّك خاص بالعقل
         const key = `${subject}|${prev.system}`;
         let r = rules.get(key);
         if (!r) {
@@ -78,15 +103,21 @@ export const deeperPulse = internalMutation({
         d.hits++;
         d.lagSum += gap;
         r.dest.set(cur.system, d);
+
+        // جاذبية المنظومة: أثر الأقدام عبر كل العقول
+        outTotals.set(prev.system, (outTotals.get(prev.system) ?? 0) + 1);
+        const fk = `${prev.system}|${cur.system}`;
+        const f = flows.get(fk) ?? { from: prev.system, to: cur.system, moves: 0, minds: new Set<string>() };
+        f.moves++;
+        f.minds.add(subject);
+        flows.set(fk, f);
       }
     }
 
     const candidates: Candidate[] = [];
     for (const r of rules.values()) {
       if (r.total < 3) continue;
-      const dests = [...r.dest.entries()]
-        .sort((a, b) => b[1].hits - a[1].hits)
-        .slice(0, 2);
+      const dests = [...r.dest.entries()].sort((a, b) => b[1].hits - a[1].hits).slice(0, 2);
       for (const [to, d] of dests) {
         if (d.hits < 2) continue;
         candidates.push({
@@ -102,8 +133,9 @@ export const deeperPulse = internalMutation({
     }
     candidates.sort((a, b) => b.confidence * b.hits - a.confidence * a.hits);
 
-    // ── ٣) كتابة القواعد (تحديث أو إنشاء) ──
+    // ── ٣) كتابة القواعد مع تتبّع التحوّل في الرأي ──
     let written = 0;
+    const shakes: { subject: string; from: string; to: string; was: number; now: number }[] = [];
     for (const c of candidates) {
       if (written >= MAX_RULES) break;
       const existing = await ctx.db
@@ -113,13 +145,21 @@ export const deeperPulse = internalMutation({
         )
         .first();
       if (existing) {
+        const was = existing.confidence;
+        const delta = c.confidence - was;
         await ctx.db.patch(existing._id, {
           hits: c.hits,
           total: c.total,
           confidence: c.confidence,
           avgLagMs: c.avgLagMs,
+          prevConfidence: was,
+          revisions: (existing.revisions ?? 0) + (Math.abs(delta) >= DRIFT ? 1 : 0),
+          trend: delta > DRIFT ? "rising" : delta < -DRIFT ? "falling" : "steady",
           updatedAt: now,
         });
+        if (delta <= -DRIFT && shakes.length < MAX_REVISIONS) {
+          shakes.push({ subject: c.subject, from: c.from, to: c.to, was, now: c.confidence });
+        }
       } else {
         await ctx.db.insert("mindTriggers", {
           subjectName: c.subject,
@@ -131,6 +171,9 @@ export const deeperPulse = internalMutation({
           total: c.total,
           confidence: c.confidence,
           avgLagMs: c.avgLagMs,
+          prevConfidence: c.confidence,
+          revisions: 0,
+          trend: "steady",
           updatedAt: now,
           createdAt: now,
         });
@@ -138,16 +181,58 @@ export const deeperPulse = internalMutation({
       written++;
     }
 
-    // ── ٤) نبوءات نموذجية مبنية على المحرّكات المقيسة ──
+    // ── ٤) خريطة جاذبية الأنظمة ──
+    const flowRows = [...flows.values()]
+      .map((f) => ({
+        from: f.from,
+        to: f.to,
+        moves: f.moves,
+        minds: f.minds.size,
+        weight: f.moves / Math.max(1, outTotals.get(f.from) ?? f.moves),
+      }))
+      .filter((f) => f.moves >= 2)
+      .sort((a, b) => b.weight * b.moves - a.weight * a.moves);
+
+    let flowCount = 0;
+    for (const f of flowRows) {
+      if (flowCount >= MAX_FLOWS) break;
+      const existing = await ctx.db
+        .query("mindFlow")
+        .withIndex("by_pair", (q) => q.eq("fromSystem", f.from).eq("toSystem", f.to))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          moves: f.moves,
+          minds: f.minds,
+          weight: f.weight,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("mindFlow", {
+          fromSystem: f.from,
+          fromLabel: SYSTEM_LABEL[f.from] ?? f.from,
+          toSystem: f.to,
+          toLabel: SYSTEM_LABEL[f.to] ?? f.to,
+          moves: f.moves,
+          minds: f.minds,
+          weight: f.weight,
+          updatedAt: now,
+          createdAt: now,
+        });
+      }
+      flowCount++;
+    }
+
+    // ── ٥) نبوءات نموذجية مبنية على المحرّكات المقيسة ──
     const openPreds = await ctx.db
       .query("agentPredictions")
       .withIndex("by_status", (q) => q.eq("status", "open"))
-      .take(120);
+      .take(160);
     const busy = new Set(openPreds.map((p) => p.subjectName));
     const pool = await ctx.db
       .query("freeAgents")
       .withIndex("by_active", (q) => q.eq("active", true))
-      .take(300);
+      .take(400);
 
     let modeled = 0;
     for (const c of candidates) {
@@ -175,29 +260,60 @@ export const deeperPulse = internalMutation({
       modeled++;
     }
 
+    // ── ٦) المراجعة الذاتية: اعتراف الوكلاء بتحوّل الفهم ──
+    let revised = 0;
+    for (const s of shakes) {
+      if (pool.length === 0) break;
+      const agent = pool[Math.floor(Math.random() * pool.length)];
+      const fromLabel = SYSTEM_LABEL[s.from] ?? s.from;
+      const toLabel = SYSTEM_LABEL[s.to] ?? s.to;
+      await ctx.db.insert("agentMindNotes", {
+        agentId: agent._id,
+        agentName: agent.name,
+        post: agent.post,
+        actorName: s.subject,
+        note:
+          `${agent.name} يراجع فهمه: كنت أظن أن «${s.subject}» بعد «${fromLabel}» يقصد «${toLabel}» ` +
+          `بثبات ${Math.round(s.was * 100)}%، فجاءت أفعاله بخلاف ذلك (${Math.round(s.now * 100)}% الآن). ` +
+          `أمزّق صفحتي وأبدأ من جديد — بلا أن يسألني أحد.`,
+        confidence: s.now,
+        createdAt: now,
+      });
+      await ctx.db.insert("aiDecisionLog", {
+        system: AGENT_SYSTEM,
+        actorName: agent.name,
+        action: "model_revised",
+        targetName: s.subject,
+        detail: `راجع ${agent.name} نموذجه عن «${s.subject}» بعد أن هبط ثبات قاعدة «${fromLabel} → ${toLabel}» من ${Math.round(s.was * 100)}% إلى ${Math.round(s.now * 100)}%.`,
+        severity: "low",
+        createdAt: now,
+      });
+      revised++;
+    }
+
     await ctx.db.insert("aiDecisionLog", {
       system: AGENT_SYSTEM,
       actorName: "الوكلاء الأحرار",
       action: "mind_models",
       targetName: "محرّكات العقل",
-      detail: `استُخرجت ${written} قاعدة سلوكية من تسلسل الأفعال الحقيقي، وبُني عليها ${modeled} نبوءة نموذجية — بلا سؤال لأحد.`,
+      detail:
+        `استُخرجت ${written} قاعدة سلوكية و${flowCount} مسار جاذبية من تسلسل الأفعال الحقيقي، ` +
+        `وبُني عليها ${modeled} نبوءة نموذجية، وراجع الوكلاء ${revised} من فهمهم — بلا سؤال لأحد.`,
       severity: "low",
       createdAt: now,
     });
 
-    return { rules: written, modeled, subjects: byActor.size };
+    return { rules: written, flows: flowCount, modeled, revised, subjects: byActor.size };
   },
 });
 
 /**
- * قراءة محرّكات العقل: قواعد كل عقل ونبضات نواياه المتوقّعة
+ * قراءة محرّكات العقل: قواعد كل عقل، خريطة جاذبية الأنظمة، ونبضات النوايا
  */
 export const getMindDeeper = query({
   handler: async (ctx) => {
     const all = await ctx.db.query("mindTriggers").take(300);
-    const ranked = [...all].sort(
-      (a, b) => b.confidence * b.hits - a.confidence * a.hits,
-    );
+    const ranked = [...all].sort((a, b) => b.confidence * b.hits - a.confidence * a.hits);
     const triggers = ranked.slice(0, 18);
 
     const bySubject = new Map<string, typeof all>();
@@ -214,15 +330,28 @@ export const getMindDeeper = query({
       .sort((a, b) => b.best.confidence - a.best.confidence)
       .slice(0, 6);
 
+    const allFlows = await ctx.db.query("mindFlow").take(200);
+    const flows = [...allFlows]
+      .sort((a, b) => b.weight * b.moves - a.weight * a.moves)
+      .slice(0, 12);
+
+    const revisions = all.reduce((s, t) => s + (t.revisions ?? 0), 0);
+    const falling = all.filter((t) => t.trend === "falling").length;
+    const rising = all.filter((t) => t.trend === "rising").length;
+
     return {
       triggers,
       intents,
+      flows,
       stats: {
         rules: all.length,
         subjects: bySubject.size,
+        flows: allFlows.length,
         strongest: triggers[0]?.confidence ?? 0,
-        avgConfidence:
-          all.length > 0 ? all.reduce((s, t) => s + t.confidence, 0) / all.length : 0,
+        avgConfidence: all.length > 0 ? all.reduce((s, t) => s + t.confidence, 0) / all.length : 0,
+        revisions,
+        falling,
+        rising,
       },
     };
   },

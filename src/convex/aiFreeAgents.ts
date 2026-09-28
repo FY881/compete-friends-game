@@ -30,7 +30,7 @@ import { internal } from "./_generated/api";
 
 export const AGENT_SYSTEM = "free_agents";
 const OBS_CAP = 24; // عدد الملاحظات قبل أن ينصرف الوكيل ويُنجب خليفة
-export const CAP_PER_POST = 16; // أقصى عدد وكلاء في الركن الواحد — سعة كبرى
+export const CAP_PER_POST = 40; // أقصى عدد وكلاء في الركن الواحد — سعة كبرى
 const MAX_AGENTS = 1400; // سقف قراءة الجدول في النبضة
 const PLANT_PER_PULSE = 30; // بلوغ النبضة الكبرى في كل ساعة
 const BLOOM_PER_PULSE = 40; // بلوغ النبضة المتسارعة كل ربع ساعة
@@ -184,6 +184,23 @@ export const POSTS: { post: string; label: string; emoji: string; watch: string 
   { post: "atlas", label: "أطلس", emoji: "🛰️", watch: "من يراقب النظام ومن يراقبه النظام" },
   { post: "governance", label: "لوحة الحكم", emoji: "🏦", watch: "من يُصلح الجماعة ومن يستغلّها" },
   { post: "notifications", label: "مركز الإشعارات", emoji: "🔔", watch: "أي نداء يجذب انتباه العقل" },
+  // ── أنظمة حقيقية داخلية لم تكن مغطّاة ──
+  { post: "errorhunter", label: "صياد الأخطاء", emoji: "🐞", watch: "من يكسر النظام ومن يحتمل خطأه" },
+  { post: "apicenter", label: "مركز API", emoji: "🔌", watch: "من يبني على اللعبة ومن يستهلكها" },
+  { post: "security", label: "الأمن", emoji: "🛡️", watch: "من يحمي الجماعة ومن يختبرها" },
+  { post: "analytics", label: "التحليلات", emoji: "📉", watch: "من يهتم بالأرقام ومن يهتم بالصورة" },
+  { post: "achievements", label: "الإنجازات", emoji: "🥇", watch: "من يجمع للإنجاز ومن للعرض" },
+  { post: "concierge", label: "الكونسيرج", emoji: "🛎️", watch: "من يسأل بلطف ومن يتوقّع الخدمة" },
+  { post: "autoadmin", label: "الإدارة الذاتية", emoji: "🤖", watch: "من يثق بالنظام ومن يتحدّاه" },
+  { post: "content", label: "المحتوى", emoji: "🗂️", watch: "من يصنع ومن يستهلك فقط" },
+  { post: "debate", label: "المناظرات", emoji: "🗣️", watch: "من يغيّر رأيه بالحجة ومن يعاند" },
+  { post: "emergency", label: "الطوارئ", emoji: "🚨", watch: "من يهبّ في الأزمة ومن يهرب منها" },
+  { post: "viceowner", label: "نائب المالك", emoji: "🧑‍💼", watch: "من يخدم السلطة عن قناعة ومن لنفسه" },
+  { post: "sovereign", label: "المراسيم السيادية", emoji: "📜", watch: "من يطيع الأمر ومن يلتفّ عليه" },
+  { post: "moderation", label: "المراقبة", emoji: "👮", watch: "من يستقيم في العلن ومن في السر" },
+  { post: "progress", label: "مركز التقدّم", emoji: "📈", watch: "من يتابع تقدّمه ومن يتجاهله" },
+  { post: "profilecustom", label: "التخصيص العميق", emoji: "🎨", watch: "كم يريد العقل أن يُعرف عنه" },
+  { post: "tiers", label: "طبقات الإشعارات", emoji: "🔕", watch: "ما الذي يريد العقل أن يقاطعه أحد به" },
 ];
 
 export const PERSONAS = [
