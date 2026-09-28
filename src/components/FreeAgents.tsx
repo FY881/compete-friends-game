@@ -20,6 +20,7 @@ type Agent = {
   persona: string;
   watch: string;
   observations: number;
+  spot?: string;
 };
 
 type Note = {
@@ -82,7 +83,38 @@ type Lineage = {
   createdAt: number;
 };
 
-type Corner = { post: string; label: string; emoji: string };
+type Corner = { post: string; label: string; emoji: string; count?: number };
+
+type Prediction = {
+  _id: string;
+  agentName: string;
+  post: string;
+  subjectName: string;
+  predictedLabel: string;
+  basis: string;
+  status: string;
+  actualLabel?: string;
+  createdAt: number;
+  windowEndsAt: number;
+};
+
+type Seer = { name: string; post: string; hits: number; misses: number; accuracy: number };
+
+type Stats = {
+  active: number;
+  retired: number;
+  covered: number;
+  totalCorners: number;
+  capacity: number;
+  intel?: number;
+  bonds?: number;
+  dossiers?: number;
+  predictions?: number;
+  hits?: number;
+  misses?: number;
+  openPredictions?: number;
+  accuracy?: number;
+};
 
 type Annal = {
   _id: string;
@@ -114,16 +146,16 @@ type Data = {
   clusters: Cluster[];
   lineage: Lineage[];
   corners: Corner[];
-  stats: {
-    active: number;
-    retired: number;
-    covered: number;
-    totalCorners: number;
-    capacity: number;
-    intel: number;
-    bonds: number;
-    dossiers: number;
-  };
+  stats: Stats;
+};
+
+type Watch = {
+  agents: Agent[];
+  predictions: Prediction[];
+  seers: Seer[];
+  corners: Corner[];
+  method: string[];
+  stats: Stats;
 };
 
 const ANNAL_LABEL: Record<string, string> = {
@@ -134,7 +166,7 @@ const ANNAL_LABEL: Record<string, string> = {
   note_written: "بصمة",
 };
 
-const CAP_PER_POST = 2;
+const CAP_PER_POST = 10;
 const LEGACY: Record<string, string> = {
   meta: "العقل الأعظم",
   grand: "الخطة الكبرى",
@@ -159,6 +191,18 @@ const BOND_LABEL: Record<string, string> = {
   exchange: "تبادل",
 };
 
+const PRED_STYLE: Record<string, string> = {
+  open: "border-slate-500/30 bg-slate-900/50 text-slate-300",
+  hit: "border-emerald-500/40 bg-emerald-500/5 text-emerald-300",
+  miss: "border-rose-500/40 bg-rose-500/5 text-rose-300",
+};
+
+const PRED_LABEL: Record<string, string> = {
+  open: "بانتظار الواقع",
+  hit: "أصاب ✅",
+  miss: "أخطأ ✗",
+};
+
 function ago(ts: number): string {
   const m = Math.max(0, Math.round((Date.now() - ts) / 60_000));
   if (m < 60) return `قبل ${m} دقيقة`;
@@ -169,10 +213,11 @@ function ago(ts: number): string {
 
 export function FreeAgents() {
   const data = useQuery(api.aiFreeAgents.getFreeAgents) as unknown as Data | undefined;
+  const watch = useQuery(api.aiMindWatch.getMindWatch) as unknown as Watch | undefined;
   const greet = useMutation(api.aiFreeAgents.greetAgent);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const agents = data?.agents ?? [];
+  const agents: Agent[] = watch?.agents ?? data?.agents ?? [];
   const notes = data?.notes ?? [];
   const intel = data?.intel ?? [];
   const bonds = data?.bonds ?? [];
@@ -180,8 +225,11 @@ export function FreeAgents() {
   const annals = data?.annals ?? [];
   const clusters = data?.clusters ?? [];
   const lineage = data?.lineage ?? [];
-  const corners = data?.corners ?? [];
-  const stats = data?.stats;
+  const corners: Corner[] = watch?.corners ?? data?.corners ?? [];
+  const predictions = watch?.predictions ?? [];
+  const seers = watch?.seers ?? [];
+  const method = watch?.method ?? [];
+  const stats: Stats | undefined = watch?.stats ?? data?.stats;
 
   const labelOf = (post: string) => {
     const c = corners.find((x) => x.post === post);
@@ -220,11 +268,21 @@ export function FreeAgents() {
           تتناسل وتتشابك، وتجمّع فهمها المشترك — بلا أي تدخّل منك أو من النظام.
         </p>
         {stats && (
-          <div className="relative mt-3 grid grid-cols-4 gap-2 text-center">
-            <Stat label="التغطية" value={`${stats.covered}/${stats.totalCorners}`} />
-            <Stat label="بصمات عقول" value={String(stats.intel)} />
-            <Stat label="علاقات" value={String(stats.bonds)} />
-            <Stat label="ملفات فهم" value={String(stats.dossiers)} />
+          <div className="relative mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+            <Stat label="أركان مسكونة" value={`${stats.covered}/${stats.totalCorners}`} />
+            <Stat label="أحرار أحياء" value={`${stats.active}/${stats.capacity}`} />
+            <Stat
+              label="دقة التنبؤ"
+              value={
+                (stats.hits ?? 0) + (stats.misses ?? 0) > 0
+                  ? `${Math.round((stats.accuracy ?? 0) * 100)}%`
+                  : "…"
+              }
+            />
+            <Stat
+              label="نبوءات محسومة"
+              value={`${(stats.hits ?? 0) + (stats.misses ?? 0)}`}
+            />
           </div>
         )}
       </div>
@@ -242,21 +300,22 @@ export function FreeAgents() {
           <div className="flex flex-wrap gap-1.5">
             {corners.map((c) => {
               const here = perPost.get(c.post) ?? [];
+              const n = c.count ?? here.length;
               return (
                 <span
                   key={c.post}
                   title={here.map((a) => a.name).join("، ") || "لم يُزرع أحد هنا بعد"}
                   className={
                     "rounded-full border px-2 py-1 text-[10px] transition-colors " +
-                    (here.length > 0
+                    (n > 0
                       ? "border-slate-400/40 bg-slate-500/10 text-slate-100"
                       : "border-slate-700/40 text-slate-600")
                   }
                 >
                   {c.emoji} {c.label}
-                  {here.length > 0 && (
+                  {n > 0 && (
                     <span className="ms-1 text-slate-400">
-                      {here.length}/{CAP_PER_POST}
+                      {n}/{CAP_PER_POST}
                     </span>
                   )}
                 </span>
@@ -290,6 +349,9 @@ export function FreeAgents() {
                   <p className="mt-0.5 text-[11px] text-slate-400">
                     {emojiOf(a.post)} {labelOf(a.post)} · {a.role}
                   </p>
+                  {a.spot && (
+                    <p className="mt-0.5 text-[10px] text-slate-600">📌 {a.spot} داخل الركن</p>
+                  )}
                 </div>
                 <button
                   onClick={() => onGreet(a._id, a.name)}
@@ -492,6 +554,83 @@ export function FreeAgents() {
               ))}
             </ul>
           </div>
+        </section>
+      )}
+
+      {/* منهج فهم العقول */}
+      {method.length > 0 && (
+        <section className="rounded-2xl border border-slate-500/25 bg-slate-900/40 p-3">
+          <h3 className="mb-2 text-xs font-bold text-slate-300">
+            منهج الفهم — سبع خطوات تُنفّذها النبضة وحدها
+          </h3>
+          <ul className="grid gap-1 sm:grid-cols-2">
+            {method.map((m) => (
+              <li key={m} className="text-[11px] leading-relaxed text-slate-400">
+                {m}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+            لا أمر من المالك ولا من النظام: الرصد والتنبؤ والمحاسبة تقع كلها على الخادم.
+          </p>
+        </section>
+      )}
+
+      {/* أدقّ العيون */}
+      {seers.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold text-slate-300">
+            أدقّ العيون — من صار فهمه أقرب إلى الواقع
+          </h3>
+          {seers.map((s) => (
+            <div
+              key={s.name}
+              className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2.5"
+            >
+              <p className="min-w-0 flex-1 truncate text-[11px] font-bold text-emerald-200">
+                🔭 {s.name}
+                <span className="ms-1 font-normal text-slate-500">· {labelOf(s.post)}</span>
+              </p>
+              <span className="shrink-0 text-[10px] text-slate-400">
+                {s.hits} إصابة · {s.misses} خطأ
+              </span>
+              <span className="shrink-0 rounded-full border border-emerald-500/40 px-2 py-0.5 text-[9px] text-emerald-300">
+                {Math.round(s.accuracy * 100)}%
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* سجل النبوءات */}
+      {predictions.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold text-slate-300">
+            سجل النبوءات — هل فهموا العقل فعلاً؟
+          </h3>
+          {predictions.map((p) => (
+            <div
+              key={p._id}
+              className={"rounded-xl border p-2.5 " + (PRED_STYLE[p.status] ?? PRED_STYLE.open)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-[11px] text-slate-400">
+                  <span className="font-bold text-slate-200">{p.agentName}</span> يتوقّع لـ
+                  <span className="text-slate-100"> {p.subjectName}</span>
+                </p>
+                <span className="shrink-0 rounded-full border px-2 py-0.5 text-[9px]">
+                  {PRED_LABEL[p.status] ?? p.status}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed opacity-90">{p.basis}</p>
+              <p className="mt-1 text-[9px] opacity-80">
+                🎯 «{p.predictedLabel}»
+                {p.actualLabel ? ` · حدث فعلاً: «${p.actualLabel}»` : ""}
+                {" · "}
+                {ago(p.createdAt)}
+              </p>
+            </div>
+          ))}
         </section>
       )}
 

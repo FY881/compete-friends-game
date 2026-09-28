@@ -7,7 +7,7 @@ import { miniGameTables } from "./schemaMiniGames";
 import { gameLiveTables } from "./schemaGameLive";
 import { tierValidator } from "./tiers";
 import { apiCenterTables } from "./schemaApiCenter";
-import { agentMindTables } from "./schemaAgents";
+import { agentMindTables } from "./schemaAgents"; // agentMindTables + agentPredictions
 
 /**
  * ═══════════════════════════════════════════════════════════════════════

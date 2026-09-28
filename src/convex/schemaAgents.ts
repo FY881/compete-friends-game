@@ -78,4 +78,27 @@ export const agentMindTables = {
     .index("by_child", ["childName"])
     .index("by_parent", ["parentName"])
     .index("by_created", ["createdAt"]),
+
+  // 🔮 التنبؤ والتحقق — أعلى درجات فهم العقل الحقيقي:
+  //    الوكيل لا يكتفي بالوصف، بل يتوقّع أين سيكون العقل بعد ساعات، ثم
+  //    تُقارن نبوءته بما فعله العقل فعلاً: إصابة أم خطأ. الدقة تتراكم
+  //    على الوكيل نفسه، فتصير معرفة مقيسة لا انطباعاً.
+  agentPredictions: defineTable({
+    agentId: v.optional(v.id("freeAgents")),
+    agentName: v.string(),
+    post: v.string(), // الركن الذي أطلق منه النبوءة
+    subjectName: v.string(), // العقل المتنبَّأ به
+    predictedSystem: v.string(), // النظام الذي توقّع أن يقصده
+    predictedLabel: v.string(), // اسمه بالعربية للواجهة
+    basis: v.string(), // لماذا توقّع ذلك (شفافية كاملة)
+    horizonMs: v.number(), // أفق النبوءة بالمللي ثانية
+    status: v.string(), // open | hit | miss
+    actualSystem: v.optional(v.string()), // ما حدث فعلاً في النافذة
+    createdAt: v.number(),
+    windowEndsAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status", "windowEndsAt"])
+    .index("by_subject", ["subjectName"])
+    .index("by_created", ["createdAt"]),
 };

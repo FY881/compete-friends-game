@@ -401,7 +401,7 @@ const JOB_DEFS: JobDef[] = [
     group: "AI",
     intervalMinutes: 15,
     enabled: true,
-    run: (ctx) => ctx.runMutation(internal.aiFreeAgents.bloomJob, {}),
+    run: (ctx) => ctx.runMutation(internal.aiMindWatch.bloomPulse, {}),
   },
 ];
 
