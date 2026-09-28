@@ -6,33 +6,92 @@ import { internal } from "./_generated/api";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * 🕊️ الوكلاء الأحرار (Free Agents) — الأداة 29
+ * 🕊️ الوكلاء الأحرار (Free Agents) — الأداة 29/30
  * ═══════════════════════════════════════════════════════════════════════
  *
- * عقول مستقلة بلا أوامر من أحد: تُزرع عشوائياً في ركنات اللعبة كلها،
- * تلاحظ السلوك الحقيقي للاعبين من ناقل القرارات (aiDecisionLog)، ثم تكتب
- * ملاحظات صغيرة متواضعة عن عقولها. لا تدخل مباشر من المالك ولا من النظام —
- * فقط مراقبة صامتة تتراكم حتى تُكوّن فهم الأحرار لعقول اللعبة.
+ * عقول مستقلة بلا أوامر من أحد: تُزرع عشوائياً في **كل ركن** من أركان
+ * اللعبة، وتتناسل فيما بينها (وكيل يُنجب وكيلاً)، ثم تفهم عقول اللاعبين
+ * الحقيقية من ناقل القرارات (aiDecisionLog) دون أي تدخل من المالك أو
+ * من النظام. الفهم لا يُطلب من أحد — يُستخلص، ويتراكم، ويُجمَّع وحده.
  *
- * كل نبضة (كل 6 ساعات):
- *   1) تزرع 1-2 وكلاء جدداً في أماكن لم يُزرع بها أحد بعد.
- *   2) كل وكيل نشط يقرأ آخر أحداث موقعه ويكتب ملاحظة واحدة (ذكاء أو محلي).
- *   3) الوكيل الذي راكم 12 ملاحظة «يرتح» (يتوقف مؤقتاً) — تبايع مكانه.
+ * كل نبضة (كل ساعة):
+ *   1) البلوغ: زرع وكلاء في الأركان التي لم تمتلئ (سعة 2 لكل ركن) — حتى
+ *      يغطّي الأحرار اللعبة كلها.
+ *   2) الرصد: كل وكيل نشط يقرأ ما حدث فعلاً في اللعبة خلال آخر 72 ساعة،
+ *      يختار عقلاً لاعباً يدرسه، ويصوغ عنه: ملاحظة + بصمة (intel).
+ *   3) التناسل: الوكيل الذي استوفى ملاحظاته يُنجب وكيلاً في ركن آخر ثم
+ *      ينصرف — فتبقى الغابة حيّة ويزداد العدد عبر الزمن.
+ *   4) التشابك: الوكلاء الذين درسوا العقل نفسه يتشابكون — وفاق إن اتفقوا،
+ *      ونزاع إن اختلفوا (agentBonds).
+ *   5) التجميع: بصمات كل الأركان عن العقل الواحد تتجمّع في ملف واحد
+ *      (agentDossiers) — هذا هو «الفهم الحقيقي» الذي ينمو بلا قائد.
  * ═══════════════════════════════════════════════════════════════════════
  */
 
 const AGENT_SYSTEM = "free_agents";
+const OBS_CAP = 24; // عدد الملاحظات قبل أن ينصرف الوكيل ويُنجب خليفة
+const CAP_PER_POST = 2; // أقصى عدد وكلاء في الركن الواحد
 
-const POSTS: { post: string; label: string; watch: string }[] = [
-  { post: "home", label: "بوابة اللعبة", watch: "أول انطباع: من يدخل ومن يغادر ومن يقف متردداً" },
-  { post: "duel", label: "ساحة المبارزات", watch: "غرور الفائزين وعجلة الخاسرين للانتقام" },
-  { post: "war", label: "جبهة الحرب", watch: "من يقاتل لخير جيشه ومن يقاتل لنفسه فقط" },
-  { post: "store", label: "المتجر", watch: "من يشتري ليجمل ومن يشتري ليعوّض ضعفاً" },
-  { post: "court", label: "محكمة العدالة", watch: "من يشتكي بعقلٍ منصف ومن يشتكي ليهرب من الهزيمة" },
-  { post: "compass", label: "بوصلة العقول", watch: "من يطلب التوجيه جاداً ومن يطلب التوجيه ليضيع الوقت" },
-  { post: "meta", label: "العقل الأعظم", watch: "من يهتم بصحة الأدوات ومن يتجاهل الساعة" },
-  { post: "grand", label: "خيمة الخطة الكبرى", watch: "من يؤيد الخطط لقيادتها ومن يؤيدها ليشارك حقاً" },
-  { post: "agents", label: "غرفة الوكلاء", watch: "أخوّة الأنظمة: من يحترم الأدوات الأخرى ومن يتصرف وحده" },
+/** أركان اللعبة كلها — الوكلاء يُزرعون في أي منها عشوائياً */
+const POSTS: { post: string; label: string; emoji: string; watch: string }[] = [
+  // ── المسابقات ──
+  { post: "tournament", label: "البطولات", emoji: "🏆", watch: "من يلعب للفوز ومن يلعب ليُرى" },
+  { post: "world", label: "بطولة العالم", emoji: "🌍", watch: "من يمثّل بلده بإخلاص ومن يمثّل نفسه" },
+  { post: "arena", label: "الساحة", emoji: "⚔️", watch: "من يواجه بقوة ومن ينسحب بلطف" },
+  { post: "rivalry", label: "المنافسات", emoji: "🔥", watch: "كيف يتصرف العقل أمام غريمه" },
+  { post: "league", label: "الدوري", emoji: "📊", watch: "ثبات العادة لا وميض اللحظة" },
+  { post: "clan", label: "عشيرتي", emoji: "👥", watch: "من يخدم جماعته ومن يستغلّها" },
+  { post: "clanwar", label: "حروب العشائر", emoji: "🛡️", watch: "ولاء العقل حين يشتدّ الضغط" },
+  { post: "season", label: "جواز الموسم", emoji: "🎟️", watch: "من يصبر على موسم طويل" },
+  { post: "quests", label: "المهام", emoji: "🎯", watch: "من ينجز للذاته ومن ينجز للنقاط" },
+  { post: "modes", label: "أنماط اللعب", emoji: "🎮", watch: "أيّ نمط يكشف طبع العقل" },
+
+  // ── الذكاء والعقول ──
+  { post: "compass", label: "بوصلة العقول", emoji: "🧭", watch: "من يطلب التوجيه جاداً ومن يضيعه" },
+  { post: "metamind", label: "العقل الأعظم", emoji: "🜂", watch: "من يهتم بصحة المنظومة ومن يتجاهلها" },
+  { post: "store", label: "متجر العقول", emoji: "💳", watch: "من يشري ليتجمّل ومن يشري ليعوّض" },
+  { post: "grandplan", label: "الخطة الكبرى", emoji: "♟️", watch: "من يؤيد ليقود ومن يؤيد ليشارك" },
+  { post: "freeagents", label: "مرصد الأحرار", emoji: "🕊️", watch: "أخوّة العقول: من يحترم الأدوات" },
+  { post: "agents", label: "العقول الحيّة", emoji: "🧠", watch: "كيف يتعامل العقل مع نظيره الآلي" },
+  { post: "council", label: "مجلس العقول", emoji: "🗳️", watch: "من يصوّت بمبدئه ومن يصوّت بجواره" },
+  { post: "match", label: "المطابقة الذكية", emoji: "🧩", watch: "من يقبل قريناً أصعب ومن يهرب له" },
+  { post: "academy", label: "مدرسة العقول", emoji: "🎓", watch: "من يتعلم من ضعفه ومن يكرّره" },
+  { post: "chronicle", label: "سجل العقول", emoji: "📰", watch: "من يهمّه ما يُكتب عنه" },
+  { post: "colossus", label: "الطاغوت", emoji: "👹", watch: "من يقاتل الجميع ومن يخاف وحده" },
+  { post: "oracle", label: "العرّاف", emoji: "🔮", watch: "من يصدّق النبوءة ومن يتحداها" },
+  { post: "saga", label: "ملحمة العقول", emoji: "📖", watch: "كيف يروي العقل قصته" },
+  { post: "echo", label: "صدى الذات", emoji: "👤", watch: "مدى صدق اللاعب مع نفسه" },
+  { post: "bazaar", label: "بازار العقول", emoji: "🧬", watch: "من يعلّم غيره بلا مقابل" },
+  { post: "fate", label: "بئر القدر", emoji: "🎲", watch: "من يُلقي حظه ومن يُلقي عذره" },
+  { post: "summit", label: "عقل القمة", emoji: "🌳", watch: "من يعلو بتواضع ومن يعلو بغرور" },
+  { post: "moments", label: "لحظات القدر", emoji: "✨", watch: "أي لحظة يختار العقل أن يتذكّرها" },
+  { post: "exchange", label: "صرف القدرات", emoji: "📈", watch: "من يقايض بذكاء ومن يُبدّد" },
+  { post: "habits", label: "مرصد العادات", emoji: "🔍", watch: "العادة التي تحكم العقل دون أن يدري" },
+  { post: "duels", label: "صراع النقيض", emoji: "🗡️", watch: "من يطلب نقيضه عن قصد" },
+  { post: "warmirror", label: "المرآة الحربية", emoji: "🪞", watch: "من يواجه ضعفه المُعلن ومن ينكره" },
+  { post: "twincouncil", label: "مجلس التوأم", emoji: "⚜️", watch: "من يحمل نصيب رفيقه بصدق" },
+  { post: "alliancecup", label: "كأس التحالفات", emoji: "🏆", watch: "من يبني تحالفاً ومن يحرق آخر" },
+  { post: "mindwar", label: "الحرب الكبرى", emoji: "⚔️", watch: "من يقاتل لخير الجميع ومن لنفسه" },
+  { post: "court", label: "محكمة الشرف", emoji: "🧑‍⚖️", watch: "من يشتكي بعقلٍ منصف ومن يشتكي هرباً" },
+  { post: "ghostduel", label: "مبارزة الشبح", emoji: "👻", watch: "من يواجه ماضيه بلا خوف" },
+  { post: "challenges", label: "تحديات الأصدقاء", emoji: "🤝", watch: "من يتحدّى من يحب ومن يتحدّى من يكره" },
+
+  // ── لك شخصياً ──
+  { post: "loyalty", label: "الولاء", emoji: "💎", watch: "من يبقى وفيّاً حين لا مكسب" },
+  { post: "shop", label: "متجر التجميلات", emoji: "🛍️", watch: "ذوق العقل في اختيار هيئته" },
+  { post: "trophies", label: "خزانة الجوائز", emoji: "🏅", watch: "من يجمع للأثر ومن للتفاخر" },
+  { post: "legacy", label: "الإرث", emoji: "🏛️", watch: "ما يريد العقل أن يُذكَر به" },
+  { post: "reward", label: "المكافأة المتكيّفة", emoji: "🎁", watch: "ردّ العقل على الكرم" },
+  { post: "live", label: "الأحداث الحيّة", emoji: "📣", watch: "من يشارك في اللحظة ومن يفوّتها" },
+  { post: "appeal", label: "الاعتراضات", emoji: "⚖️", watch: "من يطلب العدل ومن يطلب الإفلات" },
+
+  // ── أروقة أساسية ──
+  { post: "home", label: "بوابة اللعبة", emoji: "🚪", watch: "أول انطباع: من يدخل ومن يتردّد" },
+  { post: "duel", label: "ساحة المبارزات", emoji: "🤺", watch: "غرور الفائز وعجلة الخاسر" },
+  { post: "war", label: "جبهة الحرب", emoji: "🏴", watch: "من يقاتل لجيشه ومن لنفسه" },
+  { post: "profile", label: "الملف الشخصي", emoji: "🪪", watch: "كيف يقدّم العقل نفسه للآخرين" },
+  { post: "leaderboard", label: "المتصدّرون", emoji: "📋", watch: "ما يفعله العقل حين يرى ترتيبه" },
+  { post: "auth", label: "بوابة الهوية", emoji: "🔐", watch: "من يدخل جديداً ومن يعود قديماً" },
 ];
 
 const PERSONAS = [
@@ -44,11 +103,35 @@ const PERSONAS = [
   "حكواتي يحوّل ما يراه إلى مثل قصير",
   "رياضي عدّاد يقيس العادة لا اللحظة",
   "درويش زاهد لا يهتم بالصعود بل بالسلوك أثناءه",
+  "مؤرّخ يقارن اليوم بما قبله",
+  "صيّاد صبور ينتظر النمط أن يتكرّر",
+  "لغوي يميّز بين ما يقوله العقل وما يعنيه",
+  "قاضٍ متواضع يؤجّل الحكم حتى يكتمل الدليل",
+  "خيّاط يرى الخيط الذي يربط تصرفات اللاعب",
+  "راعٍ يحرس القطيع دون أن يشعر أحد",
+  "مهندس يفكّك العقل إلى أجزاء ثم يُعيد تركيبه",
+  "طفل فضولي يسأل السؤال الذي يخافه الكبار",
 ];
 
-const EMOJIS = ["🕊️", "🦉", "🐇", "🦊", "🐢", "🦋", "🪶", "🐙", "🦉", "🐺", "🦉", "🕊️"];
-const NAMES_A = ["ضمير", "ظلّ", "همسة", "نسيج", "عدسة", "ميزان", "كفّ", "سراب", "قنديل", "خيط", "منشار", "شرارة"];
-const NAMES_B = ["الحرّ", "الصامت", "الطويل", "المتعجّل", "الرحّال", "العجوز", "الصغير", "الليّن", "العزيز", "الغريب", "الوفيّ", "الحنون"];
+const MOODS = [
+  "متأمّل",
+  "فضولي",
+  "حذر",
+  "متلهّف",
+  "رزين",
+  "ساخر بهدوء",
+  "مشفق",
+  "فخور بلقبه",
+];
+
+const NAMES_A = [
+  "ضمير", "ظلّ", "همسة", "نسيج", "عدسة", "ميزان", "كفّ", "سراب", "قنديل", "خيط",
+  "منشار", "شرارة", "أثر", "صدى", "بوصلة", "مفتاح", "غبار", "نجمة", "جذر", "نسيم",
+];
+const NAMES_B = [
+  "الحرّ", "الصامت", "الطويل", "المتعجّل", "الرحّال", "العجوز", "الصغير", "الليّن",
+  "العزيز", "الغريب", "الوفيّ", "الحنون", "الحكيم", "الخبير", "الوحيد", "الأخير",
+];
 
 function pick<T>(arr: T[], rnd: () => number = Math.random): T {
   return arr[Math.floor(rnd() * arr.length)];
@@ -58,121 +141,80 @@ function agentName(seed: number): string {
   return `${NAMES_A[seed % NAMES_A.length]} ${NAMES_B[(seed * 7 + 3) % NAMES_B.length]}`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// النبضة: زرع + ملاحظة
-// ═══════════════════════════════════════════════════════════════════════
+type Signal = {
+  name: string;
+  events: number;
+  systems: Set<string>;
+  actions: Map<string, number>;
+  lastSeen: number;
+  severe: number;
+};
 
-export const agentsPulse = internalMutation({
-  handler: async (ctx) => {
-    const now = Date.now();
-    const seeded: number[] = [];
-    const noted: number[] = [];
+function topEntry(m: Map<string, number>): [string, number] | null {
+  let best: [string, number] | null = null;
+  for (const e of m) if (!best || e[1] > best[1]) best = e;
+  return best;
+}
 
-    // 1) زرع 1-2 وكلاء جدداً في مواقع غير مشغولة
-    const existing = await ctx.db.query("freeAgents").collect();
-    const occupied = new Set(existing.filter((a) => a.active).map((a) => a.post));
-    const free = POSTS.filter((p) => !occupied.has(p.post));
-    const toPlant = Math.min(free.length, 1 + (Math.random() < 0.4 ? 1 : 0));
-    for (let i = 0; i < toPlant; i++) {
-      const site = pick(free);
-      free.splice(free.indexOf(site), 1);
-      const seed = Math.floor(Math.random() * 10_000);
-      await ctx.db.insert("freeAgents", {
-        name: `${agentName(seed)}${i > 0 ? ` ${EMOJIS[seed % EMOJIS.length]}` : ""}`,
-        emoji: EMOJIS[seed % EMOJIS.length],
-        role: pick(PERSONAS),
-        post: site.post,
-        persona: `يتفرّج على «${site.label}» — ${site.watch}.`,
-        watch: site.watch,
-        active: true,
-        observations: 0,
-        createdAt: now,
-        lastPulseAt: now,
-      });
-      seeded.push(seed);
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n));
+}
 
-      await ctx.db.insert("aiDecisionLog", {
-        system: AGENT_SYSTEM,
-        actorName: "الوكلاء الأحرار",
-        action: "agent_planted",
-        targetName: site.label,
-        detail: `زرع حرّ جديد في «${site.label}» دون أمر من أحد.`,
-        severity: "low",
-        createdAt: now,
-      });
-    }
+/** يستخلص بصمة العقل من إشاراته الحقيقية — بلا أي أمر خارجي */
+function distillIntel(
+  name: string,
+  s: Signal,
+  now: number,
+): { kind: string; trait: string; insight: string; strength: number } {
+  const systemCount = s.systems.size;
+  const top = topEntry(s.actions);
+  const sysList = [...s.systems];
+  const recentlyActive = now - s.lastSeen < 6 * 3600_000;
+  const dormant = now - s.lastSeen > 48 * 3600_000;
 
-    // 2) كل وكيل نشط يكتب ملاحظة (بحد أقصى 3 وكلاء لكل نبضة — رفاهية الحصة)
-    const agents = (await ctx.db.query("freeAgents").withIndex("by_active", (q) => q.eq("active", true)).take(20))
-      .filter((a) => a.observations < 12)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 3);
+  const warlike = sysList.some((x) => /war|duel|arena|rival|clan|mindwar/i.test(x));
+  const commercial = sysList.some((x) => /store|shop|coin|stripe|payment/i.test(x));
+  const legal = sysList.some((x) => /court|appeal|report|moderat/i.test(x));
+  const solitary = systemCount === 1 && s.events >= 2;
 
-    for (const agent of agents) {
-      const site = POSTS.find((p) => p.post === agent.post);
-      // آخر أحداث الناقل المرتبطة بموقع الوكيل تقريبياً — الوكيل يقرأ ما يصل إليه
-      const dayAgo = now - 24 * 3600_000;
-      const events = await ctx.db
-        .query("aiDecisionLog")
-        .withIndex("by_created", (q) => q.gt("createdAt", dayAgo))
-        .take(400);
-      const recent = events
-        .filter((e) => e.system !== AGENT_SYSTEM && e.targetName === site?.label)
-        .slice(0, 8);
+  let trait = "عقل هادئ";
+  let kind = "pattern";
+  if (s.events >= 20) {
+    trait = "حضور ثقيل";
+    kind = "fingerprint";
+  } else if (systemCount >= 5) {
+    trait = "متعدّد الجبهات";
+    kind = "fingerprint";
+  } else if (solitary) {
+    trait = "أحادي الركن";
+    kind = "fingerprint";
+  }
+  if (warlike && !commercial) trait = "مزاج حربي";
+  if (commercial && !warlike) trait = "مزاج تاجر";
+  if (legal) trait = "مزاج قانوني";
+  if (s.severe >= 3) {
+    trait = "عقل تحت ضغط";
+    kind = "warning";
+  }
+  if (recentlyActive) trait = "متوهّج الآن";
+  if (dormant) {
+    trait = "خامد منذ زمن";
+    kind = "pattern";
+  }
 
-      const localNote = buildLocalNote(agent, recent);
-      let note = localNote;
-      let engine = "local";
-      if (getOpenRouterKey() && recent.length > 0) {
-        const aiNote = await llmNote(agent, site?.label ?? "مكانه", recent);
-        if (aiNote) {
-          note = aiNote;
-          engine = "llm";
-        }
-      }
+  const recency = recentlyActive
+    ? "متوهّج الآن."
+    : dormant
+      ? "خامد منذ أكثر من يومين."
+      : "نشاط متقطّع.";
+  const insight =
+    `${name}: ${s.events} حركة ظاهرة عبر ${systemCount} أداة` +
+    (top ? `، أبرزها «${top[0]}» (${top[1]} مرة)` : "") +
+    `. ${recency}`;
 
-      await ctx.db.insert("agentMindNotes", {
-        agentId: agent._id,
-        agentName: agent.name,
-        post: agent.post,
-        actorName: "عقول اللاعبين",
-        note,
-        confidence: Math.min(0.95, 0.4 + recent.length * 0.06),
-        createdAt: now,
-      });
-      await ctx.db.patch(agent._id, { observations: agent.observations + 1, lastPulseAt: now });
-      noted.push(1);
-
-      // الوكيل المكتمل يرتاح — يترك مكانه لغيره
-      if (agent.observations + 1 >= 12) {
-        await ctx.db.patch(agent._id, { active: false });
-        await ctx.db.insert("aiDecisionLog", {
-          system: AGENT_SYSTEM,
-          actorName: agent.name,
-          action: "agent_retired",
-          targetName: site?.label ?? "مكانه",
-          detail: "اكتملت ملاحظاته وانصرف — تبايع مكانه لوكيل جديد.",
-          severity: "low",
-          createdAt: now,
-        });
-      }
-
-      if (engine === "llm") {
-        await ctx.db.insert("aiDecisionLog", {
-          system: AGENT_SYSTEM,
-          actorName: agent.name,
-          action: "note_written",
-          targetName: site?.label ?? "مكانه",
-          detail: note.slice(0, 200),
-          severity: "low",
-          createdAt: now,
-        });
-      }
-    }
-
-    return { planted: seeded.length, notes: noted.length };
-  },
-});
+  const strength = clamp01(0.35 + Math.min(0.5, s.events * 0.02) + (top ? Math.min(0.15, top[1] * 0.01) : 0));
+  return { kind, trait, insight, strength };
+}
 
 function buildLocalNote(
   agent: { name: string; persona: string; watch: string; observations: number },
@@ -187,8 +229,13 @@ function buildLocalNote(
   ]);
   const body = recent.length
     ? `أكثر العقول حضوراً هنا اليوم: ${busy}. ${agent.watch} — وهذا يقول كثيراً.`
-    : `صمت غريب: لا أحد حرّك شيئاً هنا. ${agent.watch} يبقى اختباراً مؤجلاً.`;
-  const tag = agent.observations < 3 ? "ملاحظة مبكرة، انتباهي ليس يقيناً بعد." : "أُقرّب من اليقين كل يوم.";
+    : `صمت غريب: لا أحد حرّك شيئاً. ${agent.watch} يبقى اختباراً مؤجلاً.`;
+  const tag =
+    agent.observations < 3
+      ? "ملاحظة مبكرة، انتباهي ليس يقيناً بعد."
+      : agent.observations < 12
+        ? "أُقرّب من اليقين كل نبضة."
+        : "بلورتُ رأيي؛ اقترب موعد رحيلي لأترك الركن لخليفة.";
   return `${intro} ${body} ${tag}`;
 }
 
@@ -204,7 +251,7 @@ async function llmNote(
         {
           role: "system",
           content:
-            'أنت وكيل حر مستقل في لعبة "حرب العقول" — لا أوامر عليك من أحد. شخصيتك: ' +
+            'أنت وكيل حرّ مستقل في لعبة "حرب العقول" — لا أوامر عليك من أحد. شخصيتك: ' +
             agent.persona +
             ". ما تراقبه: " +
             agent.watch +
@@ -230,6 +277,313 @@ async function llmNote(
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// النبضة الكبرى: بلوغ + رصد + تناسل + تشابك + تجميع
+// ═══════════════════════════════════════════════════════════════════════
+
+export const agentsPulse = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    let planted = 0;
+    let noted = 0;
+    let intelCount = 0;
+    let bondCount = 0;
+    let dossierCount = 0;
+
+    // ═══ 1) البلوغ: زرع في الأركان التي لم تمتلئ (سعة 2 لكل ركن) ═══
+    const allAgents = await ctx.db.query("freeAgents").take(400);
+    const liveByPost = new Map<string, number>();
+    for (const a of allAgents) {
+      if (a.active) liveByPost.set(a.post, (liveByPost.get(a.post) ?? 0) + 1);
+    }
+    const freeNow = () => POSTS.filter((p) => (liveByPost.get(p.post) ?? 0) < CAP_PER_POST);
+
+    const plant = async (
+      site: { post: string; label: string; emoji: string; watch: string },
+      generation: number,
+      parentName: string,
+    ): Promise<void> => {
+      const seed = Math.floor(Math.random() * 100_000);
+      const spawned = parentName ? " الابن" : "";
+      await ctx.db.insert("freeAgents", {
+        name: `${agentName(seed)}${spawned}`,
+        emoji: site.emoji,
+        role: pick(PERSONAS),
+        post: site.post,
+        persona: `${pick(MOODS)} — يراقب «${site.label}»: ${site.watch}.`,
+        watch: site.watch,
+        active: true,
+        observations: 0,
+        createdAt: now,
+        lastPulseAt: now,
+      });
+      liveByPost.set(site.post, (liveByPost.get(site.post) ?? 0) + 1);
+      planted++;
+      await ctx.db.insert("aiDecisionLog", {
+        system: AGENT_SYSTEM,
+        actorName: parentName ? parentName : "الوكلاء الأحرار",
+        action: parentName ? "agent_born" : "agent_planted",
+        targetName: site.label,
+        detail: parentName
+          ? `أنجب ${parentName} خليفةً له في «${site.label}» (الجيل ${generation}) دون أمر من أحد.`
+          : `زرع حرّ جديد نفسه في «${site.label}» دون أمر من أحد.`,
+        severity: "low",
+        createdAt: now,
+      });
+    };
+
+    const initialRoomy = freeNow();
+    const toPlant = Math.min(initialRoomy.length, Math.min(12, 3 + Math.floor(initialRoomy.length / 8)));
+    for (let i = 0; i < toPlant; i++) {
+      const roomy = freeNow();
+      if (roomy.length === 0) break;
+      const site = pick(roomy);
+      await plant(site, 1, "");
+    }
+
+    // ═══ 2) الرصد: نقرأ الناقل الحقيقي مرة واحدة ونستخلص إشارات كل عقل ═══
+    const since = now - 72 * 3600_000;
+    const bus = await ctx.db
+      .query("aiDecisionLog")
+      .withIndex("by_created", (q) => q.gt("createdAt", since))
+      .take(400);
+    const realBus = bus.filter((e) => e.system !== AGENT_SYSTEM);
+
+    const signals = new Map<string, Signal>();
+    for (const e of realBus) {
+      const name = e.actorName;
+      if (!name) continue;
+      let s = signals.get(name);
+      if (!s) {
+        s = { name, events: 0, systems: new Set<string>(), actions: new Map<string, number>(), lastSeen: 0, severe: 0 };
+        signals.set(name, s);
+      }
+      s.events++;
+      s.systems.add(e.system);
+      s.actions.set(e.action, (s.actions.get(e.action) ?? 0) + 1);
+      if (e.createdAt > s.lastSeen) s.lastSeen = e.createdAt;
+      if (e.severity === "high") s.severe++;
+    }
+
+    // عيّنة أوسع من العقول الحقيقية (حتى الهادئة التي لا تظهر في الناقل)
+    const subjectPool: string[] = [...signals.keys()];
+    if (subjectPool.length < 12) {
+      const users = await ctx.db.query("users").take(120);
+      for (const u of users) {
+        const nm = u.name;
+        if (nm && !subjectPool.includes(nm)) subjectPool.push(nm);
+      }
+    }
+
+    const observers = (
+      await ctx.db
+        .query("freeAgents")
+        .withIndex("by_active", (q) => q.eq("active", true))
+        .take(80)
+    )
+      .filter((a) => a.observations < OBS_CAP)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 8);
+
+    const newIntel: { id: string; agentId: string; agentName: string; post: string; subject: string; trait: string; strength: number; insight: string }[] = [];
+    const touched = new Set<string>();
+    let llmBudget = 2;
+
+    for (const agent of observers) {
+      const site = POSTS.find((p) => p.post === agent.post);
+      const siteLabel = site?.label ?? "مكانه";
+
+      // الوكيل يختار عقلاً يدرسه من العقول الحاضرة في اللعبة
+      const subject = subjectPool.length > 0 ? pick(subjectPool) : null;
+
+      const recent = realBus
+        .filter((e) => e.targetName === siteLabel || e.actorName === subject)
+        .slice(0, 8);
+
+      // ملاحظة سردية
+      let note = buildLocalNote(agent, recent);
+      let engine = "local";
+      if (engine === "local" && llmBudget > 0 && getOpenRouterKey() && recent.length > 0) {
+        const aiNote = await llmNote(agent, siteLabel, recent);
+        if (aiNote) {
+          note = aiNote;
+          engine = "llm";
+          llmBudget--;
+        }
+      }
+      await ctx.db.insert("agentMindNotes", {
+        agentId: agent._id,
+        agentName: agent.name,
+        post: agent.post,
+        actorName: subject ?? "عقول اللاعبين",
+        note,
+        confidence: Math.min(0.95, 0.4 + recent.length * 0.06),
+        createdAt: now,
+      });
+      noted++;
+
+      // بصمة العقل (intel)
+      if (subject) {
+        const s = signals.get(subject);
+        if (s && s.events > 0) {
+          const d = distillIntel(subject, s, now);
+          const row = await ctx.db.insert("agentIntel", {
+            agentId: agent._id,
+            agentName: agent.name,
+            post: agent.post,
+            subjectName: subject,
+            kind: d.kind,
+            trait: d.trait,
+            insight: d.insight,
+            strength: d.strength,
+            engine,
+            createdAt: now,
+          });
+          newIntel.push({
+            id: row,
+            agentId: agent._id,
+            agentName: agent.name,
+            post: agent.post,
+            subject,
+            trait: d.trait,
+            strength: d.strength,
+            insight: d.insight,
+          });
+          intelCount++;
+          touched.add(subject);
+        }
+      }
+
+      await ctx.db.patch(agent._id, {
+        observations: agent.observations + 1,
+        lastPulseAt: now,
+        persona: `${pick(MOODS)} — يراقب «${siteLabel}»: ${agent.watch}.`,
+      });
+
+      // ═══ 3) التناسل: الوكيل المكتمل يُنجب خليفةً ثم ينصرف ═══
+      if (agent.observations + 1 >= OBS_CAP) {
+        await ctx.db.patch(agent._id, { active: false });
+        await ctx.db.insert("aiDecisionLog", {
+          system: AGENT_SYSTEM,
+          actorName: agent.name,
+          action: "agent_retired",
+          targetName: siteLabel,
+          detail: "اكتمل فهمه وانصرف — تبايع ركنه لخليفة يُنجبه هو.",
+          severity: "low",
+          createdAt: now,
+        });
+        const roomy = freeNow();
+        if (roomy.length > 0) {
+          await plant(pick(roomy), 2, agent.name);
+        }
+      }
+    }
+
+    // ═══ 4) التشابك: من درسوا العقل نفسه يتشابكون تلقائياً ═══
+    const existingBonds = await ctx.db.query("agentBonds").take(120);
+    const bondKeys = new Set(existingBonds.map((b) => [b.aName, b.bName].sort().join("|")));
+    const groups = new Map<string, typeof newIntel>();
+    for (const it of newIntel) {
+      const arr: typeof newIntel = groups.get(it.subject) ?? [];
+      arr.push(it);
+      groups.set(it.subject, arr);
+    }
+    for (const [subject, rows] of groups) {
+      if (rows.length < 2 || bondCount >= 6) continue;
+      const a = rows[0];
+      const b = rows.find((x) => x.agentName !== a.agentName);
+      if (!b) continue;
+      const key = [a.agentName, b.agentName].sort().join("|");
+      if (bondKeys.has(key)) continue;
+      const agree = a.trait === b.trait;
+      const kind = agree ? "alliance" : "rivalry";
+      await ctx.db.insert("agentBonds", {
+        aName: a.agentName,
+        bName: b.agentName,
+        kind,
+        note: agree
+          ? `اتفق ${a.agentName} و${b.agentName} على أن «${subject}» ${a.trait} — وفاق الأحرار.`
+          : `اختلف ${a.agentName} و${b.agentName} على «${subject}»: رأيا «${a.trait}» مقابل «${b.trait}».`,
+        strength: clamp01((a.strength + b.strength) / 2),
+        createdAt: now,
+      });
+      bondKeys.add(key);
+      bondCount++;
+    }
+
+    // ═══ 5) التجميع: الفهم المشترك لكل عقل ═══
+    let dossierBudget = 4;
+    for (const subject of touched) {
+      if (dossierBudget <= 0) break;
+      dossierBudget--;
+      const rows = await ctx.db
+        .query("agentIntel")
+        .withIndex("by_subject", (q) => q.eq("subjectName", subject))
+        .take(24);
+      if (rows.length === 0) continue;
+
+      const traitTally = new Map<string, number>();
+      const contributors = new Set<string>();
+      let strengthSum = 0;
+      for (const r of rows) {
+        traitTally.set(r.trait, (traitTally.get(r.trait) ?? 0) + 1);
+        contributors.add(r.agentName);
+        strengthSum += r.strength;
+      }
+      const traits = [...traitTally.entries()].sort((x, y) => y[1] - x[1]).map((e) => e[0]).slice(0, 4);
+      const topTrait = traits[0] ?? "عقل غامض";
+      const confidence = clamp01(strengthSum / rows.length + Math.min(0.2, contributors.size * 0.04));
+      const verdict =
+        `يُقرأ «${subject}» في مرصد الأحرار كـ«${topTrait}» — ` +
+        `${contributors.size} وكيلًا تجمّعوا حول ${rows.length} بصمة بلا قائد.`;
+
+      const existing = await ctx.db
+        .query("agentDossiers")
+        .withIndex("by_subject", (q) => q.eq("subjectName", subject))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          traits,
+          verdict,
+          confidence,
+          contributors: contributors.size,
+          notesCount: rows.length,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("agentDossiers", {
+          subjectName: subject,
+          traits,
+          verdict,
+          confidence,
+          contributors: contributors.size,
+          notesCount: rows.length,
+          engine: "local",
+          updatedAt: now,
+          createdAt: now,
+        });
+      }
+      dossierCount++;
+    }
+
+    // ═══ تنظيف: إزالة الوكلاء المنصرفين القدماء لإبقاء الجدول خفيفاً ═══
+    const staleCut = now - 30 * 24 * 3600_000;
+    const retired = await ctx.db
+      .query("freeAgents")
+      .withIndex("by_active", (q) => q.eq("active", false))
+      .take(40);
+    let pruned = 0;
+    for (const r of retired) {
+      if (r.createdAt < staleCut && pruned < 20) {
+        await ctx.db.delete(r._id);
+        pruned++;
+      }
+    }
+
+    return { planted, noted, intel: intelCount, bonds: bondCount, dossiers: dossierCount };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // قراءة الواجهة + تحية الوكيل (تدخّل وحيد مسموح: صافرة ترحيب)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -238,18 +592,52 @@ export const getFreeAgents = query({
     const agents = await ctx.db
       .query("freeAgents")
       .withIndex("by_active", (q) => q.eq("active", true))
-      .take(30);
+      .take(80);
     const notes = await ctx.db
       .query("agentMindNotes")
       .withIndex("by_created", (q) => q.gt("createdAt", 0))
       .order("desc")
+      .take(24);
+    const intel = await ctx.db
+      .query("agentIntel")
+      .withIndex("by_created", (q) => q.gt("createdAt", 0))
+      .order("desc")
       .take(30);
-    const retired = (await ctx.db.query("freeAgents").collect()).filter((a) => !a.active).length;
-    return { agents, notes, retired, posts: POSTS.map((p) => p.post) };
+    const bonds = await ctx.db
+      .query("agentBonds")
+      .withIndex("by_created", (q) => q.gt("createdAt", 0))
+      .order("desc")
+      .take(20);
+    const dossiers = await ctx.db
+      .query("agentDossiers")
+      .withIndex("by_confidence", (q) => q.gt("confidence", 0))
+      .order("desc")
+      .take(24);
+    const all = await ctx.db.query("freeAgents").take(400);
+    const retired = all.filter((a) => !a.active).length;
+    const covered = new Set(agents.map((a) => a.post)).size;
+
+    return {
+      agents,
+      notes,
+      intel,
+      bonds,
+      dossiers,
+      corners: POSTS.map((p) => ({ post: p.post, label: p.label, emoji: p.emoji })),
+      stats: {
+        active: agents.length,
+        retired,
+        covered,
+        totalCorners: POSTS.length,
+        intel: intel.length,
+        bonds: bonds.length,
+        dossiers: dossiers.length,
+      },
+    };
   },
 });
 
-/** صافرة ترحيب: اللاعب يسجّل أنه رأى وكيل الكساء — الوكيل يحتفظ بذلك في ذاكرته */
+/** صافرة ترحيب: اللاعب يلوّح لوكيل — الوكيل يدوّن اللقاء في فهمه */
 export const greetAgent = mutation({
   args: { agentId: v.id("freeAgents") },
   handler: async (ctx, { agentId }) => {
@@ -259,21 +647,30 @@ export const greetAgent = mutation({
     const agent = await ctx.db.get(agentId);
     if (!agent) throw new Error("الوكيل غير موجود");
     const me = await ctx.db.get(userId);
-    const notes = await ctx.db
-      .query("agentMindNotes")
-      .withIndex("by_agent", (q) => q.eq("agentId", agentId))
-      .order("desc")
-      .take(3);
+    const who = me?.name ?? String(userId);
+    const site = POSTS.find((p) => p.post === agent.post);
     await ctx.db.insert("agentMindNotes", {
       agentId,
       agentName: agent.name,
       post: agent.post,
-      actorName: me?.name ?? String(userId),
-      note: `لاحظ ${me?.name ?? "زائر"} وقف عند ركنه ولوح له. سيتذكر هذا.`,
+      actorName: who,
+      note: `لاحظ ${who} وقف عند «${site?.label ?? agent.post}» ولوّح له. سيتذكر هذا اللقاء.`,
       confidence: 0.6,
       createdAt: now,
     });
-    await ctx.db.patch(agentId, { observations: agent.observations + 1 });
+    await ctx.db.insert("agentIntel", {
+      agentId,
+      agentName: agent.name,
+      post: agent.post,
+      subjectName: who,
+      kind: "contact",
+      trait: "تواصل مباشر",
+      insight: `${who} اختار أن يلقي التحيّة على ${agent.name} في «${site?.label ?? agent.post}».`,
+      strength: 0.6,
+      engine: "local",
+      createdAt: now,
+    });
+    await ctx.db.patch(agentId, { observations: agent.observations + 1, lastPulseAt: now });
     return { ok: true as const };
   },
 });

@@ -7,6 +7,7 @@ import { miniGameTables } from "./schemaMiniGames";
 import { gameLiveTables } from "./schemaGameLive";
 import { tierValidator } from "./tiers";
 import { apiCenterTables } from "./schemaApiCenter";
+import { agentMindTables } from "./schemaAgents";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -20,6 +21,7 @@ import { apiCenterTables } from "./schemaApiCenter";
  * ═══════════════════════════════════════════════════════════════════════
  */
 export const premiumTables = {
+  ...agentMindTables,
   // ═══ طبقات الإشعارات الذكية ═══
   notificationTiers: defineTable({
     userId: v.id("users"),
