@@ -412,6 +412,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiMindDeeper.deeperPulse, {}),
   },
+  {
+    key: "free_agents_society",
+    name: "الوكلاء الأحرار — مجتمع العقول",
+    description: "كل ست ساعات يقيس إيقاع كل لاعب (ليلي أم نهاري وأين قمّته)، ويرسم دوائر الرفقة من اللقاءات الفعلية في الركن نفسه، ويكشف من يتحرّك بعده غيره — بلا سؤال لأحد.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiMindSociety.societyPulse, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

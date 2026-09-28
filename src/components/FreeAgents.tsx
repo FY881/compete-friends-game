@@ -140,6 +140,54 @@ type Deeper = {
   };
 };
 
+type Rhythm = {
+  _id: string;
+  subjectName: string;
+  hours: number[];
+  samples: number;
+  peakHour: number;
+  chronotype: string;
+  nightShare: number;
+};
+
+type Circle = {
+  _id: string;
+  aName: string;
+  bName: string;
+  systemLabel: string;
+  encounters: number;
+  strength: number;
+};
+
+type Influence = {
+  _id: string;
+  name: string;
+  leads: number;
+  follows: number;
+  pull: number;
+  topSystemLabel: string;
+};
+
+type Society = {
+  rhythms: Rhythm[];
+  circles: Circle[];
+  influence: Influence[];
+  stats: {
+    rhythms: number;
+    circles: number;
+    influencers: number;
+    nightOwls: number;
+    avgPull: number;
+  };
+};
+
+const CHRONO: Record<string, string> = {
+  "ليل": "🌙",
+  "صباح": "🌅",
+  "نهار": "☀️",
+  "مساء": "🌆",
+};
+
 const TREND: Record<string, { label: string; cls: string }> = {
   rising: { label: "▲ يثبت", cls: "border-emerald-500/40 text-emerald-300" },
   falling: { label: "▼ يتراجع", cls: "border-rose-500/40 text-rose-300" },
@@ -261,6 +309,7 @@ export function FreeAgents() {
   const data = useQuery(api.aiFreeAgents.getFreeAgents) as unknown as Data | undefined;
   const watch = useQuery(api.aiMindWatch.getMindWatch) as unknown as Watch | undefined;
   const deeper = useQuery(api.aiMindDeeper.getMindDeeper) as unknown as Deeper | undefined;
+  const society = useQuery(api.aiMindSociety.getMindSociety) as unknown as Society | undefined;
   const greet = useMutation(api.aiFreeAgents.greetAgent);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -279,6 +328,9 @@ export function FreeAgents() {
   const triggers = deeper?.triggers ?? [];
   const intents = deeper?.intents ?? [];
   const flows = deeper?.flows ?? [];
+  const rhythms = society?.rhythms ?? [];
+  const circles = society?.circles ?? [];
+  const influence = society?.influence ?? [];
   const stats: Stats | undefined = watch?.stats ?? data?.stats;
 
   const labelOf = (post: string) => {
@@ -702,6 +754,94 @@ export function FreeAgents() {
                   ثبات {Math.round(it.best.confidence * 100)}%
                 </span>
               </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* مجتمع العقول: الإيقاع والرفقة والجرّ */}
+      {rhythms.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold text-slate-300">
+            مجتمع العقول — الإيقاع ودوائر الرفقة ومن يجرّ
+          </h3>
+          {society?.stats && (
+            <p className="text-[10px] leading-relaxed text-slate-500">
+              {society.stats.rhythms} إيقاع مقيس · {society.stats.circles} دائرة رفقة ·{" "}
+              {society.stats.influencers} عقلًا يجذب غيره · {society.stats.nightOwls} عقلًا ليليّ.
+            </p>
+          )}
+
+          {rhythms.map((r) => {
+            const max = Math.max(1, ...r.hours);
+            return (
+              <div key={r._id} className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate text-[11px] font-bold text-violet-200">
+                    {CHRONO[r.chronotype] ?? "⏰"} {r.subjectName}
+                  </p>
+                  <span className="shrink-0 text-[10px] text-slate-500">
+                    {r.chronotype} · قمّته {r.peakHour}:00 · ليل {Math.round(r.nightShare * 100)}%
+                  </span>
+                </div>
+                <div className="mt-2 flex h-6 items-end gap-px">
+                  {r.hours.map((n, i) => (
+                    <div
+                      key={i}
+                      title={`${i}:00 — ${n}`}
+                      className={
+                        "flex-1 rounded-sm " +
+                        (i === r.peakHour ? "bg-violet-300" : "bg-violet-500/50")
+                      }
+                      style={{ height: `${Math.max(6, Math.round((n / max) * 100))}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {circles.map((c) => (
+            <div key={c._id} className="rounded-xl border border-teal-500/20 bg-teal-500/5 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-[11px] text-slate-200">
+                  👥 {c.aName} <span className="text-teal-300">+</span> {c.bName}
+                </p>
+                <span className="shrink-0 text-[10px] text-slate-500">
+                  {c.encounters} لقاء · {c.systemLabel}
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-700/50">
+                  <div
+                    className="h-full rounded-full bg-teal-400/70"
+                    style={{ width: `${Math.round(c.strength * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-slate-500">
+                  تزامن {Math.round(c.strength * 100)}%
+                </span>
+              </div>
+            </div>
+          ))}
+
+          {influence.map((n) => (
+            <div
+              key={n._id}
+              className="flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/5 p-2.5"
+            >
+              <p className="min-w-0 flex-1 truncate text-[11px] font-bold text-orange-200">
+                {n.pull >= 0.6 ? "🧲" : "🫱"} {n.name}
+                {n.topSystemLabel ? (
+                  <span className="ms-1 font-normal text-slate-500">· {n.topSystemLabel}</span>
+                ) : null}
+              </p>
+              <span className="shrink-0 text-[10px] text-slate-400">
+                يجرّ {n.leads} · يُجرّ {n.follows}
+              </span>
+              <span className="shrink-0 rounded-full border border-orange-500/40 px-2 py-0.5 text-[9px] text-orange-300">
+                جرّ {Math.round(n.pull * 100)}%
+              </span>
             </div>
           ))}
         </section>

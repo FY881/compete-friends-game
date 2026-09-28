@@ -141,4 +141,46 @@ export const agentMindTables = {
     .index("by_pair", ["fromSystem", "toSystem"])
     .index("by_weight", ["weight"])
     .index("by_created", ["createdAt"]),
+
+  // ⏰ إيقاع كل عقل — متى يكون حاضراً فعلاً: ليلي أم نهاري، وأي ساعة قمّته
+  mindRhythms: defineTable({
+    subjectName: v.string(),
+    hours: v.array(v.number()), // ٢٤ عدداً: حضوره في كل ساعة
+    samples: v.number(),
+    peakHour: v.number(),
+    chronotype: v.string(), // ليل | صباح | نهار | مساء
+    nightShare: v.number(), // نصيب ساعات الليل من نشاطه
+    updatedAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_subject", ["subjectName"])
+    .index("by_samples", ["samples"]),
+
+  // 👥 الرفقة — من يجالس من فعلاً: لقاءات مقيسة في الركن نفسه والنافذة نفسها
+  mindCircles: defineTable({
+    aName: v.string(),
+    bName: v.string(),
+    system: v.string(),
+    systemLabel: v.string(),
+    encounters: v.number(),
+    strength: v.number(), // 0-1: كم لقاء مقابل أقل حضور بينهما
+    updatedAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_pair", ["aName", "bName", "system"])
+    .index("by_strength", ["strength"]),
+
+  // 🧲 من يجرّ الآخرين — من يتحرّك بعده غيره في الركن نفسه خلال ربع ساعة
+  mindInfluence: defineTable({
+    name: v.string(),
+    leads: v.number(), // كم مرة تحرّك غيره بعده
+    follows: v.number(), // كم مرة تحرّك هو بعد غيره
+    pull: v.number(), // leads ÷ (leads + follows)
+    topSystem: v.string(),
+    topSystemLabel: v.string(),
+    updatedAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_name", ["name"])
+    .index("by_pull", ["pull"]),
 };
