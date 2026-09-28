@@ -46,6 +46,16 @@ export const agentMindTables = {
   agentDossiers: defineTable({
     subjectName: v.string(),
     traits: v.array(v.string()), // البصمات المتفق عليها
+    axes: v.optional(
+      v.object({
+        aggression: v.number(), // 0-1: الميول القتالية
+        curiosity: v.number(), // التعلّم والاستكشاف
+        commerce: v.number(), // التبادل والمتجر
+        loyalty: v.number(), // الانتماء والوفاء
+        sociability: v.number(), // المجالس والتحديات
+        caution: v.number(), // الحذر والقانون
+      }),
+    ),
     verdict: v.string(), // خلاصة الفهم
     confidence: v.number(), // 0-1
     contributors: v.number(), // كم وكيلًا شارك في الفهم
@@ -56,4 +66,16 @@ export const agentMindTables = {
   })
     .index("by_subject", ["subjectName"])
     .index("by_confidence", ["confidence"]),
+
+  // شجرة سلالات الأحرار — من أنجب من، جيلاً بعد جيل
+  agentLineage: defineTable({
+    childName: v.string(),
+    parentName: v.string(),
+    generation: v.number(),
+    post: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_child", ["childName"])
+    .index("by_parent", ["parentName"])
+    .index("by_created", ["createdAt"]),
 };

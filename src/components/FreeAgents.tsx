@@ -58,11 +58,28 @@ type Dossier = {
   _id: string;
   subjectName: string;
   traits: string[];
+  axes?: {
+    aggression: number;
+    curiosity: number;
+    commerce: number;
+    loyalty: number;
+    sociability: number;
+    caution: number;
+  };
   verdict: string;
   confidence: number;
   contributors: number;
   notesCount: number;
   updatedAt: number;
+};
+
+type Lineage = {
+  _id: string;
+  childName: string;
+  parentName: string;
+  generation: number;
+  post: string;
+  createdAt: number;
 };
 
 type Corner = { post: string; label: string; emoji: string };
@@ -78,6 +95,15 @@ type Annal = {
 
 type Cluster = { trait: string; members: string[] };
 
+const AXIS_LABEL: { key: keyof NonNullable<Dossier["axes"]>; label: string }[] = [
+  { key: "aggression", label: "قتال" },
+  { key: "curiosity", label: "فضول" },
+  { key: "commerce", label: "تجارة" },
+  { key: "loyalty", label: "ولاء" },
+  { key: "sociability", label: "مجالس" },
+  { key: "caution", label: "حذر" },
+];
+
 type Data = {
   agents: Agent[];
   notes: Note[];
@@ -86,6 +112,7 @@ type Data = {
   dossiers: Dossier[];
   annals: Annal[];
   clusters: Cluster[];
+  lineage: Lineage[];
   corners: Corner[];
   stats: {
     active: number;
@@ -152,6 +179,7 @@ export function FreeAgents() {
   const dossiers = data?.dossiers ?? [];
   const annals = data?.annals ?? [];
   const clusters = data?.clusters ?? [];
+  const lineage = data?.lineage ?? [];
   const corners = data?.corners ?? [];
   const stats = data?.stats;
 
@@ -311,6 +339,21 @@ export function FreeAgents() {
                 </span>
               ))}
             </div>
+            {d.axes && (
+              <div className="mt-2 grid grid-cols-3 gap-x-3 gap-y-1">
+                {AXIS_LABEL.map((ax) => (
+                  <div key={ax.key} className="flex items-center gap-1.5">
+                    <span className="w-8 shrink-0 text-[9px] text-slate-500">{ax.label}</span>
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-700/50">
+                      <div
+                        className="h-full rounded-full bg-sky-400/70"
+                        style={{ width: `${Math.round((d.axes?.[ax.key] ?? 0) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <p className="mt-1.5 text-xs leading-relaxed text-slate-300">{d.verdict}</p>
             <div className="mt-2 flex items-center gap-2">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-700/50">
@@ -402,6 +445,36 @@ export function FreeAgents() {
           </div>
         ))}
       </section>
+
+      {/* شجرة السلالات */}
+      {lineage.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold text-slate-300">شجرة السلالات — من أنجب من</h3>
+          <div className="space-y-2 rounded-xl border border-slate-500/20 bg-black/30 p-3">
+            {Object.entries(
+              lineage.reduce<Record<string, Lineage[]>>((acc, l) => {
+                if (!acc[l.parentName]) acc[l.parentName] = [];
+                acc[l.parentName].push(l);
+                return acc;
+              }, {}),
+            ).map(([parent, kids]) => (
+              <div key={parent}>
+                <p className="text-[11px] font-bold text-slate-200">🕊️ {parent}</p>
+                <ul className="mt-1 space-y-0.5 ps-4">
+                  {kids.map((k) => (
+                    <li key={k._id} className="text-[11px] text-slate-400">
+                      ↳ {k.childName}{" "}
+                      <span className="text-slate-600">
+                        (الجيل {k.generation} · {labelOf(k.post)})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* سجل البلوغ */}
       {annals.length > 0 && (

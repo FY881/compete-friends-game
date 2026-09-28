@@ -30,7 +30,7 @@ import { internal } from "./_generated/api";
 
 const AGENT_SYSTEM = "free_agents";
 const OBS_CAP = 24; // عدد الملاحظات قبل أن ينصرف الوكيل ويُنجب خليفة
-const CAP_PER_POST = 3; // أقصى عدد وكلاء في الركن الواحد
+const CAP_PER_POST = 4; // أقصى عدد وكلاء في الركن الواحد
 
 /** أركان اللعبة كلها — الوكلاء يُزرعون في أي منها عشوائياً */
 const POSTS: { post: string; label: string; emoji: string; watch: string }[] = [
@@ -216,6 +216,28 @@ function distillIntel(
   return { kind, trait, insight, strength };
 }
 
+function computeAxes(s: Signal | undefined): {
+  aggression: number;
+  curiosity: number;
+  commerce: number;
+  loyalty: number;
+  sociability: number;
+  caution: number;
+} {
+  const sys = s ? [...s.systems].join(" ") : "";
+  const hit = (re: RegExp) => (re.test(sys) ? 1 : 0);
+  const ev = s ? Math.min(1, s.events / 20) : 0;
+  const axis = (re: RegExp) => clamp01(hit(re) * 0.6 + ev * 0.4);
+  return {
+    aggression: axis(/war|duel|arena|rival|mindwar|colossus|battle|clash/i),
+    curiosity: axis(/academy|compass|oracle|saga|echo|habit|train|school/i),
+    commerce: axis(/store|shop|coin|stripe|payment|exchange|season/i),
+    loyalty: axis(/clan|alliance|twin|loyal|legacy|troph/i),
+    sociability: axis(/council|challenge|forum|chat|live|room|squad|match/i),
+    caution: axis(/court|appeal|report|moderat|fair|govern/i),
+  };
+}
+
 function buildLocalNote(
   agent: { name: string; persona: string; watch: string; observations: number },
   recent: { actorName: string; action: string; detail: string }[],
@@ -304,8 +326,9 @@ export const agentsPulse = internalMutation({
     ): Promise<void> => {
       const seed = Math.floor(Math.random() * 100_000);
       const spawned = parentName ? " الابن" : "";
+      const childName = `${agentName(seed)}${spawned}`;
       await ctx.db.insert("freeAgents", {
-        name: `${agentName(seed)}${spawned}`,
+        name: childName,
         emoji: site.emoji,
         role: pick(PERSONAS),
         post: site.post,
@@ -318,6 +341,15 @@ export const agentsPulse = internalMutation({
       });
       liveByPost.set(site.post, (liveByPost.get(site.post) ?? 0) + 1);
       planted++;
+      if (parentName) {
+        await ctx.db.insert("agentLineage", {
+          childName,
+          parentName,
+          generation,
+          post: site.post,
+          createdAt: now,
+        });
+      }
       await ctx.db.insert("aiDecisionLog", {
         system: AGENT_SYSTEM,
         actorName: parentName ? parentName : "الوكلاء الأحرار",
@@ -569,9 +601,11 @@ export const agentsPulse = internalMutation({
         .query("agentDossiers")
         .withIndex("by_subject", (q) => q.eq("subjectName", subject))
         .first();
+      const axes = computeAxes(signals.get(subject));
       if (existing) {
         await ctx.db.patch(existing._id, {
           traits,
+          axes,
           verdict,
           confidence,
           contributors: contributors.size,
@@ -582,6 +616,7 @@ export const agentsPulse = internalMutation({
         await ctx.db.insert("agentDossiers", {
           subjectName: subject,
           traits,
+          axes,
           verdict,
           confidence,
           contributors: contributors.size,
@@ -672,6 +707,12 @@ export const getFreeAgents = query({
       .sort((a, b) => b.members.length - a.members.length)
       .slice(0, 6);
 
+    const lineage = await ctx.db
+      .query("agentLineage")
+      .withIndex("by_created", (q) => q.gt("createdAt", 0))
+      .order("desc")
+      .take(40);
+
     return {
       agents,
       notes,
@@ -680,6 +721,7 @@ export const getFreeAgents = query({
       dossiers,
       annals,
       clusters,
+      lineage,
       corners: POSTS.map((p) => ({ post: p.post, label: p.label, emoji: p.emoji })),
       stats: {
         active: agents.length,
