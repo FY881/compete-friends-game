@@ -394,6 +394,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiFreeAgents.agentsJob, {}),
   },
+  {
+    key: "free_agents_bloom",
+    name: "الوكلاء الأحرار — البلوغ المتسارع",
+    description: "كل ربع ساعة يزرع بذوراً جديدة في الأركان الفارغة فقط حتى تمتلئ اللعبة بأقصى عدد من الأحرار، ثم يتوقف من نفسه عند الاكتمال — بلا أي أمر من أحد.",
+    group: "AI",
+    intervalMinutes: 15,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiFreeAgents.bloomJob, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

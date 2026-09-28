@@ -30,7 +30,7 @@ import { internal } from "./_generated/api";
 
 const AGENT_SYSTEM = "free_agents";
 const OBS_CAP = 24; // عدد الملاحظات قبل أن ينصرف الوكيل ويُنجب خليفة
-const CAP_PER_POST = 2; // أقصى عدد وكلاء في الركن الواحد
+const CAP_PER_POST = 3; // أقصى عدد وكلاء في الركن الواحد
 
 /** أركان اللعبة كلها — الوكلاء يُزرعون في أي منها عشوائياً */
 const POSTS: { post: string; label: string; emoji: string; watch: string }[] = [
@@ -332,7 +332,7 @@ export const agentsPulse = internalMutation({
     };
 
     const initialRoomy = freeNow();
-    const toPlant = Math.min(initialRoomy.length, Math.min(12, 3 + Math.floor(initialRoomy.length / 8)));
+    const toPlant = Math.min(initialRoomy.length, Math.min(18, 3 + Math.floor(initialRoomy.length / 8)));
     for (let i = 0; i < toPlant; i++) {
       const roomy = freeNow();
       if (roomy.length === 0) break;
@@ -453,11 +453,40 @@ export const agentsPulse = internalMutation({
         }
       }
 
-      await ctx.db.patch(agent._id, {
-        observations: agent.observations + 1,
-        lastPulseAt: now,
-        persona: `${pick(MOODS)} — يراقب «${siteLabel}»: ${agent.watch}.`,
-      });
+      // الهجرة: بعض الأحرار يرتحلون إلى ركن جديد — تغطية تتجدّد بلا أمر
+      let movedTo: { post: string; label: string } | null = null;
+      if (Math.random() < 0.25) {
+        const roomy = freeNow().filter((p) => p.post !== agent.post);
+        if (roomy.length > 0) {
+          const dest = pick(roomy);
+          movedTo = { post: dest.post, label: dest.label };
+          liveByPost.set(agent.post, Math.max(0, (liveByPost.get(agent.post) ?? 1) - 1));
+          liveByPost.set(dest.post, (liveByPost.get(dest.post) ?? 0) + 1);
+        }
+      }
+      if (movedTo) {
+        await ctx.db.patch(agent._id, {
+          observations: agent.observations + 1,
+          lastPulseAt: now,
+          post: movedTo.post,
+          persona: `${pick(MOODS)} — يراقب «${movedTo.label}»: ${agent.watch}.`,
+        });
+        await ctx.db.insert("aiDecisionLog", {
+          system: AGENT_SYSTEM,
+          actorName: agent.name,
+          action: "agent_migrated",
+          targetName: movedTo.label,
+          detail: `ارتحل ${agent.name} من «${siteLabel}» إلى «${movedTo.label}» ليتعلّم من ركن جديد.`,
+          severity: "low",
+          createdAt: now,
+        });
+      } else {
+        await ctx.db.patch(agent._id, {
+          observations: agent.observations + 1,
+          lastPulseAt: now,
+          persona: `${pick(MOODS)} — يراقب «${siteLabel}»: ${agent.watch}.`,
+        });
+      }
 
       // ═══ 3) التناسل: الوكيل المكتمل يُنجب خليفةً ثم ينصرف ═══
       if (agent.observations + 1 >= OBS_CAP) {
@@ -617,18 +646,47 @@ export const getFreeAgents = query({
     const retired = all.filter((a) => !a.active).length;
     const covered = new Set(agents.map((a) => a.post)).size;
 
+    // سجلّ البلوغ: الولادات والهجرات والانصراف — ازدياد الأحرار عبر الزمن
+    const annals = (
+      await ctx.db
+        .query("aiDecisionLog")
+        .withIndex("by_created", (q) => q.gt("createdAt", 0))
+        .order("desc")
+        .take(60)
+    )
+      .filter((e) => e.system === AGENT_SYSTEM)
+      .slice(0, 20);
+
+    // عناقيد العقول: من يشتركون في البصمة نفسها
+    const traitGroups = new Map<string, Set<string>>();
+    for (const d of dossiers) {
+      for (const t of d.traits) {
+        const set = traitGroups.get(t) ?? new Set<string>();
+        set.add(d.subjectName);
+        traitGroups.set(t, set);
+      }
+    }
+    const clusters = [...traitGroups.entries()]
+      .map(([trait, members]) => ({ trait, members: [...members] }))
+      .filter((c) => c.members.length >= 2)
+      .sort((a, b) => b.members.length - a.members.length)
+      .slice(0, 6);
+
     return {
       agents,
       notes,
       intel,
       bonds,
       dossiers,
+      annals,
+      clusters,
       corners: POSTS.map((p) => ({ post: p.post, label: p.label, emoji: p.emoji })),
       stats: {
         active: agents.length,
         retired,
         covered,
         totalCorners: POSTS.length,
+        capacity: POSTS.length * CAP_PER_POST,
         intel: intel.length,
         bonds: bonds.length,
         dossiers: dossiers.length,
@@ -676,11 +734,62 @@ export const greetAgent = mutation({
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// البلوغ المتسارع: نبضة خفيفة تزرع فقط حتى تمتلئ كل الأركان
+// ═══════════════════════════════════════════════════════════════════════
+
+export const bloomPulse = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const all = await ctx.db.query("freeAgents").take(400);
+    const live = new Map<string, number>();
+    for (const a of all) if (a.active) live.set(a.post, (live.get(a.post) ?? 0) + 1);
+    const roomy = POSTS.filter((p) => (live.get(p.post) ?? 0) < CAP_PER_POST);
+    if (roomy.length === 0) return { planted: 0 as number };
+    const toPlant = Math.min(roomy.length, 18);
+    let planted = 0;
+    for (let i = 0; i < toPlant; i++) {
+      const site = roomy[Math.floor(Math.random() * roomy.length)];
+      roomy.splice(roomy.indexOf(site), 1);
+      const seed = Math.floor(Math.random() * 100_000);
+      await ctx.db.insert("freeAgents", {
+        name: agentName(seed),
+        emoji: site.emoji,
+        role: pick(PERSONAS),
+        post: site.post,
+        persona: `${pick(MOODS)} — يراقب «${site.label}»: ${site.watch}.`,
+        watch: site.watch,
+        active: true,
+        observations: 0,
+        createdAt: now,
+        lastPulseAt: now,
+      });
+      await ctx.db.insert("aiDecisionLog", {
+        system: AGENT_SYSTEM,
+        actorName: "الوكلاء الأحرار",
+        action: "agent_planted",
+        targetName: site.label,
+        detail: `بذرة جديدة في «${site.label}» — البلوغ يتسارع.`,
+        severity: "low",
+        createdAt: now,
+      });
+      planted++;
+    }
+    return { planted };
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // المهمة الدورية
 // ═══════════════════════════════════════════════════════════════════════
 
 export const agentsJob = internalMutation({
   handler: async (ctx): Promise<unknown> => {
     return await ctx.runMutation(internal.aiFreeAgents.agentsPulse, {});
+  },
+});
+
+export const bloomJob = internalMutation({
+  handler: async (ctx): Promise<unknown> => {
+    return await ctx.runMutation(internal.aiFreeAgents.bloomPulse, {});
   },
 });

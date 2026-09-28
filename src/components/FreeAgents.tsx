@@ -67,22 +67,44 @@ type Dossier = {
 
 type Corner = { post: string; label: string; emoji: string };
 
+type Annal = {
+  _id: string;
+  actorName: string;
+  action: string;
+  targetName: string;
+  detail: string;
+  createdAt: number;
+};
+
+type Cluster = { trait: string; members: string[] };
+
 type Data = {
   agents: Agent[];
   notes: Note[];
   intel: Intel[];
   bonds: Bond[];
   dossiers: Dossier[];
+  annals: Annal[];
+  clusters: Cluster[];
   corners: Corner[];
   stats: {
     active: number;
     retired: number;
     covered: number;
     totalCorners: number;
+    capacity: number;
     intel: number;
     bonds: number;
     dossiers: number;
   };
+};
+
+const ANNAL_LABEL: Record<string, string> = {
+  agent_planted: "بذرة",
+  agent_born: "تناسل",
+  agent_migrated: "ارتحال",
+  agent_retired: "انصراف",
+  note_written: "بصمة",
 };
 
 const CAP_PER_POST = 2;
@@ -128,6 +150,8 @@ export function FreeAgents() {
   const intel = data?.intel ?? [];
   const bonds = data?.bonds ?? [];
   const dossiers = data?.dossiers ?? [];
+  const annals = data?.annals ?? [];
+  const clusters = data?.clusters ?? [];
   const corners = data?.corners ?? [];
   const stats = data?.stats;
 
@@ -160,7 +184,7 @@ export function FreeAgents() {
         <div className="relative flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-slate-100">🕊️ الوكلاء الأحرار</h2>
           <span className="rounded-full border border-slate-500/30 bg-black/40 px-2 py-0.5 text-[10px] text-slate-300">
-            {stats ? `${stats.active} نشط · ${stats.retired} انصرف` : "…"}
+            {stats ? `${stats.active}/${stats.capacity} حرّ · ${stats.retired} انصرف` : "…"}
           </span>
         </div>
         <p className="relative mt-1 text-xs leading-relaxed text-slate-400">
@@ -301,6 +325,24 @@ export function FreeAgents() {
         ))}
       </section>
 
+      {/* عناقيد العقول */}
+      {clusters.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold text-slate-300">عناقيد العقول — من يشاركون البصمة</h3>
+          {clusters.map((c) => (
+            <div key={c.trait} className="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="rounded-full border border-sky-500/40 px-2 py-0.5 text-[10px] text-sky-300">
+                  {c.trait}
+                </span>
+                <span className="text-[10px] text-slate-500">{c.members.length} عقل</span>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">{c.members.join(" ، ")}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* شبكة العلاقات */}
       {bonds.length > 0 && (
         <section className="space-y-2">
@@ -360,6 +402,25 @@ export function FreeAgents() {
           </div>
         ))}
       </section>
+
+      {/* سجل البلوغ */}
+      {annals.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold text-slate-300">سجل البلوغ — ازدياد الأحرار</h3>
+          <div className="rounded-xl border border-slate-500/20 bg-black/30 p-3">
+            <ul className="space-y-1.5">
+              {annals.map((a) => (
+                <li key={a._id} className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-400">
+                  <span className="shrink-0 rounded-full border border-slate-500/30 px-1.5 py-0.5 text-[9px] text-slate-400">
+                    {ANNAL_LABEL[a.action] ?? a.action}
+                  </span>
+                  <span className="min-w-0">{a.detail}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {/* دفتر الملاحظات */}
       <section className="space-y-2">
