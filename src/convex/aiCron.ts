@@ -403,6 +403,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiMindWatch.bloomPulse, {}),
   },
+  {
+    key: "free_agents_deeper",
+    name: "الوكلاء الأحرار — محرّكات العقل",
+    description: "كل ست ساعات يقرأ تسلسل الأفعال الحقيقي ويقيس انتقالات كل عقل من نظام إلى آخر، فيستخرج قواعد سلوكية مقيسة ويبني عليها نبوءات نموذجية أدقّ — بلا سؤال لأحد.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiMindDeeper.deeperPulse, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

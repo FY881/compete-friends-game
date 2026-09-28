@@ -101,4 +101,24 @@ export const agentMindTables = {
     .index("by_status", ["status", "windowEndsAt"])
     .index("by_subject", ["subjectName"])
     .index("by_created", ["createdAt"]),
+
+  // ⚙️ محرّكات العقل — نماذج سلوكية تُستخرج من تسلسل الأفعال الحقيقي:
+  //    «بعد كل مرة في X يقصد Y في N من M مرة خلال ست ساعات». لا تخمين ولا
+  //    استبيان: انتقالات مقيسة من ناقل القرارات، تصير أساساً لنبوءات أدقّ.
+  mindTriggers: defineTable({
+    subjectName: v.string(), // العقل صاحب المحرّك
+    fromSystem: v.string(), // النظام الذي يبدأ منه
+    fromLabel: v.string(),
+    toSystem: v.string(), // النظام الذي يقصده بعده عادةً
+    toLabel: v.string(),
+    hits: v.number(), // كم مرة وقع الانتقال فعلاً
+    total: v.number(), // إجمالي الانتقالات من نفس المبدأ
+    confidence: v.number(), // hits ÷ total
+    avgLagMs: v.number(), // متوسط الزمن بين الفعلين
+    updatedAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_subject", ["subjectName"])
+    .index("by_confidence", ["confidence"])
+    .index("by_pair", ["subjectName", "fromSystem", "toSystem"]),
 };

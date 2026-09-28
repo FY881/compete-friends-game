@@ -29,7 +29,7 @@ import {
  */
 
 const MAX_AGENTS = 1400;
-const BLOOM_PER_PULSE = 40; // أقصى عدد بذور في الموجة الواحدة
+const BLOOM_PER_PULSE = 60; // أقصى عدد بذور في الموجة الواحدة
 
 /** ميكرو-مواقع عشوائية داخل كل ركن — توزيع أوسع من ركنٍ واحد */
 const SPOTS = [
@@ -57,7 +57,7 @@ function spotOf(name: string): string {
 }
 
 /** أسماء الأنظمة الحقيقية في ناقل القرارات */
-const SYSTEM_LABEL: Record<string, string> = {
+export const SYSTEM_LABEL: Record<string, string> = {
   questions: "بنك الأسئلة",
   players: "سجل اللاعبين",
   moderation: "الرقابة",
@@ -229,6 +229,7 @@ export const getMindWatch = query({
         "٥ · التنبؤ: الوكيل يقول أين سيكون العقل بعد ست ساعات",
         "٦ · التحقق: تُقارن النبوءة بالواقع → إصابة أو خطأ",
         "٧ · الدقة: معرفة مقيسة تتراكم على كل وكيل",
+        "٨ · المحرّكات: قياس ما يدفع العقل لفعل التالي من تسلسل أفعاله",
       ],
       stats: {
         active: activeAll.length,

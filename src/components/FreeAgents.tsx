@@ -100,6 +100,25 @@ type Prediction = {
 
 type Seer = { name: string; post: string; hits: number; misses: number; accuracy: number };
 
+type Trigger = {
+  _id: string;
+  subjectName: string;
+  fromLabel: string;
+  toLabel: string;
+  hits: number;
+  total: number;
+  confidence: number;
+  avgLagMs: number;
+};
+
+type Intent = { subject: string; best: Trigger; rules: number };
+
+type Deeper = {
+  triggers: Trigger[];
+  intents: Intent[];
+  stats: { rules: number; subjects: number; strongest: number; avgConfidence: number };
+};
+
 type Stats = {
   active: number;
   retired: number;
@@ -214,6 +233,7 @@ function ago(ts: number): string {
 export function FreeAgents() {
   const data = useQuery(api.aiFreeAgents.getFreeAgents) as unknown as Data | undefined;
   const watch = useQuery(api.aiMindWatch.getMindWatch) as unknown as Watch | undefined;
+  const deeper = useQuery(api.aiMindDeeper.getMindDeeper) as unknown as Deeper | undefined;
   const greet = useMutation(api.aiFreeAgents.greetAgent);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -229,6 +249,8 @@ export function FreeAgents() {
   const predictions = watch?.predictions ?? [];
   const seers = watch?.seers ?? [];
   const method = watch?.method ?? [];
+  const triggers = deeper?.triggers ?? [];
+  const intents = deeper?.intents ?? [];
   const stats: Stats | undefined = watch?.stats ?? data?.stats;
 
   const labelOf = (post: string) => {
@@ -597,6 +619,50 @@ export function FreeAgents() {
               <span className="shrink-0 rounded-full border border-emerald-500/40 px-2 py-0.5 text-[9px] text-emerald-300">
                 {Math.round(s.accuracy * 100)}%
               </span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* محرّكات العقل */}
+      {triggers.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold text-slate-300">
+            محرّكات العقل — ما الذي يدفعه لفعل التالي
+          </h3>
+          <p className="text-[10px] leading-relaxed text-slate-500">
+            قواعد مقيسة من تسلسل الأفعال الحقيقي لا من سؤال: «بعد كل مرة في نظام، إلى أين يقصد؟»
+            {deeper?.stats ? ` — ${deeper.stats.rules} قاعدة عن ${deeper.stats.subjects} عقل.` : ""}
+          </p>
+          {intents.map((it) => (
+            <div
+              key={it.subject}
+              className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-[11px] font-bold text-indigo-200">
+                  ⚙️ {it.subject}
+                </p>
+                <span className="shrink-0 text-[10px] text-slate-500">{it.rules} قاعدة</span>
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-300">
+                بعد «{it.best.fromLabel}» يقصد «{it.best.toLabel}» في {it.best.hits} من{" "}
+                {it.best.total} مرة
+                <span className="text-slate-500">
+                  {" · "}خلال {Math.round(it.best.avgLagMs / 60000)} دقيقة وسطياً
+                </span>
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-700/50">
+                  <div
+                    className="h-full rounded-full bg-indigo-400/70"
+                    style={{ width: `${Math.round(it.best.confidence * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-slate-500">
+                  ثبات {Math.round(it.best.confidence * 100)}%
+                </span>
+              </div>
             </div>
           ))}
         </section>
