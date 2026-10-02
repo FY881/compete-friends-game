@@ -53,6 +53,7 @@ import { MetaMind } from "@/components/MetaMind";
 import { StripeStore } from "@/components/StripeStore";
 import { GrandStrategy } from "@/components/GrandStrategy";
 import { FreeAgents } from "@/components/FreeAgents";
+import { HealthGuard } from "@/components/HealthGuard";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -396,6 +397,7 @@ export default function Play() {
     { id: "reward", label: "المكافأة المتكيّفة", emoji: "🎁", group: "لك شخصياً", node: <AdaptiveRewardCard /> },
     { id: "live", label: "الأحداث الحيّة", emoji: "📣", group: "لك شخصياً", node: <LiveEventBanner /> },
     { id: "appeal", label: "الاعتراضات", emoji: "⚖️", group: "لك شخصياً", node: <AppealForm /> },
+    { id: "healthguard", label: "المدقّق الشامل", emoji: "🩺", group: "لك شخصياً", node: <HealthGuard /> },
   ];
   const DECK_GROUPS = ["المسابقات", "الذكاء والعقول", "لك شخصياً"];
   const activePanel = deckPanel ? SYSTEMS_DECK.find((s) => s.id === deckPanel)?.node : null;

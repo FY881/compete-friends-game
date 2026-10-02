@@ -421,6 +421,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiMindSociety.societyPulse, {}),
   },
+  {
+    key: "health_guard",
+    name: "المدقّق الشامل — حارس الصحة الدائم",
+    description: "كل ساعة يفحص كل شيء في اللعبة: مهام الخلفية، الأخطاء غير المحلولة، العناقيد، الرقع، الوكلاء الأحرار، ونبض القرارات — ويصلح ما يمكن إصلاحه تلقائياً فلا تعود المشاكل دون أن تُكتشف.",
+    group: "صيانة",
+    intervalMinutes: 60,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiHealthGuard.healthPulse, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

@@ -8,6 +8,7 @@ import { gameLiveTables } from "./schemaGameLive";
 import { tierValidator } from "./tiers";
 import { apiCenterTables } from "./schemaApiCenter";
 import { agentMindTables } from "./schemaAgents"; // agentMindTables + agentPredictions
+import { healthTables } from "./schemaHealth"; // أداة 31 — المدقّق الشامل
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -22,6 +23,7 @@ import { agentMindTables } from "./schemaAgents"; // agentMindTables + agentPred
  */
 export const premiumTables = {
   ...agentMindTables,
+  ...healthTables,
   // ═══ طبقات الإشعارات الذكية ═══
   notificationTiers: defineTable({
     userId: v.id("users"),
