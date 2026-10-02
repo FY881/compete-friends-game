@@ -430,6 +430,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiHealthGuard.healthPulse, {}),
   },
+  {
+    key: "free_agents_frontier",
+    name: "الوكلاء الأحرار — استكشاف الأُفق",
+    description: "كل ست ساعات يخرج المستكشفون الأحرار إلى 12 مجالاً كبرى من حياة اللعبة (الاقتصاد، المحتوى، الأمان، النمو...)، يقيسون حيوية كل مجال من الأحداث الحقيقية، يكتبون أحكامهم، ويرسمون روابط الجاذبية بين المجالات — بلا سؤال لأحد.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiMindFrontier.frontierPulse, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

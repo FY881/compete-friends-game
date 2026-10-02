@@ -30,8 +30,8 @@ import { internal } from "./_generated/api";
 
 export const AGENT_SYSTEM = "free_agents";
 const OBS_CAP = 24; // عدد الملاحظات قبل أن ينصرف الوكيل ويُنجب خليفة
-export const CAP_PER_POST = 60; // أقصى عدد وكلاء في الركن الواحد — سعة كبرى
-const MAX_AGENTS = 5000; // سقف قراءة الجدول في النبضة (يغطّي السعة كلها)
+export const CAP_PER_POST = 100; // أقصى عدد وكلاء في الركن الواحد — سعة الأُفق (7900 حرّاً)
+const MAX_AGENTS = 9000; // سقف قراءة الجدول في النبضة (يغطّي السعة كلها)
 const PLANT_PER_PULSE = 40; // بلوغ النبضة الكبرى في كل ساعة
 const BLOOM_PER_PULSE = 40; // بلوغ النبضة المتسارعة كل ربع ساعة
 const OBSERVERS_PER_PULSE = 18; // كم وكيلًا يرصد كل نبضة

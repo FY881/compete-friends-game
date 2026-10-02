@@ -9,6 +9,7 @@ import { tierValidator } from "./tiers";
 import { apiCenterTables } from "./schemaApiCenter";
 import { agentMindTables } from "./schemaAgents"; // agentMindTables + agentPredictions
 import { healthTables } from "./schemaHealth"; // أداة 31 — المدقّق الشامل
+import { frontierTables } from "./schemaFrontier"; // جولة التوسيع 8 — الأُفق
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -24,6 +25,7 @@ import { healthTables } from "./schemaHealth"; // أداة 31 — المدقّق
 export const premiumTables = {
   ...agentMindTables,
   ...healthTables,
+  ...frontierTables,
   // ═══ طبقات الإشعارات الذكية ═══
   notificationTiers: defineTable({
     userId: v.id("users"),

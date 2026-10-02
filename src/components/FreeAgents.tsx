@@ -260,7 +260,7 @@ const ANNAL_LABEL: Record<string, string> = {
   note_written: "بصمة",
 };
 
-const CAP_PER_POST = 10;
+const CAP_PER_POST = 100; // نفس سعة الخادم بعد توسيع الأُفق
 const LEGACY: Record<string, string> = {
   meta: "العقل الأعظم",
   grand: "الخطة الكبرى",
