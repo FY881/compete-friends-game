@@ -439,6 +439,15 @@ const JOB_DEFS: JobDef[] = [
     enabled: true,
     run: (ctx) => ctx.runMutation(internal.aiMindFrontier.frontierPulse, {}),
   },
+  {
+    key: "free_agents_assembly",
+    name: "الوكلاء الأحرار — مجالس المداولات",
+    description: "كل ست ساعات يُعقد مجلسان من الأحرار (مجلس الأُفق ومجلس الصيانة): يقرؤون البيانات الحقيقية، يضعون اقتراحات، ويصوّت كل وكيل بوزن خبرته — والقرار يُسجَّل بالأغلبية مع النصاب.",
+    group: "AI",
+    intervalMinutes: 360,
+    enabled: true,
+    run: (ctx) => ctx.runMutation(internal.aiMindAssembly.assemblyPulse, {}),
+  },
 ];
 
 const JOB_BY_KEY = new Map(JOB_DEFS.map((d) => [d.key, d]));

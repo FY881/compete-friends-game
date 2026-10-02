@@ -31,7 +31,7 @@ import { internal } from "./_generated/api";
 export const AGENT_SYSTEM = "free_agents";
 const OBS_CAP = 24; // عدد الملاحظات قبل أن ينصرف الوكيل ويُنجب خليفة
 export const CAP_PER_POST = 100; // أقصى عدد وكلاء في الركن الواحد — سعة الأُفق (7900 حرّاً)
-const MAX_AGENTS = 9000; // سقف قراءة الجدول في النبضة (يغطّي السعة كلها)
+const MAX_AGENTS = 10000; // سقف قراءة الجدول في النبضة (يغطّي السعة كلها)
 const PLANT_PER_PULSE = 40; // بلوغ النبضة الكبرى في كل ساعة
 const BLOOM_PER_PULSE = 40; // بلوغ النبضة المتسارعة كل ربع ساعة
 const OBSERVERS_PER_PULSE = 18; // كم وكيلًا يرصد كل نبضة
@@ -201,6 +201,17 @@ export const POSTS: { post: string; label: string; emoji: string; watch: string 
   { post: "progress", label: "مركز التقدّم", emoji: "📈", watch: "من يتابع تقدّمه ومن يتجاهله" },
   { post: "profilecustom", label: "التخصيص العميق", emoji: "🎨", watch: "كم يريد العقل أن يُعرف عنه" },
   { post: "tiers", label: "طبقات الإشعارات", emoji: "🔕", watch: "ما الذي يريد العقل أن يقاطعه أحد به" },
+  // ── أركان جولة 9 — التوسيع الأكبر ──
+  { post: "membership", label: "مركز العضويات", emoji: "🏅", watch: "من يلتزم بالعضوية ومن يشتري الاسم فقط" },
+  { post: "forum", label: "ملتقى العقول", emoji: "🧠", watch: "من يبني مجتمعاً ومن يبحث عن تصفيق" },
+  { post: "minigames", label: "الألعاب المصغّرة", emoji: "🎮", watch: "من يلعب ببهجة ومن بغضب" },
+  { post: "atlas", label: "أطلس كنترول", emoji: "🗺️", watch: "من يستخدم القوة لخدمة اللعبة ومن لنفسه" },
+  { post: "storefront", label: "المتجر", emoji: "🛒", watch: "من يشتري ما يحتاج ومن ما يتمنّى" },
+  { post: "smartinbox", label: "البريد الذكي", emoji: "📬", watch: "من يقرأ الرسائل ومن يهرب منها" },
+  { post: "honor", label: "محكمة الشرف", emoji: "🧑‍⚖️", watch: "من يقول الحقيقة تحت المحاسبة" },
+  { post: "leaderboard", label: "صدارة النخبة", emoji: "👑", watch: "من يتوّج بالصدارة ومن يخاف منها" },
+  { post: "replays", label: "مشاهدة الجولات", emoji: "🎥", watch: "من يدرس نفسه ومن يُعيد الوجع فقط" },
+  { post: "economy", label: "الاقتصاد الحيّ", emoji: "💰", watch: "من يعرف قيمة الشيء ومن يعرف ثمنه فقط" },
 ];
 
 export const PERSONAS = [

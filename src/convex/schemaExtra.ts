@@ -10,6 +10,7 @@ import { apiCenterTables } from "./schemaApiCenter";
 import { agentMindTables } from "./schemaAgents"; // agentMindTables + agentPredictions
 import { healthTables } from "./schemaHealth"; // أداة 31 — المدقّق الشامل
 import { frontierTables } from "./schemaFrontier"; // جولة التوسيع 8 — الأُفق
+import { assemblyTables } from "./schemaAssembly"; // جولة التوسيع 9 — مجالس الأحرار
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -26,6 +27,7 @@ export const premiumTables = {
   ...agentMindTables,
   ...healthTables,
   ...frontierTables,
+  ...assemblyTables,
   // ═══ طبقات الإشعارات الذكية ═══
   notificationTiers: defineTable({
     userId: v.id("users"),

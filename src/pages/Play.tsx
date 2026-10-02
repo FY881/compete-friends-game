@@ -55,6 +55,7 @@ import { GrandStrategy } from "@/components/GrandStrategy";
 import { FreeAgents } from "@/components/FreeAgents";
 import { HealthGuard } from "@/components/HealthGuard";
 import { MindFrontier } from "@/components/MindFrontier";
+import { MindAssembly } from "@/components/MindAssembly";
 import { PersonalChallenges } from "@/components/PersonalChallenges";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { TrophyCase } from "@/components/TrophyCase";
@@ -367,6 +368,7 @@ export default function Play() {
     { id: "grandplan", label: "الخطة الكبرى", emoji: "♟️", group: "الذكاء والعقول", node: <GrandStrategy /> },
     { id: "freeagents", label: "الوكلاء الأحرار", emoji: "🕊️", group: "الذكاء والعقول", node: <FreeAgents /> },
     { id: "mindfrontier", label: "أُفق الأحرار", emoji: "🌌", group: "الذكاء والعقول", node: <MindFrontier /> },
+    { id: "mindassembly", label: "مجالس الأحرار", emoji: "🏛️", group: "الذكاء والعقول", node: <MindAssembly /> },
     { id: "agents", label: "العقول الحيّة", emoji: "🧠", group: "الذكاء والعقول", node: <LivingAgentsTab /> },
     { id: "council", label: "مجلس العقول", emoji: "🗳️", group: "الذكاء والعقول", node: <MindsCouncil /> },
     { id: "match", label: "المطابقة الذكية", emoji: "🧩", group: "الذكاء والعقول", node: <SmartMatchCard /> },
